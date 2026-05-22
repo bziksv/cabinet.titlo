@@ -20,7 +20,7 @@
             <div class="col-12 col-lg-6">
                 <p class="fw-semibold mb-1">{{ __('Unverified accounts cleanup') }}</p>
                 <p class="text-secondary mb-2">
-                    {{ __('Cron deletes accounts without email verification older than :days days (daily 02:15, DeleteUnverifiedUsers). Disable: DELETE_UNVERIFIED_USERS=false in .env. Period: DELETE_UNVERIFIED_USERS_DAYS.', ['days' => (int) env('DELETE_UNVERIFIED_USERS_DAYS', 30)]) }}
+                    {{ __('Cron deletes accounts without email verification older than :days days (daily 02:15 only). Test on server: php artisan users:prune-unverified --dry-run. Disable: DELETE_UNVERIFIED_USERS=false.', ['days' => (int) env('DELETE_UNVERIFIED_USERS_DAYS', 30)]) }}
                 </p>
                 <p class="text-secondary mb-0">
                     <i class="bi bi-funnel me-1"></i>{{ __('Filter «Email verification» applies the same verified / unverified criterion. KPI «Verified» counts users with email_verified_at.') }}
