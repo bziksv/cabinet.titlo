@@ -6,6 +6,7 @@ use App\News;
 use App\NewsComments;
 use App\NewsLikes;
 use App\NewsNotification;
+use App\Support\NewsBadge;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Contracts\Foundation\Application;
@@ -28,7 +29,7 @@ class NewsController extends Controller
      */
     private function newsIndexRelations(): array
     {
-        $userColumns = ['id', 'name', 'last_name', 'image'];
+        $userColumns = ['id', 'name', 'last_name', 'image', 'news_comments_blocked_at'];
         $userLoader = static function ($query) use ($userColumns) {
             $query->without(['pay', 'roles'])->select($userColumns);
         };
@@ -58,11 +59,8 @@ class NewsController extends Controller
      */
     public function index()
     {
-        if (! cabinet_skip_heavy_web()) {
-            $notification = NewsNotification::firstOrNew(['user_id' => Auth::id()]);
-            $notification->last_check = Carbon::now();
-            $notification->save();
-        }
+        NewsBadge::markNewsSeen((int) Auth::id());
+        NewsBadge::markCommentsSeenForAdmin((int) Auth::id());
 
         $newsQuery = News::query()
             ->with($this->newsIndexRelations())
@@ -85,7 +83,9 @@ class NewsController extends Controller
             ]);
         }
 
-        return view('news.index', compact('news', 'admin'));
+        $canComment = Auth::user()->canCommentOnNews();
+
+        return view('news.index', compact('news', 'admin', 'canComment'));
     }
 
     /**
@@ -134,6 +134,12 @@ class NewsController extends Controller
      */
     public function storeComment(Request $request)
     {
+        /** @var User $user */
+        $user = Auth::user();
+        if (! $user->canCommentOnNews()) {
+            return response(['message' => __('You are blocked from commenting on news.')], 403);
+        }
+
         $request = $request->all();
         $request['user_id'] = Auth::id();
         $comment = new NewsComments($request);
@@ -236,15 +242,53 @@ class NewsController extends Controller
      */
     public static function calculateCountNewNews()
     {
-        $notification = NewsNotification::where('user_id', Auth::id())->first();
-        if ($notification !== null) {
-            $count = News::where('created_at', '>=', $notification->last_check)->count();
-        } else {
-            $count = News::count();
+        $userId = (int) Auth::id();
+        $payload = [
+            'count' => NewsBadge::unreadNewsCount($userId),
+        ];
+
+        if (User::isUserAdmin()) {
+            $comments = NewsBadge::unreadCommentsForAdmin($userId);
+            $payload['commentCount'] = $comments['count'];
+            $payload['commentUrl'] = $comments['url'];
         }
 
-        return response([
-            'count' => $count
-        ], 200);
+        return response($payload, 200);
+    }
+
+    public function blockCommentUser(Request $request)
+    {
+        if (! User::isUserAdmin()) {
+            return abort(403);
+        }
+
+        $target = User::findOrFail((int) $request->input('user_id'));
+        if ($target->id === Auth::id()) {
+            return response(['message' => __('You cannot block yourself.')], 422);
+        }
+
+        apply_global_team_permissions();
+        $target->loadMissing('roles');
+        if ($target->hasRole(['admin', 'Super Admin'])) {
+            return response(['message' => __('Cannot block an administrator.')], 422);
+        }
+
+        $target->news_comments_blocked_at = Carbon::now();
+        $target->save();
+
+        return response(['blocked' => true], 200);
+    }
+
+    public function unblockCommentUser(Request $request)
+    {
+        if (! User::isUserAdmin()) {
+            return abort(403);
+        }
+
+        $target = User::findOrFail((int) $request->input('user_id'));
+        $target->news_comments_blocked_at = null;
+        $target->save();
+
+        return response(['blocked' => false], 200);
     }
 }

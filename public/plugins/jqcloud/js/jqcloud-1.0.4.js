@@ -12,8 +12,6 @@
 (function ($) {
     "use strict";
     $.fn.jQCloud = function (word_array, options) {
-        console.log(word_array)
-        console.log('ANOTHER')
         // Reference to the container element
         var $this = this;
         // Namespace word ids to avoid collisions between multiple clouds
@@ -159,7 +157,12 @@
                 word_style.left = left + "px";
                 word_style.top = top + "px";
 
+                var placementAttempts = 0;
                 while (hitTest(word_span[0], already_placed_words)) {
+                    if (++placementAttempts > 2500) {
+                        word_span.remove();
+                        return;
+                    }
                     // option shape is 'rectangular' so move the word in a rectangular spiral
                     if (options.shape === "rectangular") {
                         steps_in_direction++;

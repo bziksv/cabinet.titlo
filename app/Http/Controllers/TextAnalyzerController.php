@@ -25,7 +25,12 @@ class TextAnalyzerController extends Controller
      */
     public function index()
     {
-        return view('text-analyse.index');
+        return view('text-analyse.index', [
+            'response' => session('text_analyzer.response'),
+            'request' => session('text_analyzer.request', []),
+            'url' => session('text_analyzer.url'),
+            'scrollToResults' => session('text_analyzer.scroll_to_results', false),
+        ]);
     }
 
     /**
@@ -49,7 +54,7 @@ class TextAnalyzerController extends Controller
             if (!$html) {
                 flash()->overlay($request['url'], __('connection attempt failed'))->error();
 
-                return view('text-analyse.index');
+                return view('text-analyse.index', ['request' => $request]);
             } else {
                 $html = TextAnalyzer::removeStylesAndScripts($html);
                 $response = TextAnalyzer::analyze($html, $request);
@@ -59,7 +64,13 @@ class TextAnalyzerController extends Controller
             $response = TextAnalyzer::analyze($request['textarea'], $request);
         }
 
-        return view('text-analyse.index', compact('response', 'request'));
+        session([
+            'text_analyzer.response' => $response,
+            'text_analyzer.request' => $request,
+            'text_analyzer.scroll_to_results' => true,
+        ]);
+
+        return redirect()->route('text.analyzer.view');
     }
 
     /**

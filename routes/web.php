@@ -76,7 +76,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('tariff-settings', 'TariffSettingsController');
     Route::get('tariff-setting-values/{id}/create', 'TariffSettingValuesController@create')->name('tariff-setting-values.create');
     Route::resource('tariff-setting-values', 'TariffSettingValuesController')->except([
-        'create', 'index', 'show', 'edit', 'update'
+        'create', 'index', 'show',
     ]);
 
     Route::get('/meta-tags/tags-options', 'MetaTagsController@tagsOptions');
@@ -206,6 +206,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/save-edit-news', 'NewsController@editNews')->name('save.edit.news');
     Route::post('/edit-comment', 'NewsController@editComment')->name('edit.comment');
     Route::post('/get-count-new-news', 'NewsController@calculateCountNewNews')->name('get.count.new.news');
+    Route::post('/news/block-comment-user', 'NewsController@blockCommentUser')->name('news.block-comment-user');
+    Route::post('/news/unblock-comment-user', 'NewsController@unblockCommentUser')->name('news.unblock-comment-user');
 
     Route::get('/competitor-analysis', 'SearchCompetitorsController@index')->name('competitor.analysis');
     Route::post('/competitor-analysis', 'SearchCompetitorsController@analyseSites')->name('analysis.sites');

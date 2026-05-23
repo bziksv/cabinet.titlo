@@ -155,7 +155,12 @@
         $(function () {
             var activityChartData = @json($activity['chart'] ?? ['labels' => [], 'values' => []]);
             var activityCanvas = document.getElementById('cabinet-users-activity-chart');
+            var activityChartEmpty = document.getElementById('cabinet-users-activity-chart-empty');
             if (activityCanvas && typeof Chart !== 'undefined' && activityChartData.labels && activityChartData.labels.length) {
+                if (activityChartEmpty) {
+                    activityChartEmpty.classList.add('d-none');
+                }
+                activityCanvas.classList.remove('d-none');
                 new Chart(activityCanvas.getContext('2d'), {
                     type: 'line',
                     data: {
@@ -189,6 +194,9 @@
                         },
                     },
                 });
+            } else if (activityCanvas && activityChartEmpty) {
+                activityCanvas.classList.add('d-none');
+                activityChartEmpty.classList.remove('d-none');
             }
 
             var routes = {

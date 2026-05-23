@@ -9,4 +9,5 @@
 <link rel="stylesheet" href="{{ asset('css/cabinet-select2-bs5.css') }}">
 <link rel="stylesheet" href="{{ asset('css/cabinet-tempusdominus-bs5.css') }}">
 <link rel="stylesheet" href="{{ asset('css/cabinet-modals-bs5.css') }}">
-<link rel="stylesheet" href="{{ asset('css/custom.css') }}">
+@php $customCssVer = @filemtime(public_path('css/custom.css')) ?: time(); @endphp
+<link rel="stylesheet" href="{{ asset('css/custom.css') }}?v={{ $customCssVer }}">

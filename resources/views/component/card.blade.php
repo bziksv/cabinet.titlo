@@ -18,13 +18,9 @@
 
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">{{ $title }}</h3>
+            <h3 class="card-title">{!! $titleHtml ?? e($title) !!}</h3>
             <div class="card-tools">
                 {{ $tools ?? null }}
-                <!-- This will cause the card to maximize when clicked -->
-                <button type="button" class="btn btn-tool" data-lte-toggle="card-maximize">
-                    <i class="fas fa-expand"></i>
-                </button>
             </div>
         </div>
         <!-- /.card-header -->

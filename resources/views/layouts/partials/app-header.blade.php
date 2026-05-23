@@ -7,13 +7,23 @@
                 </a>
             </li>
             <li class="nav-item d-none d-md-block">
-                <a class="nav-link @if(request()->routeIs('news')) active @endif" href="{{ route('news') }}">
-                    <i class="bi bi-newspaper me-1" aria-hidden="true"></i>
-                    {{ __('News and updates') }}
-                    @if((int) $count > 0)
-                        <span class="navbar-badge badge text-bg-warning ms-1">{{ $count }}</span>
+                <div class="nav-link d-flex flex-wrap align-items-center gap-1 py-2 @if(request()->routeIs('news')) active @endif">
+                    <a class="text-reset text-decoration-none d-inline-flex align-items-center @if(request()->routeIs('news')) fw-semibold @endif"
+                       href="{{ route('news') }}">
+                        <i class="bi bi-newspaper me-1" aria-hidden="true"></i>
+                        {{ __('News and updates') }}
+                        @if((int) $count > 0)
+                            <span class="badge text-bg-warning ms-1">{{ $count > 99 ? '99+' : $count }}</span>
+                        @endif
+                    </a>
+                    @if(($newsCommentCount ?? 0) > 0 && !empty($newsCommentUrl))
+                        <a href="{{ $newsCommentUrl }}"
+                           class="badge text-bg-info text-decoration-none"
+                           title="{{ $newsCommentTitle }}">
+                            <i class="bi bi-chat-dots-fill me-1" aria-hidden="true"></i>{{ $newsCommentCount > 99 ? '99+' : $newsCommentCount }}
+                        </a>
                     @endif
-                </a>
+                </div>
             </li>
             <li class="nav-item d-none d-md-block">
                 <a class="nav-link @if(request()->routeIs('support.*')) active @endif"

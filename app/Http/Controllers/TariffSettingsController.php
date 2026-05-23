@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Classes\Tariffs\Facades\Tariffs;
-use App\Classes\Tariffs\FreeTariff;
+use App\Support\TariffLimitRegistry;
+use App\Support\TariffTierOrder;
 use App\TariffSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,28 +19,27 @@ class TariffSettingsController extends Controller
     /** @return array<string, string> */
     protected function tariffLabels(): array
     {
-        $labels = [];
-        foreach ((new Tariffs())->getTariffs() as $tariff) {
-            $labels[$tariff->code()] = $tariff->name();
-        }
-        $labels[(new FreeTariff())->code()] = (new FreeTariff())->name();
-
-        return $labels;
+        return TariffTierOrder::labelsMap();
     }
 
     public function index(): View
     {
-        $settings = TariffSetting::with(['fields' => static function ($query) {
-            $query->orderBy('sort');
-        }])->orderBy('name')->get();
+        $settings = TariffSetting::with('fields')->orderBy('name')->get();
+
+        $settings->each(static function (TariffSetting $setting) {
+            $setting->setRelation('fields', TariffTierOrder::sortFields($setting->fields));
+        });
 
         $valuesCount = $settings->sum(static function (TariffSetting $setting) {
             return $setting->fields->count();
         });
 
+        $limitCatalog = TariffLimitRegistry::compareWithSettings($settings);
+
         return view('tariff-settings.index', [
             'settings' => $settings,
             'tariffLabels' => $this->tariffLabels(),
+            'limitCatalog' => $limitCatalog,
             'stats' => [
                 'settings' => $settings->count(),
                 'values' => $valuesCount,
@@ -55,7 +54,14 @@ class TariffSettingsController extends Controller
      */
     public function create()
     {
-        return view('tariff-settings.create');
+        $existingCodes = TariffSetting::orderBy('code')->get(['code', 'name']);
+        $suggestedCode = request('code');
+        $suggestedEntry = null;
+        if ($suggestedCode && isset(TariffLimitRegistry::byCode()[$suggestedCode])) {
+            $suggestedEntry = TariffLimitRegistry::byCode()[$suggestedCode];
+        }
+
+        return view('tariff-settings.create', compact('existingCodes', 'suggestedCode', 'suggestedEntry'));
     }
 
     /**

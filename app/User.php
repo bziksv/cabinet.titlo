@@ -47,15 +47,11 @@ class User extends Authenticatable implements MustVerifyEmail
         'password', 'remember_token',
     ];
 
-    /**
-     * The attributes that should be cast to native types.
-     *
-     * @var array
-     */
     protected $casts = [
         'email_verified_at' => 'datetime',
         'last_online_at' => 'datetime',
         'telegram_prompt_snoozed_until' => 'datetime',
+        'news_comments_blocked_at' => 'datetime',
         'metrics' => 'json',
     ];
 
@@ -276,6 +272,20 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * @return bool
      */
+    public function canCommentOnNews(): bool
+    {
+        if (self::isUserAdmin()) {
+            return true;
+        }
+
+        return $this->news_comments_blocked_at === null;
+    }
+
+    public function isNewsCommentsBlocked(): bool
+    {
+        return $this->news_comments_blocked_at !== null;
+    }
+
     public static function isUserAdmin(): bool
     {
         if (!Auth::check()) {

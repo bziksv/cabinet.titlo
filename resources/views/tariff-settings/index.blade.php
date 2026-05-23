@@ -43,6 +43,18 @@
             </div>
         </div>
 
+        <div class="alert alert-light border small mb-3">
+            <p class="mb-2">
+                <i class="bi bi-info-circle me-1 text-primary"></i>
+                {{ __('Tariff rows are shown in plan order: Free → Optimal → Ultimate → Maximum. Column «Sort» is legacy; display order no longer depends on it.') }}
+            </p>
+            <p class="mb-0 text-secondary">
+                {{ __('Yellow row: limit is lower than on the previous (cheaper) plan — check values in DB (e.g. Maximum should usually be ≥ Ultimate).') }}
+            </p>
+        </div>
+
+        @include('tariff-settings.partials.limit-catalog')
+
         <div class="card shadow-sm mb-3">
             <div class="card-body py-2">
                 <div class="input-group input-group-sm" style="max-width: 20rem;">
@@ -59,7 +71,7 @@
         @forelse($settings as $setting)
             <div class="card shadow-sm mb-3 cabinet-ts-setting-card"
                  id="{{ $setting->code }}"
-                 data-ts-search="{{ strtolower($setting->name . ' ' . $setting->code) }}">
+                 data-ts-search="{{ e(strtolower($setting->name . ' ' . $setting->code)) }}">
                 <div class="card-header d-flex flex-wrap align-items-start justify-content-between gap-2">
                     <div class="min-w-0">
                         <h3 class="h6 mb-1">
@@ -69,7 +81,7 @@
                         <div class="cabinet-ts-code d-inline-flex align-items-center gap-1 small"
                              role="button"
                              tabindex="0"
-                             data-copy-code="{{ $setting->code }}"
+                             data-copy-code="{{ e($setting->code) }}"
                              title="{{ __('Copy code') }}">
                             <code>{{ $setting->code }}</code>
                             <i class="bi bi-clipboard text-secondary"></i>
@@ -88,8 +100,8 @@
                         </a>
                         <form method="POST"
                               action="{{ route('tariff-settings.destroy', $setting->id) }}"
-                              class="d-inline"
-                              onsubmit="return confirm(@json(__('Delete this limit property and all tariff values?')))">
+                              class="d-inline cabinet-ts-confirm-form"
+                              data-confirm="{{ e(__('Delete this limit property and all tariff values?')) }}">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="btn btn-outline-danger" title="{{ __('Delete') }}">
@@ -126,27 +138,42 @@
                             </tr>
                             </thead>
                             <tbody>
+                            @php
+                                $tierWarnings = \App\Support\TariffTierOrder::invertedLimitWarnings($setting->fields);
+                            @endphp
                             @forelse($setting->fields as $field)
-                                <tr>
+                                <tr class="{{ isset($tierWarnings[$field->id]) ? 'table-warning' : '' }}">
                                     <td>
                                         <span class="fw-semibold">{{ $tariffLabels[$field->tariff] ?? $field->tariff }}</span>
                                         @if(isset($tariffLabels[$field->tariff]))
                                             <code class="small text-secondary ms-1">{{ $field->tariff }}</code>
                                         @endif
+                                        @if(isset($tierWarnings[$field->id]))
+                                            <div class="small text-warning-emphasis mt-1">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>{{ $tierWarnings[$field->id] }}
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="text-end font-monospace">{{ number_format($field->value, 0, ',', ' ') }}</td>
                                     <td class="text-center text-secondary">{{ $field->sort }}</td>
                                     <td class="text-end">
-                                        <form method="POST"
-                                              action="{{ route('tariff-setting-values.destroy', $field->id) }}"
-                                              class="d-inline"
-                                              onsubmit="return confirm(@json(__('Delete this value?')))">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="{{ route('tariff-setting-values.edit', $field->id) }}"
+                                               class="btn btn-sm btn-outline-secondary"
+                                               title="{{ __('Edit') }}">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <form method="POST"
+                                                  action="{{ route('tariff-setting-values.destroy', $field->id) }}"
+                                                  class="d-inline cabinet-ts-confirm-form"
+                                                  data-confirm="{{ e(__('Delete this value?')) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="{{ __('Delete') }}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty
@@ -218,6 +245,15 @@
                     target.scrollIntoView({behavior: 'smooth', block: 'start'});
                 }
             }
+
+            document.querySelectorAll('form.cabinet-ts-confirm-form[data-confirm]').forEach(function (form) {
+                form.addEventListener('submit', function (e) {
+                    var msg = form.getAttribute('data-confirm');
+                    if (!msg || !window.confirm(msg)) {
+                        e.preventDefault();
+                    }
+                });
+            });
         })();
     </script>
 @endsection

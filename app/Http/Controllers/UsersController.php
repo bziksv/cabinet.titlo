@@ -60,14 +60,11 @@ class UsersController extends Controller
         }
 
         $tariffSelect = $this->tariffSelectData();
-        $skipHeavy = filter_var(env('SKIP_HEAVY_WEB_MIDDLEWARE', false), FILTER_VALIDATE_BOOLEAN);
 
         return view('users.index', [
             'tariffSelect' => $tariffSelect,
             'roles' => Role::orderBy('name')->pluck('name', 'name'),
-            'activity' => $skipHeavy
-                ? UsersActivityDashboard::emptySnapshot()
-                : UsersActivityDashboard::snapshot(),
+            'activity' => UsersActivityDashboard::snapshotCached(),
             'stats' => $this->usersIndexStats(),
         ]);
     }

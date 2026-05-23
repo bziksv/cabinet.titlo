@@ -6,7 +6,7 @@
     </div>
     <div class="col-md-6">
         <label class="form-label" for="code">{{ __('Code') }} <span class="text-danger">*</span></label>
-        {!! Form::text('code', null, [
+        {!! Form::text('code', old('code', $suggestedCode ?? null), [
             'class' => 'form-control font-monospace',
             'id' => 'code',
             'required' => true,

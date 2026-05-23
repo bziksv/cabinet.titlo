@@ -5,6 +5,7 @@ namespace App\Support;
 use App\User;
 use App\VisitStatistic;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,22 +22,41 @@ class UsersActivityDashboard
     }
 
     /**
-     * Заглушка при SKIP_HEAVY_WEB_MIDDLEWARE (страница /users без тяжёлых запросов к visit_statistics).
-     *
-     * @return array{active: array<string, int>, chart: array{labels: array, values: array}}
+     * Кэш сводки для /users (не отключается SKIP_HEAVY_WEB_MIDDLEWARE).
      */
-    public static function emptySnapshot(): array
+    public static function snapshotCached(?int $ttlMinutes = null): array
     {
-        return [
-            'active' => [
-                'today' => 0,
-                'days_3' => 0,
-                'days_7' => 0,
-                'days_14' => 0,
-                'days_30' => 0,
-            ],
-            'chart' => ['labels' => [], 'values' => []],
-        ];
+        $ttl = $ttlMinutes ?? (int) env('USERS_ACTIVITY_CACHE_MINUTES', 10);
+        $ttl = max(1, min($ttl, 60));
+
+        return Cache::remember(
+            'cabinet.users.activity_dashboard',
+            now()->addMinutes($ttl),
+            static function () {
+                return self::snapshot();
+            }
+        );
+    }
+
+    /**
+     * Подписи оси X без запросов к БД (если данных нет).
+     *
+     * @return array{labels: array<int, string>, values: array<int, int>}
+     */
+    public static function emptyChartSeries(int $days = 30): array
+    {
+        $days = max($days, 7);
+        $from = Carbon::today()->subDays($days - 1);
+        $labels = [];
+        $values = [];
+
+        for ($i = 0; $i < $days; $i++) {
+            $day = $from->copy()->addDays($i);
+            $labels[] = $day->format('d.m');
+            $values[] = 0;
+        }
+
+        return ['labels' => $labels, 'values' => $values];
     }
 
     /**

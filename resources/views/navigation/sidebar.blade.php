@@ -19,14 +19,18 @@
         @if(isset($modules))
             @foreach($modules as $key => $module)
                 @if(!array_key_exists('configurationInfo', $module))
-                    <li class="nav-item menu-item" data-id="{{ $module['id'] }}">
-                        <a class="nav-link search-link" href="{{ $module['link'] }}">
+                    @php $itemActive = \App\Support\CabinetSidebarActive::isLinkActive($module['link'] ?? null); @endphp
+                    <li class="nav-item menu-item {{ $itemActive ? 'cabinet-sidebar-item--active' : '' }}" data-id="{{ $module['id'] }}">
+                        <a class="nav-link search-link {{ $itemActive ? 'active' : '' }}"
+                           href="{{ $module['link'] }}"
+                           @if($itemActive) aria-current="page" @endif>
                             <span class="nav-icon cabinet-sidebar-menu__icon">{!! $module['icon'] !!}</span>
                             <p class="module-name mb-0">{{ $module['title'] }}</p>
                         </a>
                     </li>
                 @elseif(count($module) > 1)
-                    <li class="nav-item folder menu-item @if($module['configurationInfo']['show'] == 'true') menu-open @endif"
+                    @php $folderOpen = \App\Support\CabinetSidebarActive::folderShouldOpen($module); @endphp
+                    <li class="nav-item folder menu-item {{ $folderOpen ? 'menu-open' : '' }}"
                         data-action="{{ $module['configurationInfo']['show'] }}">
                         <a href="#" class="nav-link sidebar-folder-toggle">
                             <i class="nav-icon bi bi-folder-fill"></i>
@@ -36,13 +40,16 @@
                             </p>
                         </a>
                         <ul class="nav nav-treeview"
-                            @if($module['configurationInfo']['show'] == 'false') style="display: none;" @endif>
+                            @if(!$folderOpen) style="display: none;" @endif>
                             @foreach($module as $k => $elem)
                                 @if($k === 'configurationInfo')
                                     @continue
                                 @endif
-                                <li class="nav-item" data-id="{{ $elem['id'] }}">
-                                    <a class="nav-link search-link" href="{{ $elem['link'] }}">
+                                @php $childActive = \App\Support\CabinetSidebarActive::isLinkActive($elem['link'] ?? null); @endphp
+                                <li class="nav-item {{ $childActive ? 'cabinet-sidebar-item--active' : '' }}" data-id="{{ $elem['id'] }}">
+                                    <a class="nav-link search-link {{ $childActive ? 'active' : '' }}"
+                                       href="{{ $elem['link'] }}"
+                                       @if($childActive) aria-current="page" @endif>
                                         <span class="nav-icon cabinet-sidebar-menu__icon">{!! $elem['icon'] !!}</span>
                                         <p class="module-name mb-0">{{ $elem['title'] }}</p>
                                     </a>
@@ -52,8 +59,11 @@
                     </li>
                 @endif
             @endforeach
-            <li class="nav-item menu-item">
-                <a class="nav-link search-link" href="{{ route('partners') }}">
+            @php $partnersActive = \App\Support\CabinetSidebarActive::isLinkActive(route('partners')); @endphp
+            <li class="nav-item menu-item {{ $partnersActive ? 'cabinet-sidebar-item--active' : '' }}">
+                <a class="nav-link search-link {{ $partnersActive ? 'active' : '' }}"
+                   href="{{ route('partners') }}"
+                   @if($partnersActive) aria-current="page" @endif>
                     <i class="nav-icon bi bi-handshake"></i>
                     <p class="module-name mb-0">{{ __('Partners') }}</p>
                 </a>

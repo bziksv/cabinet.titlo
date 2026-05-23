@@ -39,6 +39,9 @@
             </p>
             <div class="cabinet-users-activity-chart-wrap" style="height: 220px;">
                 <canvas id="cabinet-users-activity-chart" aria-label="{{ __('Active users chart') }}"></canvas>
+                <p id="cabinet-users-activity-chart-empty" class="text-secondary small mb-0 d-none text-center py-5">
+                    {{ __('Chart data is not available. Reload the page or clear cache: php artisan cache:clear') }}
+                </p>
             </div>
         </div>
     </div>

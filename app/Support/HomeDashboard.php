@@ -4,7 +4,7 @@ namespace App\Support;
 
 use App\MenuItemsPosition;
 use App\News;
-use App\NewsNotification;
+use App\Support\NewsBadge;
 use App\SupportTicket;
 use App\User;
 use Illuminate\Support\Facades\Auth;
@@ -145,11 +145,6 @@ class HomeDashboard
             return 0;
         }
 
-        $notification = NewsNotification::where('user_id', Auth::id())->first();
-        if ($notification !== null) {
-            return (int) News::where('created_at', '>=', $notification->last_check)->count();
-        }
-
-        return (int) News::count();
+        return NewsBadge::unreadNewsCount((int) Auth::id());
     }
 }

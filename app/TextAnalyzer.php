@@ -3,12 +3,15 @@
 namespace App;
 
 use App\Classes\SimpleHtmlDom\HtmlDocument;
+use App\Support\TextAnalyzerStopWords;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-use JavaScript;
 
 class TextAnalyzer extends Model
 {
+    /** Точек на графике Ципфа (топ слов по частоте). */
+    public const ZIPF_GRAPH_TOP_WORDS = 20;
+
     protected $guarded = [];
 
     protected $table = 'text_analyser_count_checks';
@@ -172,19 +175,19 @@ class TextAnalyzer extends Model
             'countWords' => count(explode(' ', $totalWords)),
         ];
 
-        $textWithoutLinks = TextAnalyzer::prepareCloud($total);
-        $linksText = TextAnalyzer::prepareCloud($link);
-        $textWithLinks = TextAnalyzer::prepareCloud(trim($total . ' ' . $link));
+        $excludePhraseStopWords = !empty($request['conjunctionsPrepositionsPronouns']);
 
         $response['totalWords'] = TextAnalyzer::analyzeWords($total, $link);
-        $response['phrases'] = TextAnalyzer::searchPhrases(trim($total . ' ' . $link));
-
-        JavaScript::put([
-            'textWithoutLinks' => $textWithoutLinks,
-            'textWithLinks' => $textWithLinks,
-            'linksText' => $linksText,
-            'graph' => TextAnalyzer::prepareDataGraph($response['totalWords']),
-        ]);
+        if ($excludePhraseStopWords) {
+            $response['totalWords'] = TextAnalyzer::filterStopWordsFromStats($response['totalWords']);
+        }
+        $response['phrases'] = TextAnalyzer::searchPhrases(trim($total . ' ' . $link), $excludePhraseStopWords);
+        $response['clouds'] = [
+            'text' => TextAnalyzer::prepareCloudFromAnalyzedWords($response['totalWords'], 'inText', 80),
+            'links' => TextAnalyzer::prepareCloudFromAnalyzedWords($response['totalWords'], 'inLink', 80),
+            'both' => TextAnalyzer::prepareCloudFromAnalyzedWords($response['totalWords'], 'total', 80),
+        ];
+        $response['graph'] = TextAnalyzer::prepareDataGraph($response['totalWords']);
 
         TariffSetting::saveStatistics(TextAnalyzer::class, Auth::id());
 
@@ -391,41 +394,142 @@ class TextAnalyzer extends Model
         return str_replace($search, $replace, $unicodeString);
     }
 
-    public static function prepareCloud($string, int $separator = 2): array
+    public static function prepareCloud($string, int $minLength = 2, bool $excludeStopWords = false): array
     {
-        $words = [];
-        $was = [];
-        $array = explode(" ", $string);
-        $countWords = count($array);
-        foreach ($array as $item) {
-            if (mb_strlen($item) > $separator) {
-                $item = addslashes($item);
-                preg_match_all("/.*?\s($item)\s.*?/",
-                    $string,
-                    $matches,
-                    PREG_SET_ORDER);
-                if (!in_array($item, $was) && $item != "") {
-                    $weight = count($matches);
-                    $words[] = [
-                        'text' => $item,
-                        'weight' => $weight,
-                        'html' => [
-                            'title' => (1 / $countWords) * $weight
-                        ],
-                    ];
-                    $was[] = $item;
-                }
-            }
-            // максимальное кол-во слов в облаке - 200
-            if (count($words) == 200) {
-                break;
-            }
+        return self::cloudListFromCounts(self::cloudWordCounts($string, $minLength, $excludeStopWords));
+    }
+
+    /**
+     * Облако из той же статистики, что таблица «Общий анализ слов» (поле inText / inLink / total).
+     *
+     * @param array<int, array<string, mixed>> $analyzedWords
+     * @return array<int, array{text: string, weight: int}>
+     */
+    public static function prepareCloudFromAnalyzedWords(array $analyzedWords, string $zone, int $limit = 80): array
+    {
+        $allowed = ['inText', 'inLink', 'total'];
+        if (!in_array($zone, $allowed, true)) {
+            $zone = 'total';
         }
 
-        $words['count'] = 199;
-        $collection = collect($words);
+        $counts = [];
+        foreach ($analyzedWords as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $text = trim((string) ($row['text'] ?? ''));
+            if ($text === '' || mb_strlen($text) < 2 || $text === 'т') {
+                continue;
+            }
+            $weight = (int) ($row[$zone] ?? 0);
+            if ($weight <= 0) {
+                continue;
+            }
+            $counts[$text] = $weight;
+        }
 
-        return $collection->sortByDesc('weight')->toArray();
+        $list = self::cloudListFromCounts($counts, $limit);
+        unset($list['count']);
+
+        return array_values(array_filter($list, 'is_array'));
+    }
+
+    /** Список слов для UI (без ключа count — только массив). */
+    public static function prepareCloudForUi(string $string, int $minLength = 2, bool $excludeStopWords = false): array
+    {
+        $list = self::prepareCloud($string, $minLength, $excludeStopWords);
+        unset($list['count']);
+
+        return array_values(array_filter($list, 'is_array'));
+    }
+
+    /** Облако для зоны «текст + ссылки»: сумма частот по обеим зонам. */
+    public static function prepareCloudCombined(string $text, string $link, int $minLength = 2, bool $excludeStopWords = false): array
+    {
+        $textCounts = self::cloudWordCounts($text, $minLength, $excludeStopWords);
+        $linkCounts = self::cloudWordCounts($link, $minLength, $excludeStopWords);
+        if ($textCounts === [] && $linkCounts === []) {
+            return [];
+        }
+        $merged = $textCounts;
+        foreach ($linkCounts as $word => $count) {
+            $merged[$word] = ($merged[$word] ?? 0) + $count;
+        }
+
+        return self::cloudListFromCounts($merged);
+    }
+
+    public static function prepareCloudCombinedForUi(string $text, string $link, int $minLength = 2, bool $excludeStopWords = false): array
+    {
+        $list = self::prepareCloudCombined($text, $link, $minLength, $excludeStopWords);
+        unset($list['count']);
+
+        return array_values(array_filter($list, 'is_array'));
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private static function cloudWordCounts(string $string, int $minLength, bool $excludeStopWords = false): array
+    {
+        $string = trim($string);
+        if ($string === '') {
+            return [];
+        }
+        $counts = [];
+        foreach (preg_split('/\s+/u', $string, -1, PREG_SPLIT_NO_EMPTY) as $word) {
+            if ($word === '' || mb_strlen($word) < $minLength || $word === 'т') {
+                continue;
+            }
+            if ($excludeStopWords && TextAnalyzerStopWords::isPhraseStopWord($word)) {
+                continue;
+            }
+            $counts[$word] = ($counts[$word] ?? 0) + 1;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Убрать служебные слова из таблицы/графика (тот же список, что для фраз).
+     *
+     * @param array<int, array<string, mixed>> $words
+     * @return array<int, array<string, mixed>>
+     */
+    public static function filterStopWordsFromStats(array $words): array
+    {
+        return array_values(array_filter($words, static function ($row) {
+            $text = mb_strtolower(trim((string) ($row['text'] ?? '')));
+            if ($text === '' || $text === 'т') {
+                return false;
+            }
+
+            return !TextAnalyzerStopWords::isPhraseStopWord($text);
+        }));
+    }
+
+    /**
+     * @param array<string, int> $counts
+     * @return array<int, array{text: string, weight: int}>
+     */
+    private static function cloudListFromCounts(array $counts, int $limit = 150): array
+    {
+        if ($counts === []) {
+            return [];
+        }
+        arsort($counts);
+        $words = [];
+        foreach (array_slice($counts, 0, $limit, true) as $text => $weight) {
+            $words[] = [
+                'text' => $text,
+                'weight' => $weight,
+            ];
+        }
+
+        // Совместимость с relevance-analysis (arrayToObj ожидает ключ count).
+        $words['count'] = count($words);
+
+        return $words;
     }
 
     public static function analyzeWords($textWords, $linkWords): array
@@ -443,20 +547,29 @@ class TextAnalyzer extends Model
         return TextAnalyzer::calculateTFIDF($result, $totalWords, 'inText');
     }
 
-    public static function searchPhrases($string)
+    public static function searchPhrases($string, bool $excludeStopWords = true)
     {
-        $phrases = [];
-        $array = explode(' ', $string);
+        $array = preg_split('/\s+/u', trim($string), -1, PREG_SPLIT_NO_EMPTY);
         $generalCount = count($array);
-
-        for ($i = 1; $i < $generalCount; $i++) {
-            $phrases[] = [
-                'phrase' => $array[$i - 1] . ' ' . $array[$i]
-            ];
+        if ($generalCount < 2) {
+            return [];
         }
 
-        $phraseCounts = array_count_values(array_column($phrases, 'phrase'));
+        $phrases = [];
+        for ($i = 1; $i < $generalCount; $i++) {
+            $left = $array[$i - 1];
+            $right = $array[$i];
+            if (!self::isMeaningfulPhraseToken($left, $excludeStopWords) || !self::isMeaningfulPhraseToken($right, $excludeStopWords)) {
+                continue;
+            }
+            $phrases[] = $left . ' ' . $right;
+        }
 
+        if ($phrases === []) {
+            return [];
+        }
+
+        $phraseCounts = array_count_values($phrases);
         $result = [];
         foreach ($phraseCounts as $phrase => $count) {
             $result[] = [
@@ -466,11 +579,35 @@ class TextAnalyzer extends Model
             ];
         }
 
-        usort($result, function ($a, $b) {
-            return $b['count'] - $a['count'];
+        usort($result, static function ($a, $b) {
+            return $b['count'] <=> $a['count'] ?: strcmp($a['phrase'], $b['phrase']);
         });
 
-        return array_splice($result, 0, 26);
+        return array_slice($result, 0, 150);
+    }
+
+    /**
+     * Значимое слово для биграммы: не служебная часть речи и не короче 2 букв.
+     */
+    private static function isMeaningfulPhraseToken(string $word, bool $excludeStopWords): bool
+    {
+        $word = mb_strtolower(trim($word));
+        if ($word === '') {
+            return false;
+        }
+        // Частица «т» не участвует в биграммах
+        if ($word === 'т') {
+            return false;
+        }
+        if ($excludeStopWords) {
+            if (mb_strlen($word) < 2) {
+                return false;
+            }
+
+            return !TextAnalyzerStopWords::isPhraseStopWord($word);
+        }
+
+        return mb_strlen($word) >= 1;
     }
 
     public static function getHiddenText($html, $regex)
@@ -511,11 +648,12 @@ class TextAnalyzer extends Model
         $i = 0;
         foreach ($array as $item) {
             $result[] = [
-                'x' => $i + 5,
+                'x' => $i + 1,
                 'y' => $item['total'],
                 'label' => $item['text'],
+                'rank' => $i + 1,
             ];
-            if ($i == 20) {
+            if ($i >= self::ZIPF_GRAPH_TOP_WORDS - 1) {
                 break;
             }
             $i++;
@@ -673,20 +811,86 @@ class TextAnalyzer extends Model
 
     public static function calculateTFIDF($array, $textAr, $type): array
     {
-        for ($i = 0; $i < count($array); $i++) {
-            if (isset($array[$i]['wordForms'][$type])) {
-                for ($j = 0; $j < count($array[$i]['wordForms'][$type]); $j++) {
-                    $word = array_key_first($array[$i]['wordForms'][$type][$j]);
-                    $count = array_shift($array[$i]['wordForms'][$type][$j]);
-                    $array[$i]['wordForms'][$type][$j] = [
-                        $word => $count
-                    ];
-                    $array[$i]['wordForms'][$type][$j]['tf'] = round($count / count($textAr), 4);
-                    $array[$i]['wordForms'][$type][$j]['idf'] = round(log10(count($textAr) / $count), 4);
-                }
+        $corpusSize = max(1, count($textAr));
+
+        foreach ($array as &$row) {
+            if (!isset($row['wordForms'][$type]) || !is_array($row['wordForms'][$type])) {
+                continue;
             }
+            foreach ($row['wordForms'][$type] as &$formEntry) {
+                $parsed = self::parseWordFormEntry($formEntry);
+                if ($parsed['lemma'] === '' || $parsed['count'] === null || (int) $parsed['count'] < 1) {
+                    continue;
+                }
+                $count = (int) $parsed['count'];
+                $formEntry = [
+                    'lemma' => $parsed['lemma'],
+                    'count' => $count,
+                    'tf' => round($count / $corpusSize, 4),
+                    'idf' => round(log10($corpusSize / $count), 4),
+                ];
+            }
+            unset($formEntry);
         }
+        unset($row);
 
         return $array;
+    }
+
+    /**
+     * Нормализация одной словоформы для UI (поддержка старого и нового формата).
+     *
+     * @param mixed $entry
+     * @return array{lemma: string, count: int|null, tf: float|null, idf: float|null}
+     */
+    public static function parseWordFormEntry($entry): array
+    {
+        $empty = ['lemma' => '', 'count' => null, 'tf' => null, 'idf' => null];
+        if (!is_array($entry)) {
+            return $empty;
+        }
+
+        if (isset($entry['lemma']) || isset($entry['count'])) {
+            return [
+                'lemma' => trim((string) ($entry['lemma'] ?? '')),
+                'count' => isset($entry['count']) ? (int) $entry['count'] : null,
+                'tf' => isset($entry['tf']) ? (float) $entry['tf'] : null,
+                'idf' => isset($entry['idf']) ? (float) $entry['idf'] : null,
+            ];
+        }
+
+        $tf = isset($entry['tf']) ? (float) $entry['tf'] : null;
+        $idf = isset($entry['idf']) ? (float) $entry['idf'] : null;
+
+        foreach ($entry as $key => $value) {
+            if ($key === 'tf' || $key === 'idf') {
+                continue;
+            }
+            if (is_array($value)) {
+                foreach ($value as $innerKey => $innerVal) {
+                    if (!is_array($innerVal) && (string) $innerKey !== '') {
+                        return [
+                            'lemma' => (string) $innerKey,
+                            'count' => (int) $innerVal,
+                            'tf' => $tf,
+                            'idf' => $idf,
+                        ];
+                    }
+                }
+                continue;
+            }
+            if ((string) $key === '') {
+                continue;
+            }
+
+            return [
+                'lemma' => (string) $key,
+                'count' => is_numeric($value) ? (int) $value : null,
+                'tf' => $tf,
+                'idf' => $idf,
+            ];
+        }
+
+        return $empty;
     }
 }

@@ -1,7 +1,21 @@
+@php
+    $isEdit = isset($settingValue) && $settingValue->exists;
+@endphp
 <div class="row g-3">
     <div class="col-12">
         <label class="form-label" for="tariff">{{ __('Tariff') }} <span class="text-danger">*</span></label>
-        {!! Form::select('tariff', $select, null, ['class' => 'form-select', 'id' => 'tariff', 'required' => true]) !!}
+        @if($isEdit)
+            <input type="text"
+                   class="form-control"
+                   id="tariff"
+                   value="{{ $select[$settingValue->tariff] ?? $settingValue->tariff }} ({{ $settingValue->tariff }})"
+                   readonly
+                   disabled>
+            {!! Form::hidden('tariff', $settingValue->tariff) !!}
+            <div class="form-text">{{ __('Tariff plan cannot be changed when editing; delete and add again if needed.') }}</div>
+        @else
+            {!! Form::select('tariff', $select, null, ['class' => 'form-select', 'id' => 'tariff', 'required' => true]) !!}
+        @endif
         @error('tariff') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
     </div>
     <div class="col-md-4">

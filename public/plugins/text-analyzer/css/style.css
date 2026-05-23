@@ -1,3 +1,5 @@
-html {
-    min-height: 4200px !important;
+/* jqcloud — доп. стили (основная вёрстка: cabinet-text-analyzer.css) */
+.jqcloud {
+    font-family: var(--bs-font-sans-serif, inherit);
+    line-height: 1.2;
 }

@@ -1,0 +1,377 @@
+/* Анализатор текста — AdminLTE 4 / BS5 */
+
+.cabinet-text-analyzer-page .cabinet-ta-page-version {
+    font-size: 0.7rem;
+    font-weight: 600;
+    vertical-align: middle;
+    letter-spacing: 0.02em;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-intro {
+    max-width: 42rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-mode .nav-link {
+    font-weight: 500;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-textarea {
+    min-height: 12rem;
+    resize: vertical;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-options .form-check-label {
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-options .form-text {
+    margin-top: 0.15rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-kpi > [class*="col-"] {
+    min-width: 0;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-kpi .info-box {
+    min-height: 5.25rem;
+    height: 100%;
+    margin-bottom: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-kpi .info-box-icon {
+    width: 56px;
+    min-width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-kpi .info-box-content {
+    min-width: 0;
+    overflow: hidden;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    line-height: 1.35;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-kpi .info-box-text {
+    font-size: 0.75rem;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: unset;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-kpi .info-box-number {
+    font-size: 1.15rem;
+    line-height: 1.2;
+    margin-top: 0.15rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-cloud {
+    height: 350px;
+    min-height: 350px;
+    max-height: 350px;
+    width: 100%;
+    position: relative;
+    background: #fff;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+    overflow: hidden;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-chart-wrap {
+    height: 400px;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    z-index: 0;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-chart-wrap canvas {
+    display: block;
+    width: 100% !important;
+    max-width: 100%;
+    max-height: 100% !important;
+    height: auto !important;
+}
+
+.cabinet-text-analyzer-page div.jqcloud {
+    font-family: var(--bs-font-sans-serif, "Source Sans 3", sans-serif);
+}
+
+.cabinet-text-analyzer-page div.jqcloud span {
+    cursor: help;
+    white-space: nowrap;
+    pointer-events: auto;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-cloud-panel {
+    background: #fff;
+    padding: 0.5rem 0;
+}
+
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_processing {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+.cabinet-text-analyzer-page .dataTables_wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-dt-top,
+.cabinet-text-analyzer-page .cabinet-ta-dt-bottom {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.cabinet-text-analyzer-page #totalTable_wrapper .dataTables_length label,
+.cabinet-text-analyzer-page #totalTable_wrapper .dataTables_filter label,
+.cabinet-text-analyzer-page #phrasesTable_wrapper .dataTables_length label,
+.cabinet-text-analyzer-page #phrasesTable_wrapper .dataTables_filter label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    margin-bottom: 0;
+    font-weight: normal;
+    font-size: 0.875rem;
+}
+
+.cabinet-text-analyzer-page #totalTable_wrapper .dataTables_filter input,
+.cabinet-text-analyzer-page #phrasesTable_wrapper .dataTables_filter input {
+    min-width: 10rem;
+}
+
+.cabinet-text-analyzer-page #totalTable_wrapper .dataTables_info,
+.cabinet-text-analyzer-page #phrasesTable_wrapper .dataTables_info {
+    padding-top: 0.65rem;
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+}
+
+.cabinet-text-analyzer-page #totalTable_wrapper .dataTables_paginate,
+.cabinet-text-analyzer-page #phrasesTable_wrapper .dataTables_paginate {
+    padding-top: 0.5rem;
+}
+
+.cabinet-text-analyzer-page #totalTable,
+.cabinet-text-analyzer-page #phrasesTable {
+    width: 100% !important;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-results .card-body:has(.cabinet-ta-chart-wrap) {
+    overflow: hidden;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-row.is-expanded > td {
+    border-bottom-width: 0;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-detail__cell {
+    background: var(--bs-tertiary-bg);
+    border-top: 0 !important;
+    vertical-align: top;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-forms-panel {
+    padding: 0.75rem 1rem 1rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-zone {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+    overflow: hidden;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-zone__title {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--bs-secondary-color);
+    background: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-zone__table {
+    font-size: 0.8125rem;
+    margin-bottom: 0;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-zone__table th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-zone__col-form {
+    min-width: 8rem;
+    width: 45%;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-zone__col-count {
+    min-width: 4.25rem;
+    width: 18%;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-zone__col-metric {
+    min-width: 3.5rem;
+    width: 18%;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-detail__cell {
+    background: var(--bs-tertiary-bg);
+    vertical-align: top;
+    padding: 0;
+}
+
+.cabinet-text-analyzer-page #totalTable tbody tr.child > td {
+    padding: 0;
+    background: var(--bs-tertiary-bg);
+    border-top: 0;
+    box-shadow: none;
+}
+
+.cabinet-text-analyzer-page #totalTable tbody tr.child + tr.cabinet-ta-word-row > td,
+.cabinet-text-analyzer-page #totalTable tbody tr.cabinet-ta-word-row:has(+ tr.child) > td {
+    border-bottom-width: 0;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-zone__lemma {
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-toggle {
+    cursor: pointer;
+    user-select: none;
+    border: 0;
+    vertical-align: baseline;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-toggle:hover,
+.cabinet-text-analyzer-page .cabinet-ta-word-toggle:focus-visible {
+    color: var(--bs-primary);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-word-toggle:hover .cabinet-ta-word-toggle__icon,
+.cabinet-text-analyzer-page .cabinet-ta-word-toggle:focus-visible .cabinet-ta-word-toggle__icon {
+    color: var(--bs-primary);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-results .card-header {
+    background: var(--bs-tertiary-bg);
+}
+
+/* AdminLTE: .card-title { float: left } — подсказка не должна быть в одной строке с заголовком */
+.cabinet-text-analyzer-page .cabinet-ta-card-header-stacked::after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-card-header-stacked .card-title {
+    float: none;
+    display: block;
+    width: 100%;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-card-header-stacked__hint {
+    display: block;
+    clear: both;
+    max-width: 52rem;
+    line-height: 1.45;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-cloud-card .card-header {
+    background: transparent;
+}
+
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_length,
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_filter,
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_info,
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_paginate {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_length,
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_filter {
+    padding-top: 0.75rem;
+    padding-bottom: 0.5rem;
+}
+
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_length label,
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_filter label {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    font-weight: normal;
+    white-space: normal;
+}
+
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_length select,
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_filter input {
+    width: auto;
+    min-width: 4.5rem;
+    margin: 0;
+}
+
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_info {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.cabinet-text-analyzer-page .dataTables_wrapper .dataTables_paginate {
+    padding-top: 0.25rem;
+    padding-bottom: 0.75rem;
+}
+
+.cabinet-text-analyzer-page #phrasesTable tbody td:first-child {
+    max-width: 18rem;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.cabinet-text-analyzer-page #phrasesTable tbody tr {
+    cursor: help;
+}
+
+.cabinet-text-analyzer-page #totalTable thead th,
+.cabinet-text-analyzer-page #phrasesTable thead th {
+    white-space: nowrap;
+    vertical-align: middle;
+    padding-right: 1.75rem;
+    position: relative;
+}
+
+.cabinet-text-analyzer-page #totalTable thead th.sorting,
+.cabinet-text-analyzer-page #totalTable thead th.sorting_asc,
+.cabinet-text-analyzer-page #totalTable thead th.sorting_desc,
+.cabinet-text-analyzer-page #phrasesTable thead th.sorting,
+.cabinet-text-analyzer-page #phrasesTable thead th.sorting_asc,
+.cabinet-text-analyzer-page #phrasesTable thead th.sorting_desc {
+    background-position: right 0.35rem center;
+    background-size: 0.65rem;
+}
+
+.cabinet-text-analyzer-page #totalTable tbody td,
+.cabinet-text-analyzer-page #phrasesTable tbody td {
+    vertical-align: middle;
+}

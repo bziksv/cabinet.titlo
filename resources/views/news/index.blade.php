@@ -12,6 +12,12 @@
         <link rel="stylesheet" href="{{ asset('css/cabinet-news.css') }}"/>
     @endslot
 
+    @if(!$canComment)
+        <div class="alert alert-warning small mb-3">
+            <i class="bi bi-slash-circle me-1"></i>{{ __('You are blocked from commenting on news. Contact support if you think this is a mistake.') }}
+        </div>
+    @endif
+
     @isset($news[0])
         <div class="cabinet-news-feed position-relative">
             <div class="scroll-to d-flex flex-column">
@@ -66,12 +72,14 @@
                         </div>
 
                         <div id="comments-{{ $item->id }}" class="cabinet-news-comments mt-3" style="display: none;">
-                            <div class="input-group input-group-sm mb-3">
-                                <input type="hidden" name="news_id" value="{{ $item->id }}">
-                                <textarea name="comment" class="form-control" rows="2" required
-                                          placeholder="{{ __('Comment') }}"></textarea>
-                                <button type="button" class="btn btn-secondary send-comment">{{ __('Send') }}</button>
-                            </div>
+                            @if($canComment)
+                                <div class="input-group input-group-sm mb-3">
+                                    <input type="hidden" name="news_id" value="{{ $item->id }}">
+                                    <textarea name="comment" class="form-control" rows="2" required
+                                              placeholder="{{ __('Comment') }}"></textarea>
+                                    <button type="button" class="btn btn-secondary send-comment">{{ __('Send') }}</button>
+                                </div>
+                            @endif
                             <ul class="list-unstyled mb-0 news-comments-list">
                                 @foreach($item->comments as $comment)
                                     <li class="d-flex gap-2 mb-3 cabinet-news-comment" id="comment-{{ $comment->id }}">
@@ -82,16 +90,25 @@
                                             <div class="d-flex justify-content-between align-items-start gap-2">
                                                 <span class="small fw-semibold">
                                                     {{ $comment->user->name }}
-                                                    <span class="text-info fw-normal">
-                                                        @if($admin){{ __('Admin') }}@else{{ __('User') }}@endif
-                                                    </span>
+                                                    @if($comment->user->isNewsCommentsBlocked())
+                                                        <span class="badge text-bg-danger ms-1">{{ __('Comments blocked') }}</span>
+                                                    @endif
                                                 </span>
                                                 <small class="text-secondary flex-shrink-0">
                                                     {{ $comment->created_at->diffForHumans() }}
                                                 </small>
                                             </div>
                                             @if($comment->user_id === \Illuminate\Support\Facades\Auth::id() || $admin)
-                                                <div class="float-end ms-2">
+                                                <div class="float-end ms-2 d-flex flex-wrap gap-1 justify-content-end">
+                                                    @if($admin && $comment->user_id !== \Illuminate\Support\Facades\Auth::id())
+                                                        <button type="button"
+                                                                class="btn btn-link btn-sm p-0 {{ $comment->user->isNewsCommentsBlocked() ? 'text-success' : 'text-danger' }} toggle-news-comment-block"
+                                                                data-user-id="{{ $comment->user_id }}"
+                                                                data-blocked="{{ $comment->user->isNewsCommentsBlocked() ? '1' : '0' }}"
+                                                                title="{{ $comment->user->isNewsCommentsBlocked() ? __('Unblock comments') : __('Block comments (spam)') }}">
+                                                            <i class="bi {{ $comment->user->isNewsCommentsBlocked() ? 'bi-unlock' : 'bi-slash-circle' }}"></i>
+                                                        </button>
+                                                    @endif
                                                     <button type="button" class="btn btn-link btn-sm p-0 text-secondary edit-comment-btn" title="{{ __('Edit') }}">
                                                         <i class="fa fa-edit"></i>
                                                     </button>
@@ -191,6 +208,27 @@
                     }, 'json');
                 });
 
+                $('.cabinet-news-feed').on('click', '.toggle-news-comment-block', function () {
+                    var $btn = $(this);
+                    var userId = $btn.data('user-id');
+                    var blocked = String($btn.data('blocked')) === '1';
+                    var url = blocked
+                        ? @json(route('news.unblock-comment-user'))
+                        : @json(route('news.block-comment-user'));
+                    if (!blocked && !window.confirm(@json(__('Block this user from commenting on news?')))) {
+                        return;
+                    }
+                    $.post(url, {
+                        user_id: userId,
+                        _token: $('meta[name="csrf-token"]').attr('content')
+                    }, function () {
+                        location.reload();
+                    }, 'json').fail(function (xhr) {
+                        var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : @json(__('Error'));
+                        alert(msg);
+                    });
+                });
+
                 $('.cabinet-news-feed').on('click', '.send-comment', function () {
                     var $btn = $(this);
                     var $block = $btn.closest('.cabinet-news-comments');
@@ -222,8 +260,29 @@
                             '<textarea rows="3" class="form-control form-control-sm mt-1 d-none edit-comment-field" data-comment-id="' + response.commentId + '">' +
                             $('<div>').text(response.comment).html() + '</textarea></div></li>'
                         );
-                    }, 'json');
+                    }, 'json').fail(function (xhr) {
+                        var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : @json(__('Error'));
+                        alert(msg);
+                    });
                 });
+
+                function openCommentFromHash() {
+                    var hash = window.location.hash;
+                    if (!hash || hash.indexOf('comment-') !== 1) {
+                        return;
+                    }
+                    var $comment = $(hash);
+                    if (!$comment.length) {
+                        return;
+                    }
+                    $comment.closest('.cabinet-news-comments').show();
+                    $comment.addClass('cabinet-news-comment--highlight');
+                    setTimeout(function () {
+                        $comment[0].scrollIntoView({behavior: 'smooth', block: 'center'});
+                    }, 150);
+                }
+
+                openCommentFromHash();
 
                 $('.cabinet-news-feed').on('click', '.comments-toggle', function () {
                     $(this).closest('.cabinet-news-post').find('.cabinet-news-comments').slideToggle(300);

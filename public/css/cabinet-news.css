@@ -35,6 +35,19 @@
     object-fit: cover;
 }
 
+.cabinet-news-comment--highlight {
+    background: rgba(var(--bs-warning-rgb), 0.15);
+    border-radius: var(--bs-border-radius);
+    padding: 0.35rem;
+    margin: -0.35rem;
+    animation: cabinet-news-comment-pulse 1.5s ease-in-out 2;
+}
+
+@keyframes cabinet-news-comment-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(var(--bs-warning-rgb), 0.35); }
+    50% { box-shadow: 0 0 0 0.35rem rgba(var(--bs-warning-rgb), 0.2); }
+}
+
 .cabinet-news-comments .form-control {
     resize: vertical;
     min-height: 2.5rem;
