@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\TextAnalyzer\TextAnalyzerReportPdfExport;
 use App\Exports\TextAnalyzer\TextAnalyzerWorkbookExport;
+use App\Services\TextAnalyzerPdfService;
 use App\TariffSetting;
 use App\TextAnalyzer;
 use App\TextAnalyzerPublicShare;
@@ -87,7 +87,6 @@ class TextAnalyzerController extends Controller
         }
 
         session()->forget('text_analyzer.export_snapshot');
-        TextAnalyzerPublicShare::revokeActiveForUser((int) Auth::id());
 
         $request = $request->all();
 
@@ -97,13 +96,23 @@ class TextAnalyzerController extends Controller
                 flash()->overlay($request['url'], __('connection attempt failed'))->error();
 
                 return view('text-analyse.index', ['request' => $request]);
-            } else {
-                $html = TextAnalyzer::removeStylesAndScripts($html);
-                $response = TextAnalyzer::analyze($html, $request);
             }
-
+            $html = TextAnalyzer::removeStylesAndScripts($html);
+            $response = TextAnalyzer::analyze($html, $request);
         } else {
             $response = TextAnalyzer::analyze($request['textarea'], $request);
+        }
+
+        if (TextAnalyzer::shouldCompareCompetitor($request)) {
+            $competitorUrl = trim((string) ($request['competitorUrl'] ?? ''));
+            $competitorHtml = TextAnalyzer::curlInit($competitorUrl);
+            if (!$competitorHtml) {
+                flash()->overlay($competitorUrl, __('Competitor page connection failed'))->warning();
+            } else {
+                $competitorHtml = TextAnalyzer::removeStylesAndScripts($competitorHtml);
+                $competitorResponse = TextAnalyzer::analyze($competitorHtml, $request);
+                TextAnalyzer::attachCompetitorComparison($response, $competitorResponse, $competitorUrl);
+            }
         }
 
         session()->flash('text_analyzer.response', $response);
@@ -181,7 +190,12 @@ class TextAnalyzerController extends Controller
 
     public function revokePublicShare(): JsonResponse
     {
-        TextAnalyzerPublicShare::revokeActiveForUser((int) Auth::id());
+        $snapshot = $this->exportSnapshot();
+        if ($snapshot !== null) {
+            TextAnalyzerPublicShare::revokeForUserSnapshot((int) Auth::id(), $snapshot);
+        } else {
+            TextAnalyzerPublicShare::revokeActiveForUser((int) Auth::id());
+        }
 
         return response()->json([
             'success' => true,
@@ -201,10 +215,11 @@ class TextAnalyzerController extends Controller
         $meta = $this->buildExportMeta($snapshot);
         $fileName = 'text-analyzer-report-' . date('Y-m-d-His') . '.pdf';
 
-        return Excel::download(
-            new TextAnalyzerReportPdfExport($snapshot['response'], $snapshot['request'], $meta),
-            $fileName,
-            ExcelFormat::MPDF
+        return app(TextAnalyzerPdfService::class)->downloadResponse(
+            $snapshot['response'],
+            $snapshot['request'] ?? [],
+            $meta,
+            $fileName
         );
     }
 
@@ -240,6 +255,21 @@ class TextAnalyzerController extends Controller
                 'url.required' => __("You didn't fill in the URL field"),
                 'url.website' => __('The URL must be valid')
             ]);
+        }
+
+        if (TextAnalyzer::shouldCompareCompetitor($request->all())) {
+            $rules = [
+                'competitorUrl' => 'required|website',
+            ];
+            $messages = [
+                'competitorUrl.required' => __('Enter the competitor page URL'),
+                'competitorUrl.website' => __('The competitor URL must be valid'),
+            ];
+            if ($request['type'] === 'url' && !empty($request['url'])) {
+                $rules['competitorUrl'] .= '|different:url';
+                $messages['competitorUrl.different'] = __('Competitor URL must differ from your page URL');
+            }
+            $this->validate($request, $rules, $messages);
         }
     }
 

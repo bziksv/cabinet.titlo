@@ -1,7 +1,13 @@
 @php
+    $hasCompare = !empty($response['comparison']);
+    $competitorUrlForPayload = $hasCompare ? ($response['comparison']['competitor_url'] ?? '') : '';
     $cabinetTaPayload = [
+        'compare' => $hasCompare,
+        'competitorHost' => $hasCompare ? ($response['comparison']['competitor_host'] ?? \App\TextAnalyzer::urlHost($competitorUrlForPayload)) : '',
         'clouds' => $response['clouds'] ?? ['text' => [], 'links' => [], 'both' => []],
+        'cloudsCompetitor' => $hasCompare ? ($response['competitor']['clouds'] ?? []) : [],
         'graph' => $response['graph'] ?? [],
+        'graphCompetitor' => $hasCompare ? ($response['competitor']['graph'] ?? []) : [],
     ];
     $cabinetTaWordForms = [];
     foreach ($response['totalWords'] as $wordIndex => $word) {
@@ -21,6 +27,13 @@
     @if(empty($isPublicView))
         @include('text-analyse.partials.export-bar', ['publicShare' => $publicShare ?? null])
     @endif
+
+    @if($hasCompare)
+        @include('text-analyse.partials.results-compare', [
+            'response' => $response,
+            'request' => $request ?? [],
+        ])
+    @else
 
     <div class="row g-2 g-md-3 mb-3 cabinet-ta-kpi">
         <div class="col-6 col-lg-3 d-flex min-w-0">
@@ -80,6 +93,10 @@
                         role="img"
                         aria-label="{{ __('Text analysis according to Zipfs law') }}"></canvas>
             </div>
+            @include('text-analyse.partials.zipf-table', [
+                'graph' => $response['graph'] ?? [],
+                'hasCompare' => false,
+            ])
         </div>
     </div>
 
@@ -221,4 +238,6 @@
             </div>
         </div>
     </div>
+
+    @endif
 </div>

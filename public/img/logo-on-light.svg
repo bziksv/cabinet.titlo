@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" role="img" aria-label="Датагон">
+  <defs>
+    <linearGradient id="dg-bg-light" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2f5de0"/>
+      <stop offset="100%" stop-color="#1e3f9e"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="6" width="36" height="36" rx="10" fill="url(#dg-bg-light)"/>
+  <path d="M12 14h5v18h5c4.5 0 7.5-3 7.5-7.5S26.5 17 22 17h-10z" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="33" cy="14" r="1.6" fill="#8fd3ff"/>
+  <circle cx="36.5" cy="17.5" r="1.2" fill="#8fd3ff"/>
+  <text x="48" y="32" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="22" font-weight="600" fill="#0f172a">Датагон</text>
+</svg>

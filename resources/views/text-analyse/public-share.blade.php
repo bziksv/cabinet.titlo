@@ -7,6 +7,8 @@
 @endsection
 
 @section('content')
+    @include('text-analyse.partials.public-register-cta')
+
     <div class="alert alert-info cabinet-ta-public-banner mb-3">
         <div class="fw-semibold mb-1">{{ __('Public project access') }}</div>
         <div class="small mb-0">

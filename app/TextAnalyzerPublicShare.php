@@ -105,9 +105,11 @@ class TextAnalyzerPublicShare extends Model
             return null;
         }
 
-        static::where('user_id', $userId)->active()->update([
-            'revoked_at' => Carbon::now(),
-        ]);
+        // «Обновить ссылку» — только для того же снимка отчёта; другие ссылки не трогаем
+        static::where('user_id', $userId)
+            ->active()
+            ->where('snapshot_hash', self::snapshotHash($snapshot))
+            ->update(['revoked_at' => Carbon::now()]);
 
         $payload = [
             'response' => $snapshot['response'] ?? [],
@@ -133,6 +135,18 @@ class TextAnalyzerPublicShare extends Model
 
         return static::where('user_id', $userId)
             ->active()
+            ->update(['revoked_at' => Carbon::now()]);
+    }
+
+    public static function revokeForUserSnapshot(int $userId, array $snapshot): int
+    {
+        if (!self::tableAvailable()) {
+            return 0;
+        }
+
+        return static::where('user_id', $userId)
+            ->active()
+            ->where('snapshot_hash', self::snapshotHash($snapshot))
             ->update(['revoked_at' => Carbon::now()]);
     }
 }

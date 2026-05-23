@@ -126,6 +126,36 @@
             </div>
         </div>
 
+        <div class="cabinet-ta-switch-row mt-1">
+            <div class="cabinet-ta-switch-row__toggle">
+                <input type="hidden" name="compareCompetitor" value="0">
+                <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
+                    <input class="custom-control-input click_tracking"
+                           type="checkbox"
+                           id="switchCompareCompetitor"
+                           name="compareCompetitor"
+                           value="1"
+                           data-click="Compare with competitor"
+                           @if(\App\TextAnalyzer::shouldCompareCompetitor($request ?? [])) checked @endif>
+                    <label class="custom-control-label" for="switchCompareCompetitor"></label>
+                </div>
+            </div>
+            <span class="cabinet-ta-switch-row__text">{{ __('Compare with competitor') }}</span>
+        </div>
+
+        <div id="cabinet-ta-competitor-url"
+             class="mt-2 {{ \App\TextAnalyzer::shouldCompareCompetitor($request ?? []) ? '' : 'd-none' }}">
+            <label class="form-label fw-semibold" for="cabinet-ta-competitor-url-input">{{ __('Competitor page URL') }}</label>
+            <input type="url"
+                   class="form-control"
+                   name="competitorUrl"
+                   id="cabinet-ta-competitor-url-input"
+                   placeholder="https://competitor.example/page"
+                   value="{{ $request['competitorUrl'] ?? '' }}"
+                   @if(\App\TextAnalyzer::shouldCompareCompetitor($request ?? [])) required @endif>
+            <p class="form-text mb-0">{{ __('Competitor URL compare hint') }}</p>
+        </div>
+
         <div id="cabinet-ta-list-words" class="mt-2 {{ empty($request['removeWords']) ? 'd-none' : '' }}">
             <label class="form-label" for="listWords">{{ __('Words to exclude') }}</label>
             <textarea class="form-control font-monospace"

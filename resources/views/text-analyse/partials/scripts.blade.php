@@ -8,8 +8,11 @@
         emptyLabel: @json(__('No records')),
         repetitionsLabel: @json(__('Repetitions')),
         chartLabels: {
-            actual: @json(__('Actual values')),
+            actual: @json((isset($response) && !empty($response['comparison'])) ? __('Your page') : __('Actual values')),
             ideal: @json(__('Ideal values')),
+            competitor: @json((isset($response) && !empty($response['comparison']))
+                ? \App\TextAnalyzer::competitorLabel($response['comparison']['competitor_url'] ?? '')
+                : __('Competitor')),
             xAxis: @json(__('Word density'))
         }
     };

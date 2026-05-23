@@ -263,6 +263,8 @@
     function ZipfChart(cfg) {
         this.canvasId = cfg.canvasId;
         this.graph = cfg.graph || [];
+        this.graphCompetitor = cfg.graphCompetitor || [];
+        this.compare = !!cfg.compare;
         this.labels = cfg.labels || {};
         this.instance = null;
         this.resizeBound = false;
@@ -301,48 +303,74 @@
             return;
         }
         var graph = this.graph;
+        var rankMax = graph.length;
+        if (this.compare && this.graphCompetitor.length) {
+            rankMax = Math.max(rankMax, this.graphCompetitor.length);
+        }
         var baseY = graph[0].y;
         var actualLabel = this.labels.actual || 'Actual';
         var idealLabel = this.labels.ideal || 'Ideal';
+        var competitorLabel = this.labels.competitor || 'Competitor';
         var xAxisLabel = this.labels.xAxis || this.labels.rank || 'Word density';
         var self = this;
+        var datasets = [
+            {
+                label: actualLabel,
+                data: graph.map(function (point) {
+                    return {x: point.x, y: point.y};
+                }),
+                borderColor: '#1d4ed8',
+                backgroundColor: 'rgba(29, 78, 216, 0.12)',
+                pointBackgroundColor: '#1d4ed8',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 1,
+                borderWidth: 2.5,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.15,
+                fill: false
+            }
+        ];
+
+        if (this.compare && this.graphCompetitor.length) {
+            datasets.push({
+                label: competitorLabel,
+                data: this.graphCompetitor.map(function (point) {
+                    return {x: point.x, y: point.y};
+                }),
+                borderColor: '#ca8a04',
+                backgroundColor: 'rgba(202, 138, 4, 0.1)',
+                pointBackgroundColor: '#ca8a04',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 1,
+                borderWidth: 2.5,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.15,
+                fill: false
+            });
+        }
+
+        datasets.push({
+            label: idealLabel,
+            data: this.buildIdeal(baseY, graph.length),
+            borderColor: '#ea580c',
+            backgroundColor: 'rgba(234, 88, 12, 0.08)',
+            pointBackgroundColor: '#ea580c',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 1,
+            borderWidth: 2,
+            borderDash: [7, 5],
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            tension: 0.15,
+            fill: false
+        });
 
         this.instance = new Chart(canvas.getContext('2d'), {
             type: 'line',
             data: {
-                datasets: [
-                    {
-                        label: actualLabel,
-                        data: graph.map(function (point) {
-                            return {x: point.x, y: point.y};
-                        }),
-                        borderColor: '#1d4ed8',
-                        backgroundColor: 'rgba(29, 78, 216, 0.12)',
-                        pointBackgroundColor: '#1d4ed8',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 1,
-                        borderWidth: 2.5,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        tension: 0.15,
-                        fill: false
-                    },
-                    {
-                        label: idealLabel,
-                        data: this.buildIdeal(baseY, graph.length),
-                        borderColor: '#ea580c',
-                        backgroundColor: 'rgba(234, 88, 12, 0.08)',
-                        pointBackgroundColor: '#ea580c',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 1,
-                        borderWidth: 2,
-                        borderDash: [7, 5],
-                        pointRadius: 3,
-                        pointHoverRadius: 5,
-                        tension: 0.15,
-                        fill: false
-                    }
-                ]
+                datasets: datasets
             },
             options: {
                 responsive: true,
@@ -358,14 +386,24 @@
                                     return '';
                                 }
                                 var item = items[0];
-                                if (item.datasetIndex !== 0) {
+                                var point;
+                                if (item.datasetIndex === 0) {
+                                    point = graph[item.dataIndex];
+                                } else if (self.compare && self.graphCompetitor.length && item.datasetIndex === 1) {
+                                    point = self.graphCompetitor[item.dataIndex];
+                                } else {
                                     return idealLabel;
                                 }
-                                var point = graph[item.dataIndex];
                                 return point && point.label ? point.label : '#' + item.parsed.x;
                             },
                             label: function (ctx) {
-                                var name = ctx.datasetIndex === 0 ? actualLabel : idealLabel;
+                                var name = actualLabel;
+                                var idealIndex = self.compare && self.graphCompetitor.length ? 2 : 1;
+                                if (ctx.datasetIndex === 1 && self.compare && self.graphCompetitor.length) {
+                                    name = competitorLabel;
+                                } else if (ctx.datasetIndex === idealIndex) {
+                                    name = idealLabel;
+                                }
                                 return name + ': ' + ctx.parsed.y;
                             }
                         }
@@ -375,7 +413,7 @@
                     x: {
                         type: 'linear',
                         min: 1,
-                        max: graph.length,
+                        max: rankMax,
                         title: {display: true, text: xAxisLabel},
                         grid: {color: 'rgba(0, 0, 0, 0.06)'},
                         ticks: {
@@ -528,11 +566,21 @@
         releaseUiLock();
         startUiLockWatchdog();
 
-        var payload = readJsonScript('cabinet-ta-payload', {clouds: {text: [], links: [], both: []}, graph: []});
+        var payload = readJsonScript('cabinet-ta-payload', {
+            compare: false,
+            clouds: {text: [], links: [], both: []},
+            cloudsCompetitor: {},
+            graph: [],
+            graphCompetitor: []
+        });
         var wordForms = readJsonScript('cabinet-ta-word-forms', {});
 
         try {
-            initResultTables({wordForms: wordForms});
+            if (!payload.compare) {
+                initResultTables({wordForms: wordForms});
+            } else {
+                initTableSearch();
+            }
         } catch (e) {
             console.error('cabinet-text-analyzer: tables', e);
         }
@@ -541,26 +589,33 @@
             (new ZipfChart({
                 canvasId: 'cabinet-ta-zipf-chart',
                 graph: payload.graph || [],
+                graphCompetitor: payload.graphCompetitor || [],
+                compare: !!payload.compare,
                 labels: cfg.chartLabels || {}
             })).render();
         } catch (e) {
             console.error('cabinet-text-analyzer: chart', e);
         }
 
-        var clouds = [
-            {
-                hostSelector: '#cabinet-ta-cloud-text-host',
-                getData: function () { return (payload.clouds || {}).text; }
-            },
-            {
-                hostSelector: '#cabinet-ta-cloud-links-host',
-                getData: function () { return (payload.clouds || {}).links; }
-            },
-            {
-                hostSelector: '#cabinet-ta-cloud-both-host',
-                getData: function () { return (payload.clouds || {}).both; }
+        var cloudDefs = [
+            {suffix: 'text', key: 'text'},
+            {suffix: 'links', key: 'links'},
+            {suffix: 'both', key: 'both'}
+        ];
+        var clouds = [];
+        cloudDefs.forEach(function (zone) {
+            clouds.push({
+                hostSelector: '#cabinet-ta-cloud-' + zone.suffix + '-host',
+                getData: function () { return (payload.clouds || {})[zone.key]; }
+            });
+            if (payload.compare) {
+                clouds.push({
+                    hostSelector: '#cabinet-ta-cloud-' + zone.suffix + '-competitor-host',
+                    getData: function () { return (payload.cloudsCompetitor || {})[zone.key]; }
+                });
             }
-        ].map(function (item) {
+        });
+        clouds = clouds.map(function (item) {
             item.renderer = new CloudRenderer({
                 hostSelector: item.hostSelector,
                 getData: item.getData,
@@ -627,6 +682,17 @@
                     navigator.clipboard.writeText(input.value);
                 }
             }
+            var copiedLabel = window.cabinetTaShareLabels && window.cabinetTaShareLabels.copied
+                ? window.cabinetTaShareLabels.copied
+                : '';
+            if (copiedLabel) {
+                $copy.addClass('is-copied');
+                var prevHtml = $copy.html();
+                $copy.html('<i class="bi bi-check2"></i><span class="d-none d-md-inline ms-1">' + copiedLabel + '</span>');
+                window.setTimeout(function () {
+                    $copy.removeClass('is-copied').html(prevHtml);
+                }, 1600);
+            }
         });
 
         $create.on('click', function () {
@@ -638,7 +704,8 @@
             }).done(function (response) {
                 if (response && response.success) {
                     $url.val(response.url);
-                    $expires.text((labels.validUntil ? labels.validUntil + ': ' : '') + (response.expires_at || ''));
+                    var expiresText = (labels.validUntil ? labels.validUntil + ' ' : '') + (response.expires_at || '');
+                    $expires.text(expiresText).removeClass('d-none text-bg-secondary').addClass('text-bg-success');
                     $copy.add($revoke).prop('disabled', false);
                     $create.html('<i class="bi bi-link-45deg me-1"></i>' + labels.refresh);
                 }
@@ -661,7 +728,7 @@
             }).done(function (response) {
                 if (response && response.success) {
                     $url.val('');
-                    $expires.text('');
+                    $expires.text('').addClass('d-none').removeClass('text-bg-success').addClass('text-bg-secondary');
                     $copy.add($revoke).prop('disabled', true);
                     $create.html('<i class="bi bi-link-45deg me-1"></i>' + labels.create);
                 }
@@ -691,6 +758,12 @@
             var on = $(this).is(':checked');
             $('#cabinet-ta-list-words').toggleClass('d-none', !on);
             $('#listWords').prop('required', on);
+        });
+
+        $('#switchCompareCompetitor').on('change', function () {
+            var on = $(this).is(':checked');
+            $('#cabinet-ta-competitor-url').toggleClass('d-none', !on);
+            $('#cabinet-ta-competitor-url-input').prop('required', on);
         });
 
         if (cfg.initialUrl && !cfg.hasResponse) {

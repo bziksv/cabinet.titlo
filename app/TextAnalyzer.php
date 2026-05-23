@@ -1059,4 +1059,169 @@ class TextAnalyzer extends Model
 
         return $empty;
     }
+
+    public static function shouldCompareCompetitor(array $request): bool
+    {
+        if (empty($request['compareCompetitor'])) {
+            return false;
+        }
+
+        return !in_array($request['compareCompetitor'], [false, 0, '0', 'false', 'off', ''], true);
+    }
+
+    /**
+     * Домен из URL (без www) для подписей «Конкурент · example.com».
+     */
+    public static function urlHost(?string $url): string
+    {
+        $url = trim((string) $url);
+        if ($url === '') {
+            return '';
+        }
+
+        if (!preg_match('#^https?://#i', $url)) {
+            $url = 'https://' . $url;
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (!is_string($host) || $host === '') {
+            return preg_replace('#^www\.#i', '', trim((string) parse_url($url, PHP_URL_PATH), '/'));
+        }
+
+        return (string) preg_replace('/^www\./i', '', $host);
+    }
+
+    public static function competitorLabel(?string $url): string
+    {
+        $host = self::urlHost($url);
+        if ($host === '') {
+            return (string) __('Competitor');
+        }
+
+        return __('Competitor') . ' · ' . $host;
+    }
+
+    /**
+     * @param array $response основной отчёт (мутируется)
+     * @param array $competitorResponse
+     */
+    public static function attachCompetitorComparison(array &$response, array $competitorResponse, string $competitorUrl): void
+    {
+        $response['competitor'] = array_merge($competitorResponse, [
+            'url' => $competitorUrl,
+        ]);
+        $response['comparison'] = [
+            'competitor_url' => $competitorUrl,
+            'competitor_host' => self::urlHost($competitorUrl),
+            'totalWords' => self::buildComparisonWordRows(
+                $response['totalWords'] ?? [],
+                $competitorResponse['totalWords'] ?? []
+            ),
+            'phrases' => self::buildComparisonPhraseRows(
+                $response['phrases'] ?? [],
+                $competitorResponse['phrases'] ?? []
+            ),
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $mainWords
+     * @param array<int, array<string, mixed>> $competitorWords
+     * @return array<int, array<string, mixed>>
+     */
+    public static function buildComparisonWordRows(array $mainWords, array $competitorWords): array
+    {
+        $mainByText = [];
+        foreach ($mainWords as $word) {
+            $key = mb_strtolower((string) ($word['text'] ?? ''));
+            if ($key !== '') {
+                $mainByText[$key] = $word;
+            }
+        }
+
+        $competitorByText = [];
+        foreach ($competitorWords as $word) {
+            $key = mb_strtolower((string) ($word['text'] ?? ''));
+            if ($key !== '') {
+                $competitorByText[$key] = $word;
+            }
+        }
+
+        $keys = array_unique(array_merge(array_keys($mainByText), array_keys($competitorByText)));
+        $rows = [];
+
+        foreach ($keys as $key) {
+            $main = $mainByText[$key] ?? null;
+            $competitor = $competitorByText[$key] ?? null;
+            $lemma = (string) (($main['text'] ?? null) ?: ($competitor['text'] ?? $key));
+            $mainTotal = (int) ($main['total'] ?? 0);
+            $competitorTotal = (int) ($competitor['total'] ?? 0);
+
+            $rows[] = [
+                'text' => $lemma,
+                'main' => $main,
+                'competitor' => $competitor,
+                'delta_total' => $mainTotal - $competitorTotal,
+                'sort_total' => max($mainTotal, $competitorTotal),
+            ];
+        }
+
+        usort($rows, static function ($a, $b) {
+            return ($b['sort_total'] ?? 0) <=> ($a['sort_total'] ?? 0)
+                ?: strcmp((string) ($a['text'] ?? ''), (string) ($b['text'] ?? ''));
+        });
+
+        return $rows;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $mainPhrases
+     * @param array<int, array<string, mixed>> $competitorPhrases
+     * @return array<int, array<string, mixed>>
+     */
+    public static function buildComparisonPhraseRows(array $mainPhrases, array $competitorPhrases): array
+    {
+        $mainByPhrase = [];
+        foreach ($mainPhrases as $phrase) {
+            $key = mb_strtolower(trim((string) ($phrase['phrase'] ?? '')));
+            if ($key !== '') {
+                $mainByPhrase[$key] = $phrase;
+            }
+        }
+
+        $competitorByPhrase = [];
+        foreach ($competitorPhrases as $phrase) {
+            $key = mb_strtolower(trim((string) ($phrase['phrase'] ?? '')));
+            if ($key !== '') {
+                $competitorByPhrase[$key] = $phrase;
+            }
+        }
+
+        $keys = array_unique(array_merge(array_keys($mainByPhrase), array_keys($competitorByPhrase)));
+        $rows = [];
+
+        foreach ($keys as $key) {
+            $main = $mainByPhrase[$key] ?? null;
+            $competitor = $competitorByPhrase[$key] ?? null;
+            $label = trim((string) (($main['phrase'] ?? null) ?: ($competitor['phrase'] ?? $key)));
+            $mainCount = (int) ($main['count'] ?? 0);
+            $competitorCount = (int) ($competitor['count'] ?? 0);
+
+            $rows[] = [
+                'phrase' => $label,
+                'main' => $main,
+                'competitor' => $competitor,
+                'delta_count' => $mainCount - $competitorCount,
+                'sort_count' => max($mainCount, $competitorCount),
+            ];
+        }
+
+        usort($rows, static function ($a, $b) {
+            return ($b['sort_count'] ?? 0) <=> ($a['sort_count'] ?? 0)
+                ?: strcmp((string) ($a['phrase'] ?? ''), (string) ($b['phrase'] ?? ''));
+        });
+
+        return array_slice($rows, 0, 150);
+    }
 }

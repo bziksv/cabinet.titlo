@@ -208,6 +208,8 @@ if ($pdfResp->getStatusCode() === 200) {
 }
 PHP
 
+php scripts/verify-text-analyzer-pdf.php || exit 1
+
 echo "--- Browser smoke (playwright) ---"
 node <<'NODE'
 const fs = require('fs');
