@@ -50,6 +50,8 @@ stop_all() {
   fi
   pkill -f "php-fpm.*cabinet-php-fpm" 2>/dev/null || true
 
+  bash "$ROOT/scripts/dev-cluster-queue.sh" stop 2>/dev/null || true
+
   lsof -ti :"$PORT" -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true
   lsof -ti :9074 -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true
   rm -f "$MODE_FILE" /tmp/cabinet-dev.pid 2>/dev/null || true
@@ -166,8 +168,11 @@ fi
 
 parallel_smoke || true
 
+bash "$ROOT/scripts/dev-cluster-queue.sh" start >/dev/null 2>&1 || true
+
 echo "Кабинет: http://localhost:${PORT}/login (nginx + php-fpm, параллельные запросы)"
 echo "Лог: tail -f $LOG"
+echo "Очереди кластера: tail -f /tmp/cabinet-cluster-queue.log"
 echo "Остановка: bash scripts/dev-fpm.sh stop"
 
 if [[ "${1:-}" == "detach" ]] || [[ -n "${CABINET_DEV_DETACH:-}" ]]; then

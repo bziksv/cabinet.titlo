@@ -84,10 +84,15 @@
                                                     {{ __('View results') }}
                                                 </a>
                                                 <div class="btn-group btn-group-sm w-100 mt-1" role="group">
+                                                    <a href="{{ route('edit.clusters.v2', $project->id) }}"
+                                                       class="btn btn-outline-secondary" target="_blank"
+                                                       title="{{ __('Hands editor v2') }}">
+                                                        <i class="fas fa-edit" aria-hidden="true"></i><span class="visually-hidden">{{ __('Hands editor v2') }}</span>
+                                                    </a>
                                                     <a href="{{ route('edit.clusters', $project->id) }}"
                                                        class="btn btn-outline-secondary" target="_blank"
-                                                       title="{{ __('Hands editor') }}">
-                                                        <i class="fas fa-edit" aria-hidden="true"></i>
+                                                       title="{{ __('Hands editor v1') }}">
+                                                        <i class="fas fa-pen" aria-hidden="true"></i><span class="visually-hidden">{{ __('Hands editor v1') }}</span>
                                                     </a>
                                                     <button type="button"
                                                             data-bs-toggle="modal"
@@ -847,7 +852,8 @@
                                     8: '<div class="cabinet-cluster-project-actions">' +
                                         '<a href="/show-cluster-result/' + cluster['id'] + '" target="_blank" class="btn btn-primary btn-sm w-100">{{ __('View results') }}</a>' +
                                         '<div class="btn-group btn-group-sm w-100 mt-1" role="group">' +
-                                        '<a href="/edit-clusters/' + cluster['id'] + '" class="btn btn-outline-secondary" target="_blank" title="{{ __('Hands editor') }}"><i class="fas fa-edit"></i></a>' +
+                                        '<a href="/edit-clusters-v2/' + cluster['id'] + '" class="btn btn-outline-secondary" target="_blank" title="{{ __('Hands editor v2') }}"><i class="fas fa-edit"></i></a>' +
+                                        '<a href="/edit-clusters/' + cluster['id'] + '" class="btn btn-outline-secondary" target="_blank" title="{{ __('Hands editor v1') }}"><i class="fas fa-pen"></i></a>' +
                                         '<button type="button" data-bs-toggle="modal" data-bs-target="#repeat-scan" data-order="' + cluster['id'] + '" class="btn btn-outline-secondary repeat-scan" title="{{ __('Repeat analysis') }}"><i class="fas fa-redo"></i></button>' +
                                         '<a href="/download-cluster-result/' + cluster['id'] + '/csv" target="_blank" class="btn btn-outline-secondary" title="{{ __('Download csv') }}">CSV</a>' +
                                         '<a href="/download-cluster-result/' + cluster['id'] + '/xls" target="_blank" class="btn btn-outline-secondary" title="{{ __('Download xls') }}">XLS</a>' +

@@ -1,0 +1,143 @@
+/* Выделение уникальных слов — AdminLTE 4 / BS5 */
+
+.cabinet-unique-page {
+    --cabinet-uw-radius: 0.5rem;
+}
+
+.cabinet-unique-page .cabinet-uw-textarea {
+    min-height: 11rem;
+    resize: vertical;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.cabinet-unique-page .cabinet-uw-kpi .info-box {
+    min-height: 5.25rem;
+    margin-bottom: 0;
+}
+
+.cabinet-unique-page .cabinet-uw-kpi .info-box-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.cabinet-unique-page .cabinet-uw-kpi.is-empty .info-box-number {
+    color: var(--bs-secondary-color);
+}
+
+.cabinet-unique-page .cabinet-uw-step-title {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--bs-emphasis-color);
+}
+
+.cabinet-unique-page .cabinet-uw-step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: var(--bs-primary);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.cabinet-unique-page .cabinet-uw-input-pane.cabinet-uw-dropzone--active {
+    box-shadow: inset 0 0 0 2px var(--bs-primary);
+    border-radius: var(--cabinet-uw-radius);
+    background: rgba(var(--bs-primary-rgb), 0.04);
+}
+
+.cabinet-unique-page .cabinet-uw-line-badge {
+    font-variant-numeric: tabular-nums;
+}
+
+.cabinet-unique-page .cabinet-uw-actions {
+    gap: 0.5rem;
+}
+
+.cabinet-unique-page .cabinet-uw-result {
+    display: none;
+}
+
+.cabinet-unique-page.cabinet-uw-has-result .cabinet-uw-result {
+    display: block;
+}
+
+.cabinet-unique-page.cabinet-uw-has-result .cabinet-uw-empty-note {
+    display: none;
+}
+
+.cabinet-unique-page .cabinet-uw-kpi:not(.is-empty) .info-box-number {
+    color: inherit;
+}
+
+.cabinet-unique-page .cabinet-uw-table-wrap {
+    max-height: 28rem;
+    overflow: auto;
+}
+
+.cabinet-unique-page .cabinet-uw-table th.cabinet-uw-sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.cabinet-unique-page .cabinet-uw-sort-hint {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin-left: 0.15rem;
+}
+
+.cabinet-unique-page .cabinet-uw-table td.cabinet-uw-phrases-cell {
+    min-width: 12rem;
+    max-width: 22rem;
+}
+
+.cabinet-unique-page .cabinet-uw-phrases-preview {
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    max-height: 4.5rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    margin: 0;
+}
+
+.cabinet-unique-page .cabinet-uw-col-actions {
+    width: 2.75rem;
+    text-align: center;
+}
+
+.cabinet-unique-page .cabinet-uw-col-hidden {
+    display: none !important;
+}
+
+.cabinet-unique-page .cabinet-uw-tools-card {
+    border-radius: var(--cabinet-uw-radius);
+}
+
+.cabinet-unique-page .cabinet-uw-processing .btn[data-uw-process] {
+    pointer-events: none;
+    opacity: 0.75;
+}
+
+.cabinet-unique-page .cabinet-uw-mark {
+    padding: 0 0.1em;
+    background: rgba(var(--bs-warning-rgb), 0.35);
+    border-radius: 0.15rem;
+}
+
+.cabinet-unique-page .cabinet-uw-next-modules .btn {
+    font-size: 0.8125rem;
+}

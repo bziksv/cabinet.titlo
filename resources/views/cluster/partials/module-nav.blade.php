@@ -23,8 +23,14 @@
                        class="nav-link{{ $active === 'result' ? ' active' : '' }}">{{ __('My project') }}</a>
                 </li>
                 <li class="nav-item">
+                    <a href="{{ route('edit.clusters.v2', $clusterId) }}"
+                       class="nav-link{{ $active === 'edit-v2' ? ' active' : '' }}">
+                        {{ __('Hands editor v2') }}
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="{{ route('edit.clusters', $clusterId) }}"
-                       class="nav-link{{ $active === 'edit' ? ' active' : '' }}">{{ __('Hands editor') }}</a>
+                       class="nav-link{{ $active === 'edit' ? ' active' : '' }}">{{ __('Hands editor v1') }}</a>
                 </li>
             @endif
             @if($admin ?? false)
@@ -33,7 +39,7 @@
                        class="nav-link{{ $active === 'config' ? ' active' : '' }}">{{ __('Module administration') }}</a>
                 </li>
             @endif
-            @if(($active === 'edit') && isset($cluster['default_result']))
+            @if(in_array($active, ['edit', 'edit-v2'], true) && isset($cluster['default_result']))
                 <li class="nav-item ms-auto">
                     <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#resetAllChanges">
                         {{ __('Rolling back all changes') }}

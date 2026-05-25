@@ -6,13 +6,19 @@ use App\Http\Requests\CreateProjectDescriptionRequest;
 use App\Http\Requests\EditProjectDescriptionRequest;
 use App\Http\Requests\CreateProjectRequest;
 use App\Http\Requests\EditProjectRequest;
+use App\HtmlEditorPublicShare;
+use App\HtmlEditorPreset;
 use App\Project;
 use App\ProjectDescription;
+use App\Services\HtmlEditorPresetService;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use JavaScript;
@@ -34,11 +40,15 @@ class TextEditorController extends Controller
             ->with('descriptions')
             ->orderByDesc('id')
             ->get();
-        if (count($projects) === 0) {
+        $projectCount = $projects->count();
+        $textCount = $projects->sum(static function (Project $project) {
+            return $project->descriptions->count();
+        });
+        if ($projectCount === 0) {
             return self::createView(false);
         }
 
-        return view('html-editor.projects', compact('projects'));
+        return view('html-editor.projects', compact('projects', 'projectCount', 'textCount'));
     }
 
     /**
@@ -56,7 +66,7 @@ class TextEditorController extends Controller
 
         $lang = Auth::user()->lang;
 
-        return view('html-editor.create-project', compact('showButton', 'lang'));
+        return view('html-editor.create-project', array_merge(compact('showButton', 'lang'), $this->editorFormExtras()));
     }
 
     /**
@@ -107,7 +117,7 @@ class TextEditorController extends Controller
 
         flash()->overlay(__('Project was successfully created'), $request->project_name)->success();
 
-        return view('html-editor.create-project', compact('showButton', 'request'));
+        return view('html-editor.create-project', array_merge(compact('showButton', 'request'), $this->editorFormExtras()));
     }
 
 
@@ -136,10 +146,12 @@ class TextEditorController extends Controller
             ->join('projects', 'projects.id', '=', 'project_description.project_id')
             ->where('projects.user_id', Auth::id())
             ->where('project_description.id', $id)
-            ->select('project_description.*')
+            ->select('project_description.*', 'projects.project_name')
             ->firstOrFail();
 
-        return view('html-editor.edit-description', compact('project', 'lang'));
+        $publicShare = HtmlEditorPublicShare::activeForDescription((int) $project->id, (int) Auth::id());
+
+        return view('html-editor.edit-description', array_merge(compact('project', 'lang', 'publicShare'), $this->editorFormExtras()));
     }
 
     /**
@@ -202,7 +214,9 @@ class TextEditorController extends Controller
             ->orderBy('project_name')
             ->get(['id', 'project_name']);
 
-        return view('html-editor.create-description', compact('lang', 'projects'));
+        $preselectedProjectId = (int) request()->query('project_id', 0);
+
+        return view('html-editor.create-description', array_merge(compact('lang', 'projects', 'preselectedProjectId'), $this->editorFormExtras()));
     }
 
     /**
@@ -278,5 +292,174 @@ class TextEditorController extends Controller
             return true;
         }
         return false;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function editorFormExtras(): array
+    {
+        return [
+            'presetsPayload' => HtmlEditorPresetService::payloadForUser((int) Auth::id()),
+        ];
+    }
+
+    /**
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storePreset(Request $request)
+    {
+        if (!Schema::hasTable('html_editor_presets')) {
+            return response()->json(['message' => __('Presets storage is not ready yet. Run database migration.')], 503);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:120',
+            'html' => 'required|string|max:500000',
+        ]);
+
+        if (strip_tags($validated['html']) === '') {
+            return response()->json(['message' => __('The text cannot be empty')], 422);
+        }
+
+        $userId = (int) Auth::id();
+        $count = HtmlEditorPreset::query()->where('user_id', $userId)->count();
+        if ($count >= HtmlEditorPresetService::maxUserPresets()) {
+            return response()->json(['message' => __('You have reached the maximum number of presets')], 422);
+        }
+
+        $preset = HtmlEditorPreset::query()->create([
+            'user_id' => $userId,
+            'name' => $validated['name'],
+            'html' => $validated['html'],
+        ]);
+
+        return response()->json([
+            'preset' => [
+                'id' => 'user:' . $preset->id,
+                'name' => $preset->name,
+                'html' => $preset->html,
+                'builtin' => false,
+            ],
+        ]);
+    }
+
+    /**
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroyPreset(int $id)
+    {
+        if (!Schema::hasTable('html_editor_presets')) {
+            return response()->json(['message' => __('Presets storage is not ready yet. Run database migration.')], 503);
+        }
+
+        HtmlEditorPreset::query()
+            ->where('user_id', Auth::id())
+            ->where('id', $id)
+            ->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
+  /**
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function createPublicShare(Request $request): JsonResponse
+    {
+        if (!HtmlEditorPublicShare::tableAvailable()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Public sharing is temporarily unavailable. Run database migration html_editor_public_shares.'),
+                'code' => 503,
+            ]);
+        }
+
+        $validated = $request->validate([
+            'description_id' => 'required|integer',
+            'html' => 'nullable|string|max:500000',
+        ]);
+
+        $description = ProjectDescription::query()
+            ->join('projects', 'projects.id', '=', 'project_description.project_id')
+            ->where('projects.user_id', Auth::id())
+            ->where('project_description.id', $validated['description_id'])
+            ->select('project_description.*', 'projects.project_name')
+            ->firstOrFail();
+
+        $html = $validated['html'] ?? $description->description;
+        if (self::isDescriptionEmpty($html)) {
+            return response()->json([
+                'success' => false,
+                'message' => __('The text cannot be empty'),
+                'code' => 422,
+            ]);
+        }
+
+        $plain = trim(preg_replace('/\s+/u', ' ', strip_tags($html)));
+        $meta = [
+            'project_name' => $description->project_name,
+            'text_excerpt' => $plain !== '' ? Str::limit($plain, 120) : __('Empty text'),
+            'version' => config('cabinet-html-editor.version'),
+        ];
+
+        $share = HtmlEditorPublicShare::issueForDescription(
+            (int) Auth::id(),
+            (int) $description->id,
+            $html,
+            $meta
+        );
+
+        if ($share === null) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Public link could not be created.'),
+                'code' => 500,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Public link created'),
+            'code' => 201,
+            'url' => $share->publicUrl(),
+            'expires_at' => $share->expires_at->format('d.m.Y H:i'),
+        ]);
+    }
+
+    /**
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function revokePublicShare(Request $request): JsonResponse
+    {
+        if (!HtmlEditorPublicShare::tableAvailable()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Public sharing is temporarily unavailable.'),
+                'code' => 503,
+            ]);
+        }
+
+        $validated = $request->validate([
+            'description_id' => 'required|integer',
+        ]);
+
+        ProjectDescription::query()
+            ->join('projects', 'projects.id', '=', 'project_description.project_id')
+            ->where('projects.user_id', Auth::id())
+            ->where('project_description.id', $validated['description_id'])
+            ->select('project_description.id')
+            ->firstOrFail();
+
+        HtmlEditorPublicShare::revokeForDescription((int) Auth::id(), (int) $validated['description_id']);
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Public link revoked'),
+            'code' => 201,
+        ]);
     }
 }

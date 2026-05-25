@@ -86,3 +86,6 @@ Route::post('bot', 'TelegramBotController@index');
 
 Route::post('demo/analiz-teksta/run', 'Api\\Demo\\TextAnalyzerDemoController@run');
 Route::post('demo/analiz-konkurentov/run', 'Api\\Demo\\CompetitorAnalysisDemoController@run');
+Route::post('demo/vydelenie-unikalnykh-slov-v-tekste/run', 'Api\\Demo\\UniqueWordsDemoController@run');
+Route::post('demo/klasterizator-klyuchevykh-slov/run', 'Api\\Demo\\ClusterDemoController@run');
+Route::post('demo/klasterizator-klyuchevykh-slov/poll', 'Api\\Demo\\ClusterDemoController@poll');

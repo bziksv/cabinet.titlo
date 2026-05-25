@@ -1,5 +1,5 @@
 @php use Illuminate\Support\Str; @endphp
-@component('component.card', ['title' =>  __('Editing Clusters') ])
+@component('component.card', ['title' =>  __('Hands editor v1') ])
     @slot('css')
         <link rel="stylesheet" type="text/css"
               href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
@@ -332,6 +332,11 @@
         <input type="submit" id="sendForm">
     </form>
 
+    <div class="alert alert-secondary border-0 shadow-sm mb-3 py-2" role="status">
+        <a href="{{ route('edit.clusters.v2', $cluster['id']) }}" class="alert-link fw-semibold">{{ __('Hands editor v2') }}</a>
+        — упрощённый режим: перемещение фраз через выпадающий список, без рабочей области.
+    </div>
+
     <div class="card">
         <div class="card-header d-flex p-0">
             <ul class="nav nav-pills p-2">
@@ -348,8 +353,13 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link admin-link" href="{{ route('edit.clusters.v2', $cluster['id']) }}">
+                        {{ __('Hands editor v2') }}
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link admin-link active" href="{{ route('edit.clusters', $cluster['id']) }}">
-                        {{ __('Hands editor') }}
+                        {{ __('Hands editor v1') }}
                     </a>
                 </li>
                 <li class="nav-item">

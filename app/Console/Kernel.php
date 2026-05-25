@@ -11,6 +11,7 @@ use App\Classes\Cron\DeleteUnverifiedUsers;
 use App\Classes\Cron\HttpHeadersDelete;
 use App\Classes\Cron\MetaTags;
 use App\Classes\Cron\MetaTagsHistoriesDelete;
+use App\Classes\Cron\HtmlEditorPublicSharesDelete;
 use App\Classes\Cron\RelevancePublicSharesDelete;
 use App\Classes\Cron\TextAnalyzerPublicSharesDelete;
 use App\Classes\Cron\UserStatisticsStore;
@@ -49,6 +50,7 @@ class Kernel extends ConsoleKernel
         $schedule->call(new HttpHeadersDelete())->cron('0 0 * * *');
         $schedule->call(new RelevancePublicSharesDelete())->cron('0 0 * * *');
         $schedule->call(new TextAnalyzerPublicSharesDelete())->cron('0 0 * * *');
+        $schedule->call(new HtmlEditorPublicSharesDelete())->cron('0 0 * * *');
         $schedule->call(new DeleteUnverifiedUsers())->dailyAt('02:15');
 
         $schedule->call(new MetaTags(6))->cron('0 */6 * * *');

@@ -554,7 +554,22 @@
         }
 
         const q = response.count || 0;
-        setProgress(Math.min(90, 12 + q * 4), cfg.i18n.queue + ' ' + q);
+        const total = response.phrases_total || (response.debug_state && response.debug_state.phrases_total) || 0;
+        const pending = response.phrases_pending || (response.debug_state && response.debug_state.phrases_pending) || 0;
+        let pct;
+        let label;
+        if (total > 0) {
+          pct = Math.min(90, 12 + Math.round((q / total) * 78));
+          if (q === 0 && pending > 0) {
+            label = cfg.i18n.waitingQueue + ' ' + pending + ' / ' + total;
+          } else {
+            label = cfg.i18n.queue + ' ' + q + ' / ' + total;
+          }
+        } else {
+          pct = Math.min(90, 12 + q * 4);
+          label = cfg.i18n.queue + ' ' + q;
+        }
+        setProgress(pct, label);
       },
       error: function () {
         clusterDebugLine('error', 'poll.failed', { progressId: progressId });

@@ -5,6 +5,7 @@ namespace App\Jobs\Cluster;
 use App\Cluster;
 use App\ClusterResults;
 use App\Support\ClusterAnalysisDebugLog;
+use App\Support\ClusterQueues;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -50,7 +51,7 @@ class WaitClusterAnalyseQueue implements ShouldQueue
                 'current' => $current,
             ]);
             try {
-                dispatch(new WaitClusterAnalyseQueue($this->cluster))->onQueue('cluster_wait')->delay(Carbon::now()->addSeconds(10));
+                dispatch(new WaitClusterAnalyseQueue($this->cluster))->onQueue(ClusterQueues::name('wait'))->delay(Carbon::now()->addSeconds(10));
             } catch (\Throwable $e) {
                 ClusterAnalysisDebugLog::error($progressId, 'job.wait.redispatch_failed', [
                     'message' => $e->getMessage(),

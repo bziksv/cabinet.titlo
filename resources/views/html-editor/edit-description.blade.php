@@ -1,45 +1,60 @@
-@component('component.card', ['title' => __('Edit a text')])
+@component('component.card', [
+    'title' => __('Edit HTML text'),
+    'titleHtml' => e(__('Edit HTML text')) . ' · ' . e($project->project_name ?? '') . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-html-editor'])->render(),
+])
     @slot('css')
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/summernote/summernote.css') }}"/>
-        <link rel="stylesheet" type="text/css"
-              href="{{ asset('plugins/list-comparison/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
-        <style>
-            .HtmlEditor {
-                background: oldlace;
-            }
-        </style>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-html-editor.css') }}?v={{ @filemtime(public_path('css/cabinet-html-editor.css')) ?: time() }}">
+        <style>#header-nav-bar .cabinet-header-limits-menu tr.HtmlEditor { background: oldlace; }</style>
     @endslot
-    <form action="{{ route('save.edit.description') }}" method="POST" class="col-12 mb-5">
-        @csrf
-        <input type="hidden"
-               name="description_id"
-               value="{{ $project->id }}">
-        <div class="form-group">
-            <label>{{__('Text')}}</label>
-            <textarea name="description" id="description"
-                      class="form-control mb-3">{!! $project->description !!}</textarea>
-            @error('description') <span class="error invalid-feedback">{{ $message }}</span>@enderror
-        </div>
-        <div>
-            <input type="submit" class="btn btn-secondary mr-2" value="{{__('Save the project')}}">
-            <a href="{{ route('HTML.editor') }}"
-               class="btn btn-default btn-flat">{{__('Back to projects')}}</a>
-        </div>
-        <div id="scroll_to_bottom"></div>
-    </form>
+
+    @slot('tools')
+        <a href="{{ route('HTML.editor') }}?project={{ $project->project_id }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>{{ __('My projects') }}
+        </a>
+    @endslot
+
+    <div class="cabinet-html-editor-page cabinet-html-editor-form" data-he-lang="{{ $lang }}">
+        <p class="cabinet-he-edit-trail small text-muted mb-3">
+            <a href="{{ route('HTML.editor') }}" class="text-muted text-decoration-none">{{ __('HTML editor') }}</a>
+            <span aria-hidden="true"> › </span>
+            <a href="{{ route('HTML.editor') }}?project={{ $project->project_id }}" class="text-muted text-decoration-none">{{ $project->project_name ?? '—' }}</a>
+        </p>
+
+        <form action="{{ route('save.edit.description') }}" method="POST">
+            @csrf
+            <input type="hidden" name="description_id" value="{{ $project->id }}">
+
+            <details class="cabinet-he-fold mb-3">
+                <summary class="cabinet-he-fold-summary">{{ __('HTML presets') }}</summary>
+                <div class="cabinet-he-fold-body">
+                    @include('html-editor.partials.cabinet-he-presets', ['compact' => true])
+                </div>
+            </details>
+
+            <details class="cabinet-he-fold mb-3">
+                <summary class="cabinet-he-fold-summary">{{ __('Public link without registration') }}</summary>
+                <div class="cabinet-he-fold-body">
+                    @include('html-editor.partials.cabinet-he-public-share', [
+                        'descriptionId' => $project->id,
+                        'publicShare' => $publicShare ?? null,
+                        'compact' => true,
+                    ])
+                </div>
+            </details>
+
+            @include('html-editor.partials.cabinet-he-editor-split', [
+                'fieldValue' => old('description', $project->description),
+                'invalid' => $errors->has('description'),
+            ])
+            @error('description') <div class="invalid-feedback d-block mb-3">{{ $message }}</div> @enderror
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="submit" class="btn btn-secondary">{{ __('Save HTML text') }}</button>
+            </div>
+        </form>
+    </div>
+
     @slot('js')
-        <script src="{{ asset('/plugins/ckeditor/ckeditor.js') }}" type="text/javascript" charset="utf-8"></script>
-        <script src="{{ asset('/plugins/ckeditor/adapters/jquery.js') }}" type="text/javascript" charset="utf-8"></script>
-        <script>
-            $('#description').ckeditor({
-                language: "{{ $lang }}",
-            });
-            $(document).ready(function () {
-                setTimeout(() => {
-                    console.clear()
-                    $('#cke_93').remove()
-                }, 300)
-            })
-        </script>
+        @include('partials.cabinet-html-editor-ckeditor')
+        <script src="{{ asset('js/cabinet-html-editor.js') }}?v={{ @filemtime(public_path('js/cabinet-html-editor.js')) ?: time() }}"></script>
     @endslot
 @endcomponent

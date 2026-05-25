@@ -23,6 +23,7 @@
     var splitToggleEl = root.querySelector('#cabinet-dup-split-toggle');
     var undoBtn = root.querySelector('[data-dup-undo]');
     var beforePaneEl = root.querySelector('.cabinet-dup-split-pane--before');
+    var mainLabelEl = root.querySelector('[data-dup-main-label]');
     var dropZoneEl = root.querySelector('[data-dup-dropzone]');
     var configEl = document.getElementById('cabinet-duplicates-config');
     var config = {};
@@ -125,6 +126,14 @@
             beforePaneEl.classList.toggle('d-none', !on);
         }
         root.classList.toggle('cabinet-dup-split-active', !!on);
+        if (mainLabelEl) {
+            var hasSnapshot = beforeViewEl && beforeViewEl.value.trim() !== '';
+            if (on && hasSnapshot) {
+                mainLabelEl.textContent = config.mainLabelProcessed || 'Processed list';
+            } else {
+                mainLabelEl.textContent = config.mainLabelYourText || 'Your text';
+            }
+        }
     }
 
     function setKpi(before, after, dupRemoved, emptyRemoved) {
@@ -262,6 +271,7 @@
         var after = countNonEmptyLines(text);
         updateLineCount();
         setKpi(before, after, metrics.dupRemoved, metrics.emptyRemoved);
+        updateSplitLayout();
         scheduleSave();
     }
 

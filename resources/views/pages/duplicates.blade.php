@@ -88,20 +88,22 @@
             </div>
 
             <div class="cabinet-dup-editor" data-dup-dropzone>
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                    <label class="form-label mb-0" for="cabinet-dup-text">{{ __('Your text') }}</label>
-                    <span class="text-muted small">
-                        {{ __('Count phrases') }}:
-                        <span class="badge text-bg-light border cabinet-dup-line-badge" data-dup-line-count>0</span>
-                    </span>
+                <div class="cabinet-dup-main-pane">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <label class="form-label mb-0" for="cabinet-dup-text" data-dup-main-label>{{ __('Your text') }}</label>
+                        <span class="text-muted small">
+                            {{ __('Count phrases') }}:
+                            <span class="badge text-bg-light border cabinet-dup-line-badge" data-dup-line-count>0</span>
+                        </span>
+                    </div>
+                    <p class="text-muted small cabinet-dup-drop-hint mb-2">
+                        <i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i>{{ __('Drop a .txt file here or paste text below') }}
+                    </p>
+                    <textarea id="cabinet-dup-text"
+                              class="form-control cabinet-dup-textarea"
+                              rows="12"
+                              placeholder="{{ __('Enter or paste keywords, one per line. Blank lines are ignored when counting.') }}"></textarea>
                 </div>
-                <p class="text-muted small cabinet-dup-drop-hint mb-2">
-                    <i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i>{{ __('Drop a .txt file here or paste text below') }}
-                </p>
-                <textarea id="cabinet-dup-text"
-                          class="form-control cabinet-dup-textarea"
-                          rows="12"
-                          placeholder="{{ __('Enter or paste keywords, one per line. Blank lines are ignored when counting.') }}"></textarea>
 
                 <div class="form-check form-switch cabinet-dup-split-toggle mt-3 mb-0">
                     <input class="form-check-input" type="checkbox" role="switch" id="cabinet-dup-split-toggle">
@@ -254,6 +256,8 @@
             'copyTitle' => __('Copy'),
             'emptyText' => __('Nothing to copy'),
             'copyFailedText' => __('Copy failed'),
+            'mainLabelYourText' => __('Your text'),
+            'mainLabelProcessed' => __('Processed list'),
             'invalidFileText' => __('Only .txt files are supported'),
             'fileTitle' => __('File'),
         ], JSON_UNESCAPED_UNICODE) !!}

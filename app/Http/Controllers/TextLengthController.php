@@ -2,64 +2,62 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Contracts\View\Factory;
+use App\Services\TextLengthAnalysisService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class TextLengthController extends Controller
 {
+  public function __construct()
+  {
+    $this->middleware(['permission:Counting text length']);
+  }
 
-    public function __construct()
-    {
-        $this->middleware(['permission:Counting text length']);
+  public function index(): View
+  {
+    return view('pages.length');
+  }
+
+  public function countingTextLength(Request $request): JsonResponse
+  {
+    $text = (string) $request->input('text', '');
+    $maxChars = (int) config('cabinet-text-length.max_chars', 38600);
+
+    if (trim($text) === '') {
+      return response()->json([
+        'error' => 'validation',
+        'message' => __('The text should not be empty'),
+      ], 422);
     }
 
-    /**
-     * @return Factory|View
-     */
-    public function index(): View
-    {
-        return view('pages.length');
+    if (mb_strlen($text) > $maxChars) {
+      return response()->json([
+        'error' => 'validation',
+        'message' => sprintf(
+          __('Maximum :count characters per check'),
+          number_format($maxChars, 0, ',', ' ')
+        ),
+      ], 422);
     }
 
-    /**
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function countingTextLength(Request $request): JsonResponse
-    {
-        $length = Str::length($request->text);
-        $countSpaces = self::countingSpaces($request->text);
-        $lengthWithOutSpaces = $length - $countSpaces;
-        $data = [
-            'success' => true,
-            'text' => $request->text,
-            'length' => $length,
-            'countSpaces' => $countSpaces,
-            'lengthWithOutSpaces' => $lengthWithOutSpaces,
-            'countWords' => self::countingWord($request->text)
-        ];
+    $fields = [
+      'title' => (string) $request->input('title', ''),
+      'description' => (string) $request->input('description', ''),
+      'h1' => (string) $request->input('h1', ''),
+    ];
 
-        return response()->json(['data' => $data]);
-    }
+    $result = TextLengthAnalysisService::analyze($text, $fields);
 
-    /**
-     * @param $str
-     * @return int
-     */
-    public static function countingSpaces($str): int
-    {
-        return substr_count($str, ' ');
-    }
-
-    /**
-     * @param $str
-     * @return int
-     */
-    public static function countingWord($str): int
-    {
-        return count(explode(' ', $str));
-    }
+    return response()->json([
+      'data' => $result,
+      // Legacy keys for старых интеграций
+      'legacy' => [
+        'length' => $result['summary']['chars_with_spaces'],
+        'countSpaces' => $result['summary']['spaces'],
+        'lengthWithOutSpaces' => $result['summary']['chars_no_spaces'],
+        'countWords' => $result['summary']['words'],
+      ],
+    ]);
+  }
 }

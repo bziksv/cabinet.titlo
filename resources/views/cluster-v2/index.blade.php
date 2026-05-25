@@ -320,6 +320,7 @@
                     progressError: @json(__('Progress polling failed')),
                     started: @json(__('Analysis started…')),
                     queue: @json(__('In queue')),
+                    waitingQueue: @json('Ожидание воркера'),
                     rendering: @json(__('Render data')),
                     historyHint: @json(__('The analysis has been successfully launched, the results will be automatically added to the table')),
                     telegramRequired: @json(__('Subscribe to notifications in Telegram first.')),
@@ -331,7 +332,7 @@
                     copyUrls: @json('Копировать URL'),
                     viewLinks: @json(__('View links phrases')),
                     resultsMeta: @json('Кластеров: :clusters · Фраз: :phrases'),
-                    freqZeroHint: @json('Частотность не получена (Wordstat). Перезапустите анализ — если снова нули, проверьте XMLRiver в /admin/xml-providers.'),
+                    freqZeroHint: @json('Частотность 0: проверьте локальный queue worker (scripts/dev-cluster-queue.sh) и Wordstat New в XMLRiver. Перезапустите анализ после правки.'),
                     presetApplied: @json('Пресет KAWE применён'),
                 },
             };

@@ -1,0 +1,100 @@
+/* Подсчёт длины текста — AdminLTE 4 / BS5 */
+
+.cabinet-text-length-page {
+    --cabinet-tl-radius: 0.5rem;
+}
+
+.cabinet-text-length-page .cabinet-tl-textarea {
+    min-height: 14rem;
+    resize: vertical;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+
+.cabinet-text-length-page .cabinet-tl-kpi .info-box {
+    min-height: 5.25rem;
+    margin-bottom: 0;
+}
+
+.cabinet-text-length-page .cabinet-tl-kpi .info-box-number {
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.cabinet-text-length-page .cabinet-tl-kpi.is-empty .info-box-number {
+    color: var(--bs-secondary-color);
+}
+
+.cabinet-text-length-page .cabinet-tl-step-title {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--bs-emphasis-color);
+}
+
+.cabinet-text-length-page .cabinet-tl-step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: var(--bs-primary);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.cabinet-text-length-page .cabinet-tl-char-badge {
+    font-variant-numeric: tabular-nums;
+}
+
+.cabinet-text-length-page .cabinet-tl-actions {
+    gap: 0.5rem;
+}
+
+.cabinet-text-length-page .cabinet-tl-report {
+    display: none;
+}
+
+.cabinet-text-length-page.cabinet-tl-has-result .cabinet-tl-report {
+    display: block;
+}
+
+.cabinet-text-length-page.cabinet-tl-has-result .cabinet-tl-empty-note {
+    display: none;
+}
+
+.cabinet-text-length-page .cabinet-tl-metric-card {
+    border-radius: var(--cabinet-tl-radius);
+}
+
+.cabinet-text-length-page .cabinet-tl-extended-card {
+    border-radius: var(--cabinet-tl-radius);
+}
+
+.cabinet-text-length-page .cabinet-tl-seo-ok {
+    color: var(--bs-success);
+}
+
+.cabinet-text-length-page .cabinet-tl-seo-over {
+    color: var(--bs-danger);
+}
+
+.cabinet-text-length-page .cabinet-tl-over-limit[hidden] {
+    display: none !important;
+}
+
+.cabinet-text-length-page .cabinet-tl-char-badge.is-over {
+    background: var(--bs-danger) !important;
+    color: #fff !important;
+    border-color: var(--bs-danger) !important;
+}

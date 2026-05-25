@@ -559,3 +559,154 @@
     color: #d4d4d4;
     border-radius: 0;
 }
+
+/* Ручное редактирование v2 — /edit-clusters-v2 */
+.cabinet-cluster-edit-v2 .cabinet-cluster-edit-v2__table th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cabinet-cluster-edit-v2 .cl-edit-phrase {
+    font-size: 0.875rem;
+    max-width: 320px;
+    word-break: break-word;
+}
+
+.cabinet-cluster-edit-v2 .cl-edit-move + .select2-container {
+    min-width: 220px;
+}
+
+.cabinet-cluster-edit-v2 .select2-container--bootstrap4 .select2-selection--single {
+    min-height: 31px;
+    font-size: 0.875rem;
+}
+
+.cabinet-cluster-edit-v2 .select2-container--open .select2-dropdown {
+    z-index: 1060;
+}
+
+.cabinet-cluster-edit-v2 .cl-edit-rename {
+    font-weight: 600;
+}
+
+.cabinet-cluster-edit-v2 .cabinet-cluster-edit-v2__group .card-header {
+    background: var(--bs-tertiary-bg);
+}
+
+.cabinet-cluster-edit-v2 .cl-edit-url:hover {
+    text-decoration: underline;
+}
+
+.cabinet-cluster-edit-v2__layout {
+    align-items: flex-start;
+}
+
+@media (min-width: 992px) {
+    .cabinet-cluster-edit-v2__sidebar-col {
+        position: sticky;
+        top: 0.75rem;
+        align-self: flex-start;
+        z-index: 20;
+    }
+}
+
+.cabinet-cluster-edit-v2__sidebar {
+    max-height: calc(100vh - 1.5rem);
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.cabinet-cluster-edit-v2__sidebar > .card-header {
+    flex-shrink: 0;
+}
+
+.cabinet-cluster-edit-v2__sidebar .card-body {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0;
+}
+
+.cabinet-cluster-edit-v2__sidebar .card-body > .p-2 {
+    flex-shrink: 0;
+}
+
+.cabinet-cluster-edit-v2__sidebar-list {
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.cabinet-cluster-edit-v2__group,
+.cabinet-cluster-edit-v2__singles {
+    scroll-margin-top: 0.75rem;
+}
+
+.cabinet-cluster-edit-v2__sidebar-list .cl-edit-sidebar-item.active {
+    background: var(--bs-primary-bg-subtle);
+}
+
+.cabinet-cluster-edit-v2__sidebar-list .cl-edit-sidebar-drop-target.is-drop-target {
+    background: var(--bs-primary-bg-subtle) !important;
+    outline: 2px dashed var(--bs-primary);
+    outline-offset: -2px;
+}
+
+.cabinet-cluster-edit-v2__sidebar-list .cl-edit-sidebar-drop-target.is-drop-target .text-body {
+    color: var(--bs-primary) !important;
+}
+
+.cabinet-cluster-edit-v2 .cl-edit-drag-handle {
+    cursor: grab;
+    width: 28px;
+    user-select: none;
+}
+
+.cabinet-cluster-edit-v2 .cl-edit-drag-handle:active {
+    cursor: grabbing;
+}
+
+.cabinet-cluster-edit-v2 tr.cl-edit-drag-source {
+    display: none;
+}
+
+.cabinet-cluster-edit-v2 .cl-edit-drag-mirror {
+    opacity: 0.95;
+    box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.18);
+    border-radius: 0.25rem;
+    background: var(--bs-body-bg);
+}
+
+body.cl-edit-dragging {
+    cursor: grabbing;
+}
+
+body.cl-edit-dragging .cl-edit-drag-handle {
+    cursor: grabbing;
+}
+
+.cabinet-cluster-edit-v2 tr.cl-edit-placeholder td {
+    padding: 0;
+    vertical-align: middle;
+    line-height: 1;
+    background: var(--bs-primary-bg-subtle);
+    border: 1px dashed var(--bs-primary);
+}
+
+.cabinet-cluster-edit-v2 tr.cl-edit-placeholder td:first-child {
+    border-left: 1px dashed var(--bs-primary);
+}
+
+.cabinet-cluster-edit-v2__group.is-drop-target {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
+}
+
+.cabinet-cluster-edit-v2 .cl-edit-merge-bar .btn:disabled {
+    opacity: 0.6;
+}

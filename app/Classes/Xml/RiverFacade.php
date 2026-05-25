@@ -2,6 +2,7 @@
 
 namespace App\Classes\Xml;
 
+use App\Support\ClusterAnalysisDebugLog;
 use Illuminate\Support\Facades\Log;
 
 class RiverFacade
@@ -16,12 +17,20 @@ class RiverFacade
 
     protected $countAttempts;
 
+    /** @var string|null progressId для ClusterAnalysisDebugLog */
+    protected static $debugProgressId = null;
+
     public function __construct($region)
     {
         $this->user = config('xmlriver.user');
         $this->key = config('xmlriver.key');
         $this->region = $region;
-        $this->countAttempts = 3;
+        $this->countAttempts = 4;
+    }
+
+    public static function setClusterDebugProgressId(?string $progressId): void
+    {
+        self::$debugProgressId = $progressId !== '' ? $progressId : null;
     }
 
     public function setQuery($query)
@@ -50,7 +59,9 @@ class RiverFacade
     }
 
     /**
-     * @param bool $searchInItems Для базовой частоты — подставить нормализованную фразу из popular, если есть.
+     * Wordstat New — pagetype=history, totalValue (см. xmlriver.com/apiwordstatnew).
+     *
+     * @param bool $searchInItems Для базовой частоты — нормализованная фраза из popular.
      * @return array{number: int, phrase: string}
      */
     public function riverRequest(bool $searchInItems = true): array
@@ -63,49 +74,60 @@ class RiverFacade
 
         try {
             $riverResponse = null;
+            $lastError = null;
 
             for ($attempt = 1; $attempt <= $this->countAttempts; $attempt++) {
                 $riverResponse = $this->fetchNewWordstatResponse($query);
 
-                if ($this->hasWordstatError($riverResponse)) {
-                    if ($attempt >= $this->countAttempts) {
-                        Log::debug('river request error response', [
-                            'query' => $query,
-                            'response' => $riverResponse,
-                        ]);
-
-                        return $empty;
-                    }
-
-                    usleep(400000 * $attempt);
-                    continue;
-                }
-
-                if (isset($riverResponse['totalValue'])) {
-                    break;
-                }
-
-                if ($attempt >= $this->countAttempts) {
-                    Log::debug('river request missing totalValue', [
+                if ($this->hasFatalWordstatError($riverResponse)) {
+                    $lastError = $riverResponse;
+                    $this->debugLog('warn', 'river.wordstat.error', [
                         'query' => $query,
+                        'attempt' => $attempt,
                         'response' => $riverResponse,
                     ]);
 
                     return $empty;
                 }
 
+                if ($this->isRetryableWordstatError($riverResponse)) {
+                    $lastError = $riverResponse;
+                    $this->debugLog('warn', 'river.wordstat.retry', [
+                        'query' => $query,
+                        'attempt' => $attempt,
+                        'code' => $riverResponse['code'] ?? null,
+                        'error' => $riverResponse['error'] ?? null,
+                    ]);
+                    usleep(600000 * $attempt);
+                    continue;
+                }
+
+                if (isset($riverResponse['totalValue'])) {
+                    $phrase = $query;
+                    if ($searchInItems) {
+                        $phrase = $this->resolvePopularPhrase($riverResponse, $query) ?? $query;
+                    }
+
+                    return [
+                        'number' => (int) $riverResponse['totalValue'],
+                        'phrase' => $phrase,
+                    ];
+                }
+
+                $lastError = $riverResponse;
                 usleep(400000 * $attempt);
             }
 
-            $phrase = $query;
-            if ($searchInItems) {
-                $phrase = $this->resolvePopularPhrase($riverResponse, $query) ?? $query;
-            }
+            Log::debug('river request missing totalValue', [
+                'query' => $query,
+                'response' => $lastError,
+            ]);
+            $this->debugLog('warn', 'river.wordstat.empty', [
+                'query' => $query,
+                'response' => $lastError,
+            ]);
 
-            return [
-                'number' => (int) $riverResponse['totalValue'],
-                'phrase' => $phrase,
-            ];
+            return $empty;
         } catch (\Throwable $e) {
             Log::debug('river request error', [
                 'message' => $e->getMessage(),
@@ -113,18 +135,28 @@ class RiverFacade
                 'file' => $e->getFile(),
                 'query' => $query,
             ]);
+            $this->debugLog('error', 'river.wordstat.exception', [
+                'query' => $query,
+                'message' => $e->getMessage(),
+            ]);
 
             return $empty;
         }
     }
 
-  /**
+    /**
      * @return array<string, mixed>|null
      */
     protected function fetchNewWordstatResponse(string $query): ?array
     {
         $url = $this->buildNewWordstatUrl($query);
-        $raw = @file_get_contents($url);
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 45,
+                'ignore_errors' => true,
+            ],
+        ]);
+        $raw = @file_get_contents($url, false, $context);
 
         if ($raw === false || $raw === '') {
             return null;
@@ -143,29 +175,50 @@ class RiverFacade
             $base = 'https://xmlriver.com/wordstat/new/json';
         }
 
-        return $base . '?' . http_build_query([
+        $params = http_build_query([
             'user' => $this->user,
             'key' => $this->key,
             'regions' => $this->region,
             'pagetype' => 'history',
-            'query' => $query,
         ], '', '&', PHP_QUERY_RFC3986);
+
+        return $base . '?' . $params . '&query=' . rawurlencode($query);
     }
 
     /**
      * @param array<string, mixed>|null $response
      */
-    protected function hasWordstatError(?array $response): bool
+    protected function hasFatalWordstatError(?array $response): bool
+    {
+        if ($response === null) {
+            return false;
+        }
+
+        if (!isset($response['code'])) {
+            return !empty($response['error']) && !isset($response['totalValue']);
+        }
+
+        $code = (int) $response['code'];
+
+        return in_array($code, [2, 31, 42, 45, 121, 200, 400], true);
+    }
+
+    /**
+     * @param array<string, mixed>|null $response
+     */
+    protected function isRetryableWordstatError(?array $response): bool
     {
         if ($response === null) {
             return true;
         }
 
-        if (!empty($response['error'])) {
-            return true;
+        if (!isset($response['code'])) {
+            return !empty($response['error']) && !isset($response['totalValue']);
         }
 
-        return isset($response['code']) && (int) $response['code'] !== 0;
+        $code = (int) $response['code'];
+
+        return in_array($code, [101, 110, 115, 500], true);
     }
 
     /**
@@ -191,15 +244,18 @@ class RiverFacade
         return null;
     }
 
-    /**
-     * @param string $string
-     * @return int
-     */
-    protected function removeExtraSymbols(string $string): int
+    protected function debugLog(string $level, string $message, array $context = []): void
     {
-        $number = preg_replace('/[^0-9]/', '', $string);
-        $number = htmlentities($number);
+        if (self::$debugProgressId === null) {
+            return;
+        }
 
-        return (int) str_replace('&nbsp;', '', $number);
+        if ($level === 'error') {
+            ClusterAnalysisDebugLog::error(self::$debugProgressId, $message, $context);
+        } elseif ($level === 'warn') {
+            ClusterAnalysisDebugLog::warn(self::$debugProgressId, $message, $context);
+        } else {
+            ClusterAnalysisDebugLog::info(self::$debugProgressId, $message, $context);
+        }
     }
 }

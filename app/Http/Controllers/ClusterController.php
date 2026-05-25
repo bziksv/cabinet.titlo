@@ -13,6 +13,8 @@ use App\Exports\Cluster\ClusterGroupExport;
 use App\Exports\Cluster\ClusterResultExport;
 use App\Jobs\Cluster\StartClusterAnalyseQueue;
 use App\Support\ClusterAnalysisDebugLog;
+use App\Support\ClusterProgress;
+use App\Support\ClusterQueues;
 use App\Support\YandexLrRegions;
 use App\User;
 use Carbon\Carbon;
@@ -184,10 +186,10 @@ class ClusterController extends Controller
             ], 422);
         }
 
-        dispatch(new StartClusterAnalyseQueue($request->all(), $user))->onQueue('main_cluster');
+        dispatch(new StartClusterAnalyseQueue($request->all(), $user))->onQueue(ClusterQueues::name('main'));
 
         ClusterAnalysisDebugLog::info($progressId, 'http.analyseCluster.dispatched', [
-            'queue' => 'main_cluster',
+            'queue' => ClusterQueues::name('main'),
         ]);
 
         return $this->withClusterDebug($progressId, [
@@ -283,16 +285,16 @@ class ClusterController extends Controller
             ]);
         }
 
-        $queueCount = ClusterQueue::where('progress_id', '=', $id)->count();
-        ClusterAnalysisDebugLog::info($id, 'http.getProgress.pending', [
-            'queue_count' => $queueCount,
-        ]);
+        $progress = ClusterProgress::snapshot($id);
+        ClusterAnalysisDebugLog::info($id, 'http.getProgress.pending', $progress);
 
         return $this->withClusterDebug($id, [
-            'count' => $queueCount,
-            'debug_state' => [
-                'queue_count' => $queueCount,
-            ],
+            'count' => $progress['queue_count'],
+            'phrases_done' => $progress['phrases_done'],
+            'phrases_pending' => $progress['phrases_pending'],
+            'phrases_total' => $progress['phrases_total'],
+            'waiting_in_queue' => $progress['waiting_in_queue'],
+            'debug_state' => $progress,
         ]);
     }
 
@@ -575,6 +577,115 @@ class ClusterController extends Controller
         return response()->json([
             'phrases' => explode("\n", $phrases)
         ]);
+    }
+
+    public function editClustersV2(ClusterResults $cluster)
+    {
+        if ($cluster->created_at <= Carbon::parse('00:00 22.02.2023')) {
+            return abort(403, __('In order to edit this result, you need to reshoot it'));
+        }
+
+        $cluster->request = json_decode($cluster->request, true);
+        $editPayload = $this->buildClusterEditV2Payload(Cluster::unpackCluster($cluster->result));
+
+        return view('cluster-v2.edit', [
+            'cluster' => $cluster,
+            'admin' => User::isUserAdmin(),
+            'groups' => $editPayload['groups'],
+            'singles' => $editPayload['singles'],
+            'groupNames' => $editPayload['groupNames'],
+        ]);
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $clusters
+     * @return array{groups: array<int, array<string, mixed>>, singles: array<int, array<string, mixed>>, groupNames: string[]}
+     */
+    protected function buildClusterEditV2Payload(array $clusters): array
+    {
+        ksort($clusters);
+
+        $groups = [];
+        $singles = [];
+        $groupNames = [];
+
+        foreach ($clusters as $mainPhrase => $items) {
+            $phraseRows = [];
+            foreach ($items as $phrase => $item) {
+                if ($phrase === 'finallyResult' || !is_array($item)) {
+                    continue;
+                }
+
+                $phraseRows[] = [
+                    'phrase' => $phrase,
+                    'based' => (int) ($item['based']['number'] ?? $item['based'] ?? 0),
+                    'phrased' => (int) ($item['phrased']['number'] ?? $item['phrased'] ?? 0),
+                    'target' => (int) ($item['target']['number'] ?? $item['target'] ?? 0),
+                    'url' => $this->extractClusterPhraseUrl($item),
+                ];
+            }
+
+            if (count($items) <= 2) {
+                foreach ($phraseRows as $row) {
+                    $singles[] = array_merge($row, ['from' => $mainPhrase]);
+                }
+                continue;
+            }
+
+            $groupNames[] = $mainPhrase;
+            $groups[] = [
+                'name' => $mainPhrase,
+                'phrases' => $phraseRows,
+                'totals' => [
+                    'based' => array_sum(array_column($phraseRows, 'based')),
+                    'phrased' => array_sum(array_column($phraseRows, 'phrased')),
+                    'target' => array_sum(array_column($phraseRows, 'target')),
+                ],
+                'relevance' => $this->summarizeGroupRelevance($phraseRows),
+            ];
+        }
+
+        return [
+            'groups' => $groups,
+            'singles' => $singles,
+            'groupNames' => $groupNames,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    protected function extractClusterPhraseUrl(array $item): ?string
+    {
+        if (!empty($item['link']) && is_string($item['link'])) {
+            return $item['link'];
+        }
+
+        if (!empty($item['relevance']) && is_array($item['relevance'])) {
+            foreach ($item['relevance'] as $url) {
+                if (is_string($url) && $url !== '') {
+                    return $url;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $phraseRows
+     * @return array{url: string|null, uniform: bool, count: int}
+     */
+    protected function summarizeGroupRelevance(array $phraseRows): array
+    {
+        $urls = array_values(array_filter(array_column($phraseRows, 'url')));
+        $unique = array_values(array_unique($urls));
+
+        return [
+            'url' => $unique[0] ?? null,
+            'uniform' => count($unique) === 1 && count($unique) > 0,
+            'count' => count($unique),
+        ];
     }
 
     public function editClusters(ClusterResults $cluster)

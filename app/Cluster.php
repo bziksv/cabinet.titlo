@@ -6,6 +6,7 @@ use App\Classes\Xml\SimplifiedXmlFacade;
 use App\Jobs\Cluster\ClusterQueue;
 use App\Jobs\Cluster\WaitClusterAnalyseQueue;
 use App\Support\ClusterAnalysisDebugLog;
+use App\Support\ClusterQueues;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -256,14 +257,16 @@ class Cluster
         ClusterAnalysisDebugLog::info($this->progressId, 'cluster.startAnalysis', [
             'phrases' => $this->countPhrases,
             'mode' => $this->mode,
+            'child_queue' => ClusterQueues::name('child'),
+            'wait_queue' => ClusterQueues::name('wait'),
         ]);
 
         foreach ($this->phrases as $key => $phrase) {
-            dispatch(new ClusterQueue($this, $key, $phrase))->onQueue('child_cluster');
+            dispatch(new ClusterQueue($this, $key, $phrase))->onQueue(ClusterQueues::name('child'));
         }
 
         try {
-            dispatch(new WaitClusterAnalyseQueue($this))->onQueue('cluster_wait');
+            dispatch(new WaitClusterAnalyseQueue($this))->onQueue(ClusterQueues::name('wait'));
         } catch (\Throwable $e) {
             ClusterAnalysisDebugLog::error($this->progressId, 'cluster.wait.dispatch_failed', [
                 'message' => $e->getMessage(),
@@ -304,9 +307,11 @@ class Cluster
         $now = Carbon::now();
         $month = strlen($now->month) < 2 ? '0' . $now->month : $now->month;
 
-        $count = ClusterLimit::calculateCountRequests($this->request);
-        ClusterLimit::where('user_id', '=', $this->user->id)
-            ->where('date', '=', "$now->year-$month")->increment('count', $count);
+        if (empty($this->request['demo'])) {
+            $count = ClusterLimit::calculateCountRequests($this->request);
+            ClusterLimit::where('user_id', '=', $this->user->id)
+                ->where('date', '=', "$now->year-$month")->increment('count', $count);
+        }
 
         ClusterAnalysisDebugLog::info($this->getProgressId(), 'cluster.calculate.done', [
             'clusters' => count($this->clusters ?? []),

@@ -38,6 +38,7 @@ Route::get('public/share/relevance/{token}', 'RelevancePublicShareController@sho
 Route::get('public/share/relevance/{token}/history/{id}', 'RelevancePublicShareController@showHistory')->name('relevance.public.share.history');
 Route::post('public/share/relevance/{token}/details', 'RelevancePublicShareController@getDetails')->name('relevance.public.share.details');
 Route::get('public/share/text-analyzer/{token}', 'TextAnalyzerPublicShareController@show')->name('text.analyzer.public.share.view');
+Route::get('public/share/html-editor/{token}', 'HtmlEditorPublicShareController@show')->name('html.editor.public.share.view');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
 Route::get('/personal-data/en', 'AccessController@getEnPersonalData');
@@ -154,11 +155,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('unique', 'UniqueController@index');
     Route::post('unique', 'UniqueController@dataTableView')->name('unique.dataTableView');
 
-    Route::get('unique-words', 'UniqueWordsController@index')->name('unique.words');
-    Route::post('unique-words', 'UniqueWordsController@countingUniqueWords')->name('unique.words');
-    Route::post('download-unique-words', 'UniqueWordsController@createFile')->name('create.file.unique.words');
-    Route::post('download-unique-phrases', 'UniqueWordsController@createFile')->name('create.file.unique.phrases');
-    Route::post('download-file', 'UniqueWordsController@downloadFile')->name('download-file');
+    Route::get('unique-words', function () {
+        return redirect('/unique', 301);
+    });
+    Route::post('unique-words', 'UniqueController@dataTableView');
+    Route::post('download-unique-words', function () {
+        return redirect('/unique', 301);
+    });
+    Route::post('download-unique-phrases', function () {
+        return redirect('/unique', 301);
+    });
+    Route::post('download-file', function () {
+        return redirect('/unique', 301);
+    });
 
     Route::get('html-editor', 'TextEditorController@index')->name('HTML.editor');
     Route::get('create-project', 'TextEditorController@createView')->name('create.project');
@@ -172,6 +181,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('description/delete/{id}', 'TextEditorController@destroyDescription')->name('delete.description');
     Route::get('create-description', 'TextEditorController@createDescriptionView')->name('create.description');
     Route::post('save-description', 'TextEditorController@createDescription')->name('save.description');
+    Route::post('html-editor/presets', 'TextEditorController@storePreset')->name('html-editor.presets.store');
+    Route::delete('html-editor/presets/{id}', 'TextEditorController@destroyPreset')->name('html-editor.presets.destroy');
+    Route::post('html-editor/public-share', 'TextEditorController@createPublicShare')->name('html.editor.public.share.create');
+    Route::post('html-editor/public-share/revoke', 'TextEditorController@revokePublicShare')->name('html.editor.public.share.revoke');
 
     Route::get('backlink', 'BacklinkController@index')->name('backlink');
     Route::get('add-backlink', 'BacklinkController@createView')->name('add.backlink.view');
@@ -466,6 +479,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/download-cluster-competitors', 'ClusterController@downloadClusterCompetitors')->name('download.cluster.competitors');
     Route::post('/download-cluster-phrases', 'ClusterController@downloadClusterPhrases')->name('download.cluster.phrases');
     Route::get('/edit-clusters/{cluster}', 'ClusterController@editClusters')->name('edit.clusters');
+    Route::get('/edit-clusters-v2/{cluster}', 'ClusterController@editClustersV2')->name('edit.clusters.v2');
     Route::post('/confirmation-new-cluster', 'ClusterController@confirmationNewCluster')->name('confirmation.new.cluster');
     Route::post('/edit-clusters', 'ClusterController@editCluster')->name('edit.cluster');
     Route::post('/check-group-name/', 'ClusterController@checkGroupName')->name('check.group.name');

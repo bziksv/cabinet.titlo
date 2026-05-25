@@ -41,6 +41,7 @@ class ClusterQueue implements ShouldQueue
     public function handle()
     {
         $progressId = $this->cluster->getProgressId();
+        RiverFacade::setClusterDebugProgressId($progressId);
         ClusterAnalysisDebugLog::info($progressId, 'job.phrase.start', [
             'key' => $this->key,
             'phrase' => $this->phrase,
@@ -55,17 +56,20 @@ class ClusterQueue implements ShouldQueue
         if ($this->cluster->getSearchPhrases()) {
             $river->setQuery('"' . $this->phrase . '"');
             $phrase = $river->riverRequest(false);
+            usleep(250000);
         }
 
         if ($this->cluster->getSearchTarget()) {
             $river->setQuery('"!' . implode(' !', explode(' ', $this->phrase)) . '"');
             $target = $river->riverRequest(false);
+            usleep(250000);
         }
 
         if ($this->cluster->getSearchBase()) {
             $river->setQuery($this->phrase);
             $based = $river->riverRequest();
-            $baseFormEq = $based['phrase'] === $this->phrase;
+            $baseFormEq = ($based['phrase'] ?? $this->phrase) === $this->phrase;
+            usleep(250000);
         } else {
             $baseFormEq = true;
         }

@@ -2,45 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use App\UniqueWords\ShinglesWord;
+use App\Services\UniqueWordsAnalysisService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\UniqueWords\WordForms;
-use App\Helpers\WordHelper;
+use Illuminate\View\View;
 
 class UniqueController extends Controller
 {
-    public function index()
+    public function __construct()
     {
-        return view('unique.index');
+        $this->middleware(['permission:Unique words']);
     }
 
-    public function dataTableView(Request $request)
+    public function index(): View
     {
-        $data = [];
-        $content = $request->input("content", "");
-
-        if ($content) {
-            $morphy = new WordForms($content);
-            $shingles = new ShinglesWord;
-            $shingles->setText($content);
-
-            foreach ($morphy->getOriginWords() as $word) {
-                $forms = $morphy->getWordFormsInText($word);
-
-                if (!$forms) {
-                    continue;
-                }
-
-                $keysWords = implode(PHP_EOL, $shingles->getShinglesAroundWord($forms));
-                $word = mb_strtolower($word);
-                $forms = mb_strtolower(implode(', ', $forms));
-                $count = $morphy->getCount();
-
-                $data[] = [$word, $forms, $count, $keysWords];
-            }
-        }
-
-        return $data;
+        return view('pages.unique');
     }
 
+    public function dataTableView(Request $request): JsonResponse
+    {
+        $content = (string) $request->input('content', '');
+
+        return response()->json(UniqueWordsAnalysisService::analyze($content));
+    }
 }

@@ -127,8 +127,13 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" href="{{ route('edit.clusters.v2', $cluster['id']) }}">
+                        {{ __('Hands editor v2') }}
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="{{ route('edit.clusters', $cluster['id']) }}">
-                        {{ __('Hands editor') }}
+                        {{ __('Hands editor v1') }}
                     </a>
                 </li>
                 @if($admin)
