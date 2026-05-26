@@ -49,22 +49,6 @@
                 <a href="{{ route('add.backlink.view') }}" class="btn btn-primary">
                     <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>{{ __('Add link tracking') }}
                 </a>
-                @if($isAdmin ?? false)
-                    <form action="{{ route('backlink.test-telegram-alerts') }}"
-                          method="post"
-                          class="d-inline"
-                          onsubmit='return confirm(@json(__('Backlink test telegram confirm')))'>
-                        @csrf
-                        <button type="submit"
-                                class="btn btn-outline-secondary"
-                                title="{{ __('Backlink test telegram hint') }}">
-                            <i class="bi bi-telegram me-1" aria-hidden="true"></i>{{ __('Backlink test telegram btn') }}
-                            @if(($brokenLinksCount ?? 0) > 0)
-                                <span class="badge text-bg-danger ms-1">{{ $brokenLinksCount }}</span>
-                            @endif
-                        </button>
-                    </form>
-                @endif
             </div>
         </div>
 

@@ -83,6 +83,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/xml-providers', 'XmlProvidersAdminController@index')->name('admin.xml-providers.index');
     Route::post('/admin/xml-providers/refresh', 'XmlProvidersAdminController@refresh')->name('admin.xml-providers.refresh');
 
+    Route::get('/admin/telegram-proxy', 'TelegramProxyAdminController@index')->name('admin.telegram-proxy.index');
+    Route::post('/admin/telegram-proxy/proxies', 'TelegramProxyAdminController@storeProxy')->name('admin.telegram-proxy.proxies.store');
+    Route::put('/admin/telegram-proxy/proxies/{id}', 'TelegramProxyAdminController@updateProxy')->name('admin.telegram-proxy.proxies.update');
+    Route::delete('/admin/telegram-proxy/proxies/{id}', 'TelegramProxyAdminController@destroyProxy')->name('admin.telegram-proxy.proxies.destroy');
+    Route::post('/admin/telegram-proxy/import-env', 'TelegramProxyAdminController@importFromEnv')->name('admin.telegram-proxy.import-env');
+    Route::post('/admin/telegram-proxy/refresh', 'TelegramProxyAdminController@refreshStatus')->name('admin.telegram-proxy.refresh');
+    Route::post('/admin/telegram-proxy/test-notify', 'TelegramProxyAdminController@testNotify')->name('admin.telegram-proxy.test-notify');
+    Route::post('/admin/telegram-proxy/test-backlink', 'TelegramProxyAdminController@testBacklink')->name('admin.telegram-proxy.test-backlink');
+    Route::post('/admin/telegram-proxy/clear-debug', 'TelegramProxyAdminController@clearDebugLog')->name('admin.telegram-proxy.clear-debug');
+
     Route::resource('tariff-settings', 'TariffSettingsController');
     Route::get('tariff-setting-values/{id}/create', 'TariffSettingValuesController@create')->name('tariff-setting-values.create');
     Route::resource('tariff-setting-values', 'TariffSettingValuesController')->except([
@@ -189,7 +199,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('html-editor/public-share/revoke', 'TextEditorController@revokePublicShare')->name('html.editor.public.share.revoke');
 
     Route::get('backlink', 'BacklinkController@index')->name('backlink');
-    Route::post('backlink/test-telegram-alerts', 'BacklinkController@testTelegramAlerts')
+    Route::post('backlink/test-telegram-alerts', 'TelegramProxyAdminController@testBacklink')
         ->name('backlink.test-telegram-alerts');
     Route::get('add-backlink', 'BacklinkController@createView')->name('add.backlink.view');
     Route::post('add-backlink', 'BacklinkController@store')->name('add.backlink');

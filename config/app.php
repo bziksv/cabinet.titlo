@@ -127,6 +127,9 @@ return [
 
     'telegram_bot_token' => env('TELEGRAM_BOT_TOKEN'),
 
+    /** SOCKS5/HTTP proxy для api.telegram.org (если исходящий 443 с VPS заблокирован). */
+    'telegram_proxy' => env('TELEGRAM_PROXY'),
+
     /*
     |--------------------------------------------------------------------------
     | Autoloaded Service Providers

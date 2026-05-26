@@ -71,6 +71,15 @@ class CabinetAdminMenu
             ];
         })->values()->all();
 
+        if (\Illuminate\Support\Facades\Route::has('admin.telegram-proxy.index')) {
+            self::$itemsCache[] = [
+                'id' => 0,
+                'title' => __('Telegram proxy management'),
+                'link' => route('admin.telegram-proxy.index'),
+                'external' => false,
+            ];
+        }
+
         if (\Illuminate\Support\Facades\Route::has('admin.xml-providers.index')) {
             self::$itemsCache[] = [
                 'id' => 0,
