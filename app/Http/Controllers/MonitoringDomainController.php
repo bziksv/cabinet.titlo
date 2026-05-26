@@ -8,6 +8,7 @@ use App\Services\SiteMonitoringPdfService;
 use App\SiteMonitoringConfig;
 use App\SiteMonitoringPublicShare;
 use App\Support\SiteMonitoringAdminStats;
+use App\Support\SiteMonitoringListSummary;
 use App\Support\SiteMonitoringProjectStats;
 use App\Support\SiteMonitoringPublicShareTtl;
 use App\Support\SiteMonitoringTiming;
@@ -56,9 +57,12 @@ class MonitoringDomainController extends Controller
                 ->get();
         }
 
+        $listSummary = SiteMonitoringListSummary::fromProjects($projects);
+
         return view('site-monitoring.index', compact(
             'projects',
             'countProjects',
+            'listSummary',
             'admin',
             'onFreeTariff',
             'siteMonitoringEmailAvailable',
@@ -318,6 +322,7 @@ class MonitoringDomainController extends Controller
     protected function projectStatusPayload(DomainMonitoring $project): array
     {
         $pending = $project->isPendingResetStatus();
+        $hasPhrase = trim((string) ($project->phrase ?? '')) !== '';
 
         return [
             'status' => __($project->status),
@@ -325,6 +330,8 @@ class MonitoringDomainController extends Controller
             'uptime' => $project->uptime_percent !== null ? round((float) $project->uptime_percent, 2) : null,
             'broken' => (bool) $project->broken,
             'pending' => $pending,
+            'has_phrase' => $hasPhrase,
+            'phrase_fail' => $hasPhrase && $project->status === 'Keyword not found',
         ];
     }
 
@@ -334,24 +341,54 @@ class MonitoringDomainController extends Controller
      */
     public function edit(Request $request): JsonResponse
     {
-        if (strlen($request->option) > 0 || $request->name === 'phrase') {
-            $value = $request->option;
-            if ($request->name === 'timing') {
-                $project = DomainMonitoring::query()
-                    ->where('user_id', Auth::id())
-                    ->findOrFail($request->id);
-                $value = SiteMonitoringTiming::resolveForUser($value, Auth::user());
-            }
-
-            DomainMonitoring::where('id', $request->id)
-                ->where('user_id', Auth::id())
-                ->update([
-                    $request->name => $value,
-                ]);
-
-            return response()->json([]);
+        $allowed = ['project_name', 'link', 'phrase', 'timing', 'waiting_time'];
+        $field = (string) $request->input('name', '');
+        if (!in_array($field, $allowed, true)) {
+            return response()->json(['message' => __('An error has occurred')], 400);
         }
-        return response()->json([], 400);
+
+        $value = $request->input('option');
+        if ($value === null) {
+            $value = '';
+        }
+        $value = is_string($value) ? trim($value) : $value;
+
+        if ($field !== 'phrase' && $value === '') {
+            return response()->json(['message' => __('The field must contain more than 0 characters')], 400);
+        }
+
+        $projectId = (int) $request->input('id');
+        if ($projectId < 1) {
+            return response()->json(['message' => __('An error has occurred')], 400);
+        }
+
+        if ($field === 'timing') {
+            $project = DomainMonitoring::query()
+                ->where('user_id', Auth::id())
+                ->findOrFail($projectId);
+            $value = SiteMonitoringTiming::resolveForUser($value, Auth::user());
+        }
+
+        if ($field === 'link' && $value !== '' && !preg_match('#^https?://#i', $value)) {
+            $value = 'https://' . $value;
+        }
+
+        $updated = DomainMonitoring::query()
+            ->where('id', $projectId)
+            ->where('user_id', Auth::id())
+            ->update([
+                $field => $value,
+            ]);
+
+        if ($updated < 1) {
+            return response()->json(['message' => __('An error has occurred')], 404);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'name' => $field,
+            'value' => $value,
+        ]);
     }
 
     /**

@@ -19,7 +19,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="shortcut icon" href="{{ asset('img/favicon.svg') }}"/>
-    <title>@yield('title')</title>
+    @include('layouts.partials.document-title')
     @include('layouts.partials.lte4-head')
     <link rel="stylesheet" href="{{ asset('css/cabinet-telegram-prompt.css') }}">
     @yield('css')
@@ -76,19 +76,42 @@
 
 <script>
     (function ($) {
+        function cabinetAdminGearMenu() {
+            return $('#cabinet-admin-gear-menu');
+        }
+
         function closeCabinetAdminGear() {
+            var $menu = cabinetAdminGearMenu();
+            $menu.removeClass('is-open').css({top: '', left: '', display: ''});
+            var $home = $menu.data('gear-home');
+            if ($home && $home.length) {
+                $menu.appendTo($home);
+            }
             $('.cabinet-admin-gear.is-open').removeClass('is-open')
                 .find('.cabinet-admin-gear__toggle').attr('aria-expanded', 'false');
         }
+
         function positionCabinetAdminGearMenu($gear) {
             var $btn = $gear.find('.cabinet-admin-gear__toggle');
-            var $menu = $gear.find('.cabinet-admin-gear__menu');
-            var offset = $btn.offset();
-            var top = offset.top;
-            var left = offset.left + $btn.outerWidth() + 6;
+            var $menu = cabinetAdminGearMenu();
+            if (!$menu.length) {
+                return;
+            }
+            $menu.data('gear-home', $gear);
+            if (!$menu.parent().is('body')) {
+                $menu.appendTo(document.body);
+            }
+            $menu.addClass('is-open');
+            var rect = $btn[0].getBoundingClientRect();
             var menuWidth = $menu.outerWidth() || 272;
-            if (left + menuWidth > $(window).width() - 8) {
-                left = Math.max(8, offset.left - menuWidth - 6);
+            var menuHeight = $menu.outerHeight() || 240;
+            var top = rect.top;
+            var left = rect.right + 6;
+            if (left + menuWidth > window.innerWidth - 8) {
+                left = Math.max(8, rect.left - menuWidth - 6);
+            }
+            if (top + menuHeight > window.innerHeight - 8) {
+                top = Math.max(8, window.innerHeight - menuHeight - 8);
             }
             $menu.css({top: top + 'px', left: left + 'px'});
         }

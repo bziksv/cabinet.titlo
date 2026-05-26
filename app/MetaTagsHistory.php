@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MetaTagsHistory extends Model
 {
-    protected $fillable = ['meta_tag_id', 'ideal', 'quantity', 'data'];
+    protected $fillable = ['meta_tag_id', 'ideal', 'quantity', 'errors_count', 'data'];
 
     protected $dates = ['created_at'];
 

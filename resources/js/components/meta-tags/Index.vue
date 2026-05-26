@@ -1,243 +1,298 @@
 <template>
     <div>
-
-        <div class="row mb-4">
-            <div class="col-md-6">
-
-                <form @submit.prevent="onSubmitMetaTags">
-                    <div class="form-group">
-                        <label>{{ lang.check_url }}</label>
-                        <textarea type="text" class="form-control" rows="10" v-model="url"></textarea>
+        <div id="cabinet-mt-step-1" class="card shadow-sm border-0 cabinet-mt-check-card">
+            <div class="card-header py-2">
+                <div class="cabinet-mt-step__head">
+                    <span class="cabinet-mt-step-badge" aria-hidden="true">1</span>
+                    <div class="cabinet-mt-step__titles">
+                        <h3 class="cabinet-mt-step__title">{{ lang.step_1_title }}</h3>
+                        <p class="cabinet-mt-step__desc mb-0">{{ lang.step_1_hint || '' }}</p>
                     </div>
-
-                    <div class="form-group">
-                        <label>Получить данные</label>
-                        <select multiple class="custom-select" v-model="selectedOptions">
-                            <option v-for="option in availableOptions"
-                                    :key="option.value"
-                                    :value="option.value">
-                                {{ option.text }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>{{ lang.timeout_request }}</label>
-                        <input type="number" min="1" class="form-control" v-model="time">
-                    </div>
-
-                    <div class="row" v-for="len in length">
-                        <div class="col-sm-6">
-                            <!-- text input -->
-                            <div class="form-group">
-                                <label>{{ lang.length_word }} {{ len.name }}</label>
-                                <input type="number" class="form-control" :placeholder="lang.min" v-model.lazy="len.input.min">
-                            </div>
-                        </div>
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                <label>&nbsp;</label>
-                                <input type="number" class="form-control" :placeholder="lang.max" v-model.lazy="len.input.max">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-12">
-                            <input type="submit" class="btn btn-secondary" :value="lang.send">
-                        </div>
-                    </div>
-
-                </form>
-
+                </div>
             </div>
-        </div>
-
-        <div class="row">
-            <div class="col-md-12">
-
-                <div class="card" v-if="result.length">
-
-                    <div class="card-header">
-                        <h3 class="card-title">{{ lang.check_url }}</h3>
+            <div class="card-body">
+                <form @submit.prevent="onSubmitMetaTags">
+                    <div class="mb-3">
+                        <label class="form-label">{{ lang.check_url }}</label>
+                        <textarea class="form-control form-control-sm"
+                                  rows="8"
+                                  v-model="url"
+                                  :placeholder="lang.urls_placeholder"></textarea>
                     </div>
 
-                    <div class="progress">
-                        <div class="progress-bar" role="progressbar" :style="'width: '+ loading +'%;'" :aria-valuenow="loading" aria-valuemin="0" aria-valuemax="100">
-                            <span v-if="loading === 100">{{ lang.done }}</span>
-                            <span v-else>{{ loading }}%</span>
-                        </div>
-                    </div>
-
-                    <div class="card-body">
-
-                        <meta-filter :seen="seenCard" :metaTags="result" :lang="lang"></meta-filter>
-
-                        <div id="accordion">
-                            <div class="card" v-for="(url, index) in result" v-show="!seenCard.length || seenCard[index] === 1">
-                                    <div class="card-header card-header-accordion">
-                                        <h4 class="card-title">
-                                            <a class="d-block w-100 collapsed accordion-title" data-toggle="collapse" :href="'#collapse' + index" aria-expanded="false">
-                                                <i class="expandable-accordion-caret fas fa-caret-right fa-fw"></i> {{ url.title }}
-                                            </a>
-                                        </h4>
-
-                                        <div class="card-tools">
-                                            <div class="btn-group">
-                                                <button type="button" class="btn btn-tool dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
-                                                    <i class="fas fa-external-link-alt"></i>
-                                                </button>
-
-                                                <div class="dropdown-menu dropdown-menu-right" role="menu" style="">
-                                                    <a :href="url.url" target="_blank" class="dropdown-item">
-                                                        <i class="fas fa-external-link-alt"></i>
-                                                        {{ lang.go_to_site }}
-                                                    </a>
-                                                    <a href="#" class="dropdown-item" @click.prevent="Analyzer(url.url)">
-                                                        <i class="fas fa-chart-pie"></i>
-                                                        {{ lang.text_analysis }}
-                                                    </a>
-                                                </div>
-                                            </div>
-
-                                            <span v-for="error_badge in url.error.badge" v-if="error_badge.length" v-html="error_badge.join('')"></span>
-                                        </div>
-                                    </div>
-
-                                    <div :id="'collapse' + index" class="collapse" data-parent="#accordion" style="">
-                                        <div class="card-body">
-                                            <table class="table table-bordered">
-                                                <thead>
-                                                <tr>
-                                                    <th style="width: 150px;">{{ lang.tag }}</th>
-                                                    <th>{{ lang.content }}</th>
-                                                    <th style="width: 40px">{{ lang.count }}</th>
-                                                    <th style="width: 150px">{{ lang.main_problems }}</th>
-                                                </tr>
-                                                </thead>
-                                                <tbody>
-
-                                                <tr v-for="(item, tag) in url.data">
-                                                    <td><span class="badge badge-success">< {{ tag }} ></span></td>
-                                                    <td>
-                                                        <span v-if="item.length"><textarea class="form-control">{{ item.join( ', \r\n' ) }}</textarea></span>
-                                                        <span v-else class="badge badge-danger">{{ item }}</span>
-                                                    </td>
-                                                    <td>
-                                                        <span class="badge bg-warning">{{ item.length }}</span>
-                                                    </td>
-                                                    <td v-html="url.error.main[tag].join(' <br />')"></td>
-                                                </tr>
-
-                                                </tbody>
-                                            </table>
-                                        </div>
+                    <div class="mb-3">
+                        <label class="form-label d-block">{{ lang.fetch_fields }}</label>
+                        <div class="cabinet-mt-tags-picker border rounded p-2 bg-body-tertiary">
+                            <div class="row g-2">
+                                <div class="col-sm-6 col-lg-4"
+                                     v-for="option in availableOptions"
+                                     :key="option.value">
+                                    <div class="form-check mb-0">
+                                        <input type="checkbox"
+                                               class="form-check-input"
+                                               :id="'cabinetMtTag' + option.value"
+                                               :value="option.value"
+                                               v-model="selectedOptions">
+                                        <label class="form-check-label small"
+                                               :for="'cabinetMtTag' + option.value">
+                                            {{ option.text }}
+                                        </label>
                                     </div>
                                 </div>
+                            </div>
+                            <p v-if="!availableOptions.length" class="text-secondary small mb-0">
+                                {{ lang.tags_loading || 'Загрузка списка тегов…' }}
+                            </p>
                         </div>
+                        <div class="form-text">{{ lang.fetch_fields_hint }}</div>
+                    </div>
 
-                        <div class="row" v-if="FormShow">
-                            <div class="col-md-12">
-                                <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#ProjectModalForm" >{{ lang.save_as_project }}</button>
-                                <base-modal-form v-on:close-modal-form="CloseModalFormMetaTags" target="ProjectModalForm" method="post" request="/meta-tags" :data="result" :links="url" :lang="lang"></base-modal-form>
-                                <button type="button" class="btn btn-info" @click.prevent="Export('csv')">Экспорт CSV</button>
-                                <button type="button" class="btn btn-info" @click.prevent="Export('xlsx')">Экспорт XLSX</button>
+                    <div class="mb-3">
+                        <label class="form-label">{{ lang.timeout_request }}</label>
+                        <input type="number" min="1" class="form-control form-control-sm" v-model="time">
+                        <div class="form-text">{{ lang.timeout_hint }}</div>
+                    </div>
+
+                    <p class="text-secondary small mb-2">{{ lang.length_hint }}</p>
+                    <div class="row g-2" v-for="len in length" :key="len.id">
+                        <div class="col-sm-6">
+                            <div class="mb-3 mb-sm-0">
+                                <label class="form-label">{{ lang.length_word }}: {{ len.name }}</label>
+                                <input type="number" class="form-control form-control-sm" :placeholder="lang.min" v-model.lazy="len.input.min">
                             </div>
                         </div>
-
+                        <div class="col-sm-6">
+                            <div class="mb-3">
+                                <label class="form-label d-none d-sm-block">&nbsp;</label>
+                                <input type="number" class="form-control form-control-sm" :placeholder="lang.max" v-model.lazy="len.input.max">
+                            </div>
+                        </div>
                     </div>
+
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-search me-1" aria-hidden="true"></i>{{ lang.send }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div id="cabinet-mt-step-2"
+             class="card shadow-sm border-0 cabinet-mt-results-card"
+             v-if="result.length">
+            <div class="card-header py-2">
+                <div class="cabinet-mt-step__head">
+                    <span class="cabinet-mt-step-badge" aria-hidden="true">2</span>
+                    <div class="cabinet-mt-step__titles">
+                        <h3 class="cabinet-mt-step__title">{{ lang.results_title }}</h3>
+                        <p class="cabinet-mt-step__desc mb-0">{{ lang.step_2_hint || '' }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="progress rounded-0" role="progressbar" :aria-valuenow="loading" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar" :style="'width: '+ loading +'%;'">
+                    <span v-if="loading === 100">{{ lang.done }}</span>
+                    <span v-else>{{ loading }}%</span>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <meta-filter :seen.sync="seenCard" :metaTags="result" :lang="lang"></meta-filter>
+
+                <div id="cabinetMtAccordion" class="accordion">
+                    <div class="card border mb-2" v-for="(url, index) in result" :key="index" v-show="!seenCard.length || seenCard[index] === 1">
+                        <div class="card-header card-header-accordion py-2 d-flex align-items-start gap-2">
+                            <h4 class="card-title h6 mb-0 flex-grow-1">
+                                <a class="d-block accordion-title collapsed"
+                                   data-bs-toggle="collapse"
+                                   :href="'#collapse' + index"
+                                   role="button"
+                                   aria-expanded="false">
+                                    <i class="bi bi-chevron-right cabinet-mt-caret me-1" aria-hidden="true"></i>{{ url.title }}
+                                </a>
+                            </h4>
+                            <div class="dropdown">
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                        data-bs-toggle="dropdown"
+                                        aria-expanded="false">
+                                    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <a :href="url.url" target="_blank" rel="noopener" class="dropdown-item">
+                                            <i class="bi bi-box-arrow-up-right me-2" aria-hidden="true"></i>{{ lang.go_to_site }}
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="dropdown-item" @click.prevent="Analyzer(url.url)">
+                                            <i class="bi bi-pie-chart me-2" aria-hidden="true"></i>{{ lang.text_analysis }}
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                            <span v-for="(error_badge, tag) in url.error.badge"
+                                  :key="tag"
+                                  v-if="error_badge.length"
+                                  v-html="error_badge.join('')"></span>
+                        </div>
+
+                        <div :id="'collapse' + index" class="collapse" data-bs-parent="#cabinetMtAccordion">
+                            <div class="card-body pt-0">
+                                <table class="table table-sm table-bordered table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 150px;">{{ lang.tag }}</th>
+                                        <th>{{ lang.content }}</th>
+                                        <th style="width: 4rem">{{ lang.count }}</th>
+                                        <th style="width: 150px">{{ lang.main_problems }}</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr v-for="(item, tag) in url.data" :key="tag">
+                                        <td><span class="badge text-bg-success">&lt; {{ tag }} &gt;</span></td>
+                                        <td>
+                                            <span v-if="item.length"><textarea class="form-control form-control-sm" readonly>{{ item.join( ', \r\n' ) }}</textarea></span>
+                                            <span v-else class="badge text-bg-danger">{{ item }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge text-bg-warning">{{ item.length }}</span>
+                                        </td>
+                                        <td v-html="url.error.main[tag].join(' <br />')"></td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap cabinet-mt-export-actions mt-3" v-if="FormShow">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#ProjectModalForm">
+                        <i class="bi bi-folder-plus me-1" aria-hidden="true"></i>{{ lang.save_as_project }}
+                    </button>
+                    <base-modal-form v-on:close-modal-form="CloseModalFormMetaTags" target="ProjectModalForm" method="post" request="/meta-tags" :data="result" :links="url" :lang="lang"></base-modal-form>
+                    <button type="button" class="btn btn-outline-primary btn-sm" @click.prevent="Export('csv')">
+                        <i class="bi bi-download me-1" aria-hidden="true"></i>{{ lang.export_csv }}
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" @click.prevent="Export('xlsx')">
+                        <i class="bi bi-download me-1" aria-hidden="true"></i>{{ lang.export_xlsx }}
+                    </button>
                 </div>
             </div>
         </div>
 
-        <div class="row" v-if="metas.length">
-            <div class="col-md-12">
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">{{ lang.projects }}</h3>
+        <div id="cabinet-mt-step-3" class="card shadow-sm border-0 cabinet-mt-projects-card">
+            <div class="card-header py-2">
+                <div class="cabinet-mt-step__head">
+                    <span class="cabinet-mt-step-badge" aria-hidden="true">3</span>
+                    <div class="cabinet-mt-step__titles">
+                        <h3 class="cabinet-mt-step__title">{{ lang.projects_title }}</h3>
+                        <p class="cabinet-mt-step__desc mb-0">{{ lang.step_3_hint || '' }}</p>
                     </div>
-
-                    <div class="card-body table-responsive p-0">
-                        <table class="table table-striped projects">
-                            <thead>
-                            <tr>
-                                <th style="width: 1%">{{ lang.id }}</th>
-                                <th style="width: 15%">{{ lang.name }}</th>
-                                <th style="width: 10%">{{ lang.period }}</th>
-                                <th style="width: 10%">{{ lang.timeout }}</th>
-                                <th style="width: 25%">{{ lang.link }}</th>
-                                <th style="width: 9%">{{ lang.status }}</th>
-                                <th style="width: 30%"></th>
-                            </tr>
-                            </thead>
-
-                            <tbody>
-                                <tr v-for="meta in metas" :key="meta.id">
-                                    <td>{{ meta.id }}</td>
-                                    <td>{{ meta.name }}</td>
-                                    <td>
-                                        <select class="form-control" v-model.number="meta.period" @change.prevent="onSubmitMetaTagsEditField(meta)">
-                                            <option v-for="option in options" :value="option.value">{{option.text}}</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" min="1" v-model.number="meta.timeout" @keyup.prevent="onSubmitMetaTagsEditField(meta)">
-                                            <div class="input-group-append">
-                                                <span class="input-group-text">ms.</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <textarea class="form-control" v-text="meta.links"></textarea>
-                                    </td>
-                                    <td>
-                                        <div class="form-group">
-                                            <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
-                                                <input type="checkbox" class="custom-control-input" :id="'customSwitchStatus' + meta.id" v-model="meta.status" @change.prevent="onSubmitMetaTagsEditField(meta)">
-                                                <label class="custom-control-label" :for="'customSwitchStatus' + meta.id">{{ lang.off }} / {{ lang.on }}</label>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="project-actions text-right">
-
-                                        <a class="btn btn-info btn-sm" target="_blank" :href="'/meta-tags/histories/' + meta.id">
-                                            <i class="fas fa-list"></i>
-                                            {{ lang.history }}
-                                        </a>
-                                        <a class="btn btn-info btn-sm" href="#" @click.prevent="StartMetaTags(meta)">
-                                            <i class="fas fa-play-circle"></i>
-                                            {{ lang.start }}
-                                        </a>
-                                        <a class="btn btn-info btn-sm" href="#" data-toggle="modal" data-target="#ProjectModalFormEdit" @click.prevent="onSubmitMetaTagsEdit(meta)">
-                                            <i class="fas fa-edit"></i>
-                                            {{ lang.edit }}
-                                        </a>
-                                        <a class="btn btn-info btn-sm" @click.prevent="DeleteMetaTags(meta.id)">
-                                            <i class="fas fa-trash-alt"></i>
-                                            {{ lang.delete }}
-                                        </a>
-
-                                    </td>
-                                </tr>
-
-                            </tbody>
-
-                            <base-modal-form v-on:close-modal-form="CloseModalFormMetaTags"
-                                             target="ProjectModalFormEdit"
-                                             method="patch"
-                                             :values="value"
-                                             :request="'/meta-tags/' + request"
-                                             :lang="lang"
-                            ></base-modal-form>
-                        </table>
-                    </div>
-                    <!-- /.card-body -->
                 </div>
             </div>
-        </div>
 
+            <div v-if="!metas.length" class="card-body">
+                <p class="text-secondary small mb-0">{{ lang.projects_empty_hint }}</p>
+            </div>
+
+            <div v-else class="table-responsive">
+                <table class="table table-sm table-hover table-striped align-middle cabinet-mt-projects-table mb-0">
+                    <thead class="table-light">
+                    <tr>
+                        <th style="width: 1%">{{ lang.id }}</th>
+                        <th style="width: 14%">{{ lang.name }}</th>
+                        <th style="width: 10%">{{ lang.period }}</th>
+                        <th style="width: 10%">{{ lang.timeout }}</th>
+                        <th style="width: 24%">{{ lang.link }}</th>
+                        <th style="width: 8%">{{ lang.status }}</th>
+                        <th class="cabinet-mt-col-actions">{{ lang.actions }}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr v-for="meta in metas" :key="meta.id">
+                        <td>{{ meta.id }}</td>
+                        <td>{{ meta.name }}</td>
+                        <td class="text-nowrap small">{{ lang.period_24h }}</td>
+                        <td>
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control" min="1" v-model.number="meta.timeout" @keyup.prevent="onSubmitMetaTagsEditField(meta)">
+                                <span class="input-group-text">{{ lang.ms_unit }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <textarea class="form-control form-control-sm" readonly v-text="meta.links"></textarea>
+                        </td>
+                        <td>
+                            <div class="form-check form-switch form-switch-sm cabinet-mt-status-switch mb-0">
+                                <input type="checkbox"
+                                       class="form-check-input"
+                                       role="switch"
+                                       :id="'customSwitchStatus' + meta.id"
+                                       v-model="meta.status"
+                                       @change.prevent="onSubmitMetaTagsEditField(meta)">
+                                <label class="form-check-label small" :for="'customSwitchStatus' + meta.id">
+                                    {{ meta.status ? lang.on : lang.off }}
+                                </label>
+                            </div>
+                        </td>
+                        <td class="cabinet-mt-col-actions">
+                            <div class="btn-group btn-group-sm cabinet-mt-project-actions"
+                                 role="group"
+                                 :aria-label="lang.actions">
+                                <a class="btn btn-outline-secondary cabinet-mt-action-tip"
+                                   target="_blank"
+                                   rel="noopener"
+                                   :href="'/meta-tags/histories/' + meta.id"
+                                   data-bs-toggle="tooltip"
+                                   data-bs-placement="top"
+                                   :data-bs-title="lang.action_tip_history">
+                                    <i class="bi bi-clock-history" aria-hidden="true"></i>
+                                    <span class="visually-hidden">{{ lang.history }}</span>
+                                </a>
+                                <button type="button"
+                                        class="btn btn-outline-primary cabinet-mt-action-tip"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        :data-bs-title="lang.action_tip_run"
+                                        @click.prevent="StartMetaTags(meta)">
+                                    <i class="bi bi-play-fill" aria-hidden="true"></i>
+                                    <span class="visually-hidden">{{ lang.action_run }}</span>
+                                </button>
+                                <button type="button"
+                                        class="btn btn-outline-secondary cabinet-mt-action-tip"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        :data-bs-title="lang.action_tip_edit"
+                                        @click.prevent="onSubmitMetaTagsEdit(meta)">
+                                    <i class="bi bi-pencil" aria-hidden="true"></i>
+                                    <span class="visually-hidden">{{ lang.edit }}</span>
+                                </button>
+                                <button type="button"
+                                        class="btn btn-outline-danger cabinet-mt-action-tip"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        :data-bs-title="lang.action_tip_delete"
+                                        @click.prevent="DeleteMetaTags(meta.id)">
+                                    <i class="bi bi-trash" aria-hidden="true"></i>
+                                    <span class="visually-hidden">{{ lang.delete }}</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <base-modal-form v-on:close-modal-form="CloseModalFormMetaTags"
+                             target="ProjectModalFormEdit"
+                             method="patch"
+                             :values="value"
+                             :request="'/meta-tags/' + request"
+                             :lang="lang"
+            ></base-modal-form>
+        </div>
     </div>
 </template>
 
@@ -256,10 +311,18 @@
             },
             lang: {
                 type: [Object, Array]
+            },
+            tagsOptions: {
+                type: Array,
+                default: () => [],
             }
+        },
+        computed: {
         },
         created() {
             var app = this;
+            this.initTagOptions(this.tagsOptions);
+
             if (this.meta && this.meta.length) {
                 this.metas = this.meta;
             } else {
@@ -274,11 +337,15 @@
                     app.TariffMetaTagsPages = response.data;
                 });
 
-            axios.get('/meta-tags/tags-options')
-                .then(response => {
-                    this.availableOptions = response.data;
-                    this.selectedOptions = response.data.map(option => option.value);
-                });
+            if (!this.availableOptions.length) {
+                axios.get('/meta-tags/tags-options')
+                    .then(function (response) {
+                        app.initTagOptions(response.data || []);
+                    })
+                    .catch(function () {
+                        toastr.error(app.lang.tags_load_error || 'Не удалось загрузить список тегов');
+                    });
+            }
         },
         data() {
             return {
@@ -297,19 +364,19 @@
                 ],
                 result: [],
                 seenCard: [],
-                options: [
-                    {value: 0, text: 'manual'},
-                    {value: 6, text: '6 часов'},
-                    {value: 12, text: '12 часов'},
-                    {value: 24, text: '24 часов'},
-                ],
                 startBtnProjectId: null,
                 selectedOptions: [],
                 availableOptions: [],
             }
         },
-        computed: {
-
+        mounted() {
+            this.initProjectActionTooltips();
+        },
+        updated() {
+            this.initProjectActionTooltips();
+        },
+        beforeDestroy() {
+            this.disposeProjectActionTooltips();
         },
         watch:{
             result: function(val){
@@ -321,6 +388,7 @@
             loading: function(val){
 
                 if(this.startBtnProjectId && val === 100 && this.FormShow){
+                    var self = this;
 
                     axios.request({
                         url: '/meta-tags/histories/' + this.startBtnProjectId,
@@ -329,7 +397,7 @@
                     }).then(function(response){
 
                         if(response.statusText === "OK");
-                            toastr.success('История добавлена');
+                            toastr.success(self.lang.history_saved);
 
                     }).catch(function (error) {
 
@@ -341,45 +409,67 @@
             }
         },
         methods: {
-            BreakException(message) {
-                this.message = message;
-                this.name = "Исключение, определённое пользователем";
+            initTagOptions(options) {
+                if (!Array.isArray(options) || !options.length) {
+                    return;
+                }
+                this.availableOptions = options;
+                this.selectedOptions = options.map(function (option) {
+                    return option.value;
+                });
+            },
+            initProjectActionTooltips() {
+                var self = this;
+                this.$nextTick(function () {
+                    if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) {
+                        return;
+                    }
+                    var root = document.getElementById('cabinet-mt-step-3');
+                    if (!root) {
+                        return;
+                    }
+                    root.querySelectorAll('.cabinet-mt-action-tip[data-bs-toggle="tooltip"]').forEach(function (el) {
+                        var inst = bootstrap.Tooltip.getInstance(el);
+                        if (inst) {
+                            inst.dispose();
+                        }
+                        new bootstrap.Tooltip(el, {
+                            container: 'body',
+                            trigger: 'hover focus',
+                            boundary: 'viewport',
+                            customClass: 'cabinet-mt-action-tooltip',
+                        });
+                    });
+                });
+            },
+            disposeProjectActionTooltips() {
+                if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) {
+                    return;
+                }
+                var root = document.getElementById('cabinet-mt-step-3');
+                if (!root) {
+                    return;
+                }
+                root.querySelectorAll('.cabinet-mt-action-tip[data-bs-toggle="tooltip"]').forEach(function (el) {
+                    var inst = bootstrap.Tooltip.getInstance(el);
+                    if (inst) {
+                        inst.dispose();
+                    }
+                });
+            },
+            openTextAnalyzer(pageUrl) {
+                if (!pageUrl) {
+                    return;
+                }
+                var encoded = String(pageUrl).replace(/\//g, 'abc');
+                window.location.href = '/redirect-to-text-analyzer/' + encoded;
             },
             Analyzer(link) {
-
-                var form = document.createElement("form");
-
-                form.action = "/text-analyzer";
-                form.method = "POST";
-                form.target = "_blank";
-
-                var _token = document.createElement("input");
-                _token.setAttribute("type", "text");
-                _token.setAttribute("name", "_token");
-                _token.setAttribute("value", $('meta[name="csrf-token"]').attr('content'));
-                form.appendChild(_token);
-
-                var type = document.createElement("input");
-                type.setAttribute("type", "text");
-                type.setAttribute("name", "type");
-                type.setAttribute("value", "url");
-                form.appendChild(type);
-
-                var text = document.createElement("input");
-                text.setAttribute("type", "text");
-                text.setAttribute("name", "url");
-                text.setAttribute("value", link);
-                form.appendChild(text);
-
-                document.body.appendChild(form);
-
-                form.submit();
-
-                form.remove();
+                this.openTextAnalyzer(link);
             },
             StartMetaTags(meta)
             {
-                $("html, body").stop().animate({scrollTop : 200}, 500, 'swing');
+                $("html, body").stop().animate({scrollTop: $('#cabinet-mt-step-1').offset().top - 80}, 500, 'swing');
 
                 this.url = meta.links;
                 this.time = meta.timeout;
@@ -397,6 +487,8 @@
 
             onSubmitMetaTagsEditField(meta)
             {
+                var app = this;
+                meta.period = 24;
 
                 axios.request({
                     url: '/meta-tags/' + meta.id,
@@ -405,7 +497,7 @@
                 }).then(function(response){
 
                     if(response.statusText === "OK");
-                        toastr.success('Успешно изменено');
+                        toastr.success(app.lang.saved_success);
 
                 }).catch(function (error) {
 
@@ -418,11 +510,21 @@
 
                 this.request = meta.id;
                 this.value = meta;
+
+                var modalEl = document.getElementById('ProjectModalFormEdit');
+                if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
             },
 
             onSubmitMetaTags()
             {
                 let url = '';
+
+                if (!this.selectedOptions.length) {
+                    toastr.warning(this.lang.tags_none_selected || 'Выберите хотя бы один тег для проверки');
+                    return false;
+                }
 
                 if(this.url.length){
                     url = this.StringAsObj(this.url);
@@ -441,7 +543,7 @@
                         }, i * this.time);
                     });
                 } else{
-                    this.url = '';
+                    toastr.warning(this.lang.urls_empty);
                 }
             },
 
@@ -456,22 +558,26 @@
                 }).then(function (response) {
                     app.result.push(response.data);
                 }).catch(function (error) {
-                    toastr.error(error.response.data.message);
+                    if (error.response && error.response.data && error.response.data.message) {
+                        toastr.error(error.response.data.message);
+                    }
                 });
             },
 
             DeleteMetaTags(id)
             {
+                var app = this;
 
-                let del = confirm("Your sure?");
-                if(del){
-                    let idx = _.findIndex(this.metas, function(o) { return o.id === id; });
-
-                    axios.delete('/meta-tags/' + id);
-                    this.metas.splice(idx, 1);
-
-                    toastr.info('Успешно удалено');
+                if (!confirm(app.lang.delete_confirm)) {
+                    return;
                 }
+
+                let idx = _.findIndex(this.metas, function(o) { return o.id === id; });
+
+                axios.delete('/meta-tags/' + id);
+                this.metas.splice(idx, 1);
+
+                toastr.info(app.lang.deleted_success);
             },
 
             CloseModalFormMetaTags: function(response) {
@@ -525,7 +631,6 @@
 </script>
 
 <style scoped>
-
     .list-item {
         display: inline-block;
         margin-right: 10px;
@@ -533,9 +638,8 @@
     .list-enter-active, .list-leave-active {
         transition: all 1s;
     }
-    .list-enter, .list-leave-to /* .list-leave-active до версии 2.1.8 */ {
+    .list-enter, .list-leave-to {
         opacity: 0;
         transform: translateY(30px);
     }
-
 </style>

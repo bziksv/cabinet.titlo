@@ -90,3 +90,5 @@ Route::post('demo/vydelenie-unikalnykh-slov-v-tekste/run', 'Api\\Demo\\UniqueWor
 Route::post('demo/klasterizator-klyuchevykh-slov/run', 'Api\\Demo\\ClusterDemoController@run');
 Route::post('demo/klasterizator-klyuchevykh-slov/poll', 'Api\\Demo\\ClusterDemoController@poll');
 Route::post('demo/monitoring-saytov/run', 'Api\\Demo\\SiteMonitoringDemoController@run');
+Route::post('demo/proverka-meta-tegov-online/run', 'Api\\Demo\\MetaTagsDemoController@run');
+Route::post('demo/otslezhivanie-sroka-registratsii-domenov/run', 'Api\\Demo\\DomainInformationDemoController@run');

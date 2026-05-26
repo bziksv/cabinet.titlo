@@ -1,64 +1,71 @@
 @component('component.card', [
-    'title' => __('Monitored domains'),
-    'titleHtml' => e(__('Monitored domains')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-site-monitoring'])->render(),
+    'title' => __('Site monitoring'),
+    'titleHtml' => e(__('Site monitoring')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-site-monitoring'])->render(),
 ])
     @slot('css')
-        <link rel="stylesheet" type="text/css"
-              href="{{ asset('plugins/list-comparison/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/datatable.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/site-monitoring/css/site-monitoring.css') }}"/>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-module-kpi.css') }}?v={{ @filemtime(public_path('css/cabinet-module-kpi.css')) ?: time() }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-monitoring.css') }}?v={{ @filemtime(public_path('css/cabinet-site-monitoring.css')) ?: time() }}">
     @endslot
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <div id="toast-container" class="toast-top-right success-message" style="display:none;">
-        <div class="toast toast-success" aria-live="polite">
-            <div class="toast-message">{{ __('Successfully changed') }}</div>
+    <div class="cabinet-sm-toasts" aria-live="polite">
+        <div class="toast-top-right success-message" hidden>
+            <div class="toast toast-success">
+                <div class="toast-message">{{ __('Successfully changed') }}</div>
+            </div>
         </div>
-    </div>
-    <div id="toast-container" class="toast-top-right delete-success-message" style="display:none;">
-        <div class="toast toast-success" aria-live="polite">
-            <div class="toast-message">{{ __('Successfully deleted') }}</div>
+        <div class="toast-top-right delete-success-message" hidden>
+            <div class="toast toast-success">
+                <div class="toast-message">{{ __('Successfully deleted') }}</div>
+            </div>
         </div>
-    </div>
-    <div id="toast-container" class="toast-top-right error-message" style="display:none;">
-        <div class="toast toast-error" aria-live="assertive">
-            <div class="toast-message error-msg">{{ __('The field must contain more than 0 characters') }}</div>
+        <div class="toast-top-right error-message" hidden>
+            <div class="toast toast-error" aria-live="assertive">
+                <div class="toast-message error-msg">{{ __('The field must contain more than 0 characters') }}</div>
+            </div>
         </div>
-    </div>
-    <div id="toast-container" class="toast-top-right delete-error-message" style="display:none;">
-        <div class="toast toast-error" aria-live="assertive">
-            <div class="toast-message error-msg">{{ __('You need to select the projects you want to delete') }}</div>
+        <div class="toast-top-right delete-error-message" hidden>
+            <div class="toast toast-error" aria-live="assertive">
+                <div class="toast-message error-msg">{{ __('You need to select the projects you want to delete') }}</div>
+            </div>
         </div>
     </div>
     <div class="cabinet-site-mon-page">
         @include('site-monitoring.partials.module-nav', ['active' => 'projects', 'admin' => $admin ?? false])
         @include('site-monitoring.partials.free-tariff-email-notice')
 
-        <div class="d-flex flex-wrap align-items-center cabinet-site-mon-toolbar">
-            <a href="{{ route('add.site.monitoring.view') }}" class="btn btn-primary text-nowrap">
-                <i class="fa fa-plus me-1" aria-hidden="true"></i>{{ __('Add monitoring project') }}
-            </a>
-            <button type="button"
-                    class="btn btn-outline-warning"
-                    id="cabinetSmResetAllStats"
-                    @if(($countProjects ?? 0) < 1) disabled @endif
-                    title="{{ __('Site monitoring reset all stats') }}">
-                <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>{{ __('Site monitoring reset all stats') }}
-            </button>
-            <button type="button" class="btn btn-outline-danger" id="selectedProjects">
-                {{ __('Delete selected projects') }}
-            </button>
-            <span class="text-secondary small ms-auto cabinet-site-mon-toolbar__count">
-                {{ __('Count tracked projects') }}: <strong id="count-projects">{{ $countProjects }}</strong>
-            </span>
+        @include('site-monitoring.partials.list-kpi', ['summary' => $listSummary])
+
+        <div class="card shadow-sm border-0 cabinet-site-mon-toolbar-card">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex flex-wrap align-items-center gap-2 cabinet-site-mon-toolbar">
+                    <a href="{{ route('add.site.monitoring.view') }}" class="btn btn-primary btn-sm text-nowrap">
+                        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>{{ __('Add monitoring project') }}
+                    </a>
+                    <button type="button"
+                            class="btn btn-outline-warning btn-sm"
+                            id="cabinetSmResetAllStats"
+                            @if(($countProjects ?? 0) < 1) disabled @endif
+                            title="{{ __('Site monitoring reset all stats') }}">
+                        <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>{{ __('Site monitoring reset all stats') }}
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="selectedProjects">
+                        <i class="bi bi-trash me-1" aria-hidden="true"></i>{{ __('Delete selected projects') }}
+                    </button>
+                    <span class="text-secondary small ms-auto cabinet-site-mon-toolbar__count">
+                        {{ __('Count tracked projects') }}: <strong id="count-projects">{{ $countProjects }}</strong>
+                    </span>
+                </div>
+            </div>
         </div>
         <input type="hidden" class="checked-projects">
 
-        <div class="cabinet-sm-datatable">
-    <table id="table" class="table table-sm table-bordered table-striped align-middle cabinet-sm-table w-100 mb-0">
-        <thead>
+        <div class="card shadow-sm border-0 cabinet-sm-table-card">
+            <div class="card-body p-0 cabinet-sm-datatable">
+    <table id="table" class="table table-sm table-hover table-striped align-middle cabinet-sm-table w-100 mb-0">
+        <thead class="table-light">
         <tr>
             <th class="cabinet-sm-th-check" aria-label="{{ __('Select') }}"></th>
             <th class="col-2">{{ __('Project name') }} </th>
@@ -66,14 +73,25 @@
             <th class="col-2">{{ __('Keyword') }} </th>
             <th class="col-1">{{ __('Monitoring frequency') }}</th>
             <th class="col-1">{{ __('Response timeout') }}</th>
+            <th class="cabinet-sm-th-check-type">{{ __('Site monitoring col check type') }}</th>
             <th class="col-2">{{ __('Status') }}</th>
+            <th class="text-end cabinet-sm-th-uptime">{{ __('Uptime') }}</th>
             <th class="text-center">{{ __('Notifications') }}</th>
             <th class="col-1"></th>
         </tr>
         </thead>
         <tbody>
         @foreach($projects as $project)
-            <tr id="{{ $project->id }}">
+            @php
+                $smSearchBlob = mb_strtolower(trim(implode(' ', array_filter([
+                    $project->project_name,
+                    $project->link,
+                    $project->phrase ?? '',
+                    $project->code !== null ? (string) $project->code : '',
+                    __($project->status),
+                ]))));
+            @endphp
+            <tr id="{{ $project->id }}" data-project-id="{{ $project->id }}" data-search="{{ e($smSearchBlob) }}">
                 <td class="cabinet-sm-td-check checbox-for-remove-project">
                     <input type="checkbox"
                            id="project-{{ $project->id }}"
@@ -84,6 +102,7 @@
                 </td>
                 <td>
                     <div class="cabinet-sm-cell">
+                        <span class="visually-hidden cabinet-sm-dt-search">{{ $smSearchBlob }}</span>
                         {!! Form::text('project_name', $project->project_name, ['class' => 'form-control form-control-sm monitoring', 'data-order' => $project->project_name]) !!}
                     </div>
                 </td>
@@ -121,73 +140,78 @@
                         ], $project->waiting_time, ['class' => 'form-select form-select-sm monitoring']) !!}
                     </div>
                 </td>
+                <td data-order="{{ $project->isPendingResetStatus() ? -1 : (trim((string) ($project->phrase ?? '')) !== '' ? ($project->broken && $project->status === 'Keyword not found' ? 1 : 0) : ($project->code ?? 0)) }}" class="cabinet-sm-td-check-type">
+                    <div class="cabinet-sm-cell">
+                        @include('site-monitoring.partials.check-type-cell', ['project' => $project])
+                    </div>
+                </td>
                 <td data-order="{{ $project->isPendingResetStatus() ? 2 : ($project->broken ? 1 : 0) }}">
                     <div class="cabinet-sm-cell">
                         @include('site-monitoring.partials.status-cell', ['project' => $project])
                     </div>
                 </td>
+                <td data-order="{{ $project->isPendingResetStatus() ? -1 : ($project->uptime_percent ?? 0) }}" class="cabinet-sm-td-uptime">
+                    <div class="cabinet-sm-cell">
+                        @include('site-monitoring.partials.uptime-cell', ['project' => $project])
+                    </div>
+                </td>
                 <td data-order="{{ $project->send_notification }}" class="cabinet-sm-td-notify">
                     <div class="cabinet-sm-cell cabinet-sm-cell--center">
-                        <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success mb-0">
+                        <div class="form-check form-switch form-switch-sm mb-0 cabinet-sm-notify-switch">
                             <input type="checkbox"
-                                   class="custom-control-input send-notification-switch"
+                                   class="form-check-input send-notification-switch"
+                                   role="switch"
                                    @if($project->send_notification) checked @endif
-                                   id="customSwitch{{ $project->id }}">
-                            <label class="custom-control-label" for="customSwitch{{ $project->id }}"></label>
+                                   id="notifySwitch{{ $project->id }}">
+                            <label class="form-check-label visually-hidden" for="notifySwitch{{ $project->id }}">
+                                {{ __('Notifications') }}
+                            </label>
                         </div>
                     </div>
                 </td>
                 <td class="cabinet-sm-actions">
                     <div class="cabinet-sm-cell cabinet-sm-cell--center cabinet-sm-cell--actions">
-                        <button class="btn btn-outline-secondary btn-sm __helper-link ui_tooltip_w check" type="button"
-                                data-target="{{ $project->id }}">
-                            <i aria-hidden="true" class="fa fa-search"></i>
-                            <span class="ui_tooltip __left __l">
-                                <span class="ui_tooltip_content" style="width: 250px !important;">
-                                    {{ __('Run the check manually') }}
-                                </span>
-                            </span>
-                        </button>
-                        <button class="btn btn-outline-primary btn-sm __helper-link ui_tooltip_w cabinet-sm-stats-log" type="button"
-                                data-project-id="{{ $project->id }}"
-                                data-project-name="{{ $project->project_name }}">
-                            <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
-                            <span class="ui_tooltip __left __l">
-                                <span class="ui_tooltip_content" style="width: 250px !important;">
-                                    {{ __('Site monitoring stats log') }}
-                                </span>
-                            </span>
-                        </button>
-                        <button class="btn btn-outline-warning btn-sm __helper-link ui_tooltip_w cabinet-sm-stats-reset" type="button"
-                                data-project-id="{{ $project->id }}">
-                            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
-                            <span class="ui_tooltip __left __l">
-                                <span class="ui_tooltip_content" style="width: 250px !important;">
-                                    {{ __('Site monitoring reset stats') }}
-                                </span>
-                            </span>
-                        </button>
-                        <button class="btn btn-outline-danger btn-sm __helper-link ui_tooltip_w" type="button"
-                                data-bs-toggle="modal" data-bs-target="#remove-project-id-{{ $project->id }}">
-                            <i class="fa fa-trash" aria-hidden="true"></i>
-                            <span class="ui_tooltip __left __l">
-                                <span class="ui_tooltip_content" style="width: 250px !important;">
-                                    {{ __('Delete a project') }}
-                                </span>
-                            </span>
-                        </button>
+                        <div class="btn-group btn-group-sm" role="group" aria-label="{{ __('Actions') }}">
+                            <button class="btn btn-outline-secondary check" type="button"
+                                    data-target="{{ $project->id }}"
+                                    title="{{ __('Run the check manually') }}">
+                                <i class="bi bi-play-fill" aria-hidden="true"></i>
+                            </button>
+                            <button class="btn btn-outline-primary cabinet-sm-stats-log" type="button"
+                                    data-project-id="{{ $project->id }}"
+                                    data-project-name="{{ $project->project_name }}"
+                                    title="{{ __('Site monitoring stats log') }}">
+                                <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
+                            </button>
+                            <button class="btn btn-outline-warning cabinet-sm-stats-reset" type="button"
+                                    data-project-id="{{ $project->id }}"
+                                    title="{{ __('Site monitoring reset stats') }}">
+                                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" type="button"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#remove-project-id-{{ $project->id }}"
+                                    title="{{ __('Delete a project') }}">
+                                <i class="bi bi-trash" aria-hidden="true"></i>
+                            </button>
+                        </div>
                     </div>
                 </td>
             </tr>
         @endforeach
         </tbody>
     </table>
+            </div>
         </div>
 
         @foreach($projects as $project)
             <div class="modal fade" id="remove-project-id-{{ $project->id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">{{ __('Delete a project') }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                        </div>
                         <div class="modal-body">
                             <p class="mb-1">{{ __('Delete a project') }} «{{ $project->project_name }}»</p>
                             <p class="mb-0 text-secondary">{{ __('Are you sure?') }}</p>
@@ -227,6 +251,9 @@
                 'labels' => [
                     'httpCode' => __('http code'),
                     'uptime' => __('Uptime'),
+                    'phraseCheckOk' => __('Site monitoring phrase check ok'),
+                    'phraseCheckFail' => __('Site monitoring phrase check fail'),
+                    'checkCode' => __('Site monitoring check code', ['code' => ':code']),
                     'resetConfirm' => __('Site monitoring reset stats confirm'),
                     'resetAllConfirm' => __('Site monitoring reset all stats confirm', [
                         'count' => (int) ($countProjects ?? 0),
@@ -278,21 +305,49 @@
 
             let statsModalProjectId = null;
 
+            function renderCheckTypeCell(response) {
+                let inner = '<span class="text-secondary">—</span>'
+                if (!response.pending && response.code != null) {
+                    if (!response.has_phrase) {
+                        const tone = parseInt(response.code, 10) === 200 ? 'text-success' : 'text-danger'
+                        const label = cabinetSmLabels.checkCode.replace(':code', String(response.code))
+                        inner = '<span class="' + tone + '">' + escapeHtml(label) + '</span>'
+                    } else if (response.phrase_fail) {
+                        inner = '<span class="text-danger fw-semibold">' + escapeHtml(cabinetSmLabels.phraseCheckFail) + '</span>'
+                    } else {
+                        inner = '<span class="text-success">' + escapeHtml(cabinetSmLabels.phraseCheckOk) + '</span>'
+                    }
+                }
+                return '<div class="cabinet-sm-cell"><div class="cabinet-sm-check-type small">' + inner + '</div></div>'
+            }
+
             function renderStatusCell(response) {
                 const pending = !!response.pending
-                const statusClass = pending
-                    ? 'cabinet-sm-status--pending'
-                    : (response.broken ? 'cabinet-sm-status--bad' : 'cabinet-sm-status--ok')
-                let html = '<div class="cabinet-sm-cell"><div class="cabinet-sm-status ' + statusClass + ' small">' +
-                    '<div>' + escapeHtml(response.status) + '</div>'
+                const badgeClass = pending
+                    ? 'text-bg-secondary'
+                    : (response.broken ? 'text-bg-danger' : 'text-bg-success')
+                let html = '<div class="cabinet-sm-cell"><div class="cabinet-sm-status small">' +
+                    '<span class="badge ' + badgeClass + ' fw-normal">' + escapeHtml(response.status) + '</span>'
                 if (pending) {
-                    html += '<div class="text-secondary">' + escapeHtml(cabinetSmLabels.statusResetHint) + '</div>'
-                } else if (response.code != null) {
-                    html += '<div>' + cabinetSmLabels.httpCode + ': ' + response.code + '</div>' +
-                        '<div>' + cabinetSmLabels.uptime + ': ' + response.uptime + '%</div>'
+                    html += '<div class="text-secondary mt-1">' + escapeHtml(cabinetSmLabels.statusResetHint) + '</div>'
                 }
                 html += '</div></div>'
                 return html
+            }
+
+            function renderUptimeCell(response) {
+                let inner = '<span class="text-secondary">—</span>'
+                if (!response.pending && response.uptime != null) {
+                    inner = '<strong class="text-body">' + escapeHtml(String(response.uptime)) + '%</strong>'
+                }
+                return '<div class="cabinet-sm-cell"><div class="cabinet-sm-uptime small text-end text-nowrap">' + inner + '</div></div>'
+            }
+
+            function applyProjectRowCells($row, response) {
+                $row.children('td').eq(6).html(renderCheckTypeCell(response))
+                $row.children('td').eq(7).html(renderStatusCell(response))
+                $row.children('td').eq(8).html(renderUptimeCell(response))
+                cabinetSmRefreshRowSearch($row)
             }
 
             function escapeHtml(text) {
@@ -383,6 +438,128 @@
 
                 $('#cabinetSmStatsModalBody').html(kpiHtml + meta + incidentsHtml + timelineHtml)
             }
+            function cabinetSmRowSearchBlob($row) {
+                const parts = []
+                $row.find('input.monitoring').each(function () {
+                    const val = ($(this).val() || '').trim()
+                    if (val) {
+                        parts.push(val)
+                    }
+                })
+                $row.find('.cabinet-sm-status .badge, .cabinet-sm-check-type, .cabinet-sm-uptime').each(function () {
+                    const val = ($(this).text() || '').trim()
+                    if (val && val !== '—') {
+                        parts.push(val)
+                    }
+                })
+                return parts.join(' ').toLowerCase().replace(/\s+/g, ' ').trim()
+            }
+
+            function cabinetSmRefreshRowSearch($row) {
+                const blob = cabinetSmRowSearchBlob($row)
+                $row.attr('data-search', blob)
+                $row.find('.cabinet-sm-dt-search').text(blob)
+            }
+
+            function cabinetSmToastShow(selector, msg, timeoutMs) {
+                const $wrap = $(selector)
+                if (!$wrap.length) {
+                    return
+                }
+                $wrap.find('.toast-message').first().text(msg)
+                $wrap.stop(true, true).prop('hidden', false).addClass('is-visible')
+                clearTimeout($wrap.data('sm-toast-timer'))
+                $wrap.data('sm-toast-timer', setTimeout(function () {
+                    $wrap.removeClass('is-visible').prop('hidden', true)
+                }, timeoutMs || 4000))
+            }
+
+            function cabinetSmToastSuccess(msg) {
+                cabinetSmToastShow('.cabinet-sm-toasts .success-message', msg || cabinetSmLabels.successChanged, 4000)
+            }
+
+            function cabinetSmToastError(msg) {
+                cabinetSmToastShow('.cabinet-sm-toasts .error-message', msg || cabinetSmLabels.errorGeneric, 5000)
+            }
+
+            function cabinetSmToastDeleteSuccess(msg) {
+                cabinetSmToastShow('.cabinet-sm-toasts .delete-success-message', msg || @json(__('Successfully deleted')), 4000)
+            }
+
+            function cabinetSmToastDeleteError(msg) {
+                cabinetSmToastShow('.cabinet-sm-toasts .delete-error-message', msg || @json(__('You need to select the projects you want to delete')), 5000)
+            }
+
+            function cabinetSmRowId($row) {
+                return String($row.attr('data-project-id') || $row.attr('id') || '')
+            }
+
+            function cabinetSmSaveField($field) {
+                if ($field.data('sm-saving')) {
+                    return
+                }
+                const fieldName = $field.attr('name')
+                const newValue = $field.val()
+                const oldValue = $field.data('sm-old-value')
+                const changed = oldValue !== newValue
+                if (!changed && fieldName !== 'phrase') {
+                    return
+                }
+                const $row = $field.closest('tr')
+                const projectId = cabinetSmRowId($row)
+                if (!projectId) {
+                    return
+                }
+                $field.data('sm-saving', true)
+                $.ajax({
+                    type: 'POST',
+                    dataType: 'json',
+                    url: "{{ route('edit.domain') }}",
+                    data: {
+                        id: projectId,
+                        name: fieldName,
+                        option: newValue,
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                    },
+                    success: function (response) {
+                        if (response && response.value !== undefined && response.name === fieldName) {
+                            $field.val(response.value)
+                        }
+                        $field.data('sm-old-value', $field.val())
+                        cabinetSmRefreshRowSearch($row)
+                        cabinetSmToastSuccess()
+                    },
+                    error: function (xhr) {
+                        if (oldValue !== undefined) {
+                            $field.val(oldValue)
+                        }
+                        const msg = xhr.responseJSON && xhr.responseJSON.message
+                            ? xhr.responseJSON.message
+                            : cabinetSmLabels.errorGeneric
+                        cabinetSmToastError(msg)
+                    },
+                    complete: function () {
+                        $field.data('sm-saving', false)
+                    },
+                })
+            }
+
+            $(document).on('focus', '#table tbody .monitoring', function () {
+                $(this).data('sm-old-value', $(this).val())
+            })
+            $(document).on('blur', '#table tbody input.monitoring', function () {
+                cabinetSmSaveField($(this))
+            })
+            $(document).on('change', '#table tbody select.monitoring', function () {
+                cabinetSmSaveField($(this))
+            })
+            $(document).on('keydown', '#table tbody input.monitoring', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault()
+                    $(this).trigger('blur')
+                }
+            })
+
             let table
             $(document).ready(function () {
                 table = $('#table').DataTable({
@@ -390,6 +567,7 @@
                     autoWidth: false,
                     columnDefs: [
                         { targets: 0, orderable: false, searchable: false, width: '3.5rem', className: 'cabinet-sm-td-check' },
+                        { targets: [2, 3, 4, 5, 6, 7, 8, 9, 10], searchable: false },
                     ],
                     language: {
                         paginate: {
@@ -407,6 +585,10 @@
                     },
                 });
 
+                $('#table tbody tr[data-project-id]').each(function () {
+                    cabinetSmRefreshRowSearch($(this))
+                })
+
                 search(table)
 
                 function applyStatusCellsById(byId) {
@@ -415,12 +597,12 @@
                         if (!node || !node.id || !byId[node.id]) {
                             return
                         }
-                        $('td:eq(6)', node).html(renderStatusCell(byId[node.id]))
+                        applyProjectRowCells($(node), byId[node.id])
                     })
                     $('#table tbody tr[id]').each(function () {
                         var id = this.id
                         if (byId[id]) {
-                            $('td:eq(6)', this).html(renderStatusCell(byId[id]))
+                            applyProjectRowCells($(this), byId[id])
                         }
                     })
                 }
@@ -448,24 +630,13 @@
                                 })
                                 applyStatusCellsById(byId)
                             }
-                            const msg = response.message || cabinetSmLabels.successChanged
-                            $('.toast-top-right.success-message .toast-message').text(msg)
-                            $('.toast-top-right.success-message').show(300)
-                            if (typeof toastr !== 'undefined') {
-                                toastr.success(msg)
-                            }
-                            setTimeout(function () { $('.toast-top-right.success-message').hide(300) }, 5000)
+                            cabinetSmToastSuccess(response.message || cabinetSmLabels.successChanged)
                         },
                         error: function (xhr) {
                             const msg = xhr.responseJSON && xhr.responseJSON.message
                                 ? xhr.responseJSON.message
                                 : cabinetSmLabels.errorGeneric
-                            $('.toast-top-right.error-message .toast-message').text(msg)
-                            $('.toast-top-right.error-message').show(300)
-                            if (typeof toastr !== 'undefined') {
-                                toastr.error(msg)
-                            }
-                            setTimeout(function () { $('.toast-top-right.error-message').hide(300) }, 5000)
+                            cabinetSmToastError(msg)
                         },
                         complete: function () {
                             btn.prop('disabled', false)
@@ -476,9 +647,6 @@
                 })
             });
 
-
-            let oldValue = ''
-            let oldProjectName = ''
 
             $('input.send-notification-switch').click(function () {
                 $.ajax({
@@ -492,49 +660,13 @@
                         _token: $('meta[name="csrf-token"]').attr('content')
                     },
                     success: function () {
-                        $('.toast-top-right.success-message').show(300)
-                        setTimeout(() => {
-                            $('.toast-top-right.success-message').hide(300)
-                        }, 4000)
+                        cabinetSmToastSuccess()
                     },
                     error: function () {
-                        $('.toast-top-right.error-message').show()
-                        setTimeout(() => {
-                            $('.toast-top-right.error-message').hide(300)
-                        }, 4000)
+                        cabinetSmToastError()
                     }
                 });
             })
-            $(".monitoring").focus(function () {
-                oldValue = $(this).val()
-            })
-            $(".monitoring").blur(function () {
-                if (oldValue !== $(this).val() || $(this).attr('name') === 'phrase' && oldValue !== $(this).val()) {
-                    $.ajax({
-                        type: "POST",
-                        dataType: "json",
-                        url: "{{ route('edit.domain') }}",
-                        data: {
-                            id: $(this).closest('tr').attr('id'),
-                            name: $(this).attr('name'),
-                            option: $(this).val(),
-                            _token: $('meta[name="csrf-token"]').attr('content')
-                        },
-                        success: function () {
-                            $('.toast-top-right.success-message').show(300)
-                            setTimeout(() => {
-                                $('.toast-top-right.success-message').hide(300)
-                            }, 4000)
-                        },
-                        error: function () {
-                            $('.toast-top-right.error-message').show()
-                            setTimeout(() => {
-                                $('.toast-top-right.error-message').hide(300)
-                            }, 4000)
-                        }
-                    });
-                }
-            });
             $(document).on('change', '.checbox-for-remove-project .cabinet-sm-row-select__input', function () {
                 let $checkbox = $(this)
                 let selectedId = $checkbox.attr('id').substr(8)
@@ -568,16 +700,10 @@
                         if ($('#count-projects').text() == 0) {
                             window.location.replace('{{ route('add.site.monitoring.view') }}');
                         }
-                        $('.toast-top-right.delete-success-message').show(300)
-                        setTimeout(() => {
-                            $('.toast-top-right.delete-success-message').hide(300)
-                        }, 4000)
+                        cabinetSmToastDeleteSuccess()
                     },
                     error: function () {
-                        $('.toast-top-right.delete-error-message').show()
-                        setTimeout(() => {
-                            $('.toast-top-right.delete-error-message').hide(300)
-                        }, 4000)
+                        cabinetSmToastDeleteError()
                     }
                 });
             });
@@ -585,7 +711,9 @@
             $(document).on('click', '.check', function () {
                 let targetButton = $(this)
                 const icon = targetButton.find('i')
-                icon.attr('class', 'fa-solid fa-clock')
+                const iconClass = 'bi bi-hourglass-split'
+                icon.attr('class', iconClass)
+                targetButton.prop('disabled', true)
 
                 let parentRow = $(this).closest('tr')
                 $.ajax({
@@ -596,11 +724,14 @@
                         _token: $('meta[name="csrf-token"]').attr('content')
                     },
                     success: function (response) {
-                        icon.attr('class', 'fa fa-search')
-                        parentRow.children('td').eq(6).html(renderStatusCell(response))
+                        applyProjectRowCells(parentRow, response)
                     },
                     error: function () {
-                        icon.attr('class', 'fa fa-search')
+                        /* keep icon */
+                    },
+                    complete: function () {
+                        icon.attr('class', 'bi bi-play-fill')
+                        targetButton.prop('disabled', false)
                     }
                 });
             })
@@ -618,10 +749,8 @@
                     url: "{{ route('site.monitoring.reset.stats') }}",
                     data: { projectId: projectId, _token: $('meta[name="csrf-token"]').attr('content') },
                     success: function (response) {
-                        parentRow.children('td').eq(6).html(renderStatusCell(response))
-                        $('.toast-top-right.success-message .toast-message').text(response.message || cabinetSmLabels.successChanged)
-                        $('.toast-top-right.success-message').show(300)
-                        setTimeout(function () { $('.toast-top-right.success-message').hide(300) }, 4000)
+                        applyProjectRowCells(parentRow, response)
+                        cabinetSmToastSuccess(response.message || cabinetSmLabels.successChanged)
                     },
                     complete: function () { btn.prop('disabled', false) }
                 })
@@ -762,17 +891,13 @@
                             expires_label: data.expires_label,
                             ttl_days: data.ttl_days,
                         })
-                        $('.toast-top-right.success-message .toast-message').text(data.message || cabinetSmLabels.publicLinkCreated)
-                        $('.toast-top-right.success-message').show(300)
-                        setTimeout(function () { $('.toast-top-right.success-message').hide(300) }, 4000)
+                        cabinetSmToastSuccess(data.message || cabinetSmLabels.publicLinkCreated)
                     },
                     error: function (xhr) {
                         const msg = xhr.responseJSON && xhr.responseJSON.message
                             ? xhr.responseJSON.message
                             : cabinetSmLabels.errorGeneric
-                        $('.toast-top-right.error-message .toast-message').text(msg)
-                        $('.toast-top-right.error-message').show(300)
-                        setTimeout(function () { $('.toast-top-right.error-message').hide(300) }, 5000)
+                        cabinetSmToastError(msg)
                     },
                     complete: function () { $btn.prop('disabled', false) },
                 })
@@ -822,9 +947,7 @@
                         URL.revokeObjectURL(url)
                     })
                 }).catch(function (error) {
-                    $('.toast-top-right.error-message .toast-message').text(error.message || cabinetSmLabels.errorGeneric)
-                    $('.toast-top-right.error-message').show(300)
-                    setTimeout(function () { $('.toast-top-right.error-message').hide(300) }, 5000)
+                    cabinetSmToastError(error.message || cabinetSmLabels.errorGeneric)
                 }).finally(function () {
                     $btn.prop('disabled', false).html(originalHtml)
                 })
@@ -845,9 +968,7 @@
                     },
                     success: function (data) {
                         updateStatsSharePanel({ available: true, url: null, expires_at: null })
-                        $('.toast-top-right.success-message .toast-message').text(data.message || cabinetSmLabels.publicLinkRevoked)
-                        $('.toast-top-right.success-message').show(300)
-                        setTimeout(function () { $('.toast-top-right.success-message').hide(300) }, 4000)
+                        cabinetSmToastSuccess(data.message || cabinetSmLabels.publicLinkRevoked)
                     },
                 })
             })

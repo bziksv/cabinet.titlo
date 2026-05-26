@@ -53,20 +53,29 @@
         unset($row);
     }
 
-    $siteMonEmailLabel = __('Site monitoring email alerts');
-    $siteMonEmailRow = [
-        'slug' => 'site-mon-email',
-        'synthetic_site_mon_email' => true,
-        'values' => [],
-    ];
-    foreach ($plans as $plan) {
-        $siteMonEmailRow['values'][$plan['code']] = [
-            'is_free' => $plan['code'] === 'Free',
+    $makeEmailAlertsRow = static function (string $slug) use ($plans): array {
+        $row = [
+            'slug' => $slug,
+            'synthetic_email_alerts' => true,
+            'values' => [],
         ];
-    }
+        foreach ($plans as $plan) {
+            $row['values'][$plan['code']] = [
+                'is_free' => $plan['code'] === 'Free',
+            ];
+        }
+
+        return $row;
+    };
+
+    $siteMonEmailLabel = __('Site monitoring email alerts');
+    $siteMonEmailRow = $makeEmailAlertsRow('site-mon-email');
+    $domainInfoEmailLabel = __('Domain information email alerts');
+    $domainInfoEmailRow = $makeEmailAlertsRow('domain-info-email');
 
     $orderedFeatureRows = [];
     $siteMonInserted = false;
+    $domainInfoInserted = false;
     foreach ($featureRows as $featureName => $row) {
         $orderedFeatureRows[$featureName] = $row;
         $featureLower = mb_strtolower($featureName);
@@ -78,9 +87,20 @@
             $orderedFeatureRows[$siteMonEmailLabel] = $siteMonEmailRow;
             $siteMonInserted = true;
         }
+        if (!$domainInfoInserted && (
+            Str::contains($featureLower, 'срока регистрации')
+            || Str::contains($featureLower, 'domain information')
+            || Str::contains($featureName, 'DomainInformation')
+        )) {
+            $orderedFeatureRows[$domainInfoEmailLabel] = $domainInfoEmailRow;
+            $domainInfoInserted = true;
+        }
     }
     if (!$siteMonInserted) {
         $orderedFeatureRows[$siteMonEmailLabel] = $siteMonEmailRow;
+    }
+    if (!$domainInfoInserted) {
+        $orderedFeatureRows[$domainInfoEmailLabel] = $domainInfoEmailRow;
     }
     $featureRows = $orderedFeatureRows;
 @endphp
@@ -226,7 +246,7 @@
                                     @foreach($plans as $plan)
                                         @php $cell = $row['values'][$plan['code']] ?? null; @endphp
                                         <td class="text-center col-tariff-{{ $plan['code'] }} {{ $selectedCode === $plan['code'] ? 'col-highlight' : '' }}">
-                                            @if($row['synthetic_site_mon_email'] ?? false)
+                                            @if($row['synthetic_email_alerts'] ?? false)
                                                 @if($cell['is_free'] ?? false)
                                                     <span class="d-inline-block small text-secondary">
                                                         <i class="bi bi-telegram text-primary" aria-hidden="true"></i>
@@ -263,8 +283,6 @@
     @slot('js')
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         <script>
-            document.title = @json(__('Tariff'));
-
             (function () {
                 var $tariff = $('#tariff');
                 var $period = $('#period');

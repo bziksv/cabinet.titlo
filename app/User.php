@@ -142,6 +142,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Email-оповещения «Срок регистрации доменов» — только на платных тарифах.
+     */
+    public function canReceiveDomainInformationEmail(): bool
+    {
+        return !$this->onFreeTariff();
+    }
+
+    /**
      * @param $project
      */
     public function brokenDomainNotification($project)

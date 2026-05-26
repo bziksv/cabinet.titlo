@@ -1058,13 +1058,6 @@ class TextAnalyzerPdfBranding
         $leadLines = self::wrapCoverText($lead, $font, 22, $contentW);
         $compareH = !empty($payload['compare']) ? 72 : 0;
         $logoH = $mmY(11);
-        $contentH = $logoH + $mmY(14)
-            + $mmY(10) + 28 + 56 + 16 + count($leadLines) * 28
-            + $mmY(10) + 110
-            + ($compareH > 0 ? 20 + $compareH : 0);
-        $y = $zoneTop + (int) max(0, ($zoneBottom - $zoneTop - $contentH) / 2);
-
-        $y = self::drawCoverLogoBand($im, $padL, $y, $logoH) + $mmY(12);
 
         $coverKicker = $payload['cover_kicker'] !== ''
             ? $payload['cover_kicker']
@@ -1072,8 +1065,25 @@ class TextAnalyzerPdfBranding
         $coverTitle = $payload['cover_title'] !== ''
             ? $payload['cover_title']
             : (string) __('Text Analyse');
+        $titleLayout = self::resolveCoverTitleLayout($coverTitle, $fontBold, $contentW);
+        $titleSize = $titleLayout['size'];
+        $titleLines = $titleLayout['lines'];
+        $titleLineStep = (int) round($titleSize * 1.12);
+        $titleBlockH = count($titleLines) * $titleLineStep + 12;
+
+        $contentH = $logoH + $mmY(14)
+            + $mmY(10) + 28 + $titleBlockH + 16 + count($leadLines) * 28
+            + $mmY(10) + 110
+            + ($compareH > 0 ? 20 + $compareH : 0);
+        $y = $zoneTop + (int) max(0, ($zoneBottom - $zoneTop - $contentH) / 2);
+
+        $y = self::drawCoverLogoBand($im, $padL, $y, $logoH) + $mmY(12);
+
         $y = self::drawCoverText($im, $font, 18, $padL, $y + 18, $cKicker, mb_strtoupper($coverKicker)) + 10;
-        $y = self::drawCoverText($im, $fontBold, 52, $padL, $y + 52, $cTitle, $coverTitle) + 16;
+        foreach ($titleLines as $titleLine) {
+            $y = self::drawCoverText($im, $fontBold, $titleSize, $padL, $y + $titleSize, $cTitle, $titleLine) + 8;
+        }
+        $y += 8;
 
         foreach ($leadLines as $line) {
             $y = self::drawCoverText($im, $font, 22, $padL, $y + 22, $cLead, $line) + 6;
@@ -1204,6 +1214,28 @@ class TextAnalyzerPdfBranding
         $box = imagettfbbox($size, 0, $font, $text);
 
         return (int) abs($box[2] - $box[0]);
+    }
+
+    /**
+     * Заголовок обложки: перенос по словам, при необходимости уменьшение кегля (длинные RU-строки).
+     *
+     * @return array{size: int, lines: array<int, string>}
+     */
+    protected static function resolveCoverTitleLayout(string $title, ?string $font, int $maxWidth): array
+    {
+        $size = 52;
+        $maxLines = 3;
+        do {
+            $lines = self::wrapCoverText($title, $font, $size, $maxWidth);
+            if ($lines !== [] && count($lines) <= $maxLines) {
+                return ['size' => $size, 'lines' => $lines];
+            }
+            $size -= 6;
+        } while ($size >= 34);
+
+        $lines = self::wrapCoverText($title, $font, 34, $maxWidth);
+
+        return ['size' => 34, 'lines' => $lines !== [] ? $lines : [$title]];
     }
 
     /**

@@ -6,7 +6,7 @@ return [
      * Стабильная база: 2.9.1s (см. text-analyzer 6.9s). Эксперименты — 2.9.2 или 2.9.1s-dev.
      * Журнал: datagon.ru/docs/cabinet-competitor-analysis-changelog.md
      */
-    'version' => '2.9.1s',
+    'version' => '2.9.2',
 
     /** Расширенный лог прогресса для admin / Super Admin */
     'debug_log' => env('COMPETITOR_ANALYSIS_DEBUG_LOG', true),

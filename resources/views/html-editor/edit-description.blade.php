@@ -4,6 +4,7 @@
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-html-editor.css') }}?v={{ @filemtime(public_path('css/cabinet-html-editor.css')) ?: time() }}">
+        @include('partials.cabinet-html-editor-codemirror', ['part' => 'css'])
         <style>#header-nav-bar .cabinet-header-limits-menu tr.HtmlEditor { background: oldlace; }</style>
     @endslot
 
@@ -55,6 +56,7 @@
 
     @slot('js')
         @include('partials.cabinet-html-editor-ckeditor')
+        @include('partials.cabinet-html-editor-codemirror', ['part' => 'js'])
         <script src="{{ asset('js/cabinet-html-editor.js') }}?v={{ @filemtime(public_path('js/cabinet-html-editor.js')) ?: time() }}"></script>
     @endslot
 @endcomponent

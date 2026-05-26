@@ -168,7 +168,7 @@
                     <div class="card-body">
                 <div class="site-block-buttons cabinet-ca-toolbar mb-3 d-flex flex-wrap align-items-center gap-2" role="toolbar">
                     <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="{{ __('Highlight') }}">
-                    <button class="btn btn-primary colored-button click_tracking"
+                    <button class="btn btn-outline-secondary colored-button click_tracking"
                             type="button"
                             data-click="Highlight identical urls" id="coloredEloquentUrls"
                             data-bs-toggle="tooltip" data-bs-placement="bottom"

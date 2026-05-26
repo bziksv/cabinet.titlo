@@ -117,3 +117,32 @@ if (! function_exists('cabinet_storage_url')) {
         return null;
     }
 }
+
+if (! function_exists('cabinet_brand_name')) {
+    function cabinet_brand_name(): string
+    {
+        return \App\Support\TextAnalyzerPdfBranding::BRAND_NAME;
+    }
+}
+
+if (! function_exists('cabinet_page_title')) {
+    /**
+     * Заголовок вкладки: «Раздел — Датагон» (как бренд в сайдбаре).
+     */
+    function cabinet_page_title(?string $pageTitle = null): string
+    {
+        $brand = cabinet_brand_name();
+        $pageTitle = trim((string) $pageTitle);
+
+        if ($pageTitle === '') {
+            return $brand;
+        }
+
+        $suffix = ' — ' . $brand;
+        if (mb_substr($pageTitle, -mb_strlen($suffix)) === $suffix) {
+            return $pageTitle;
+        }
+
+        return $pageTitle . $suffix;
+    }
+}

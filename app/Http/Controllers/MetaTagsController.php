@@ -11,7 +11,7 @@ use App\Mail\MetaTagsEmail;
 use App\MetaTag;
 use App\MetaTagsHistory;
 use App\MetaTagsSettings;
-use App\TelegramBot;
+use App\Support\MetaTagsAdminStats;
 use App\User;
 use Carbon\Carbon;
 use ErrorException;
@@ -63,10 +63,38 @@ class MetaTagsController extends Controller
 
     public function tagsOptions()
     {
+        return response()->json($this->buildTagsOptions());
+    }
+
+    /**
+     * @return array<int, array{value: string, text: string}>
+     */
+    private function buildTagsOptions(): array
+    {
+        $labels = [
+            'title' => __('Meta tags field title'),
+            'description' => __('Meta tags field description'),
+            'keywords' => __('Meta tags field keywords'),
+            'canonical' => __('Meta tags field canonical'),
+            'noindex' => __('Meta tags field noindex'),
+            'robots' => __('Meta tags field robots'),
+            'h1' => __('Meta tags field h1'),
+            'h2' => __('Meta tags field h2'),
+            'h3' => __('Meta tags field h3'),
+            'h4' => __('Meta tags field h4'),
+            'h5' => __('Meta tags field h5'),
+            'h6' => __('Meta tags field h6'),
+            'a' => __('Meta tags field a'),
+        ];
+
         $options = [];
 
         foreach ($this->tags as $tag) {
-            $options[] = ['value' => $tag['name'], 'text' => $tag['name']];
+            $name = $tag['name'];
+            $options[] = [
+                'value' => $name,
+                'text' => $labels[$name] ?? $name,
+            ];
         }
 
         return $options;
@@ -76,40 +104,17 @@ class MetaTagsController extends Controller
     {
         $settings = new MetaTagsSettings();
 
-        if ($request->has('delete_records')) {
+        if ($request->isMethod('post') && $request->has('delete_records')) {
             $settings->updateOrCreate(['code' => 'delete_records'], ['value' => $request->input('delete_records')]);
 
             return redirect()->route('meta-tags.settings')->with('status', __('Saved'));
         }
 
         $delete_records = $settings->where('code', 'delete_records')->value('value');
+        $registry = MetaTagsAdminStats::snapshot();
+        $stats = $registry['summary'];
 
-        return view('meta-tags.settings', compact('delete_records'));
-    }
-
-    public function statistic()
-    {
-        $response = [
-            'users' => 0,
-            'projects' => 0,
-            'links' => 0,
-        ];
-
-        $meta = new MetaTag();
-
-        $users = $meta->select('user_id')->distinct()->get();
-
-        $response['users'] = $users->count();
-        $response['projects'] = $meta->count();
-
-        $projects = $meta->all();
-
-        foreach ($projects as $project) {
-            $links = preg_split("/[\r\n]+/", $project['links']);
-            $response['links'] += count($links);
-        }
-
-        return view('meta-tags.statistic', compact('response'));
+        return view('meta-tags.settings', compact('delete_records', 'registry', 'stats'));
     }
 
     /**
@@ -134,15 +139,34 @@ class MetaTagsController extends Controller
     {
 
         return collect([
-            'check_url' => __('Check URL'),
-            'timeout_request' => __('Timeout request'),
+            'check_url' => __('Meta tags urls label'),
+            'urls_placeholder' => __('Meta tags urls placeholder'),
+            'urls_empty' => __('Meta tags urls empty'),
+            'fetch_fields' => __('Meta tags fetch fields'),
+            'fetch_fields_hint' => __('Meta tags fetch fields hint'),
+            'tags_loading' => __('Meta tags tags loading'),
+            'tags_load_error' => __('Meta tags tags load error'),
+            'tags_none_selected' => __('Meta tags tags none selected'),
+            'timeout_request' => __('Timeout'),
+            'timeout_hint' => __('Meta tags timeout hint'),
             'length_word' => __('Length'),
-            'title' => __('title (recommend 70-80)'),
-            'description' => __('description (recommend 180-300)'),
-            'keywords' => __('keywords'),
+            'length_hint' => __('Meta tags length hint'),
+            'title' => __('Meta tags title length'),
+            'description' => __('Meta tags description length'),
+            'keywords' => __('Meta tags keywords length'),
             'min' => __('Minimum'),
             'max' => __('Maximum'),
-            'send' => __('Send'),
+            'send' => __('Meta tags check button'),
+            'step_label' => __('Meta tags step label'),
+            'step_1_title' => __('Meta tags step 1 title'),
+            'step_1_hint' => __('Meta tags step 1 hint'),
+            'step_2_title' => __('Meta tags step 2 title'),
+            'step_2_hint' => __('Meta tags step 2 hint'),
+            'step_3_title' => __('Meta tags step 3 title'),
+            'step_3_hint' => __('Meta tags step 3 hint'),
+            'results_title' => __('Meta tags results title'),
+            'projects_title' => __('Meta tags projects title'),
+            'projects_empty_hint' => __('Meta tags projects empty hint'),
             'projects' => __('Projects'),
             'id' => __('ID'),
             'name' => __('Name'),
@@ -154,6 +178,11 @@ class MetaTagsController extends Controller
             'on' => __('On'),
             'history' => __('History'),
             'start' => __('Start'),
+            'action_run' => __('Meta tags action run'),
+            'action_tip_history' => __('Meta tags action tip history'),
+            'action_tip_run' => __('Meta tags action tip run'),
+            'action_tip_edit' => __('Meta tags action tip edit'),
+            'action_tip_delete' => __('Meta tags action tip delete'),
             'edit' => __('Edit'),
             'delete' => __('Delete'),
             'filter' => __('Filter'),
@@ -163,6 +192,18 @@ class MetaTagsController extends Controller
             'save_as_project' => __('Save as project'),
             'check_interval_every' => __('Check interval every'),
             'hours' => __('hours'),
+            'period_manual' => __('Meta tags period manual'),
+            'period_6h' => __('Meta tags period 6h'),
+            'period_12h' => __('Meta tags period 12h'),
+            'period_24h' => __('Meta tags period 24h'),
+            'ms_unit' => __('Meta tags ms unit'),
+            'default_project_name' => __('Meta tags default project name'),
+            'delete_confirm' => __('Meta tags delete confirm'),
+            'history_saved' => __('Meta tags history saved'),
+            'saved_success' => __('Meta tags saved success'),
+            'deleted_success' => __('Meta tags deleted success'),
+            'export_csv' => __('Meta tags export csv'),
+            'export_xlsx' => __('Meta tags export xlsx'),
             'save_project' => __('Save project'),
             'project_name' => __('Project name'),
             'close' => __('Close'),
@@ -173,14 +214,16 @@ class MetaTagsController extends Controller
             'count' => __('Count'),
             'main_problems' => __('Main problems'),
             'go_to_site' => __('Go to site'),
+            'actions' => __('Actions'),
         ]);
     }
 
     public function index()
     {
         $lang = $this->lang();
+        $tagsOptions = $this->buildTagsOptions();
 
-        return view('meta-tags.index', compact('lang'));
+        return view('meta-tags.index', compact('lang', 'tagsOptions'));
     }
 
     /**
@@ -404,9 +447,14 @@ class MetaTagsController extends Controller
 
         if ($history) {
             $history_links = count($history);
-            $history = collect($history)->toJson();
+            $historyJson = collect($history)->toJson();
 
-            MetaTagsHistory::create(['meta_tag_id' => $id, 'quantity' => $history_links, 'data' => $history]);
+            MetaTagsHistory::create([
+                'meta_tag_id' => $id,
+                'quantity' => $history_links,
+                'errors_count' => $this->countHistoryErrorsFromJson($historyJson),
+                'data' => $historyJson,
+            ]);
         }
     }
 
@@ -418,25 +466,17 @@ class MetaTagsController extends Controller
      */
     public function showHistories($id)
     {
+        $project = Auth::user()->metaTags()->findOrFail($id);
 
-        $project = Auth::user()->metaTags()->find($id);
+        $histories = $project->histories()
+            ->select(['id', 'meta_tag_id', 'ideal', 'quantity', 'errors_count', 'created_at', 'updated_at'])
+            ->orderBy('ideal', 'desc')
+            ->orderBy('id', 'desc')
+            ->paginate(50);
 
-        $histories = $project->histories()->orderBy('ideal', 'desc')->orderBy('id', 'desc')->paginate(50);
+        $histories->getCollection()->transform(function ($item) {
+            $item->error_quantity = $item->errors_count !== null ? (int) $item->errors_count : null;
 
-        $histories->transform(function ($item, $key) {
-
-            $errors = json_decode($item->data);
-
-            $error_quantity = null;
-            foreach ($errors as $e) {
-                if (isset($e->error)) {
-                    $arr_error = Arr::flatten($e->error->badge);
-                    if (is_array($arr_error))
-                        $error_quantity += count($arr_error);
-                }
-            }
-
-            $item['error_quantity'] = $error_quantity;
             return $item;
         });
 
@@ -531,18 +571,87 @@ class MetaTagsController extends Controller
         $this->createCompareArray($history, 'card', $response);
         $this->createCompareArray($history_compare, 'card_compare', $response);
 
+        $filterErrors = [];
+        $filterDiff = [];
+
+        foreach ($response as $url => &$row) {
+            $row['diff_tags'] = [];
+            if (! isset($row['card']['tags'], $row['card_compare']['tags'])) {
+                continue;
+            }
+
+            $left = $this->metaTagTagsToArray($row['card']['tags']);
+            $right = $this->metaTagTagsToArray($row['card_compare']['tags']);
+            $tagKeys = array_unique(array_merge(array_keys($left), array_keys($right)));
+
+            foreach ($tagKeys as $tag) {
+                if (! $this->metaTagValuesEqual($left[$tag] ?? null, $right[$tag] ?? null)) {
+                    $row['diff_tags'][$tag] = $tag;
+                    $filterDiff[$tag] = $this->metaTagFieldLabel($tag);
+                }
+            }
+        }
+        unset($row);
+
         $collection = collect($response);
 
-        $filter = [];
         foreach ($response as $r) {
-            if (isset($r['badge'])) {
-                $tags = collect($r['badge'])->collapse()->keys();
-                foreach ($tags as $tag)
-                    $filter[$tag] = $tag;
+            if (! empty($r['error_tags'])) {
+                foreach ($r['error_tags'] as $tag) {
+                    $filterErrors[$tag] = $this->metaTagFieldLabel($tag);
+                }
             }
         }
 
-        return view('meta-tags.histories_compare', compact('collection', 'filter'));
+        ksort($filterErrors);
+        ksort($filterDiff);
+
+        $lang = $this->lang();
+
+        return view('meta-tags.histories_compare', [
+            'collection' => $collection,
+            'filterErrors' => $filterErrors,
+            'filterDiff' => $filterDiff,
+            'metaDiffFields' => config('cabinet-meta-tags.compare_meta_fields', []),
+            'history' => $history,
+            'historyCompare' => $history_compare,
+            'lang' => $lang,
+        ]);
+    }
+
+    private function metaTagValuesEqual($left, $right): bool
+    {
+        if (is_object($left) || is_object($right)) {
+            $left = json_decode(json_encode($left), true);
+            $right = json_decode(json_encode($right), true);
+        }
+
+        return json_encode($left) === json_encode($right);
+    }
+
+    /**
+     * @param array|object|null $tags
+     * @return array<string, mixed>
+     */
+    private function metaTagTagsToArray($tags): array
+    {
+        if (is_array($tags)) {
+            return $tags;
+        }
+
+        if (is_object($tags)) {
+            return json_decode(json_encode($tags), true) ?: [];
+        }
+
+        return [];
+    }
+
+    private function metaTagFieldLabel(string $tag): string
+    {
+        $key = 'Meta tags field ' . $tag;
+        $label = __($key);
+
+        return $label === $key ? ucfirst($tag) : $label;
     }
 
     protected function createCompareArray($model, $name = 'card', &$response = [])
@@ -555,8 +664,10 @@ class MetaTagsController extends Controller
             $response[$item->title][$name]['error'] = $item->error->main;
 
             foreach ($item->error->badge as $t => $b) {
-                if (count($b))
+                if (count($b)) {
                     $response[$item->title]['badge'][$model->created_at->format('d.m.Y') . '(' . $model->id . ')'][$t] = $b;
+                    $response[$item->title]['error_tags'][$t] = $t;
+                }
             }
         }
 
@@ -609,7 +720,7 @@ class MetaTagsController extends Controller
 
         if ($type === 'main') {
             if (empty($errors))
-                $errors[] = '<span class="badge badge-success">' . __('No problem') . '</span>';
+                $errors[] = '<span class="badge text-bg-success">' . __('No problem') . '</span>';
         }
 
         return $errors;
@@ -674,5 +785,37 @@ class MetaTagsController extends Controller
             throw new ErrorException('User not valid');
 
         $history->delete();
+    }
+
+    /**
+     * Количество ошибок в снимке (без загрузки data в списке историй).
+     */
+    protected function countHistoryErrorsFromJson(?string $json): int
+    {
+        if ($json === null || $json === '') {
+            return 0;
+        }
+
+        $errors = json_decode($json);
+
+        if (!is_array($errors) && !($errors instanceof \Traversable)) {
+            return 0;
+        }
+
+        $errorQuantity = 0;
+
+        foreach ($errors as $e) {
+            if (!isset($e->error)) {
+                continue;
+            }
+
+            $arrError = Arr::flatten($e->error->badge ?? []);
+
+            if (is_array($arrError)) {
+                $errorQuantity += count($arrError);
+            }
+        }
+
+        return $errorQuantity;
     }
 }

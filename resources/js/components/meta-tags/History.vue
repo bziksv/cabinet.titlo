@@ -7,11 +7,11 @@
             <div v-else-if="loadError" class="alert alert-danger">{{ loadError }}</div>
 
             <template v-else>
-                <meta-filter :seen="seenCard" :metaTags="history" :lang="lang"></meta-filter>
+                <meta-filter :seen.sync="seenCard" :metaTags="history" :lang="lang"></meta-filter>
 
                 <div id="accordion">
 
-                    <div class="card" v-for="(item, index) in history" v-show="!seenCard.length || seenCard[index] === 1">
+                    <div class="card" v-for="(item, index) in history" :key="item.url || item.title || index" v-show="!seenCard.length || seenCard[index] === 1">
                         <div class="card-header card-header-accordion">
                             <h4 class="card-title">
                                 <a class="d-block w-100 collapsed accordion-title" data-toggle="collapse" :href="'#collapse' + index" aria-expanded="false">
@@ -26,12 +26,12 @@
                                     </button>
 
                                     <div class="dropdown-menu dropdown-menu-right" role="menu" style="">
-                                        <a :href="item.title" target="_blank" class="dropdown-item">
-                                            <i class="fas fa-external-link-alt"></i>
+                                        <a :href="item.url || item.title" target="_blank" rel="noopener" class="dropdown-item">
+                                            <i class="bi bi-box-arrow-up-right me-2" aria-hidden="true"></i>
                                             {{ lang.go_to_site }}
                                         </a>
-                                        <a href="#" class="dropdown-item" @click.prevent="Analyzer(item.title)">
-                                            <i class="fas fa-chart-pie"></i>
+                                        <a href="#" class="dropdown-item" @click.prevent="openTextAnalyzer(item.url || item.title)">
+                                            <i class="bi bi-pie-chart me-2" aria-hidden="true"></i>
                                             {{ lang.text_analysis }}
                                         </a>
                                     </div>
@@ -156,35 +156,12 @@
                 }
                 this.fetchChunk(this.offset, false);
             },
-            Analyzer(link) {
-                var form = document.createElement("form");
-                form.action = "/text-analyzer";
-                form.method = "POST";
-                form.target = "_blank";
-
-                var _token = document.createElement("input");
-                _token.setAttribute("type", "text");
-                _token.setAttribute("name", "_token");
-                _token.setAttribute("value", $('meta[name="csrf-token"]').attr('content'));
-                form.appendChild(_token);
-
-                var type = document.createElement("input");
-                type.setAttribute("type", "text");
-                type.setAttribute("name", "type");
-                type.setAttribute("value", "url");
-                form.appendChild(type);
-
-                var text = document.createElement("input");
-                text.setAttribute("type", "text");
-                text.setAttribute("name", "text");
-                text.setAttribute("value", link);
-                form.appendChild(text);
-
-                document.body.appendChild(form);
-
-                form.submit();
-
-                form.remove();
+            openTextAnalyzer(pageUrl) {
+                if (!pageUrl) {
+                    return;
+                }
+                var encoded = String(pageUrl).replace(/\//g, 'abc');
+                window.location.href = '/redirect-to-text-analyzer/' + encoded;
             },
         }
     }

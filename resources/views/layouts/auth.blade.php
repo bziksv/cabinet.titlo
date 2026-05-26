@@ -17,7 +17,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="shortcut icon" href="{{ asset('img/favicon.svg') }}"/>
-    <title>@yield('title')</title>
+    @include('layouts.partials.document-title')
     @include('layouts.partials.lte4-head')
     @if(config('app.env') !== 'local')
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.css') }}">

@@ -256,8 +256,14 @@
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.175);
 }
 
-.cabinet-admin-gear.is-open .cabinet-admin-gear__menu {
+.cabinet-admin-gear.is-open .cabinet-admin-gear__menu,
+.cabinet-admin-gear__menu.is-open {
     display: block;
+}
+
+body > .cabinet-admin-gear__menu.is-open {
+    max-height: min(70vh, 24rem);
+    overflow-y: auto;
 }
 
 .cabinet-admin-gear__link {

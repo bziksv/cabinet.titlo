@@ -1,77 +1,115 @@
 <template>
-
-    <div class="form-group">
-        <label for="filter">{{ lang.filter }}</label>
-        <select class="custom-select" id="filter" v-model="selected" @change.prevent="onChange">
+    <div class="mb-3 cabinet-mt-filter">
+        <label class="form-label" for="cabinet-mt-filter-select">{{ lang.filter }}</label>
+        <select
+            id="cabinet-mt-filter-select"
+            class="form-select form-select-sm"
+            v-model="selected"
+            @change="onChange"
+        >
             <option value="all">{{ lang.all }}</option>
-            <option v-for="option in options" v-bind:value="option.value">{{ option.text }}</option>
+            <option v-for="option in options" :key="option.value" :value="option.value">{{ option.text }}</option>
         </select>
     </div>
-
 </template>
 
 <script>
     export default {
         name: "MetaFilter",
         props: {
-            metaTags: [Object, Array],
-            seen: [Object, Array],
-            lang: [Object, Array],
+            metaTags: {
+                type: Array,
+                default: () => [],
+            },
+            seen: {
+                type: Array,
+                default: () => [],
+            },
+            lang: {
+                type: Object,
+                default: () => ({}),
+            },
         },
-        created() {
-
-            this.updateOptions(this.metaTags);
-        },
-        watch:{
-            metaTags: function(obj){
-
-                this.updateOptions(obj);
-            }
-        },
-        data(){
+        data() {
             return {
                 selected: 'all',
-                options: []
+                options: [],
             }
         },
+        watch: {
+            metaTags: {
+                handler() {
+                    this.rebuildOptions();
+                    if (this.selected !== 'all') {
+                        this.applyFilter();
+                    }
+                },
+                deep: true,
+            },
+        },
+        created() {
+            this.rebuildOptions();
+        },
         methods: {
-
             onChange() {
-                var app = this;
-
-                this.update(0);
-
-                if(app.selected === 'all'){
-                    this.update(1);
+                this.applyFilter();
+            },
+            applyFilter() {
+                if (this.selected === 'all') {
+                    this.$emit('update:seen', []);
                     return;
                 }
 
-                _.forEach(this.metaTags, (value, index) => {
-                    _.map(value.error.badge, (v, tag) => {
-                        if(tag === app.selected && v.length)
-                            app.$set(app.seen, index, 1);
+                const seen = [];
+                const items = Array.isArray(this.metaTags) ? this.metaTags : [];
+
+                for (let index = 0; index < items.length; index++) {
+                    seen[index] = 0;
+                    const badges = items[index] && items[index].error && items[index].error.badge;
+                    if (!badges) {
+                        continue;
+                    }
+                    for (const tag in badges) {
+                        if (!Object.prototype.hasOwnProperty.call(badges, tag)) {
+                            continue;
+                        }
+                        if (tag === this.selected && badges[tag] && badges[tag].length) {
+                            seen[index] = 1;
+                            break;
+                        }
+                    }
+                }
+
+                this.$emit('update:seen', seen);
+            },
+            rebuildOptions() {
+                const opts = [];
+                const keys = {};
+                const items = Array.isArray(this.metaTags) ? this.metaTags : [];
+
+                items.forEach((value) => {
+                    const badges = value && value.error && value.error.badge;
+                    if (!badges) {
+                        return;
+                    }
+                    Object.keys(badges).forEach((tag) => {
+                        if (badges[tag] && badges[tag].length && !keys[tag]) {
+                            keys[tag] = true;
+                            opts.push({
+                                value: tag,
+                                text: _.upperFirst(tag),
+                            });
+                        }
                     });
                 });
 
-            },
-            update(seen) {
-                for (let i = 0; i < Object.keys(this.metaTags).length; i++)
-                    this.$set(this.seen, i, seen);
-            },
-            updateOptions(objs) {
+                this.options = opts;
 
-                _.forEach(objs, (value, index) => {
-                    _.map(value.error.badge, (v, tag) => {
-                        if(v.length)
-                            this.options = Object.assign({}, this.options, { [tag]: {value: tag, text: _.upperFirst(tag)} })
-
-                    });
-                });
-            }
-        }
+                if (this.selected !== 'all' && !keys[this.selected]) {
+                    this.selected = 'all';
+                    this.$emit('update:seen', []);
+                }
+            },
+        },
     }
 </script>
-
-<style scoped>
-
-</style>

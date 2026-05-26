@@ -13,6 +13,7 @@ use App\Classes\Cron\MetaTags;
 use App\Classes\Cron\MetaTagsHistoriesDelete;
 use App\Classes\Cron\HtmlEditorPublicSharesDelete;
 use App\Classes\Cron\RelevancePublicSharesDelete;
+use App\Classes\Cron\RelevanceCleaningResults;
 use App\Classes\Cron\SiteMonitoringPublicSharesDelete;
 use App\Classes\Cron\TextAnalyzerPublicSharesDelete;
 use App\Classes\Cron\UserStatisticsStore;
@@ -64,18 +65,10 @@ class Kernel extends ConsoleKernel
 
         $schedule->call(new UserStatisticsStore())->dailyAt('00:10');
 
-        // Delete relevance histories > 30 days (see relevance_analysis_config table)
-        try {
-            $schedule->call(new RelevanceCleaningResults())->daily();
-        } catch (\Throwable $e){
-            Log::debug('RelevanceCleaningResults error');
-        }
-        // Delete cluster histories > 180 days (see cluster_configuration table)
-        try {
-            $schedule->call(new ClusterCleaningResults())->daily();
-        } catch (\Throwable $e){
-            Log::debug('ClusterCleaningResults error');
-        }
+        // Delete relevance histories (see relevance_analysis_config.cleaning_interval)
+        $schedule->call(new RelevanceCleaningResults())->daily();
+        // Delete cluster_results (see cluster_configuration.cleaning_interval)
+        $schedule->call(new ClusterCleaningResults())->dailyAt('03:10');
 
         $schedule->call(function () {
             (new ProjectData(MonitoringProject::all()))->save();

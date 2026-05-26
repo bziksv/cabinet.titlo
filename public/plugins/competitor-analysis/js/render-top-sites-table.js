@@ -675,6 +675,7 @@ function renderTopSitesV2(analysedSites, messages, renderOptions) {
 
     const highlightMeta = buildSerpHighlightMeta(analysedSites, options);
     colorButtonsActions(highlightMeta.duplicateHosts, highlightMeta.duplicateUrls, highlightMeta);
+    applyDefaultSerpUrlHighlights(highlightMeta.duplicateUrls);
 
     $('#sites-block').show()
 
@@ -746,6 +747,42 @@ function getBtnGroup(url, messages) {
         '</div>'
 }
 
+function applySerpDuplicateUrlHighlights(duplicateUrls) {
+    if (!duplicateUrls || !duplicateUrls.length) {
+        return 0;
+    }
+
+    clearSerpHighlights();
+
+    const palette = getHighlightPalette();
+    let colorIndex = 0;
+    let highlighted = 0;
+    $.each(duplicateUrls, function (key, url) {
+        highlighted += setSerpHighlight(
+            serpRowsByFullUrl(url),
+            'url-' + colorIndex,
+            palette[colorIndex % palette.length]
+        );
+        colorIndex++;
+    });
+
+    return highlighted;
+}
+
+/** Как в lk.redbox: при наличии совпадений URL подсвечиваются сразу после отрисовки SERP. */
+function applyDefaultSerpUrlHighlights(duplicateUrls) {
+    const $urlBtn = $('#coloredEloquentUrls');
+    if (!duplicateUrls || !duplicateUrls.length) {
+        $urlBtn.removeClass('btn-primary').addClass('btn-outline-secondary');
+
+        return;
+    }
+
+    if (applySerpDuplicateUrlHighlights(duplicateUrls) > 0) {
+        coloredButtons($urlBtn);
+    }
+}
+
 function colorButtonsActions(duplicateHosts, duplicateUrls, highlightMeta) {
     const strings = window.competitorHighlightStrings || {};
     const meta = highlightMeta || {};
@@ -798,9 +835,9 @@ function colorButtonsActions(duplicateHosts, duplicateUrls, highlightMeta) {
 
     $('#coloredEloquentUrls').unbind().on('click', function () {
         coloredButtons($(this))
-        clearSerpHighlights()
 
         if (!duplicateUrls.length) {
+            clearSerpHighlights()
             if (typeof getBrokenScriptMessage === 'function') {
                 getBrokenScriptMessage(null, compareMode
                     ? (strings.noCrossRegionUrls || strings.noDuplicateUrls)
@@ -811,16 +848,7 @@ function colorButtonsActions(duplicateHosts, duplicateUrls, highlightMeta) {
             return
         }
 
-        const palette = getHighlightPalette()
-        let colorIndex = 0
-        $.each(duplicateUrls, function (key, url) {
-            setSerpHighlight(
-                serpRowsByFullUrl(url),
-                'url-' + colorIndex,
-                palette[colorIndex % palette.length]
-            )
-            colorIndex++
-        })
+        applySerpDuplicateUrlHighlights(duplicateUrls)
     })
 
     $('#coloredEloquentMyText').unbind().on('click', function () {

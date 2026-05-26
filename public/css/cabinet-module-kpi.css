@@ -1,0 +1,48 @@
+/* KPI info-box — эталон /unique, /duplicates; списки site-monitoring, domain-information */
+
+.cabinet-module-kpi .info-box {
+    align-items: stretch;
+    min-height: 5.25rem;
+    margin-bottom: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.cabinet-module-kpi .info-box-icon {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 4.375rem;
+    min-width: 4.375rem;
+    flex-shrink: 0;
+    font-size: 1.5rem;
+    border-radius: 0.25rem 0 0 0.25rem;
+    margin: 0;
+}
+
+.cabinet-module-kpi .info-box-icon .bi {
+    line-height: 1;
+}
+
+.cabinet-module-kpi .info-box-content {
+    justify-content: center;
+    min-width: 0;
+    line-height: 1.35;
+    padding: 0.5rem 0.65rem;
+}
+
+.cabinet-module-kpi .info-box-text {
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+}
+
+.cabinet-module-kpi .info-box-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.15rem;
+}

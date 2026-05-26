@@ -51,13 +51,15 @@
                     </button>
                 </div>
                 <div class="cabinet-he-pane-body d-flex flex-column">
-                    <textarea
-                        class="form-control font-monospace cabinet-he-html-source flex-grow-1"
-                        data-he-html-source
-                        rows="{{ $rows }}"
-                        spellcheck="false"
-                        aria-label="{{ __('HTML code') }}"
-                    ></textarea>
+                    <div class="cabinet-he-code-editor-wrap flex-grow-1" data-he-code-wrap>
+                        <textarea
+                            class="form-control font-monospace cabinet-he-html-source"
+                            data-he-html-source
+                            rows="{{ $rows }}"
+                            spellcheck="false"
+                            aria-label="{{ __('HTML code') }}"
+                        ></textarea>
+                    </div>
                     <p class="cabinet-he-html-meta small text-muted mb-0 mt-2" data-he-html-meta aria-live="polite"
                        data-he-html-chars-label="{{ __('chars in HTML') }}"
                        data-he-text-chars-label="{{ __('chars of visible text') }}"></p>

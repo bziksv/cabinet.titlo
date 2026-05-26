@@ -11,7 +11,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="shortcut icon" href="{{ asset('img/favicon.svg') }}"/>
-    <title>@yield('title') — {{ $brand }}</title>
+    @include('layouts.partials.document-title')
     @include('layouts.partials.lte4-head')
     <link rel="stylesheet" href="{{ asset('css/cabinet-public-module.css') }}?v={{ @filemtime(public_path('css/cabinet-public-module.css')) ?: time() }}">
     @yield('css')

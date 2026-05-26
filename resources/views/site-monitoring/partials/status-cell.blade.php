@@ -1,16 +1,13 @@
 @php
     /** @var \App\DomainMonitoring $project */
     $pending = $project->status === \App\DomainMonitoring::STATUS_AFTER_RESET;
-    $statusClass = $pending
-        ? 'cabinet-sm-status--pending'
-        : ($project->broken ? 'cabinet-sm-status--bad' : 'cabinet-sm-status--ok');
+    $badgeClass = $pending
+        ? 'text-bg-secondary'
+        : ($project->broken ? 'text-bg-danger' : 'text-bg-success');
 @endphp
-<div class="cabinet-sm-status {{ $statusClass }} small mb-0">
-    <div>{{ __($project->status) }}</div>
+<div class="cabinet-sm-status small mb-0">
+    <span class="badge {{ $badgeClass }} fw-normal">{{ __($project->status) }}</span>
     @if($pending)
-        <div class="text-secondary">{{ __('Site monitoring status reset hint') }}</div>
-    @elseif(isset($project->code))
-        <div>{{ __('http code') }}: {{ $project->code }}</div>
-        <div>{{ __('Uptime') }}: {{ $project->uptime_percent }}%</div>
+        <div class="text-secondary mt-1">{{ __('Site monitoring status reset hint') }}</div>
     @endif
 </div>

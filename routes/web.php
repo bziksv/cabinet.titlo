@@ -40,6 +40,7 @@ Route::post('public/share/relevance/{token}/details', 'RelevancePublicShareContr
 Route::get('public/share/text-analyzer/{token}', 'TextAnalyzerPublicShareController@show')->name('text.analyzer.public.share.view');
 Route::get('public/share/html-editor/{token}', 'HtmlEditorPublicShareController@show')->name('html.editor.public.share.view');
 Route::get('public/share/site-monitoring/{token}', 'SiteMonitoringPublicShareController@show')->name('site.monitoring.public.share.view');
+Route::get('public/share/domain-information/{token}', 'DomainInformationPublicShareController@show')->name('domain.information.public.share.view');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
 Route::get('/personal-data/en', 'AccessController@getEnPersonalData');
@@ -102,8 +103,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/meta-tags/history/{id}', 'MetaTagsController@showHistory');
     Route::get('/meta-tags/getTariffMetaTagsPages', 'MetaTagsController@getTariffMetaTagsPages');
     Route::get('/meta-tags/projects', 'MetaTagsController@projectsForUser')->name('meta-tags.projects');
-    Route::get('/meta-tags/settings', 'MetaTagsController@settings')->name('meta-tags.settings')->middleware(['role:Super Admin|admin']);
-    Route::get('/meta-tags/statistic', 'MetaTagsController@statistic')->name('meta-tags.statistic')->middleware(['role:Super Admin|admin']);
+    Route::match(['get', 'post'], '/meta-tags/settings', 'MetaTagsController@settings')->name('meta-tags.settings')->middleware(['role:Super Admin|admin']);
+    Route::redirect('/meta-tags/statistic', '/meta-tags/settings#cabinet-mt-admin-registry', 301)->middleware(['role:Super Admin|admin']);
     Route::resource('meta-tags', 'MetaTagsController');
 
     Route::get('profile/', 'ProfilesController@index')->name('profile.index');
@@ -226,6 +227,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('edit-domain-information', 'DomainInformationController@edit')->name('edit.domain.information');
     Route::post('delete-domains-information', 'DomainInformationController@removeDomains')->name('delete.domain-information');
     Route::get('check-domain-information/{id}', 'DomainInformationController@checkDomain')->name('check.domain.information');
+    Route::get('domain-information-project-stats', 'DomainInformationController@projectStats')->name('domain.information.project.stats');
+    Route::post('domain-information-export-pdf', 'DomainInformationController@exportPdf')->name('domain.information.export.pdf');
+    Route::post('domain-information-public-share', 'DomainInformationController@createPublicShare')->name('domain.information.public.share.create');
+    Route::post('domain-information-public-share/revoke', 'DomainInformationController@revokePublicShare')->name('domain.information.public.share.revoke');
 
     Route::get('text-analyzer', 'TextAnalyzerController@index')->name('text.analyzer.view');
     Route::get('/redirect-to-text-analyzer/{url}', 'TextAnalyzerController@redirectToAnalyse')->name('text.analyzer.redirect');

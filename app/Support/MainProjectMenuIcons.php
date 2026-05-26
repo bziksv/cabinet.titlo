@@ -40,7 +40,7 @@ class MainProjectMenuIcons
         13 => '<i class="fas fa-heartbeat"></i>',
         // Срок регистрации домена (было ок)
         14 => '<i class="fas fa-clock"></i>',
-        // Мета-теги (было ок)
+        // Мониторинг мета-тегов
         19 => '<i class="fas fa-heading"></i>',
         // Бэклинки (было ок)
         12 => '<i class="fas fa-link"></i>',

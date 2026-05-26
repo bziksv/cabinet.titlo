@@ -1,79 +1,28 @@
-@component('component.card', ['title' => __('Meta tags')])
-
+@component('component.card', [
+    'title' => __('Meta tags'),
+    'titleHtml' => e(__('Meta tags')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-meta-tags'])->render(),
+])
     @slot('css')
-        <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-
-        <style>
-            a.accordion-title {
-                color: #212529;
-                font-size: 1rem;
-            }
-
-            .card-header-accordion:hover {
-                background-color: rgba(0, 0, 0, .075);
-            }
-
-            [data-bs-toggle=collapse] i.expandable-accordion-caret {
-                transition: -webkit-transform .3s linear;
-                transition: transform .3s linear;
-                transition: transform .3s linear, -webkit-transform .3s linear;
-            }
-
-            [data-bs-toggle=collapse][aria-expanded=true] i.expandable-accordion-caret[class*=right] {
-                -webkit-transform: rotate(
-                    90deg);
-                transform: rotate(
-                    90deg);
-            }
-
-            .MetaTagsProject,
-            .MetaTagsPages {
-                background: oldlace;
-            }
-        </style>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-meta-tags.css') }}?v={{ @filemtime(public_path('css/cabinet-meta-tags.css')) ?: time() }}">
     @endslot
 
-    <meta-tags :lang='@json($lang)'></meta-tags>
+    <div class="cabinet-mt-page">
+        @include('meta-tags.partials.module-nav', ['active' => 'module'])
+        @include('meta-tags.partials.how-to-steps')
 
-    <div class="row">
-        <div class="col-12">
-            @component('component.admin-card')
-
-                @slot('description')
-
-                @endslot
-
-                @component('component.btn-app', ['href' => route('meta-tags.index'), 'class' => 'ml-0'])
-                    <i class="fas fa-home"></i> {{ __('Home') }}
-                @endcomponent
-
-                @component('component.btn-app', ['href' => route('meta-tags.settings'), 'class' => ''])
-                    <i class="fas fa-cog"></i> {{ __('Settings') }}
-                @endcomponent
-
-                @component('component.btn-app', ['href' => route('meta-tags.statistic'), 'class' => ''])
-                        <i class="fas fa-bullhorn"></i> {{ __('Statistic') }}
-                @endcomponent
-
-            @endcomponent
-        </div>
+        <meta-tags :lang='@json($lang)' :tags-options='@json($tagsOptions)'></meta-tags>
     </div>
 
     @slot('js')
-        <!-- Toastr -->
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
-
         <script src="{{ asset('plugins/datatables/search.js') }}"></script>
-
         <script>
             toastr.options = {
-                "preventDuplicates": true,
-                "timeOut": "1500"
+                preventDuplicates: true,
+                timeOut: 1500
             };
-
-            search(null, false)
+            search(null, false);
         </script>
     @endslot
-
 @endcomponent

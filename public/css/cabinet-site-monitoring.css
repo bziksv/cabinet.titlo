@@ -16,16 +16,23 @@
     margin-bottom: var(--cabinet-sm-gap);
 }
 
-.cabinet-site-mon-page > .cabinet-site-mon-toolbar {
+.cabinet-site-mon-page > .cabinet-sm-kpi-hint,
+.cabinet-site-mon-page > .cabinet-sm-kpi {
     margin-bottom: var(--cabinet-sm-gap);
 }
 
-.cabinet-site-mon-page > .cabinet-sm-datatable {
+.cabinet-site-mon-page > .cabinet-site-mon-toolbar-card,
+.cabinet-site-mon-page > .cabinet-sm-table-card {
     margin-bottom: var(--cabinet-sm-gap);
+}
+
+.cabinet-site-mon-page .cabinet-sm-table-card .card-body {
+    border-radius: var(--cabinet-sm-radius);
+    overflow: hidden;
 }
 
 .cabinet-site-mon-page .cabinet-sm-datatable .dataTables_wrapper {
-    padding: 0;
+    padding: 0.75rem 0.75rem 0.5rem;
 }
 
 .cabinet-site-mon-page .cabinet-sm-dt-controls {
@@ -164,8 +171,8 @@
 }
 
 .cabinet-site-mon-page #table .cabinet-sm-td-notify {
-    width: 3.25rem;
-    min-width: 3.25rem;
+    width: 4.5rem;
+    min-width: 4.5rem;
     text-align: center;
 }
 
@@ -222,29 +229,79 @@
     outline-offset: 2px;
 }
 
-.cabinet-site-mon-page #table .cabinet-sm-td-notify .custom-switch {
-    padding-left: 0;
-    margin: 0;
+.cabinet-site-mon-page #table .cabinet-sm-notify-switch {
+    display: flex;
+    justify-content: center;
+    min-height: 1.25rem;
+    padding-left: 2.5em;
 }
 
-.cabinet-site-mon-page #table .cabinet-sm-td-notify .custom-switch {
-    padding-left: 2.25rem;
+.cabinet-site-mon-page #table .cabinet-sm-notify-switch .form-check-input {
+    margin-top: 0;
+    cursor: pointer;
 }
 
 .cabinet-site-mon-page #table .cabinet-sm-status {
     line-height: 1.35;
 }
 
-.cabinet-site-mon-page #table .cabinet-sm-status--ok {
-    color: var(--bs-success);
+.cabinet-site-mon-page #table .cabinet-sm-status .badge {
+    font-size: 0.75rem;
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
 }
 
-.cabinet-site-mon-page #table .cabinet-sm-status--bad {
-    color: var(--bs-danger);
+.cabinet-site-mon-page #table .cabinet-sm-th-check-type,
+.cabinet-site-mon-page #table .cabinet-sm-td-check-type {
+    min-width: 6.5rem;
+    max-width: 8.5rem;
+    white-space: nowrap;
 }
 
-.cabinet-site-mon-page #table .cabinet-sm-status--pending {
-    color: var(--bs-secondary);
+.cabinet-sm-toasts > .toast-top-right {
+    position: fixed;
+    top: 4.5rem;
+    right: 1rem;
+    z-index: 10060;
+    min-width: 18rem;
+    max-width: min(24rem, calc(100vw - 2rem));
+    pointer-events: none;
+}
+
+.cabinet-sm-toasts > .toast-top-right.is-visible {
+    pointer-events: auto;
+}
+
+/* AdminLTE/Bootstrap скрывает .toast без .show — переопределяем для legacy-toastr разметки */
+.cabinet-sm-toasts > .toast-top-right.is-visible > .toast {
+    display: block !important;
+    opacity: 1 !important;
+    width: 100%;
+    min-width: 18rem;
+    padding: 0.85rem 1rem;
+    border: 0;
+    border-radius: 0.35rem;
+    color: #fff;
+    box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.2);
+}
+
+.cabinet-sm-toasts > .toast-top-right.is-visible > .toast.toast-success {
+    background-color: #51a351;
+}
+
+.cabinet-sm-toasts > .toast-top-right.is-visible > .toast.toast-error {
+    background-color: #bd362f;
+}
+
+.cabinet-sm-toasts .toast-message {
+    color: #fff;
+}
+
+.cabinet-site-mon-page #table .cabinet-sm-th-uptime,
+.cabinet-site-mon-page #table .cabinet-sm-td-uptime {
+    width: 5.5rem;
+    white-space: nowrap;
 }
 
 .cabinet-sm-stats-modal .cabinet-sm-stats-modal__footer {
@@ -288,7 +345,12 @@
 }
 
 .cabinet-site-mon-toolbar {
-    gap: 0.5rem 0.75rem;
+    gap: 0.5rem;
+}
+
+.cabinet-site-mon-page .cabinet-site-mon-toolbar-card .card-body {
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
 }
 
 .cabinet-site-mon-toolbar .cabinet-site-mon-toolbar__count {
@@ -297,14 +359,6 @@
 
 .cabinet-site-mon-page .table.cabinet-sm-table td {
     vertical-align: middle;
-}
-
-.cabinet-site-mon-page .cabinet-sm-status-ok {
-    color: var(--bs-info);
-}
-
-.cabinet-site-mon-page .cabinet-sm-status-bad {
-    color: var(--bs-danger);
 }
 
 .cabinet-site-mon-page .form-check.form-switch .form-check-input {
@@ -491,13 +545,16 @@
 
 .cabinet-site-mon-page #table .cabinet-sm-td-actions,
 .cabinet-site-mon-page #table .cabinet-sm-actions {
-    min-width: 11rem;
+    min-width: 10.5rem;
+    width: 10.5rem;
 }
 
 .cabinet-site-mon-page #table .cabinet-sm-cell--actions {
-    flex-wrap: wrap;
     justify-content: center;
-    gap: 0.25rem;
+}
+
+.cabinet-site-mon-page #table .cabinet-sm-cell--actions .btn-group .btn {
+    padding: 0.25rem 0.45rem;
 }
 
 /* Модалка статистики / лога проверок */
