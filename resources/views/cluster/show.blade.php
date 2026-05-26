@@ -5,6 +5,7 @@
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/keyword-generator/css/style.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/datatable.css') }}"/>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-cluster.css') }}?v={{ @filemtime(public_path('css/cabinet-cluster.css')) ?: time() }}">
         <style>
             #clusters-table > tbody > tr > td > table > thead:hover {
                 background: transparent !important;
@@ -111,40 +112,13 @@
         </div>
     </div>
 
+    @include('cluster.partials.module-nav', [
+        'active' => 'result-classic',
+        'clusterId' => $cluster['id'],
+        'admin' => $admin,
+    ])
+
     <div class="card">
-        <div class="card-header d-flex p-0">
-            <ul class="nav nav-pills p-2">
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ route('cluster') }}">{{ __('Analyzer') }}</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link"
-                       href="{{ route('cluster.projects') }}">{{ __('My projects') }}</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link active" href="{{ route('show.cluster.result', $cluster['id']) }}">
-                        {{ __('My project') }}
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ route('edit.clusters.v2', $cluster['id']) }}">
-                        {{ __('Hands editor v2') }}
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ route('edit.clusters', $cluster['id']) }}">
-                        {{ __('Hands editor v1') }}
-                    </a>
-                </li>
-                @if($admin)
-                    <li>
-                        <a class="nav-link text-primary" href="{{ route('cluster.configuration') }}">
-                            {{ __('Module administration') }}
-                        </a>
-                    </li>
-                @endif
-            </ul>
-        </div>
         <div class="card-body">
             <div class="tab-content">
                 <div class="tab-pane active" id="tab_1">

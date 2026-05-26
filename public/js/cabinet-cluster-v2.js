@@ -224,6 +224,86 @@
     updateLimits();
   }
 
+  function truthyRequestFlag(value) {
+    return value === true || value === 'true' || value === 1 || value === '1';
+  }
+
+  function applyFromSavedProject(request) {
+    if (!request || typeof request !== 'object') return;
+
+    const engine = request.engineVersion === 'professional' ? 'professional' : 'classic';
+    setMode(engine);
+    applyDefaults(engine);
+
+    $('#clv2-phrases').val(request.phrases || '');
+    $('#clv2-domain').val(request.domain || '');
+    if ($('#clv2-comment').length) {
+      $('#clv2-comment').val(request.comment || '');
+    }
+
+    if (request.region) {
+      setRegionValue(request.region, '');
+    }
+    if (request.clusteringLevel) {
+      $('#clv2-clustering-level').val(request.clusteringLevel);
+    }
+    if (request.count) {
+      $('#clv2-top').val(String(request.count));
+    }
+    if (request.save !== undefined && request.save !== null) {
+      $('#clv2-save').val(String(request.save));
+    }
+
+    $('#clv2-search-base').prop('checked', truthyRequestFlag(request.searchBase));
+    $('#clv2-search-phrases').prop('checked', truthyRequestFlag(request.searchPhrases));
+    $('#clv2-search-target').prop('checked', truthyRequestFlag(request.searchTarget));
+    $('#clv2-search-relevance').prop('checked', truthyRequestFlag(request.searchRelevance));
+    $('#clv2-brut-force').prop('checked', truthyRequestFlag(request.brutForce));
+
+    if (request.brutForceCount) {
+      $('#clv2-brut-force-count').val(request.brutForceCount);
+    }
+    if (request.gainFactor) {
+      $('#clv2-gain-factor').val(request.gainFactor);
+    }
+    if (request.reductionRatio) {
+      $('#clv2-reduction-ratio').val(request.reductionRatio);
+    }
+    if (request.ignoredDomains) {
+      $('#clv2-ignored-domains').val(request.ignoredDomains);
+    }
+    if (request.ignoredWords) {
+      $('#clv2-ignored-words').val(request.ignoredWords);
+    }
+
+    applyDomainFieldNormalization();
+    toggleBrutForce();
+    updateLimits();
+
+    const step1 = document.getElementById('clv2-step-1');
+    if (step1) {
+      step1.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function loadProjectFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('from_project');
+    if (!id || !cfg.routes.getClusterRequest) return;
+
+    $.ajax({
+      type: 'POST',
+      url: cfg.routes.getClusterRequest,
+      data: { _token: csrf(), id: id },
+      success: function (response) {
+        if (response && response.request) {
+          applyFromSavedProject(response.request);
+          showToast('success', cfg.i18n.projectLoaded || 'Параметры проекта подставлены');
+        }
+      },
+    });
+  }
+
   function applyClusterPreset(presetKey) {
     const preset = cfg.presets && cfg.presets[presetKey];
     if (!preset) return;
@@ -724,5 +804,6 @@
     }
 
     updateLimits();
+    loadProjectFromQuery();
   });
 })(jQuery, window);

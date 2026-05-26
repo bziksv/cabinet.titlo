@@ -89,3 +89,4 @@ Route::post('demo/analiz-konkurentov/run', 'Api\\Demo\\CompetitorAnalysisDemoCon
 Route::post('demo/vydelenie-unikalnykh-slov-v-tekste/run', 'Api\\Demo\\UniqueWordsDemoController@run');
 Route::post('demo/klasterizator-klyuchevykh-slov/run', 'Api\\Demo\\ClusterDemoController@run');
 Route::post('demo/klasterizator-klyuchevykh-slov/poll', 'Api\\Demo\\ClusterDemoController@poll');
+Route::post('demo/monitoring-saytov/run', 'Api\\Demo\\SiteMonitoringDemoController@run');

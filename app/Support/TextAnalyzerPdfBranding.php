@@ -72,7 +72,11 @@ class TextAnalyzerPdfBranding
             'compare' => $hasCompare,
             'competitor' => $competitorLabel,
             'locale' => app()->getLocale(),
-            'cover_rev' => '16',
+            'cover_rev' => (string) ($meta['cover_rev'] ?? '16'),
+            'cover_kicker' => (string) ($meta['cover_kicker'] ?? ''),
+            'cover_title' => (string) ($meta['cover_title'] ?? ''),
+            'cover_lead' => (string) ($meta['cover_lead'] ?? ''),
+            'cover_footer' => (string) ($meta['cover_footer'] ?? ''),
             'logo_mtime' => is_file(self::logoIconPath()) ? filemtime(self::logoIconPath()) : 0,
         ];
         $path = storage_path('app/mpdf-tmp/cover-' . md5(json_encode($payload)) . '.png');
@@ -1048,7 +1052,9 @@ class TextAnalyzerPdfBranding
         $zoneTop = $mmY(22);
         $zoneBottom = $footerLineY - $mmY(14);
 
-        $lead = (string) __('Word statistics, Zipf distribution, phrase analysis and word clouds for page text or URL.');
+        $lead = $payload['cover_lead'] !== ''
+            ? $payload['cover_lead']
+            : (string) __('Word statistics, Zipf distribution, phrase analysis and word clouds for page text or URL.');
         $leadLines = self::wrapCoverText($lead, $font, 22, $contentW);
         $compareH = !empty($payload['compare']) ? 72 : 0;
         $logoH = $mmY(11);
@@ -1060,8 +1066,14 @@ class TextAnalyzerPdfBranding
 
         $y = self::drawCoverLogoBand($im, $padL, $y, $logoH) + $mmY(12);
 
-        $y = self::drawCoverText($im, $font, 18, $padL, $y + 18, $cKicker, mb_strtoupper((string) __('Text analyzer report'))) + 10;
-        $y = self::drawCoverText($im, $fontBold, 52, $padL, $y + 52, $cTitle, (string) __('Text Analyse')) + 16;
+        $coverKicker = $payload['cover_kicker'] !== ''
+            ? $payload['cover_kicker']
+            : (string) __('Text analyzer report');
+        $coverTitle = $payload['cover_title'] !== ''
+            ? $payload['cover_title']
+            : (string) __('Text Analyse');
+        $y = self::drawCoverText($im, $font, 18, $padL, $y + 18, $cKicker, mb_strtoupper($coverKicker)) + 10;
+        $y = self::drawCoverText($im, $fontBold, 52, $padL, $y + 52, $cTitle, $coverTitle) + 16;
 
         foreach ($leadLines as $line) {
             $y = self::drawCoverText($im, $font, 22, $padL, $y + 22, $cLead, $line) + 6;
@@ -1100,7 +1112,10 @@ class TextAnalyzerPdfBranding
 
         imageline($im, $padL, $footerLineY, $width - $padL, $footerLineY, $cLine);
         self::drawCoverText($im, $font, 18, $padL, $footerY, $cFooter, parse_url(self::BRAND_SITE, PHP_URL_HOST) ?: 'datagon.ru');
-        $center = (string) __('Text analyzer report') . ' · v' . $payload['version'];
+        $footerReport = $payload['cover_footer'] !== ''
+            ? $payload['cover_footer']
+            : (string) __('Text analyzer report');
+        $center = $footerReport . ' · v' . $payload['version'];
         $centerW = self::coverTextWidth($center, $font, 18);
         self::drawCoverText($im, $font, 18, (int) (($width - $centerW) / 2), $footerY, $cFooterMid, $center);
         $pdfLabel = 'PDF';

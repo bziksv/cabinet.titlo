@@ -3,6 +3,22 @@
 .cabinet-cluster-page {
     --cabinet-cluster-highlight: oldlace;
     --cabinet-cluster-card-radius: 0.5rem;
+    padding: var(--bs-card-spacer-y, 1rem) var(--bs-card-spacer-x, 1rem);
+}
+
+.cabinet-cluster-page .cabinet-cluster-nav-card {
+    border: 0;
+    box-shadow: none !important;
+}
+
+.cabinet-cluster-page .cabinet-cluster-nav-card > .card-header {
+    padding: 0;
+    background-color: transparent;
+    border: 0;
+}
+
+.cabinet-cluster-page .cabinet-cluster-module-nav {
+    padding: 0 !important;
 }
 
 .cabinet-cluster-page .cabinet-cluster-nav-card > .card-header {

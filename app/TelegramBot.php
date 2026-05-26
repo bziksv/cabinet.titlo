@@ -23,6 +23,7 @@ class TelegramBot extends Model
     {
         $link = TelegramBot::removeProtocol($project);
         $uptimePercent = round($project->uptime_percent, 2);
+        $cabinetUrl = url(route('site.monitoring', [], false));
 
         $text = __('Project') . " <code>$project->project_name</code>  " . __('broken') . "
         " . __('Check time:') . " <code>$project->last_check</code>
@@ -32,7 +33,7 @@ class TelegramBot extends Model
         " . __('Go to the website') . "
         <a href='$link' target='_blank'>" . $link . "</a>
         " . __('Go to the service:') . "
-        <a href='https://lk.redbox.su/site-monitoring' target='_blank'>https://lk.redbox.su/site-monitoring</a>";
+        <a href='$cabinetUrl' target='_blank'>$cabinetUrl</a>";
 
         (new TelegramBotService($chatId))->sendMsg($text);
     }
@@ -41,6 +42,7 @@ class TelegramBot extends Model
     {
         $link = TelegramBot::removeProtocol($project);
         $uptimePercent = round($project->uptime_percent, 2);
+        $cabinetUrl = url(route('site.monitoring', [], false));
 
         $text = __('Project') . " <code>$project->project_name</code>  " . __('repair') . "
         " . __('Check time:') . " <code>$project->last_check</code>
@@ -50,7 +52,7 @@ class TelegramBot extends Model
         " . __('Go to the website') . "
         <a href='$link' target='_blank'>" . $link . "</a>
         " . __('Go to the service:') . "
-        <a href='https://lk.redbox.su/site-monitoring' target='_blank'>https://lk.redbox.su/site-monitoring</a>";
+        <a href='$cabinetUrl' target='_blank'>$cabinetUrl</a>";
 
         (new TelegramBotService($chatId))->sendMsg($text);
     }

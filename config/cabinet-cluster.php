@@ -5,7 +5,7 @@ return [
    * Видимая версия модуля /cluster (badge в шапке карточки).
    * Журнал: datagon.ru/docs/cabinet-cluster-changelog.md
    */
-  'version' => '2.27',
+  'version' => '2.34',
 
   /** Локально: параллельные воркеры child_cluster (scripts/dev-cluster-queue.sh). */
   'queue_workers' => (int) env('CLUSTER_QUEUE_WORKERS', env('APP_ENV', 'production') === 'local' ? 4 : 1),

@@ -337,52 +337,14 @@
         — упрощённый режим: перемещение фраз через выпадающий список, без рабочей области.
     </div>
 
+    @include('cluster.partials.module-nav', [
+        'active' => 'edit',
+        'clusterId' => $cluster['id'],
+        'admin' => $admin,
+        'cluster' => $cluster,
+    ])
+
     <div class="card">
-        <div class="card-header d-flex p-0">
-            <ul class="nav nav-pills p-2">
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ route('cluster') }}">{{ __('Analyzer') }}</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link admin-link"
-                       href="{{ route('cluster.projects') }}">{{ __('My projects') }}</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link admin-link" href="{{ route('show.cluster.result', $cluster['id']) }}">
-                        {{ __('My project') }}
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link admin-link" href="{{ route('edit.clusters.v2', $cluster['id']) }}">
-                        {{ __('Hands editor v2') }}
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link admin-link active" href="{{ route('edit.clusters', $cluster['id']) }}">
-                        {{ __('Hands editor v1') }}
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link admin-link" href="#" data-bs-toggle="modal" data-bs-target="#groupModal">
-                        {{ __('Download file') }}
-                    </a>
-                </li>
-                @if($admin)
-                    <li>
-                        <a class="nav-link admin-link" href="{{ route('cluster.configuration') }}">
-                            {{ __('Module administration') }}
-                        </a>
-                    </li>
-                @endif
-                @isset($cluster['default_result'])
-                    <li>
-                        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#resetAllChanges">
-                            {{ __('Rolling back all changes') }}
-                        </button>
-                    </li>
-                @endisset
-            </ul>
-        </div>
         <div class="card-body">
             <div class="tab-content">
                 <div class="tab-pane active" id="tab_1">

@@ -39,6 +39,7 @@ Route::get('public/share/relevance/{token}/history/{id}', 'RelevancePublicShareC
 Route::post('public/share/relevance/{token}/details', 'RelevancePublicShareController@getDetails')->name('relevance.public.share.details');
 Route::get('public/share/text-analyzer/{token}', 'TextAnalyzerPublicShareController@show')->name('text.analyzer.public.share.view');
 Route::get('public/share/html-editor/{token}', 'HtmlEditorPublicShareController@show')->name('html.editor.public.share.view');
+Route::get('public/share/site-monitoring/{token}', 'SiteMonitoringPublicShareController@show')->name('site.monitoring.public.share.view');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
 Route::get('/personal-data/en', 'AccessController@getEnPersonalData');
@@ -204,7 +205,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('add-site-monitoring', 'MonitoringDomainController@store')->name('add.site.monitoring');
     Route::get('delete-site-monitoring/{id}', 'MonitoringDomainController@remove')->name('delete.site.monitoring');
     Route::post('check-site-monitoring', 'MonitoringDomainController@checkLink')->name('check.domain');
+    Route::post('site-monitoring-reset-stats', 'MonitoringDomainController@resetStats')->name('site.monitoring.reset.stats');
+    Route::post('site-monitoring-reset-all-stats', 'MonitoringDomainController@resetAllStats')->name('site.monitoring.reset.all.stats');
+    Route::get('site-monitoring-project-stats', 'MonitoringDomainController@projectStats')->name('site.monitoring.project.stats');
+    Route::post('site-monitoring-export-pdf', 'MonitoringDomainController@exportPdf')->name('site.monitoring.export.pdf');
+    Route::post('site-monitoring-public-share', 'MonitoringDomainController@createPublicShare')->name('site.monitoring.public.share.create');
+    Route::post('site-monitoring-public-share/revoke', 'MonitoringDomainController@revokePublicShare')->name('site.monitoring.public.share.revoke');
     Route::post('edit-site-monitoring', 'MonitoringDomainController@edit')->name('edit.domain');
+    Route::get('site-monitoring-config', 'MonitoringDomainController@config')->name('site.monitoring.config');
+    Route::post('site-monitoring-config', 'MonitoringDomainController@editConfig')->name('site.monitoring.edit.config');
     Route::post('delete-domains-monitoring', 'MonitoringDomainController@removeDomains')->name('delete.sites.monitoring');
 
     Route::get('verification-token/{token}', 'TelegramBotController@verificationToken')->name('verification.token');
@@ -456,8 +465,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/set-cluster-cleaning-interval', 'ClusterController@setCleaningInterval')->name('set.cluster.cleaning.interval');
     Route::get('/cluster', 'ClusterController@index')->name('cluster');
-    Route::get('/cluster-v2', 'ClusterController@indexV2')->name('cluster.v2');
-    Route::get('/cluster-v2/regions', 'ClusterController@searchRegions')->name('cluster.v2.regions');
+    Route::get('/cluster/regions', 'ClusterController@searchRegions')->name('cluster.regions');
+    Route::redirect('/cluster-v2', '/cluster', 301);
+    Route::redirect('/cluster-v2/regions', '/cluster/regions', 301);
     Route::get('/cluster-telegram-status', 'ClusterController@telegramStatus')->name('cluster.telegram.status');
     Route::post('/analysis-cluster', 'ClusterController@analyseCluster')->name('analysis.cluster');
     Route::get('/start-cluster-progress', 'ClusterController@startProgress')->name('start.cluster.progress');
@@ -468,6 +478,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/edit-cluster-project', 'ClusterController@edit')->name('cluster.edit');
     Route::post('/get-cluster-request/', 'ClusterController@getClusterRequest')->name('get.cluster.request');
     Route::get('/show-cluster-result/{id}', 'ClusterController@showResult')->name('show.cluster.result');
+    Route::redirect('/show-cluster-result-v2/{id}', '/show-cluster-result/{id}', 301);
     Route::get('/wait-cluster-result/id', 'ClusterController@waitClusterResult')->name('wait.cluster.result');
     Route::get('/download-cluster-result/{cluster}/{type}', 'ClusterController@downloadClusterResult')->name('download.cluster.result');
     Route::get('/cluster-configuration', 'ClusterController@clusterConfiguration')->name('cluster.configuration');
@@ -479,7 +490,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/download-cluster-competitors', 'ClusterController@downloadClusterCompetitors')->name('download.cluster.competitors');
     Route::post('/download-cluster-phrases', 'ClusterController@downloadClusterPhrases')->name('download.cluster.phrases');
     Route::get('/edit-clusters/{cluster}', 'ClusterController@editClusters')->name('edit.clusters');
-    Route::get('/edit-clusters-v2/{cluster}', 'ClusterController@editClustersV2')->name('edit.clusters.v2');
+    Route::redirect('/edit-clusters-v2/{cluster}', '/edit-clusters/{cluster}', 301);
     Route::post('/confirmation-new-cluster', 'ClusterController@confirmationNewCluster')->name('confirmation.new.cluster');
     Route::post('/edit-clusters', 'ClusterController@editCluster')->name('edit.cluster');
     Route::post('/check-group-name/', 'ClusterController@checkGroupName')->name('check.group.name');

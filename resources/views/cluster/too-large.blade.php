@@ -11,6 +11,6 @@
            class="btn btn-primary">{{ __('Download') }} XLS</a>
         <a href="{{ route('download.cluster.result', ['cluster' => $clusterId, 'type' => 'csv']) }}"
            class="btn btn-secondary">{{ __('Download') }} CSV</a>
-        <a href="{{ route('cluster.projects') }}" class="btn btn-outline-secondary">{{ __('My projects') }}</a>
+        <a href="{{ route('cluster.projects') }}" class="btn btn-outline-secondary">{{ __('Projects') }}</a>
     </div>
 @endcomponent

@@ -477,6 +477,22 @@
     margin-left: auto;
 }
 
+/* Модули на component.card — единая сетка с описанием сверху */
+.cabinet-module-root > .btn.mb-4 {
+    margin-bottom: 1rem !important;
+}
+
+.cabinet-module-main-card > .card-body:has(.cabinet-cluster-v2-page),
+.cabinet-module-main-card > .card-body:has(.cabinet-cluster-page) {
+    padding: 0;
+}
+
+.cabinet-module-main-card:has(.cabinet-cluster-v2-page) > .card-header,
+.cabinet-module-main-card:has(.cabinet-cluster-page) > .card-header {
+    padding-left: var(--bs-card-spacer-x, 1rem);
+    padding-right: var(--bs-card-spacer-x, 1rem);
+}
+
 /* Новости — посты LTE3 */
 .post .user-block {
     margin-bottom: 15px;

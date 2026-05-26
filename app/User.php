@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
+use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\Url\Url as SpatieUrl;
 
@@ -122,10 +123,33 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Активен тариф Free (роль Spatie).
+     */
+    public function onFreeTariff(): bool
+    {
+        app(PermissionRegistrar::class)->setPermissionsTeamId(1);
+        $this->loadMissing('roles');
+
+        return $this->getRoleNames()->contains('Free');
+    }
+
+    /**
+     * Email-оповещения мониторинга сайтов — только на платных тарифах.
+     */
+    public function canReceiveSiteMonitoringEmail(): bool
+    {
+        return !$this->onFreeTariff();
+    }
+
+    /**
      * @param $project
      */
     public function brokenDomainNotification($project)
     {
+        if (!$this->canReceiveSiteMonitoringEmail()) {
+            return;
+        }
+
         $this->notify(new BrokenDomainNotification($project));
     }
 
@@ -134,6 +158,10 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function repairDomainNotification($project)
     {
+        if (!$this->canReceiveSiteMonitoringEmail()) {
+            return;
+        }
+
         $this->notify(new RepairDomainNotification($project));
     }
 
@@ -343,6 +371,26 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isTelegramConnected(): bool
     {
         return (bool) $this->telegram_bot_active && !empty($this->chat_id);
+    }
+
+    /**
+     * Внешние оповещения мониторинга сайтов (email или Telegram), не только таблица в кабинете.
+     */
+    public function receivesSiteMonitoringExternalAlerts(bool $projectNotificationsEnabled = true): bool
+    {
+        if (!$projectNotificationsEnabled) {
+            return false;
+        }
+
+        if (SiteMonitoringConfig::telegramEnabled() && $this->isTelegramConnected()) {
+            return true;
+        }
+
+        if (SiteMonitoringConfig::emailEnabled() && $this->canReceiveSiteMonitoringEmail()) {
+            return true;
+        }
+
+        return false;
     }
 
     public function shouldShowTelegramConnectPrompt(): bool

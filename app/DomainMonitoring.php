@@ -2,13 +2,18 @@
 
 namespace App;
 
+use App\SiteMonitoringConfig;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class DomainMonitoring extends Model
 {
+    /** Статус в таблице после сброса uptime (до следующей проверки). */
+    public const STATUS_AFTER_RESET = 'Site monitoring status after reset';
+
     protected $guarded = [];
 
     protected $table = 'domain_monitoring';
@@ -19,6 +24,59 @@ class DomainMonitoring extends Model
     public function telegramBot(): HasOne
     {
         return $this->hasOne(TelegramBot::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function checkLogs(): HasMany
+    {
+        return $this->hasMany(DomainMonitoringCheckLog::class, 'domain_monitoring_id');
+    }
+
+    public function isPendingResetStatus(): bool
+    {
+        return (string) $this->status === self::STATUS_AFTER_RESET;
+    }
+
+    public function resetStatistics(): void
+    {
+        $this->applyStatisticsResetState();
+        $this->save();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function applyStatisticsResetState(): void
+    {
+        $this->up_time = 0;
+        $this->uptime_percent = 100;
+        $this->time_last_breakdown = null;
+        $this->total_time_last_breakdown = null;
+        $this->broken = false;
+        $this->status = self::STATUS_AFTER_RESET;
+        $this->code = null;
+    }
+
+    /**
+     * Bulk reset uptime for all projects of a user; clears last HTTP snapshot in «Состояние».
+     */
+    public static function resetStatisticsForUser(int $userId): int
+    {
+        return static::query()
+            ->where('user_id', $userId)
+            ->update([
+                'up_time' => 0,
+                'uptime_percent' => 100,
+                'time_last_breakdown' => null,
+                'total_time_last_breakdown' => null,
+                'broken' => false,
+                'status' => self::STATUS_AFTER_RESET,
+                'code' => null,
+            ]);
     }
 
     public static function calculateUpTime($project)
@@ -57,45 +115,129 @@ class DomainMonitoring extends Model
 
     public static function sendNotifications($project, $oldState)
     {
-        if ($project->send_notification) {
-            $user = User::where('id', '=', $project->user_id)->first();
-
-            if ($oldState && !$project->broken) {
-                $user->repairDomainNotification($project);
-                if ($user->telegram_bot_active) {
-                    TelegramBot::repairedDomainNotification($project, $user->chat_id);
-                    $project->time_last_notification = Carbon::now();
-                }
-            }
-
-            if (!$oldState && $project->broken) {
-                $user->brokenDomainNotification($project);
-                if ($user->telegram_bot_active) {
-                    TelegramBot::brokenDomainNotification($project, $user->chat_id);
-                    $project->time_last_notification = Carbon::now();
-                }
-            }
-
-            $lastNotification = new Carbon($project->time_last_notification);
-
-            if ($oldState && $project->broken && ($lastNotification->diffInMinutes(Carbon::now()) >= 360 || $project->time_last_notification === null)) {
-                $user->brokenDomainNotification($project);
-                if ($user->telegram_bot_active) {
-                    TelegramBot::brokenDomainNotification($project, $user->chat_id);
-                }
-                $project->time_last_notification = Carbon::now();
-            }
-
-            $project->save();
+        if (!$project->send_notification) {
+            return;
         }
+
+        $user = User::where('id', '=', $project->user_id)->first();
+        if (!$user) {
+            return;
+        }
+
+        $emailOn = SiteMonitoringConfig::emailEnabled() && $user->canReceiveSiteMonitoringEmail();
+        $telegramOn = SiteMonitoringConfig::telegramEnabled()
+            && $user->telegram_bot_active
+            && $user->chat_id;
+        $repeatMinutes = SiteMonitoringConfig::repeatBrokenMinutes();
+
+        if ($oldState && !$project->broken) {
+            if ($emailOn) {
+                $user->repairDomainNotification($project);
+            }
+            if ($telegramOn) {
+                TelegramBot::repairedDomainNotification($project, $user->chat_id);
+            }
+            $project->time_last_notification = Carbon::now();
+        }
+
+        if (!$oldState && $project->broken) {
+            if ($emailOn) {
+                $user->brokenDomainNotification($project);
+            }
+            if ($telegramOn) {
+                TelegramBot::brokenDomainNotification($project, $user->chat_id);
+            }
+            $project->time_last_notification = Carbon::now();
+        }
+
+        $lastNotification = $project->time_last_notification
+            ? new Carbon($project->time_last_notification)
+            : null;
+
+        if ($oldState && $project->broken && (
+            $lastNotification === null
+            || $lastNotification->diffInMinutes(Carbon::now()) >= $repeatMinutes
+        )) {
+            if ($emailOn) {
+                $user->brokenDomainNotification($project);
+            }
+            if ($telegramOn) {
+                TelegramBot::brokenDomainNotification($project, $user->chat_id);
+            }
+            $project->time_last_notification = Carbon::now();
+        }
+
+        $project->save();
     }
 
-    public static function httpCheck($project)
+    public static function httpCheck($project, string $source = 'cron'): void
     {
         $oldState = $project->broken;
+        self::runCheck($project);
+
+        DomainMonitoring::calculateTotalTimeLastBreakdown($project, $oldState);
+        DomainMonitoring::calculateUpTime($project);
+        $project->last_check = Carbon::now();
+        $project->save();
+
+        self::recordCheckLog($project, $source);
+
+        try {
+            DomainMonitoring::sendNotifications($project, $oldState);
+        } catch (\Throwable $e) {
+
+        }
+
+    }
+
+    public static function recordCheckLog(DomainMonitoring $project, string $source): void
+    {
+        DomainMonitoringCheckLog::create([
+            'domain_monitoring_id' => $project->id,
+            'user_id' => $project->user_id,
+            'broken' => (bool) $project->broken,
+            'status' => $project->status,
+            'http_code' => $project->code,
+            'uptime_percent' => $project->uptime_percent,
+            'source' => $source === 'manual' ? 'manual' : 'cron',
+            'created_at' => Carbon::now(),
+        ]);
+    }
+
+    /**
+     * Одна проверка URL без сохранения в БД (демо на маркетинге).
+     *
+     * @return array{broken: bool, status: string, status_key: string, code: int, response_time_ms: int, phrase_used: bool}
+     */
+    public static function probe(string $link, ?string $phrase = null, int $waitingTime = 15): array
+    {
+        $project = new self([
+            'link' => $link,
+            'phrase' => $phrase !== null && trim($phrase) !== '' ? trim($phrase) : null,
+            'waiting_time' => max(10, min(20, $waitingTime)),
+        ]);
+
+        $started = microtime(true);
+        self::runCheck($project);
+
+        return [
+            'broken' => (bool) $project->broken,
+            'status' => __($project->status),
+            'status_key' => (string) $project->status,
+            'code' => (int) ($project->code ?? 0),
+            'response_time_ms' => (int) round((microtime(true) - $started) * 1000),
+            'phrase_used' => $project->phrase !== null && $project->phrase !== '',
+        ];
+    }
+
+    /**
+     * HTTP/фраза — без записи в БД.
+     */
+    public static function runCheck($project): void
+    {
         $curl = DomainMonitoring::curlInit($project);
         if (isset($curl) && $curl[1]['http_code'] === 200) {
-            if (isset($project->phrase)) {
+            if (isset($project->phrase) && $project->phrase !== '') {
                 DomainMonitoring::searchPhrase($curl, $project);
             } else {
                 $project->status = 'Everything all right';
@@ -104,21 +246,9 @@ class DomainMonitoring extends Model
             $project->code = 200;
         } else {
             $project->status = 'Unexpected response code';
-            $project->code = $curl[1]['http_code'];
+            $project->code = isset($curl[1]['http_code']) ? $curl[1]['http_code'] : 0;
             $project->broken = true;
         }
-
-        DomainMonitoring::calculateTotalTimeLastBreakdown($project, $oldState);
-        DomainMonitoring::calculateUpTime($project);
-        $project->last_check = Carbon::now();
-        $project->save();
-
-        try {
-            DomainMonitoring::sendNotifications($project, $oldState);
-        } catch (\Throwable $e) {
-
-        }
-
     }
 
     public static function curlInit($project): ?array

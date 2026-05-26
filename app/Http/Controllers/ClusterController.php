@@ -34,18 +34,6 @@ class ClusterController extends Controller
     public function index($result = null): View
     {
         $admin = User::isUserAdmin();
-
-        return view('cluster.index', [
-            'admin' => $admin,
-            'results' => $result,
-            'config' => ClusterConfiguration::first(),
-            'config_classic' => ClusterConfigurationClassic::first()
-        ]);
-    }
-
-    public function indexV2(): View
-    {
-        $admin = User::isUserAdmin();
         $config = ClusterConfiguration::first();
         $configClassic = ClusterConfigurationClassic::first();
 
@@ -335,6 +323,14 @@ class ClusterController extends Controller
 
     public function clusterProjects(): View
     {
+        return view('cluster.projects', $this->clusterProjectsViewData());
+    }
+
+    /**
+     * @return array{projects: \Illuminate\Support\Collection, admin: bool, config: ClusterConfiguration|null}
+     */
+    private function clusterProjectsViewData(): array
+    {
         $admin = User::isUserAdmin();
         $projects = ClusterResults::where('user_id', '=', Auth::id())
             ->where('show', '=', 1)->get([
@@ -342,13 +338,17 @@ class ClusterController extends Controller
                 'top', 'created_at', 'request'
             ]);
 
-        foreach ($projects as $key => $project) {
+        foreach ($projects as $project) {
             $request = json_decode($project->request, true);
-            $project->region = Common::getRegionName($request['region']);
+            $project->region = Common::getRegionName($request['region'] ?? '');
             $project->request = $request;
         }
 
-        return view('cluster.projects', ['projects' => $projects, 'admin' => $admin, 'config' => ClusterConfiguration::first()]);
+        return [
+            'projects' => $projects,
+            'admin' => $admin,
+            'config' => ClusterConfiguration::first(),
+        ];
     }
 
     public function edit(Request $request): JsonResponse
@@ -378,6 +378,35 @@ class ClusterController extends Controller
 
     public function showResult(int $id): View
     {
+        return $this->renderClusterResultView($id, 'cluster-v2.show');
+    }
+
+    private function renderClusterResultView(int $id, string $viewName): View
+    {
+        $payload = $this->clusterResultViewPayload($id);
+        if ($payload === null) {
+            return abort(403);
+        }
+
+        if (!empty($payload['too_large'])) {
+            return view('cluster.too-large', [
+                'clusterId' => $payload['clusterId'],
+                'countPhrases' => $payload['countPhrases'],
+                'countClusters' => $payload['countClusters'],
+            ]);
+        }
+
+        return view($viewName, [
+            'cluster' => $payload['cluster'],
+            'admin' => $payload['admin'],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function clusterResultViewPayload(int $id): ?array
+    {
         $cluster = ClusterResults::where('id', $id)->first([
             'count_clusters', 'count_phrases',
             'default_result', 'result',
@@ -385,28 +414,32 @@ class ClusterController extends Controller
             'id', 'show'
         ]);
 
-        if (($cluster->user_id == Auth::id() || User::isUserAdmin()) && $cluster->show === 1) {
-            $compressed = isset($cluster->default_result) ? $cluster->default_result : $cluster->result;
-            $maxCompressedBytes = 40 * 1024 * 1024;
-            if ($compressed !== null && strlen($compressed) > $maxCompressedBytes) {
-                return view('cluster.too-large', [
-                    'clusterId' => $cluster->id,
-                    'countPhrases' => (int) $cluster->count_phrases,
-                    'countClusters' => (int) $cluster->count_clusters,
-                ]);
-            }
-
-            $cluster->result = isset($cluster->default_result)
-                ? Common::uncompressArray($cluster->default_result, false)
-                : Common::uncompressArray($cluster->result, false);
-            unset($cluster->default_result);
-
-            $cluster->request = json_decode($cluster->request, true);
-
-            return view('cluster.show', ['cluster' => $cluster->toArray(), 'admin' => User::isUserAdmin()]);
+        if (!$cluster || !(($cluster->user_id == Auth::id() || User::isUserAdmin()) && $cluster->show === 1)) {
+            return null;
         }
 
-        return abort(403);
+        $compressed = isset($cluster->default_result) ? $cluster->default_result : $cluster->result;
+        $maxCompressedBytes = 40 * 1024 * 1024;
+        if ($compressed !== null && strlen($compressed) > $maxCompressedBytes) {
+            return [
+                'too_large' => true,
+                'clusterId' => $cluster->id,
+                'countPhrases' => (int) $cluster->count_phrases,
+                'countClusters' => (int) $cluster->count_clusters,
+            ];
+        }
+
+        $cluster->result = isset($cluster->default_result)
+            ? Common::uncompressArray($cluster->default_result, false)
+            : Common::uncompressArray($cluster->result, false);
+        unset($cluster->default_result);
+
+        $cluster->request = json_decode($cluster->request, true);
+
+        return [
+            'cluster' => $cluster->toArray(),
+            'admin' => User::isUserAdmin(),
+        ];
     }
 
     public function setClusterRelevanceUrl(Request $request): JsonResponse
@@ -579,23 +612,6 @@ class ClusterController extends Controller
         ]);
     }
 
-    public function editClustersV2(ClusterResults $cluster)
-    {
-        if ($cluster->created_at <= Carbon::parse('00:00 22.02.2023')) {
-            return abort(403, __('In order to edit this result, you need to reshoot it'));
-        }
-
-        $cluster->request = json_decode($cluster->request, true);
-        $editPayload = $this->buildClusterEditV2Payload(Cluster::unpackCluster($cluster->result));
-
-        return view('cluster-v2.edit', [
-            'cluster' => $cluster,
-            'admin' => User::isUserAdmin(),
-            'groups' => $editPayload['groups'],
-            'singles' => $editPayload['singles'],
-            'groupNames' => $editPayload['groupNames'],
-        ]);
-    }
 
     /**
      * @param array<string, array<string, mixed>> $clusters
@@ -695,27 +711,14 @@ class ClusterController extends Controller
         }
 
         $cluster->request = json_decode($cluster->request, true);
-        $clusters = Cluster::unpackCluster($cluster->result);
+        $editPayload = $this->buildClusterEditV2Payload(Cluster::unpackCluster($cluster->result));
 
-        if (isset($cluster->html) && $cluster->html !== '') {
-            $ar = json_decode($cluster->html, true);
-            $cluster->setClusters($cluster->result);
-            $html = $cluster->parseTree($ar);
-
-            return view('cluster.edit', [
-                'cluster' => $cluster,
-                'clusters' => $clusters,
-                'html' => $html,
-                'admin' => User::isUserAdmin()
-            ]);
-        }
-
-        ksort($clusters);
-
-        return view('cluster.edit', [
+        return view('cluster-v2.edit', [
             'cluster' => $cluster,
-            'clusters' => $clusters,
-            'admin' => User::isUserAdmin()
+            'admin' => User::isUserAdmin(),
+            'groups' => $editPayload['groups'],
+            'singles' => $editPayload['singles'],
+            'groupNames' => $editPayload['groupNames'],
         ]);
     }
 

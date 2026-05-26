@@ -1,7 +1,6 @@
 @component('component.card', [
     'title' => __('Cluster'),
-    'titleHtml' => e(__('Cluster')) . ' <span class="badge text-bg-primary ms-1 align-middle">v2</span>'
-        . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-cluster'])->render(),
+    'titleHtml' => e(__('Cluster')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-cluster'])->render(),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}">
@@ -13,7 +12,7 @@
     @endslot
 
     <div class="cabinet-cluster-v2-page" id="cabinet-cluster-v2-root">
-        @include('cluster-v2.partials.module-nav', ['active' => 'analyzer', 'admin' => $admin])
+        @include('cluster.partials.module-nav', ['active' => 'analyzer', 'admin' => $admin])
 
         <div id="toast-container" class="toast-top-right success-message">
             <div class="toast toast-success" aria-live="polite" style="display:none;">
@@ -50,14 +49,14 @@
                     'desc' => __('One phrase per line. Empty lines are ignored.'),
                 ])
                 <div class="cabinet-cluster-v2-step__body">
-                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <div class="cabinet-cluster-v2-step__toolbar">
                         <label class="form-label mb-0 visually-hidden" for="clv2-phrases">{{ __('Key phrases') }}</label>
                         @if(!empty($clusterV2PresetKawe))
                             <button type="button" class="btn btn-outline-secondary btn-sm" id="clv2-preset-kawe">
-                                Пресет KAWE
+                                Пресет Демо
                             </button>
                         @endif
-                        <span class="text-muted small ms-auto">{{ __('Count phrases') }}: <strong id="clv2-phrase-count">0</strong></span>
+                        <span class="text-muted small cabinet-cluster-v2-step__phrase-count">{{ __('Count phrases') }}: <strong id="clv2-phrase-count">0</strong></span>
                     </div>
                     <textarea id="clv2-phrases" class="form-control cabinet-cluster-v2-phrases" rows="10" placeholder="{{ __('One phrase per line') }}"></textarea>
                 </div>
@@ -250,10 +249,6 @@
             </section>
         </div>
 
-        <p class="small text-muted mt-2 mb-0">
-            <a href="{{ route('cluster') }}">{{ __('Classic UI') }}</a> — {{ __('previous interface') }}
-        </p>
-
         @include('cluster-v2.partials.admin-debug-log', ['admin' => $admin ?? false])
 
         <section id="cabinet-cluster-v2-results" class="cabinet-cluster-v2-results-wrap mt-4 d-none" aria-live="polite">
@@ -295,7 +290,8 @@
                     progress: @json(url('/get-cluster-progress')),
                     telegramStatus: @json(route('cluster.telegram.status')),
                     profile: @json(route('profile.index')),
-                    regions: @json(route('cluster.v2.regions')),
+                    regions: @json(route('cluster.regions')),
+                    getClusterRequest: @json(route('get.cluster.request')),
                 },
                 defaultRegion: @json($clusterV2DefaultRegion),
                 defaults: {
@@ -333,7 +329,8 @@
                     viewLinks: @json(__('View links phrases')),
                     resultsMeta: @json('Кластеров: :clusters · Фраз: :phrases'),
                     freqZeroHint: @json('Частотность 0: проверьте локальный queue worker (scripts/dev-cluster-queue.sh) и Wordstat New в XMLRiver. Перезапустите анализ после правки.'),
-                    presetApplied: @json('Пресет KAWE применён'),
+                    presetApplied: @json('Пресет Демо применён'),
+                    projectLoaded: @json('Параметры сохранённого проекта подставлены в форму'),
                 },
             };
         </script>

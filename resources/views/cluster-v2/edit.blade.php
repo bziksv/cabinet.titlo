@@ -1,6 +1,6 @@
 @component('component.card', [
-    'title' => __('Hands editor v2'),
-    'titleHtml' => e(__('Hands editor v2'))
+    'title' => __('Hands editor'),
+    'titleHtml' => e(__('Hands editor'))
         . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-cluster'])->render(),
 ])
     @slot('css')
@@ -12,18 +12,15 @@
     @endslot
 
     <div class="cabinet-cluster-v2-page cabinet-cluster-edit-v2" id="cabinet-cluster-edit-v2-root">
-        @include('cluster-v2.partials.edit-nav', [
-            'active' => 'edit-v2',
+        @include('cluster.partials.module-nav', [
+            'active' => 'edit',
             'clusterId' => $cluster['id'],
             'admin' => $admin,
             'cluster' => $cluster,
         ])
 
         <div class="alert alert-info border-0 shadow-sm mb-3" role="status">
-            <strong>Ручное редактирование v2.</strong>
-            Слева — оглавление групп (релевантность, объединение). Фразы можно перетаскивать за ⋮⋮ в другую группу, в таблицу или на название группы слева.
-            <a href="{{ route('edit.clusters', $cluster['id']) }}" class="alert-link ms-1">{{ __('Hands editor v1') }}</a>
-            — полный drag-and-drop с рабочей областью.
+            Слева — группы (релевантность, объединение). Фразы перетаскивайте за ⋮⋮ в другую группу, в таблицу или на название группы слева.
         </div>
 
         <div class="row g-3 cabinet-cluster-edit-v2__layout">
@@ -49,7 +46,7 @@
                     </div>
                     <div class="col-md-3 text-md-end">
                         <a href="{{ route('show.cluster.result', $cluster['id']) }}" class="btn btn-outline-secondary btn-sm">
-                            {{ __('My project') }}
+                            {{ __('Project') }}
                         </a>
                         <a href="{{ route('download.cluster.result', ['cluster' => $cluster['id'], 'type' => 'xls']) }}" class="btn btn-outline-secondary btn-sm" target="_blank">XLS</a>
                     </div>

@@ -1,12 +1,17 @@
 @php
+    use App\Classes\Tariffs\FreeTariff;
     use Illuminate\Support\Str;
 
     $currentTariffName = $actual->isNotEmpty() ? ($actual['info'][0]['value'] ?? null) : null;
     $selectedCode = array_key_first($select['tariffs']);
+    $freeTariffPlan = new FreeTariff();
 
     $plans = [];
     foreach ($tariffsArray as $tariff) {
         $code = array_search($tariff['name'], $select['tariffs'], true);
+        if ($code === false && $tariff['name'] === $freeTariffPlan->name()) {
+            $code = $freeTariffPlan->code();
+        }
         if ($code === false) {
             continue;
         }
@@ -47,6 +52,37 @@
         }
         unset($row);
     }
+
+    $siteMonEmailLabel = __('Site monitoring email alerts');
+    $siteMonEmailRow = [
+        'slug' => 'site-mon-email',
+        'synthetic_site_mon_email' => true,
+        'values' => [],
+    ];
+    foreach ($plans as $plan) {
+        $siteMonEmailRow['values'][$plan['code']] = [
+            'is_free' => $plan['code'] === 'Free',
+        ];
+    }
+
+    $orderedFeatureRows = [];
+    $siteMonInserted = false;
+    foreach ($featureRows as $featureName => $row) {
+        $orderedFeatureRows[$featureName] = $row;
+        $featureLower = mb_strtolower($featureName);
+        if (!$siteMonInserted && (
+            Str::contains($featureLower, 'мониторинг сайтов')
+            || Str::contains($featureLower, 'domain monitoring')
+            || Str::contains($featureName, 'domainMonitoring')
+        )) {
+            $orderedFeatureRows[$siteMonEmailLabel] = $siteMonEmailRow;
+            $siteMonInserted = true;
+        }
+    }
+    if (!$siteMonInserted) {
+        $orderedFeatureRows[$siteMonEmailLabel] = $siteMonEmailRow;
+    }
+    $featureRows = $orderedFeatureRows;
 @endphp
 
 @component('component.card', ['title' => __('Tariff')])
@@ -168,6 +204,9 @@
                     <h3 class="card-title mb-0">
                         <i class="bi bi-table me-1"></i>{{ __('Compare features') }}
                     </h3>
+                    <p class="text-secondary small mb-0 mt-2">
+                        {{ __('Site monitoring tariff compare footnote') }}
+                    </p>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -187,7 +226,19 @@
                                     @foreach($plans as $plan)
                                         @php $cell = $row['values'][$plan['code']] ?? null; @endphp
                                         <td class="text-center col-tariff-{{ $plan['code'] }} {{ $selectedCode === $plan['code'] ? 'col-highlight' : '' }}">
-                                            @if(!$cell || (int) ($cell['value'] ?? 0) === 0)
+                                            @if($row['synthetic_site_mon_email'] ?? false)
+                                                @if($cell['is_free'] ?? false)
+                                                    <span class="d-inline-block small text-secondary">
+                                                        <i class="bi bi-telegram text-primary" aria-hidden="true"></i>
+                                                        {{ __('Site monitoring compare telegram only') }}
+                                                    </span>
+                                                @else
+                                                    <span class="d-inline-block small">
+                                                        <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+                                                        {{ __('Site monitoring compare email telegram') }}
+                                                    </span>
+                                                @endif
+                                            @elseif(!$cell || (int) ($cell['value'] ?? 0) === 0)
                                                 <span class="text-secondary">
                                                     <i class="bi bi-x-lg" aria-hidden="true"></i>
                                                     <span class="visually-hidden">{{ __('Not available') }}</span>

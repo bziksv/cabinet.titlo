@@ -211,6 +211,13 @@
                                     @endif
                                 </div>
                                 <p class="text-secondary">{{ __('Get notifications in Telegram about monitoring and other events.') }}</p>
+                                <p class="small text-secondary mb-3">
+                                    {{ __('Site monitoring telegram profile hint') }}
+                                    <a href="{{ route('site.monitoring') }}">{{ __('Monitored domains') }}</a>
+                                    @if(\App\User::isUserAdmin())
+                                        · <a href="{{ route('site.monitoring.config') }}">{{ __('Global notification settings') }}</a>
+                                    @endif
+                                </p>
                                 <div class="d-flex flex-wrap gap-2">
                                     <a href="https://t.me/RedBoxServiceBot?start={{ base64_encode($user->email) }}"
                                        target="_blank"
