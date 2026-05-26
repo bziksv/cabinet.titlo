@@ -3,25 +3,33 @@
 namespace App\Support;
 
 use App\Services\TelegramConnectivityService;
+use App\TelegramProxy;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
- * Список прокси для Telegram API (файл на сервере, не в git).
+ * Список прокси для Telegram API (таблица telegram_proxies).
  */
 class TelegramProxyRegistry
 {
-    public static function storagePath(): string
+    /** URL из config (после config:cache), не env() напрямую. */
+    public static function configProxyUrl(): string
     {
-        return storage_path((string) config('cabinet-telegram.proxies_file', 'app/telegram-proxies.json'));
+        $url = config('app.telegram_proxy');
+
+        return is_string($url) ? trim($url) : '';
     }
 
-    public static function seedFromEnvIfEmpty(): void
+    /**
+     * Если в БД пусто — первая запись из config/app.telegram_proxy.
+     */
+    public static function seedFromConfigIfNeeded(): void
     {
-        if (is_readable(self::storagePath())) {
+        if (TelegramProxy::query()->count() > 0) {
             return;
         }
 
-        $url = trim((string) env('TELEGRAM_PROXY', ''));
+        $url = self::configProxyUrl();
         if ($url === '' || !self::isValidProxyUrl($url)) {
             return;
         }
@@ -42,37 +50,22 @@ class TelegramProxyRegistry
      */
     public static function all(): array
     {
-        self::seedFromEnvIfEmpty();
+        self::seedFromConfigIfNeeded();
 
-        $path = self::storagePath();
-        if (!is_readable($path)) {
-            return [];
-        }
-
-        $raw = json_decode((string) file_get_contents($path), true);
-        if (!is_array($raw) || !isset($raw['proxies']) || !is_array($raw['proxies'])) {
-            return [];
-        }
-
-        $out = [];
-        foreach ($raw['proxies'] as $row) {
-            if (!is_array($row) || empty($row['url'])) {
-                continue;
-            }
-            $out[] = [
-                'id' => (string) ($row['id'] ?? Str::uuid()),
-                'label' => (string) ($row['label'] ?? 'Proxy'),
-                'url' => trim((string) $row['url']),
-                'enabled' => !isset($row['enabled']) || (bool) $row['enabled'],
-                'priority' => (int) ($row['priority'] ?? 0),
-            ];
-        }
-
-        usort($out, static function (array $a, array $b) {
-            return $b['priority'] <=> $a['priority'];
-        });
-
-        return $out;
+        return TelegramProxy::query()
+            ->orderByDesc('priority')
+            ->get()
+            ->map(static function (TelegramProxy $row) {
+                return [
+                    'id' => $row->id,
+                    'label' => $row->label,
+                    'url' => $row->url,
+                    'enabled' => (bool) $row->enabled,
+                    'priority' => (int) $row->priority,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
@@ -105,7 +98,7 @@ class TelegramProxyRegistry
 
     public static function syncLegacyConfig(): void
     {
-        $url = self::primaryUrl() ?? '';
+        $url = self::primaryUrl() ?? self::configProxyUrl();
         config(['app.telegram_proxy' => $url !== '' ? $url : null]);
     }
 
@@ -133,16 +126,31 @@ class TelegramProxyRegistry
             return $b['priority'] <=> $a['priority'];
         });
 
-        $path = self::storagePath();
-        $dir = dirname($path);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
+        try {
+            $keepIds = [];
+            foreach ($normalized as $row) {
+                TelegramProxy::query()->updateOrCreate(
+                    ['id' => $row['id']],
+                    [
+                        'label' => $row['label'],
+                        'url' => $row['url'],
+                        'priority' => $row['priority'],
+                        'enabled' => $row['enabled'],
+                    ]
+                );
+                $keepIds[] = $row['id'];
+            }
 
-        file_put_contents($path, json_encode([
-            'updated_at' => now()->toIso8601String(),
-            'proxies' => $normalized,
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            if ($keepIds === []) {
+                TelegramProxy::query()->delete();
+            } else {
+                TelegramProxy::query()->whereNotIn('id', $keepIds)->delete();
+            }
+        } catch (\Throwable $e) {
+            Log::error('TelegramProxyRegistry: cannot save to database', [
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         self::syncLegacyConfig();
     }
@@ -195,7 +203,7 @@ class TelegramProxyRegistry
 
     public static function importFromEnv(): bool
     {
-        $url = trim((string) env('TELEGRAM_PROXY', ''));
+        $url = self::configProxyUrl();
         if ($url === '') {
             return false;
         }

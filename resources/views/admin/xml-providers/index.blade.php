@@ -10,8 +10,10 @@
     <div class="cabinet-xml-providers-page">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h2 class="h4 mb-2">
-                    <i class="bi bi-cloud-haze2 me-2 text-primary" aria-hidden="true"></i>{{ __('XML services management') }}
+                <h2 class="h4 mb-2 d-flex flex-wrap align-items-center gap-1">
+                    <i class="bi bi-cloud-haze2 text-primary" aria-hidden="true"></i>
+                    <span>{{ __('XML services management') }}</span>
+                    @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-xml-providers'])
                 </h2>
                 <p class="text-secondary small mb-0" style="max-width: 44rem;">
                     {{ __('Balances from provider APIs. Keys are stored in .env (XML_STOCK_*, XML_PROXY_*, XML_RIVER_*). Module mapping is defined in config/cabinet-xml-providers.php.') }}

@@ -10,8 +10,10 @@
     <div class="cabinet-tariff-settings-page">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h2 class="h4 mb-2">
-                    <i class="bi bi-sliders me-2 text-primary" aria-hidden="true"></i>{{ __('Tariffs settings') }}
+                <h2 class="h4 mb-2 d-flex flex-wrap align-items-center gap-1">
+                    <i class="bi bi-sliders text-primary" aria-hidden="true"></i>
+                    <span>{{ __('Tariffs settings') }}</span>
+                    @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-tariff-settings'])
                 </h2>
                 <p class="text-secondary small mb-0" style="max-width: 42rem;">
                     {{ __('Limits and messages per tariff plan. The code is used in PHP; values apply to Free, paid plans, etc.') }}

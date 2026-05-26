@@ -16,8 +16,10 @@
     <div class="cabinet-manage-access-page">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h2 class="h4 mb-2">
-                    <i class="bi bi-shield-lock me-2 text-primary" aria-hidden="true"></i>{{ __('Roles and permissions') }}
+                <h2 class="h4 mb-2 d-flex flex-wrap align-items-center gap-1">
+                    <i class="bi bi-shield-lock text-primary" aria-hidden="true"></i>
+                    <span>{{ __('Roles and permissions') }}</span>
+                    @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-manage-access'])
                 </h2>
                 <p class="text-secondary small mb-0">{{ __('Assign cabinet permissions to roles. Users get access through their role.') }}</p>
             </div>

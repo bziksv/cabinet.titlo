@@ -5,6 +5,8 @@
  * Балансы: App\Services\Xml\XmlProviderBalanceService
  */
 return [
+    'version' => '1.0.0s',
+
     'balance_cache_seconds' => (int) env('CABINET_XML_BALANCE_CACHE', 90),
 
     'providers' => [

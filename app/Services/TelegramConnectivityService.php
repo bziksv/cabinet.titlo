@@ -141,7 +141,7 @@ class TelegramConnectivityService
 
         $enabled = TelegramProxyRegistry::enabled();
         $primaryUrl = $enabled[0]['url'] ?? null;
-        $envUrl = trim((string) env('TELEGRAM_PROXY', ''));
+        $envUrl = TelegramProxyRegistry::configProxyUrl();
 
         return [
             'direct' => $this->probe(null, 8),

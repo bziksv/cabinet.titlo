@@ -50,7 +50,7 @@ class TelegramProxyAdminController extends Controller
             return $module;
         });
 
-        TelegramProxyRegistry::seedFromEnvIfEmpty();
+        TelegramProxyRegistry::seedFromConfigIfNeeded();
 
         return view('admin.telegram-proxy.index', [
             'status' => $connectivity->status(),

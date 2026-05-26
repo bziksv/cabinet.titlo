@@ -10,8 +10,10 @@
     <div class="cabinet-main-projects-page">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h2 class="h4 mb-2">
-                    <i class="bi bi-box-seam me-2 text-primary" aria-hidden="true"></i>{{ __('Menu modules') }}
+                <h2 class="h4 mb-2 d-flex flex-wrap align-items-center gap-1">
+                    <i class="bi bi-box-seam text-primary" aria-hidden="true"></i>
+                    <span>{{ __('Menu modules') }}</span>
+                    @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-main-projects'])
                 </h2>
                 <p class="text-secondary small mb-0" style="max-width: 42rem;">
                     {{ __('These entries define tiles on the home page and items in the sidebar menu: title, link, icon, roles, and sort order.') }}

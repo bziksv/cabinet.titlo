@@ -1,4 +1,8 @@
-@component('component.card', ['title' => __('Privacy Policy and Agree Terms')])
+@component('component.card', [
+    'title' => __('Privacy Policy and Agree Terms'),
+    'titleHtml' => e(__('Privacy Policy and Agree Terms'))
+        . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-policy-files'])->render(),
+])
     @slot('css')
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/summernote/summernote.css') }}"/>
         <link rel="stylesheet" type="text/css"

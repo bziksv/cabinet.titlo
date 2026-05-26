@@ -2886,7 +2886,7 @@
     "Telegram proxy list title": "Прокси для Telegram",
     "Telegram proxy list count": "Прокси в списке",
     "Telegram proxy list empty": "Список пуст. Добавьте прокси или нажмите «Импорт из .env» (если задан TELEGRAM_PROXY).",
-    "Telegram proxy list hint": "Приоритет выше — раньше в очереди. sendMessage: сначала direct (если доступен), затем рабочие прокси по убыванию приоритета. Файл: storage/app/telegram-proxies.json (не в git). Схема: socks5h://USER:PASS@HOST:PORT.",
+    "Telegram proxy list hint db": "Приоритет выше — раньше в очереди. sendMessage: сначала direct (если доступен), затем рабочие прокси по убыванию приоритета. Список в БД (таблица telegram_proxies), на всех серверах после migrate. Схема: socks5h://USER:PASS@HOST:PORT.",
     "Telegram proxy add": "Добавить прокси",
     "Telegram proxy import env": "Импорт из .env",
     "Telegram proxy imported env": "Прокси из TELEGRAM_PROXY добавлен в список",

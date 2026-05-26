@@ -243,7 +243,7 @@
                 </form>
             </div>
             <div class="card-footer small text-secondary">
-                {{ __('Telegram proxy list hint') }}
+                {{ __('Telegram proxy list hint db') }}
             </div>
         </div>
 

@@ -5,9 +5,6 @@
  * Все исходящие sendMessage идут через TelegramBotService (+ TELEGRAM_PROXY).
  */
 return [
-    /** Список прокси (секреты): storage/app/telegram-proxies.json, не в git */
-    'proxies_file' => 'app/telegram-proxies.json',
-
     'debug_log' => true,
     'debug_log_max_entries' => 80,
 

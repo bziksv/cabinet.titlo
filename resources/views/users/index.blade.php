@@ -12,8 +12,10 @@
     <div class="cabinet-users-page">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
             <div>
-                <h2 class="h4 mb-2">
-                    <i class="bi bi-people me-2 text-primary" aria-hidden="true"></i>{{ __('Users') }}
+                <h2 class="h4 mb-2 d-flex flex-wrap align-items-center gap-1">
+                    <i class="bi bi-people text-primary" aria-hidden="true"></i>
+                    <span>{{ __('Users') }}</span>
+                    @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-users'])
                 </h2>
                 <p class="text-secondary small mb-0">{{ __('Accounts, tariffs, roles. Use filters or table search.') }}</p>
             </div>

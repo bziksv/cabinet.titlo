@@ -14,7 +14,7 @@ class CabinetAdminMenu
     /** main_projects.id — порядок в выпадающем списке шестерёнки */
     public const PROJECT_IDS = [16, 26, 29, 17, 27, 33, 31];
 
-    /** Скрыты из шестерёнки, но остаются в PROJECT_IDS (не дублируются в сайдбаре) */
+    /** Скрыты из шестерёнки, но остаются в PROJECT_IDS (не дублируются в сайдбаре). 17 = /html/ (LTE demo), без badge-версии. */
     public const GEAR_HIDDEN_IDS = [17];
 
     /** @var array<int, array{id:int,title:string,link:string,external:bool}>|null */

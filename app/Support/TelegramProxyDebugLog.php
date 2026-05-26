@@ -71,7 +71,7 @@ class TelegramProxyDebugLog
             'token_set' => $token !== '',
             'token_prefix' => $token !== '' ? (mb_substr($token, 0, 12) . '…') : null,
             'proxies' => $proxies,
-            'env_proxy_masked' => TelegramConnectivityService::maskProxyUrl((string) env('TELEGRAM_PROXY', '')),
+            'env_proxy_masked' => TelegramConnectivityService::maskProxyUrl(TelegramProxyRegistry::configProxyUrl()),
         ]);
     }
 
