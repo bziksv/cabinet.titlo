@@ -17,7 +17,7 @@ class MonitoringProjectListSerializer
     private const CACHE_TTL_SECONDS = 120;
 
     /** Смена схемы ответа — сброс старого кэша с пустыми снимками. */
-    private const CACHE_KEY_SUFFIX = 's15';
+    private const CACHE_KEY_SUFFIX = 's16';
 
     /** Фоновая догрузка метрик — отдельный endpoint, не в list. */
     /** Один проект за HTTP — иначе таймаут 90 с на тяжёлых ProjectData. */
@@ -178,7 +178,8 @@ class MonitoringProjectListSerializer
                 },
                 'users.roles:id,name,title',
                 'searchengines' => static function ($query) {
-                    $query->select('id', 'monitoring_project_id', 'engine');
+                    $query->select('id', 'monitoring_project_id', 'engine', 'lr')
+                        ->with('location:id,lr,name');
                 },
             ])
             ->orderBy('monitoring_projects.name')
@@ -371,12 +372,8 @@ class MonitoringProjectListSerializer
         User $auth,
         array $faviconDonorsByHost = []
     ): array {
-        $engines = $project->searchengines
-            ->pluck('engine')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        $engineRegions = $this->buildEngineRegions($project->searchengines);
+        $engines = array_keys($engineRegions);
 
         $perms = $this->authPermissions;
         $authId = $auth->id;
@@ -427,9 +424,51 @@ class MonitoringProjectListSerializer
             'mastered_percent' => $snap ? $snap->mastered_percent : null,
             'snapshot_at' => $snap && $snap->updated_at ? $snap->updated_at->toIso8601String() : null,
             'engines' => $engines,
+            'engine_regions' => $engineRegions,
             'users' => $users,
             'actions' => $this->buildActions($project, $auth, $perms),
         ];
+    }
+
+    /**
+     * Города/регионы по ПС для тултипов в списке v2.
+     *
+     * @param \Illuminate\Support\Collection<int, \App\MonitoringSearchengine> $searchengines
+     * @return array<string, list<string>>
+     */
+    private function buildEngineRegions($searchengines): array
+    {
+        $out = [];
+
+        foreach ($searchengines as $se) {
+            $key = strtolower(trim((string) $se->engine));
+            if ($key === '') {
+                continue;
+            }
+            if (!isset($out[$key])) {
+                $out[$key] = [];
+            }
+
+            $label = null;
+            if ($se->location !== null && trim((string) $se->location->name) !== '') {
+                $label = trim((string) $se->location->name);
+            } elseif ($se->lr !== null && trim((string) $se->lr) !== '') {
+                $label = '[' . trim((string) $se->lr) . ']';
+            }
+
+            if ($label !== null && !in_array($label, $out[$key], true)) {
+                $out[$key][] = $label;
+            }
+        }
+
+        foreach ($out as $engine => $cities) {
+            sort($cities, SORT_NATURAL | SORT_FLAG_CASE);
+            $out[$engine] = $cities;
+        }
+
+        ksort($out);
+
+        return $out;
     }
 
     private static function initials(?string $first, ?string $last): string

@@ -51,7 +51,13 @@ $(function () {
     var $limitsHint = $('#cabinet-header-limits-hint');
     var $used = $('#userModuleUsed');
     var $limit = $('#userModuleLimit');
-    if ($('#cabinet-header-module-limit').length) {
+    var $headerModuleLimit = $('#cabinet-header-module-limit');
+    if ($headerModuleLimit.length) {
+        var limitCode = $headerModuleLimit.data('limit-code');
+        if (limitCode) {
+            $('#header-nav-bar .cabinet-header-limits-menu tr.' + limitCode)
+                .addClass('cabinet-header-limits-menu__row--current');
+        }
         return;
     }
     $('#header-nav-bar .cabinet-header-limits-menu table tbody tr').each(function () {

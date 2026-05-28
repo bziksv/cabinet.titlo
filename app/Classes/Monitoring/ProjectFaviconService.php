@@ -115,6 +115,86 @@ class ProjectFaviconService
      */
     public function importFaviconFromLegacyBase(MonitoringProject $project, string $legacyBaseUrl): bool
     {
+        return $this->importFaviconFromLegacyBaseReport($project, $legacyBaseUrl)['ok'];
+    }
+
+    /**
+     * @return array{ok: bool, url: string, http_code: int|null, bytes: int, reason: string}
+     */
+    public function importFaviconFromLegacyBaseReport(MonitoringProject $project, string $legacyBaseUrl): array
+    {
+        $fail = function (string $url, string $reason, ?int $httpCode = null, int $bytes = 0): array {
+            return [
+                'ok' => false,
+                'url' => $url,
+                'http_code' => $httpCode,
+                'bytes' => $bytes,
+                'reason' => $reason,
+            ];
+        };
+
+        if ($this->absolutePath($project) !== null) {
+            return ['ok' => true, 'url' => '', 'http_code' => null, 'bytes' => 0, 'reason' => 'already_local'];
+        }
+
+        if (!$project->favicon_path) {
+            return $fail('', 'no_favicon_path_in_db');
+        }
+
+        $relative = ltrim(str_replace('\\', '/', (string) $project->favicon_path), '/');
+        if ($relative === '') {
+            return $fail('', 'empty_path');
+        }
+
+        $remote = rtrim($legacyBaseUrl, '/');
+        if ($remote === '' || strpos($remote, 'http') !== 0) {
+            return $fail('', 'invalid_base_url');
+        }
+
+        $url = $remote . '/storage/' . $relative;
+        $ctx = stream_context_create([
+            'http' => [
+                'timeout' => 12,
+                'user_agent' => 'DatagonCabinetFaviconImport/1',
+                'follow_location' => 1,
+                'ignore_errors' => true,
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+        $bytes = @file_get_contents($url, false, $ctx);
+        $httpCode = null;
+        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+            $httpCode = (int) $m[1];
+        }
+
+        if ($bytes === false) {
+            return $fail($url, 'http_read_failed', $httpCode, 0);
+        }
+
+        $size = strlen($bytes);
+        if ($httpCode !== null && $httpCode >= 400) {
+            return $fail($url, 'http_' . $httpCode, $httpCode, $size);
+        }
+
+        if (!$this->isAcceptableFaviconBytes($size)) {
+            return $fail($url, 'weak_or_html_' . $size . 'b', $httpCode, $size);
+        }
+
+        Storage::disk('public')->put($relative, $bytes);
+
+        return is_file(storage_path('app/public/' . $relative))
+            ? ['ok' => true, 'url' => $url, 'http_code' => $httpCode, 'bytes' => $size, 'reason' => 'imported']
+            : $fail($url, 'write_failed', $httpCode, $size);
+    }
+
+    /**
+     * Копия с диска legacy (rsync/NFS): путь к storage/app/public на сервере lk.
+     */
+    public function importFaviconFromLegacyDisk(MonitoringProject $project, string $legacyPublicRoot): bool
+    {
         if ($this->absolutePath($project) !== null) {
             return true;
         }
@@ -128,31 +208,37 @@ class ProjectFaviconService
             return false;
         }
 
-        $remote = rtrim($legacyBaseUrl, '/');
-        if ($remote === '' || strpos($remote, 'http') !== 0) {
+        $src = rtrim($legacyPublicRoot, '/') . '/' . $relative;
+        if (!is_file($src) || !is_readable($src)) {
             return false;
         }
 
-        $url = $remote . '/storage/' . $relative;
-        $ctx = stream_context_create([
-            'http' => [
-                'timeout' => 10,
-                'user_agent' => 'DatagonCabinetFaviconImport/1',
-                'follow_location' => 1,
-            ],
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-            ],
-        ]);
-        $bytes = @file_get_contents($url, false, $ctx);
-        if ($bytes === false || !$this->isAcceptableFaviconBytes(strlen($bytes))) {
+        $raw = @file_get_contents($src);
+        if ($raw === false || !$this->isAcceptableFaviconBytes(strlen($raw))) {
             return false;
         }
 
-        Storage::disk('public')->put($relative, $bytes);
+        Storage::disk('public')->put($relative, $raw);
 
         return is_file(storage_path('app/public/' . $relative));
+    }
+
+    /**
+     * @param iterable<MonitoringProject> $projects
+     */
+    public function projectsMissingFaviconFile(iterable $projects): array
+    {
+        $out = [];
+        foreach ($projects as $project) {
+            if (!$project instanceof MonitoringProject) {
+                continue;
+            }
+            if ($project->favicon_path && $this->absolutePath($project) === null) {
+                $out[] = $project;
+            }
+        }
+
+        return $out;
     }
 
     /**

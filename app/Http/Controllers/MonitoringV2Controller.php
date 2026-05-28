@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\Monitoring\MonitoringPortfolioTop10TrendService;
 use App\Classes\Monitoring\MonitoringProjectListSerializer;
 use App\Classes\Monitoring\ProjectFaviconFetcher;
 use App\Classes\Monitoring\ProjectFaviconService;
@@ -133,6 +134,41 @@ class MonitoringV2Controller extends Controller
             return response()->json([
                 'message' => __('Monitoring v2 list load error'),
             ], 500);
+        }
+    }
+
+    /**
+     * Тренд среднего ТОП-10 по портфелю (30/60/90/180/366 дней).
+     */
+    public function portfolioTop10Trend(Request $request, MonitoringPortfolioTop10TrendService $trend): JsonResponse
+    {
+        App::setLocale('ru');
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        $days = (int) $request->input('days', 90);
+        $range = (string) $request->input('range', 'weeks');
+        $projectIds = $request->input('project_ids', []);
+        if (!is_array($projectIds)) {
+            $projectIds = [];
+        }
+
+        try {
+            set_time_limit(max(120, (int) ini_get('max_execution_time')));
+            $payload = $trend->seriesForUser($user, $projectIds, $days, $range);
+
+            return response()->json($payload);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'labels' => [],
+                'values' => [],
+                'empty' => true,
+                'error' => true,
+                'message' => __('Monitoring v2 portfolio trend error'),
+            ]);
         }
     }
 

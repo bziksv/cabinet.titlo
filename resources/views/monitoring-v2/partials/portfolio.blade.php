@@ -39,6 +39,7 @@
                     <button type="button" class="btn btn-light active" data-dash-chart="leaders">{{ __('Monitoring v2 dash chart leaders') }}</button>
                     <button type="button" class="btn btn-light" data-dash-chart="distribution">{{ __('Monitoring v2 dash chart distribution') }}</button>
                     <button type="button" class="btn btn-light" data-dash-chart="portfolio">{{ __('Monitoring v2 dash chart portfolio') }}</button>
+                    <button type="button" class="btn btn-light" data-dash-chart="trend">{{ __('Monitoring v2 dash chart trend') }}</button>
                 </div>
                 <div class="btn-group btn-group-sm cabinet-mon-v2-dash-metric d-none" id="cabinet-mon-v2-dash-metric" role="group" aria-label="{{ __('Monitoring v2 dash metric label') }}">
                     <button type="button" class="btn btn-light active" data-dash-metric="top10">{{ __('TOP') }}‑10</button>
@@ -47,6 +48,41 @@
                 </div>
             </div>
             <div class="cabinet-mon-v2-portfolio__canvas">
+                <div
+                    id="cabinet-mon-v2-trend-loader"
+                    class="cabinet-mon-v2-trend-loader"
+                    hidden
+                    role="status"
+                    aria-live="polite"
+                    aria-busy="true"
+                >
+                    <div class="cabinet-mon-v2-trend-loader__card">
+                        <div class="cabinet-mon-v2-trend-loader__spinner" aria-hidden="true"></div>
+                        <p class="cabinet-mon-v2-trend-loader__title mb-1">
+                            {{ __('Monitoring v2 portfolio trend loading title') }}
+                        </p>
+                        <p class="cabinet-mon-v2-trend-loader__detail mb-3" data-trend-loader-detail></p>
+                        <div class="cabinet-mon-v2-trend-loader__track" aria-hidden="true">
+                            <div class="cabinet-mon-v2-trend-loader__bar" data-trend-loader-bar></div>
+                        </div>
+                        <div class="cabinet-mon-v2-trend-loader__timeline" aria-hidden="true">
+                            @for ($i = 0; $i < 14; $i++)
+                                <span class="cabinet-mon-v2-trend-loader__dot" style="--dot-i: {{ $i }}"></span>
+                            @endfor
+                        </div>
+                    </div>
+                </div>
+                <div
+                    id="cabinet-mon-v2-trend-build"
+                    class="cabinet-mon-v2-trend-build"
+                    hidden
+                    aria-live="polite"
+                >
+                    <div class="cabinet-mon-v2-trend-build__track">
+                        <div class="cabinet-mon-v2-trend-build__bar" data-trend-build-bar></div>
+                    </div>
+                    <span class="cabinet-mon-v2-trend-build__text" data-trend-build-text></span>
+                </div>
                 <canvas id="cabinet-mon-v2-chart-main" height="320" aria-hidden="true"></canvas>
             </div>
             <p class="cabinet-mon-v2-portfolio__hint mb-0" id="cabinet-mon-v2-dash-hint">{{ __('Monitoring v2 dash hint all') }}</p>

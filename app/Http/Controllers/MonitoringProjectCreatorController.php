@@ -25,64 +25,90 @@ class MonitoringProjectCreatorController extends Controller
 
     public function createProject(Request $request)
     {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'url' => 'required|string|max:255',
+        ]);
+
         /** @var User $user */
         $user = $this->user;
 
         $project = $user->monitoringProjects()->create([
             'creator' => $user['id'],
             'status' => 1,
-            'name' => $request->input('name'),
-            'url' => $request->input('url'),
+            'name' => trim((string) $request->input('name')),
+            'url' => trim((string) $request->input('url')),
         ]);
 
         if (!$project) {
-            return false;
+            return response()->json(['message' => __('Could not create project')], 422);
         }
 
         event(new MonitoringProjectCreated($user, $project));
 
-        return $project['id'];
+        return response()->json(['id' => (int) $project->id]);
     }
 
     public function updateProject(Request $request)
     {
-        $id = $request->input('id');
+        $request->validate([
+            'id' => 'required|integer',
+            'name' => 'required|string|max:255',
+            'url' => 'required|string|max:255',
+        ]);
+
+        $id = (int) $request->input('id');
 
         /** @var User $user */
         $user = $this->user;
         $project = $user->monitoringProjects()->find($id);
+        if (!$project) {
+            return response()->json(['message' => __('Project not found')], 404);
+        }
+
         $oldUrl = $project->url;
         $project->update([
-            'name' => $request->input('name'),
-            'url' => $request->input('url'),
+            'name' => trim((string) $request->input('name')),
+            'url' => trim((string) $request->input('url')),
         ]);
 
         if ($oldUrl !== $project->url) {
             try {
-                app(ProjectFaviconService::class)->refresh($project-> true);
+                app(ProjectFaviconService::class)->refresh($project, true);
             } catch (\Throwable $e) {
                 report($e);
             }
         }
 
-        return $id;
+        return response()->json(['id' => (int) $project->id]);
     }
 
     public function editProject(Request $request)
     {
-        $id = $request->input('id');
+        $id = (int) $request->input('id');
 
         /** @var User $user */
         $user = $this->user;
+        $project = $user->monitoringProjects()->find($id);
+        if (!$project) {
+            return response()->json(null, 404);
+        }
 
-        return $user->monitoringProjects()->find($id);
+        return response()->json([
+            'id' => (int) $project->id,
+            'name' => $project->name,
+            'url' => $project->url,
+        ]);
     }
 
     public function actionQueries(Request $request)
     {
         /** @var User $user */
         $user = $this->user;
-        $this->project = $user->monitoringProjects()->find($request->input('id'));
+        $this->project = $user->monitoringProjects()->find((int) $request->input('id'));
+        if (!$this->project) {
+            return response()->json(['message' => __('Project not found')], 404);
+        }
 
         switch ($request->input('action')) {
             case 'create':
@@ -139,36 +165,51 @@ class MonitoringProjectCreatorController extends Controller
 
     public function getCompetitors(Request $request)
     {
-        $id = $request->input('id');
+        $id = (int) $request->input('id');
 
         /** @var User $user */
         $user = $this->user;
         $project = $user->monitoringProjects()->find($id);
+        if (!$project) {
+            return response()->json('', 404);
+        }
 
-        return implode(PHP_EOL, $project->competitors->pluck('url')->toArray());
+        return response(implode(PHP_EOL, $project->competitors->pluck('url')->toArray()));
     }
 
     public function createCompetitors(Request $request)
     {
-        $id = $request->input('id');
-        $competitors = preg_split("/\r\n|\n|\r/", $request->input('domains'));
+        $id = (int) $request->input('id');
+        $competitors = preg_split("/\r\n|\n|\r/", (string) $request->input('domains'));
 
         /** @var User $user */
         $user = $this->user;
         $project = $user->monitoringProjects()->find($id);
+        if (!$project) {
+            return response()->json(['message' => __('Project not found')], 404);
+        }
 
-        foreach ($competitors as $competitor){
+        foreach ($competitors as $competitor) {
+            $competitor = trim($competitor);
+            if ($competitor === '') {
+                continue;
+            }
             $project->competitors()->firstOrCreate([
                 'url' => $competitor,
             ]);
         }
+
+        return response()->json(['ok' => true]);
     }
 
     public function actionRegion(Request $request)
     {
         /** @var User $user */
         $user = $this->user;
-        $this->project = $user->monitoringProjects()->find($request->input('id'));
+        $this->project = $user->monitoringProjects()->find((int) $request->input('id'));
+        if (!$this->project) {
+            return response()->json(['message' => __('Project not found')], 404);
+        }
 
         switch ($request->input('action')) {
             case 'get':
@@ -330,15 +371,24 @@ class MonitoringProjectCreatorController extends Controller
 
     public function getGroups(Request $request)
     {
-        $id = $request->input('id');
-        if(empty($id))
-            return __('Main');
+        $id = (int) $request->input('id');
+        if ($id <= 0) {
+            return response()->json([['name' => __('Main')]]);
+        }
 
         /** @var User $user */
         $user = $this->user;
         $project = $user->monitoringProjects()->find($id);
+        if (!$project) {
+            return response()->json([['name' => __('Main')]]);
+        }
 
-        return $project['groups'];
+        $groups = $project->groups;
+        if ($groups->isEmpty()) {
+            return response()->json([['name' => __('Main')]]);
+        }
+
+        return response()->json($groups);
     }
 
     private function stringToInt(string $str)

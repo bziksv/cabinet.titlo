@@ -23,9 +23,24 @@
     let lastRows = [];
     let chartMode = 'leaders';
     let dashMetric = 'top10';
+    let trendLoading = false;
     let lastChartSig = '';
+    let trendLoaderProgressTimer = null;
+    let trendRevealTimer = null;
+    let trendLoadSeq = 0;
+
+    function chartSettings() {
+        if (window.cabinetMonV2ChartSettings) {
+            return window.cabinetMonV2ChartSettings.get();
+        }
+        return { periodDays: 90, range: 'weeks', metric: 'top', seriesPreset: '10' };
+    }
 
     function chartSignature() {
+        if (chartMode === 'trend') {
+            const s = chartSettings();
+            return 'trend|' + s.periodDays + '|' + s.range;
+        }
         return chartMode + '|' + dashMetric;
     }
 
@@ -177,6 +192,10 @@
             return true;
         }
 
+        if (chartMode === 'trend') {
+            return false;
+        }
+
         const metric = dashMetric;
         const leaders = topProjects(rows, 12, metric);
         const isMiddle = metric === 'middle';
@@ -238,6 +257,11 @@
                 },
             });
             lastChartSig = chartSignature();
+            return;
+        }
+
+        if (chartMode === 'trend') {
+            fetchPortfolioTop10Trend(rows);
             return;
         }
 
@@ -321,6 +345,10 @@
     }
 
     function updateChartSmart(rows) {
+        if (chartMode === 'trend') {
+            fetchPortfolioTop10Trend(rows);
+            return;
+        }
         const sig = chartSignature();
         if (mainChart && sig === lastChartSig && updateMainChartInPlace(rows)) {
             return;
@@ -350,16 +378,333 @@
 
     function syncMetricTabsVisibility() {
         const $metric = $('#cabinet-mon-v2-dash-metric');
-        if (!$metric.length) {
+        if ($metric.length) {
+            $metric.toggleClass('d-none', chartMode !== 'leaders');
+        }
+    }
+
+    function clearTrendLoaderProgressTimer() {
+        if (trendLoaderProgressTimer) {
+            window.clearInterval(trendLoaderProgressTimer);
+            trendLoaderProgressTimer = null;
+        }
+    }
+
+    function clearTrendRevealTimer() {
+        if (trendRevealTimer) {
+            window.clearTimeout(trendRevealTimer);
+            trendRevealTimer = null;
+        }
+    }
+
+    function setTrendLoaderBar(percent) {
+        const bar = document.querySelector('[data-trend-loader-bar]');
+        if (bar) {
+            bar.style.width = Math.max(0, Math.min(100, percent)) + '%';
+        }
+    }
+
+    function showTrendLoader(projectCount) {
+        const loader = document.getElementById('cabinet-mon-v2-trend-loader');
+        const build = document.getElementById('cabinet-mon-v2-trend-build');
+        const detail = document.querySelector('[data-trend-loader-detail]');
+        const $panel = $('.cabinet-mon-v2-portfolio__chart-panel');
+        if (!loader) {
             return;
         }
-        $metric.toggleClass('d-none', chartMode !== 'leaders');
+        hideTrendBuildProgress();
+        destroyMain();
+        $panel.addClass('cabinet-mon-v2-portfolio__chart-panel--loading');
+        loader.removeAttribute('hidden');
+        loader.setAttribute('aria-busy', 'true');
+        if (build) {
+            build.setAttribute('hidden', '');
+        }
+        setTrendLoaderBar(4);
+        clearTrendLoaderProgressTimer();
+        trendLoaderProgressTimer = window.setInterval(function () {
+            const bar = document.querySelector('[data-trend-loader-bar]');
+            if (!bar) {
+                return;
+            }
+            const current = parseFloat(bar.style.width) || 4;
+            if (current >= 88) {
+                return;
+            }
+            setTrendLoaderBar(current + 3 + Math.random() * 5);
+        }, 450);
+
+        const s = chartSettings();
+        const n = projectCount || 0;
+        if (detail && cfg.i18n && cfg.i18n.portfolioTrendLoadingDetail) {
+            detail.textContent = cfg.i18n.portfolioTrendLoadingDetail
+                .replace(':projects', String(n))
+                .replace(':days', String(s.periodDays));
+        }
+
+        const $hint = $('#cabinet-mon-v2-dash-hint');
+        if ($hint.length && cfg.i18n && cfg.i18n.portfolioTrendLoading) {
+            $hint.text(cfg.i18n.portfolioTrendLoading);
+        }
+
+        if (typeof toastr !== 'undefined' && cfg.i18n && cfg.i18n.portfolioTrendLoadingTitle) {
+            toastr.info(cfg.i18n.portfolioTrendLoadingTitle, '', {
+                timeOut: 6000,
+                progressBar: true,
+                positionClass: 'toast-top-right',
+            });
+        }
+    }
+
+    function hideTrendLoader() {
+        const loader = document.getElementById('cabinet-mon-v2-trend-loader');
+        const $panel = $('.cabinet-mon-v2-portfolio__chart-panel');
+        clearTrendLoaderProgressTimer();
+        setTrendLoaderBar(100);
+        if (loader) {
+            loader.setAttribute('aria-busy', 'false');
+            window.setTimeout(function () {
+                loader.setAttribute('hidden', '');
+                setTrendLoaderBar(0);
+            }, 280);
+        }
+        $panel.removeClass('cabinet-mon-v2-portfolio__chart-panel--loading');
+    }
+
+    function showTrendBuildProgress(current, total) {
+        const build = document.getElementById('cabinet-mon-v2-trend-build');
+        const bar = document.querySelector('[data-trend-build-bar]');
+        const text = document.querySelector('[data-trend-build-text]');
+        if (!build || !total) {
+            return;
+        }
+        build.removeAttribute('hidden');
+        const pct = Math.round((current / total) * 100);
+        if (bar) {
+            bar.style.width = pct + '%';
+        }
+        if (text && cfg.i18n && cfg.i18n.portfolioTrendBuilding) {
+            text.textContent = cfg.i18n.portfolioTrendBuilding
+                .replace(':current', String(current))
+                .replace(':total', String(total));
+        }
+    }
+
+    function hideTrendBuildProgress() {
+        const build = document.getElementById('cabinet-mon-v2-trend-build');
+        const bar = document.querySelector('[data-trend-build-bar]');
+        if (build) {
+            build.setAttribute('hidden', '');
+        }
+        if (bar) {
+            bar.style.width = '0';
+        }
+    }
+
+    function fetchPortfolioTop10Trend(rows) {
+        const url = cfg.portfolioTrendUrl;
+        if (!url || typeof $ === 'undefined') {
+            return;
+        }
+        const ids = (rows || lastRows || []).map(function (row) {
+            return row.id;
+        });
+        const loadSeq = ++trendLoadSeq;
+        trendLoading = true;
+        clearTrendRevealTimer();
+        showTrendLoader(ids.length);
+
+        const s = chartSettings();
+
+        return $.ajax({
+            method: 'POST',
+            url: url,
+            timeout: 180000,
+            traditional: true,
+            data: {
+                _token: cfg.csrf,
+                days: s.periodDays,
+                range: s.range,
+                project_ids: ids,
+            },
+        })
+            .done(function (data) {
+                if (loadSeq !== trendLoadSeq || chartMode !== 'trend') {
+                    return;
+                }
+                hideTrendLoader();
+                if (data && data.error) {
+                    renderTrendChart({ labels: [], values: [], empty: true });
+                    if (typeof toastr !== 'undefined' && data.message) {
+                        toastr.warning(data.message);
+                    }
+                    return;
+                }
+                renderTrendChart(data);
+            })
+            .fail(function (xhr) {
+                if (loadSeq !== trendLoadSeq) {
+                    return;
+                }
+                hideTrendLoader();
+                hideTrendBuildProgress();
+                destroyMain();
+                if (typeof toastr !== 'undefined') {
+                    const msg =
+                        (xhr.responseJSON && xhr.responseJSON.message) ||
+                        cfg.i18n.portfolioTrendError ||
+                        cfg.i18n.loadError;
+                    toastr.error(msg);
+                }
+                const $hint = $('#cabinet-mon-v2-dash-hint');
+                if ($hint.length && cfg.i18n && cfg.i18n.portfolioTrendError) {
+                    $hint.text(cfg.i18n.portfolioTrendError);
+                }
+            })
+            .always(function () {
+                if (loadSeq === trendLoadSeq) {
+                    trendLoading = false;
+                }
+            });
+    }
+
+    function revealTrendPointsStepwise(chart, allLabels, allValues, stepMs) {
+        clearTrendRevealTimer();
+        if (!chart || allLabels.length <= 1) {
+            hideTrendBuildProgress();
+            return;
+        }
+        const total = allLabels.length;
+        showTrendBuildProgress(1, total);
+        let i = 1;
+        const tick = function () {
+            if (!mainChart || mainChart !== chart || chartMode !== 'trend') {
+                clearTrendRevealTimer();
+                hideTrendBuildProgress();
+                return;
+            }
+            if (i >= allLabels.length) {
+                hideTrendBuildProgress();
+                return;
+            }
+            chart.data.labels.push(allLabels[i]);
+            chart.data.datasets[0].data.push(allValues[i]);
+            chart.update('active');
+            showTrendBuildProgress(i + 1, total);
+            i += 1;
+            if (i < allLabels.length) {
+                trendRevealTimer = window.setTimeout(tick, stepMs);
+            } else {
+                trendRevealTimer = window.setTimeout(hideTrendBuildProgress, 400);
+            }
+        };
+        trendRevealTimer = window.setTimeout(tick, stepMs);
+    }
+
+    function renderTrendChart(data) {
+        const canvas = document.getElementById('cabinet-mon-v2-chart-main');
+        if (!canvas || typeof window.Chart === 'undefined') {
+            return;
+        }
+
+        destroyMain();
+        const ctx = canvas.getContext('2d');
+        const allLabels = (data && data.labels) || [];
+        const allValues = (data && data.values) || [];
+        const $hint = $('#cabinet-mon-v2-dash-hint');
+
+        if (!allLabels.length || !allValues.length) {
+            if ($hint.length && cfg.i18n && cfg.i18n.portfolioTrendEmpty) {
+                $hint.text(cfg.i18n.portfolioTrendEmpty);
+            }
+            return;
+        }
+
+        const stepwise = allLabels.length > 4;
+        const labels = stepwise ? [allLabels[0]] : allLabels;
+        const values = stepwise ? [allValues[0]] : allValues;
+        hideTrendBuildProgress();
+
+        mainChart = new window.Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: (cfg.i18n && cfg.i18n.portfolioTrendLabel) || 'Средний ТОП-10',
+                        data: values,
+                        borderColor: COLORS.accent,
+                        backgroundColor: COLORS.accentPale,
+                        borderWidth: 3,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: COLORS.accent,
+                        pointBorderWidth: 2,
+                        tension: 0.2,
+                        fill: true,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                animation: {
+                    duration: stepwise ? 320 : 700,
+                    easing: 'easeOutQuart',
+                },
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: { callback: function (v) { return v + '%'; } },
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 0 },
+                    },
+                },
+            },
+        });
+        lastChartSig = chartSignature();
+
+        if (stepwise) {
+            revealTrendPointsStepwise(mainChart, allLabels, allValues, 55);
+        }
+
+        if ($hint.length && cfg.i18n && cfg.i18n.portfolioTrendHint) {
+            const projectsUsed = (data && data.projects_used) || (data && data.projects) || 0;
+            const withHistory =
+                (data && data.projects_with_history) != null
+                    ? data.projects_with_history
+                    : projectsUsed;
+            const s = chartSettings();
+            let hint = cfg.i18n.portfolioTrendHint
+                .replace(':days', String(s.periodDays))
+                .replace(':projects', String(projectsUsed))
+                .replace(':with_history', String(withHistory));
+            if (data && data.interpolation === 'nearest' && cfg.i18n.portfolioTrendInterpolated) {
+                hint += ' ' + cfg.i18n.portfolioTrendInterpolated;
+            }
+            if (data && data.projects_capped && cfg.i18n.portfolioTrendCapped) {
+                hint +=
+                    ' ' +
+                    cfg.i18n.portfolioTrendCapped.replace(
+                        ':limit',
+                        String(data.projects_requested || projectsUsed)
+                    );
+            }
+            $hint.text(hint);
+        }
     }
 
     function bindControls() {
         const $dash = $('#cabinet-mon-v2-dashboard');
         $dash.find('[data-dash-chart]').on('click', function () {
-            const next = $(this).data('dash-chart');
+            const next = $(this).attr('data-dash-chart');
             if (!next || next === chartMode) {
                 return;
             }
@@ -367,13 +712,31 @@
             $dash.find('[data-dash-chart]').removeClass('active');
             $(this).addClass('active');
             syncMetricTabsVisibility();
-            if (lastRows.length) {
+            if (chartMode !== 'trend') {
+                trendLoadSeq += 1;
+                clearTrendLoaderProgressTimer();
+                clearTrendRevealTimer();
+                hideTrendLoader();
+                hideTrendBuildProgress();
+            }
+            if (chartMode === 'trend') {
+                fetchPortfolioTop10Trend(lastRows);
+            } else if (lastRows.length) {
                 renderMainChart(lastRows);
             }
         });
 
+        $(document).on('cabinet-mon-v2-chart-settings-changed', function () {
+            if (window.cabinetMonV2ChartSettings) {
+                window.cabinetMonV2ChartSettings.syncForm();
+            }
+            if (chartMode === 'trend') {
+                fetchPortfolioTop10Trend(lastRows);
+            }
+        });
+
         $dash.find('[data-dash-metric]').on('click', function () {
-            const next = $(this).data('dash-metric');
+            const next = $(this).attr('data-dash-metric');
             if (!next || next === dashMetric) {
                 return;
             }
@@ -406,10 +769,65 @@
     }
 
     function destroy() {
+        trendLoadSeq += 1;
+        clearTrendLoaderProgressTimer();
+        clearTrendRevealTimer();
+        hideTrendLoader();
+        hideTrendBuildProgress();
         destroyMain();
     }
 
+    const PORTFOLIO_STORAGE_KEY = 'cabinet-mon-v2-portfolio-visible';
+
+    function setPortfolioVisible(visible) {
+        const $section = $('#cabinet-mon-v2-dashboard');
+        const $btn = $('#cabinet-mon-v2-portfolio-toggle');
+        if (!$section.length || !$btn.length) {
+            return;
+        }
+        $section.toggleClass('cabinet-mon-v2-portfolio--collapsed', !visible);
+        $btn.attr('aria-expanded', visible ? 'true' : 'false');
+        const label = visible
+            ? (cfg && cfg.i18n && cfg.i18n.portfolioHide) || 'Скрыть портфель'
+            : (cfg && cfg.i18n && cfg.i18n.portfolioShow) || 'Показать портфель';
+        $btn.find('.cabinet-mon-v2-portfolio-toggle-label').text(label);
+        try {
+            localStorage.setItem(PORTFOLIO_STORAGE_KEY, visible ? '1' : '0');
+        } catch (e) {
+            /* ignore */
+        }
+        if (visible && mainChart) {
+            window.setTimeout(function () {
+                mainChart.resize();
+            }, 100);
+        }
+    }
+
+    function initPortfolioToggle() {
+        const $btn = $('#cabinet-mon-v2-portfolio-toggle');
+        if (!$btn.length) {
+            return;
+        }
+        let visible = true;
+        try {
+            const stored = localStorage.getItem(PORTFOLIO_STORAGE_KEY);
+            if (stored === '0') {
+                visible = false;
+            }
+        } catch (e) {
+            /* ignore */
+        }
+        setPortfolioVisible(visible);
+        $btn.on('click', function () {
+            const collapsed = $('#cabinet-mon-v2-dashboard').hasClass(
+                'cabinet-mon-v2-portfolio--collapsed'
+            );
+            setPortfolioVisible(collapsed);
+        });
+    }
+
     bindControls();
+    initPortfolioToggle();
 
     window.cabinetMonV2Dashboard = {
         render: render,

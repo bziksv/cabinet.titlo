@@ -110,6 +110,10 @@
     max-height: 18rem;
 }
 
+#header-nav-bar .cabinet-header-limits-menu tr.cabinet-header-limits-menu__row--current {
+    background: oldlace;
+}
+
 #header-nav-bar .cabinet-header-limits-menu .dropdown-header {
     font-weight: 600;
 }

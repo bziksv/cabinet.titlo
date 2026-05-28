@@ -6,9 +6,7 @@
                 <h3 class="card-title">{{ ucfirst($engine->engine) }}, {{ $engine->location->name }} [{{ $engine->lr }}]</h3>
 
                 <div class="card-tools">
-                    <span class="badge bg-success">{{ __('Region code') }}: {{ $engine->lr }}</span>
-                    <span class="badge bg-success">{{ __('Region ID') }}: {{ $engine->id }}</span>
-                    <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">
+                    <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse" aria-label="{{ __('Collapse') }}">
                         <i class="fas fa-minus"></i>
                     </button>
                 </div>
@@ -21,7 +19,7 @@
                         <tr>
                             <th>{{ __('Update date') }}</th>
                             <th class="tooltip-child-table" title="{{ __('In this column, the average position on the search engine of a certain region/city. We consider it in the classical way: the sum of all positions divided by the number of words. Thanks to grouping by region and day, you will be able to see its dynamics. The closer the average value is to 1, the better.') }}">Средняя позиция <i class="far fa-question-circle"></i></th>
-                            <th class="tooltip-child-table" title="В столбцах ТОП Вы увидите результат в процентах, какое количество слов попадает в ТОП 3/5/10/30/100. Чем выше процент фраз, тем лучше. Благодаря группировке по регионам и дням, Вы сможете увидеть ее динамику в сравнении с 30/90/180/365 днями ранее, если результат за этот период есть в системе.">ТОП-1 <i class="far fa-question-circle"></i></th>
+                            <th class="tooltip-child-table" title="Процент фраз в ТОП. В скобках — изменение к срезу в строке ниже (более ранняя дата); подсказка при наведении на ячейку.">ТОП-1 <i class="far fa-question-circle"></i></th>
                             <th>ТОП-3</th>
                             <th>ТОП-5</th>
                             <th>ТОП-10</th>
@@ -34,15 +32,20 @@
                     <tbody>
                     @forelse($engine->data as $data)
                         <tr>
-                            <td>{{ $data->latest_created->format('d.m.Y') }}</td>
+                            <td class="text-nowrap align-middle">
+                                {{ $data->latest_created->format('d.m.Y') }}
+                                @if(!empty($data->snapshot_period_label))
+                                    <br><small class="text-secondary">{{ $data->snapshot_period_label }}</small>
+                                @endif
+                            </td>
                             <td>{{ $data->middle_position }}</td>
-                            <td class="top">{{$data->top_1}}</td>
-                            <td class="top">{{$data->top_3}}</td>
-                            <td class="top">{{$data->top_5}}</td>
-                            <td class="top">{{$data->top_10}}</td>
-                            <td class="top">{{$data->top_20}}</td>
-                            <td class="top">{{$data->top_50}}</td>
-                            <td class="top">{{$data->top_100}}</td>
+                            <td class="top" @if(!empty($data->delta_vs_label)) title="{{ $data->delta_vs_label }}" @endif>{{$data->top_1}}</td>
+                            <td class="top" @if(!empty($data->delta_vs_label)) title="{{ $data->delta_vs_label }}" @endif>{{$data->top_3}}</td>
+                            <td class="top" @if(!empty($data->delta_vs_label)) title="{{ $data->delta_vs_label }}" @endif>{{$data->top_5}}</td>
+                            <td class="top" @if(!empty($data->delta_vs_label)) title="{{ $data->delta_vs_label }}" @endif>{{$data->top_10}}</td>
+                            <td class="top" @if(!empty($data->delta_vs_label)) title="{{ $data->delta_vs_label }}" @endif>{{$data->top_20}}</td>
+                            <td class="top" @if(!empty($data->delta_vs_label)) title="{{ $data->delta_vs_label }}" @endif>{{$data->top_50}}</td>
+                            <td class="top" @if(!empty($data->delta_vs_label)) title="{{ $data->delta_vs_label }}" @endif>{{$data->top_100}}</td>
                             <td class="top">
                                 {{number_format($data->mastered, 2, ',', ' ')}}
                                 @if($data->mastered_percent)
@@ -59,6 +62,25 @@
                     @endforelse
                     </tbody>
                 </table>
+                @if(!empty($engine->chart_payload['points']))
+                    <div class="cabinet-mon-v2-child-chart-toolbar mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary cabinet-mon-v2-child-chart-toggle">
+                            <i class="fas fa-chart-line me-1" aria-hidden="true"></i>
+                            <span class="cabinet-mon-v2-child-chart-toggle-label">{{ __('Monitoring child chart show') }}</span>
+                        </button>
+                    </div>
+                    <div class="cabinet-mon-v2-child-chart-wrap d-none mt-3"
+                         data-project-id="{{ $projectId }}"
+                         data-engine-id="{{ $engine->id }}">
+                        @include('monitoring.partials._child_chart_controls')
+                        <div class="cabinet-mon-v2-child-chart-canvas-wrap">
+                            <canvas
+                                class="cabinet-mon-v2-child-chart"
+                                data-chart='@json($engine->chart_payload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)'
+                            ></canvas>
+                        </div>
+                    </div>
+                @endif
             </div>
             <!-- /.card-body -->
         </div>

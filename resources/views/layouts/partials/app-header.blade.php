@@ -77,7 +77,7 @@
                         <span class="nav-link @if($headerModuleLimit['exhausted']) text-danger @else text-warning-emphasis @endif">
                             <i class="bi bi-pie-chart me-1" aria-hidden="true"></i>
                             @if($headerModuleLimit['unlimited'])
-                                <span class="text-secondary">{{ __('Competitor analysis') }}:</span>
+                                <span class="text-secondary">{{ $headerModuleLimit['name'] }}:</span>
                                 <strong class="ms-1">{{ __('No restrictions') }}</strong>
                             @elseif($headerModuleLimit['exhausted'])
                                 <strong>{{ __('Your limits are exhausted this month') }}</strong>

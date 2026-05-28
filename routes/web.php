@@ -418,6 +418,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('monitoring-v2', 'MonitoringV2Controller@index')->name('monitoring.v2');
     Route::get('monitoring-v2/favicon', 'MonitoringV2Controller@favicon')->name('monitoring.v2.favicon');
     Route::post('monitoring-v2/projects/list', 'MonitoringV2Controller@listProjects')->name('monitoring.v2.projects.list');
+    Route::post('monitoring-v2/portfolio/top10-trend', 'MonitoringV2Controller@portfolioTop10Trend')->name('monitoring.v2.portfolio.top10-trend');
     Route::post('monitoring-v2/preferences/list-columns', 'MonitoringV2Controller@saveListColumns')->name('monitoring.v2.preferences.list-columns');
     Route::post('monitoring-v2/snapshots/fill', 'MonitoringV2Controller@fillSnapshots')->name('monitoring.v2.snapshots.fill');
     Route::post('monitoring-v2/favicons/fill', 'MonitoringV2Controller@fillFavicons')->name('monitoring.v2.favicons.fill');

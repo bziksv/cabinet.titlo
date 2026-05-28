@@ -6,7 +6,7 @@
  * @see App\Http\Controllers\MonitoringV2Controller
  */
 return [
-    'version' => '3.4.36-dev',
+    'version' => '3.4.59-dev',
 
     'debug_log' => env('MONITORING_V2_DEBUG_LOG', true),
     'debug_log_ttl_minutes' => (int) env('MONITORING_V2_DEBUG_LOG_TTL', 120),

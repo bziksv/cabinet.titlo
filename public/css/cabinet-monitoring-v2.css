@@ -46,6 +46,24 @@
 }
 
 /* —— Портфель (верхняя полоса, как дашборд SER) —— */
+.cabinet-mon-v2-portfolio--collapsed {
+    display: none !important;
+}
+
+.cabinet-mon-v2-module-nav .cabinet-mon-v2-portfolio-toggle {
+    cursor: pointer;
+    color: var(--mon-v2-text, #212529);
+}
+
+.cabinet-mon-v2-module-nav .cabinet-mon-v2-portfolio-toggle:hover,
+.cabinet-mon-v2-module-nav .cabinet-mon-v2-portfolio-toggle:focus {
+    color: var(--mon-v2-accent, #627d98);
+}
+
+.cabinet-mon-v2-module-nav .cabinet-mon-v2-portfolio-toggle[aria-expanded='false'] {
+    font-weight: 600;
+}
+
 .cabinet-mon-v2-portfolio {
     background: linear-gradient(165deg, #ffffff 0%, #eef2f7 55%, var(--mon-v2-page-bg) 100%);
     border-bottom: 1px solid #c5cdd8;
@@ -130,6 +148,172 @@
     border-color: var(--mon-v2-accent) !important;
     color: #fff !important;
     font-weight: 600;
+}
+
+.cabinet-mon-v2-portfolio__chart-panel--loading .cabinet-mon-v2-portfolio__canvas > canvas {
+    visibility: hidden;
+}
+
+.cabinet-mon-v2-trend-loader {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: linear-gradient(
+        165deg,
+        rgba(248, 250, 252, 0.97) 0%,
+        rgba(241, 245, 249, 0.98) 55%,
+        rgba(226, 232, 240, 0.35) 100%
+    );
+    border-radius: 0.5rem;
+    animation: cabinet-mon-v2-trend-loader-in 0.35s ease-out;
+}
+
+.cabinet-mon-v2-trend-loader[hidden] {
+    display: none !important;
+}
+
+.cabinet-mon-v2-trend-loader__card {
+    width: min(100%, 22rem);
+    text-align: center;
+}
+
+.cabinet-mon-v2-trend-loader__spinner {
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: 0 auto 1rem;
+    border: 3px solid #e2e8f0;
+    border-top-color: var(--mon-v2-accent);
+    border-radius: 50%;
+    animation: cabinet-mon-v2-favicon-spin 0.85s linear infinite;
+}
+
+.cabinet-mon-v2-trend-loader__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--mon-v2-text, #0f172a);
+}
+
+.cabinet-mon-v2-trend-loader__detail {
+    font-size: 0.8125rem;
+    color: var(--mon-v2-text-muted);
+    line-height: 1.45;
+}
+
+.cabinet-mon-v2-trend-loader__track {
+    height: 0.35rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+}
+
+.cabinet-mon-v2-trend-loader__bar {
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--mon-v2-accent), #94a3b8);
+    transition: width 0.45s ease-out;
+}
+
+.cabinet-mon-v2-trend-loader__timeline {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.35rem;
+    height: 2.5rem;
+    padding: 0 0.25rem;
+}
+
+.cabinet-mon-v2-trend-loader__dot {
+    display: block;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--mon-v2-accent);
+    opacity: 0.2;
+    transform: translateY(0);
+    animation: cabinet-mon-v2-trend-dot 1.4s ease-in-out infinite;
+    animation-delay: calc(var(--dot-i) * 0.08s);
+}
+
+.cabinet-mon-v2-trend-build {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 3;
+    padding: 0.35rem 0.5rem 0;
+    pointer-events: none;
+}
+
+.cabinet-mon-v2-trend-build[hidden] {
+    display: none !important;
+}
+
+.cabinet-mon-v2-trend-build__track {
+    height: 0.2rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+.cabinet-mon-v2-trend-build__bar {
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: var(--mon-v2-accent);
+    transition: width 0.12s ease-out;
+}
+
+.cabinet-mon-v2-trend-build__text {
+    font-size: 0.6875rem;
+    color: var(--mon-v2-text-muted);
+}
+
+@keyframes cabinet-mon-v2-trend-loader-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes cabinet-mon-v2-trend-dot {
+    0%,
+    100% {
+        opacity: 0.2;
+        transform: translateY(0) scale(1);
+    }
+    40% {
+        opacity: 1;
+        transform: translateY(-0.65rem) scale(1.15);
+    }
+}
+
+.cabinet-mon-v2-chart-settings-menu {
+    min-width: 18rem;
+}
+
+.cabinet-mon-v2-chart-series-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.cabinet-mon-v2-chart-series-presets .btn.active {
+    font-weight: 600;
+}
+
+.cabinet-mon-v2-chart-settings-nav .dropdown-toggle::after {
+    margin-left: 0.35em;
 }
 
 .cabinet-mon-v2-portfolio__chart-toolbar {
@@ -231,6 +415,12 @@
 
 .cabinet-mon-v2-table-scroll {
     overflow-x: auto;
+}
+
+/* DataTables FixedHeader на длинной странице v2 даёт «полосу» и перекрывает строки — не используем */
+.cabinet-mon-v2-page--shell table.dataTable.fixedHeader-floating,
+.cabinet-mon-v2-page--shell table.dataTable.fixedHeader-locked {
+    display: none !important;
 }
 
 .cabinet-mon-v2-table thead th {
@@ -1072,10 +1262,29 @@ button.cabinet-mon-v2-favicon-btn {
     color: var(--mon-v2-accent);
     background: var(--mon-v2-accent-soft);
     border: 1px solid var(--mon-v2-accent-border);
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    border-width: 0;
+    padding: 0;
 }
 
-.cabinet-mon-v2-avatar.admin-monitoring {
+.cabinet-mon-v2-avatar:not(.cabinet-mon-v2-avatar--photo) {
+    border-width: 1px;
+}
+
+.cabinet-mon-v2-avatar.admin-monitoring:not(.cabinet-mon-v2-avatar--photo) {
     border-color: var(--mon-v2-accent);
+}
+
+.cabinet-mon-v2-avatar--photo {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.cabinet-mon-v2-avatar--photo.admin-monitoring {
+    box-shadow: 0 0 0 2px var(--mon-v2-accent);
 }
 
 .cabinet-mon-v2-avatar__initials {
@@ -1150,6 +1359,15 @@ button.cabinet-mon-v2-favicon-btn {
     color: #475569;
     background: #f8fafc;
     border-color: #e2e8f0;
+}
+
+.cabinet-mon-v2-engine-tooltip .tooltip-inner {
+    max-width: min(32rem, 92vw);
+    width: max-content;
+    padding: 0.45rem 0.75rem;
+    text-align: left;
+    line-height: 1.45;
+    white-space: nowrap;
 }
 
 .cabinet-mon-v2-table tbody td.cabinet-mon-v2-table__col-engines {
@@ -1239,20 +1457,45 @@ button.cabinet-mon-v2-favicon-btn {
     background: var(--mon-v2-muted);
 }
 
+/* Раскрытые регионы — карточка на всю ширину сетки, таблица не обрезается */
+.cabinet-mon-v2-card--regions-open {
+    grid-column: 1 / -1;
+}
+
 .cabinet-mon-v2-card__detail {
     margin-top: 0.25rem;
+    width: 100%;
+    min-width: 0;
+}
+
+.cabinet-mon-v2-card__detail-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 0.25rem;
+    max-width: 100%;
 }
 
 .cabinet-mon-v2-card__detail table {
     font-size: 0.8125rem;
     margin-bottom: 0;
+    min-width: 48rem;
+    width: max-content;
+    max-width: none;
+}
+
+.cabinet-mon-v2-card__detail .cabinet-mon-v2-child-chart-controls__row {
+    flex-wrap: wrap;
+}
+
+.cabinet-mon-v2-card__detail .cabinet-mon-v2-child-chart-canvas-wrap {
+    height: 280px;
 }
 
 /* Регионы внутри карточки — без кричащего card-success */
 .cabinet-mon-v2-card__detail .card-outline.card-success {
     border-color: var(--mon-v2-border);
     border-radius: var(--cabinet-mon-v2-radius);
-    overflow: hidden;
+    overflow: visible;
 }
 
 .cabinet-mon-v2-card__detail .card-outline.card-success > .card-header {
@@ -1336,6 +1579,41 @@ button.cabinet-mon-v2-favicon-btn {
     display: grid;
     grid-template-columns: 1fr;
     gap: 1rem;
+}
+
+.cabinet-mon-v2-child-chart-controls__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    align-items: flex-end;
+    margin-bottom: 0.5rem;
+}
+
+.cabinet-mon-v2-child-chart-controls__field {
+    min-width: 10rem;
+}
+
+.cabinet-mon-v2-child-chart-controls__field .form-select {
+    min-width: 11rem;
+}
+
+.cabinet-mon-v2-child-chart-series-preset .btn.active {
+    font-weight: 600;
+}
+
+.cabinet-mon-v2-child-chart-wrap--loading .cabinet-mon-v2-child-chart-canvas-wrap {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.cabinet-mon-v2-child-chart-canvas-wrap {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.cabinet-mon-v2-child-chart-toolbar .btn {
+    font-weight: 500;
 }
 
 @media (min-width: 992px) {

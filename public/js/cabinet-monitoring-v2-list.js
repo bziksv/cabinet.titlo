@@ -79,7 +79,35 @@
     const CHILD_ROWS_PREFETCH_MS = 120;
     const CHILD_ROWS_WARM_FIRST = 6;
     const CHILD_ROWS_WARM_STAGGER_MS = 280;
+    const CHILD_ROWS_HTML_GEN = 'p8';
     const childRowsHtmlCache = {};
+
+    function getChildRowsCachedHtml(projectId) {
+        const entry = childRowsHtmlCache[String(projectId)];
+        if (entry && entry.gen === CHILD_ROWS_HTML_GEN && entry.html) {
+            return entry.html;
+        }
+        return null;
+    }
+
+    function setChildRowsCachedHtml(projectId, html) {
+        childRowsHtmlCache[String(projectId)] = { gen: CHILD_ROWS_HTML_GEN, html: html };
+    }
+
+    function getCardChildRowsHtml($card, projectId) {
+        if ($card.length && $card.data('childRowsHtmlGen') === CHILD_ROWS_HTML_GEN) {
+            return $card.data('childRowsHtml');
+        }
+        return getChildRowsCachedHtml(projectId);
+    }
+
+    function setCardChildRowsHtml($card, projectId, html) {
+        if ($card.length) {
+            $card.data('childRowsHtml', html);
+            $card.data('childRowsHtmlGen', CHILD_ROWS_HTML_GEN);
+        }
+        setChildRowsCachedHtml(projectId, html);
+    }
     const childRowsFetchPromises = {};
     const SNAPSHOT_FILL_MAX_RETRIES = 2;
 
@@ -827,7 +855,26 @@
         };
     }
 
-    function renderEngines(engines) {
+    function engineRegionsTooltip(meta, engineKey, engineRegions) {
+        const cities =
+            engineRegions && engineRegions[engineKey] ? engineRegions[engineKey] : [];
+        const label = meta.label;
+        if (!cities.length) {
+            return { html: escHtml(label), plain: label };
+        }
+        return {
+            html:
+                escHtml(label) +
+                cities
+                    .map(function (city) {
+                        return '<br>' + escHtml(city);
+                    })
+                    .join(''),
+            plain: label + ': ' + cities.join(', '),
+        };
+    }
+
+    function renderEngines(engines, engineRegions) {
         if (!engines || !engines.length) {
             return '<span class="text-secondary small">—</span>';
         }
@@ -836,15 +883,17 @@
             engines
                 .map(function (engine) {
                     const meta = engineChipMeta(engine);
+                    const engineKey = String(engine || '').toLowerCase();
+                    const tip = engineRegionsTooltip(meta, engineKey, engineRegions);
                     return (
                         '<span class="cabinet-mon-v2-engine cabinet-mon-v2-engine--' +
                         meta.mod +
-                        '" title="' +
-                        escHtml(meta.label) +
+                        '" data-bs-toggle="tooltip" data-bs-html="true" data-bs-custom-class="cabinet-mon-v2-engine-tooltip" data-bs-placement="top" title="' +
+                        tip.html +
                         '"><i class="' +
                         escHtml(meta.icon) +
                         '" aria-hidden="true"></i><span class="visually-hidden">' +
-                        escHtml(meta.label) +
+                        escHtml(tip.plain) +
                         '</span></span>'
                     );
                 })
@@ -875,7 +924,7 @@
                 const liClass =
                     'list-inline-item position-relative' + (u.can_change_status ? ' change-user-status' : '');
                 const avatarClass =
-                    'cabinet-mon-v2-avatar table-avatar img-circle img-bordered-sm' +
+                    'cabinet-mon-v2-avatar table-avatar img-circle' +
                     (u.is_admin ? ' admin-monitoring' : '');
                 const initials = escHtml(u.initials || '?');
                 const imgSrc = avatarImageSrc(u.image);
@@ -1065,7 +1114,7 @@
             renderUsers(row.users) +
             '</div>' +
             '<div class="cabinet-mon-v2-card__engines">' +
-            renderEngines(row.engines) +
+            renderEngines(row.engines, row.engine_regions) +
             '</div>' +
             '<div class="cabinet-mon-v2-card__budget small text-secondary">' +
             escHtml(cfg.i18n.budget) +
@@ -1848,7 +1897,6 @@
         dataTable = $('#cabinet-mon-v2-projects').DataTable({
             data: allRows,
             dom: 'rt',
-            fixedHeader: true,
             paging: false,
             // searching: false отключает _fnFilterCustom — ext.search не вызывается
             searching: true,
@@ -1927,7 +1975,7 @@
                     name: 'engines',
                     visible: isListColumnVisible('engines'),
                     data: function (row) {
-                        return renderEngines(row.engines);
+                        return renderEngines(row.engines, row.engine_regions);
                     },
                 },
                 {
@@ -1980,8 +2028,9 @@
 
     function fetchChildRowsHtml(projectId) {
         const key = String(projectId);
-        if (childRowsHtmlCache[key]) {
-            return Promise.resolve(childRowsHtmlCache[key]);
+        const cached = getChildRowsCachedHtml(key);
+        if (cached) {
+            return Promise.resolve(cached);
         }
         if (childRowsFetchPromises[key]) {
             return childRowsFetchPromises[key];
@@ -1990,7 +2039,7 @@
         childRowsFetchPromises[key] = axios
             .get(cfg.childRowsUrlTemplate.replace('__ID__', key))
             .then(function (response) {
-                childRowsHtmlCache[key] = response.data;
+                setChildRowsCachedHtml(key, response.data);
                 return response.data;
             })
             .finally(function () {
@@ -2002,6 +2051,7 @@
     function stashChildRowsOnRow(tr, html) {
         if (tr && tr.length && html) {
             tr.data('childRowsHtml', html);
+            tr.data('childRowsHtmlGen', CHILD_ROWS_HTML_GEN);
         }
     }
 
@@ -2019,7 +2069,7 @@
             }
             const id = ids[i];
             i += 1;
-            if (!childRowsHtmlCache[String(id)]) {
+            if (!getChildRowsCachedHtml(id)) {
                 fetchChildRowsHtml(id).catch(function () {
                     /* тихо */
                 });
@@ -2027,6 +2077,444 @@
             window.setTimeout(step, CHILD_ROWS_WARM_STAGGER_MS);
         }
         window.setTimeout(step, 600);
+    }
+
+    const childRegionChartStore =
+        typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+    const childRegionChartStoreFallback = new Map();
+
+    function childChartStoreGet(canvas) {
+        if (!canvas) {
+            return null;
+        }
+        if (childRegionChartStore) {
+            return childRegionChartStore.get(canvas);
+        }
+        return childRegionChartStoreFallback.get(canvas);
+    }
+
+    function childChartStoreSet(canvas, chart) {
+        if (!canvas) {
+            return;
+        }
+        if (childRegionChartStore) {
+            childRegionChartStore.set(canvas, chart);
+        } else {
+            childRegionChartStoreFallback.set(canvas, chart);
+        }
+    }
+
+    function childChartStoreDelete(canvas) {
+        if (!canvas) {
+            return;
+        }
+        if (childRegionChartStore) {
+            childRegionChartStore.delete(canvas);
+        } else {
+            childRegionChartStoreFallback.delete(canvas);
+        }
+    }
+
+    const CHILD_CHART_TOP_COLORS = [
+        { match: /топ-100|top-100/i, color: '#495057' },
+        { match: /топ-10|top-10/i, color: '#1971c2' },
+        { match: /топ-20|top-20/i, color: '#9c36b5' },
+        { match: /топ-30|top-30/i, color: '#c92a2a' },
+        { match: /топ-40|top-40/i, color: '#ae3ec9' },
+        { match: /топ-50|top-50/i, color: '#e67700' },
+        { match: /топ-5|top-5/i, color: '#2f9e44' },
+        { match: /топ-3|top-3/i, color: '#f76707' },
+        { match: /топ-1|top-1/i, color: '#e03131' },
+    ];
+
+    function childChartTopNumberFromLabel(label) {
+        const m = String(label || '').match(/(?:топ|top)[-\s]*(\d+)/i);
+        if (!m) {
+            return null;
+        }
+        const n = parseInt(m[1], 10);
+        return Number.isNaN(n) ? null : n;
+    }
+
+    function childChartColorForLabel(label) {
+        const n = childChartTopNumberFromLabel(label);
+        const byNum = {
+            1: '#e03131',
+            3: '#f76707',
+            5: '#2f9e44',
+            10: '#1971c2',
+            20: '#9c36b5',
+            30: '#c92a2a',
+            40: '#ae3ec9',
+            50: '#e67700',
+            100: '#495057',
+        };
+        if (n != null && byNum[n]) {
+            return byNum[n];
+        }
+        return '#1971c2';
+    }
+
+    function childChartPresetAllowedTops(preset) {
+        if (window.cabinetMonV2ChartSettings && window.cabinetMonV2ChartSettings.presetTopNumbers) {
+            return window.cabinetMonV2ChartSettings.presetTopNumbers(preset);
+        }
+        if (preset === '10') {
+            return [10];
+        }
+        if (preset === '351020100' || preset === '51020') {
+            return [3, 5, 10, 20, 100];
+        }
+        if (preset === '35102050100') {
+            return [3, 5, 10, 20, 50, 100];
+        }
+        return null;
+    }
+
+    /** Точное совпадение номера ТОП (иначе «ТОП-10» цепляет ТОП-100, ТОП-30…). */
+    function childChartDatasetMatchesPreset(label, preset) {
+        const n = childChartTopNumberFromLabel(label);
+        if (n == null) {
+            return false;
+        }
+        const allowed = childChartPresetAllowedTops(preset);
+        if (allowed === null) {
+            return true;
+        }
+        return allowed.indexOf(n) >= 0;
+    }
+
+    function styleChildChartDataset(ds, metric) {
+        const color =
+            metric === 'position' ? '#d9480f' : childChartColorForLabel(ds.label);
+        return {
+            label: ds.label,
+            data: ds.data,
+            borderColor: color,
+            backgroundColor: color + '22',
+            borderWidth: 3,
+            borderDash: [],
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: color,
+            pointBorderWidth: 2,
+            tension: 0.15,
+            fill: metric === 'position',
+            hidden: false,
+        };
+    }
+
+    function normalizeChildChartApiData(apiData, preset, metric) {
+        let datasets = (apiData && apiData.datasets) || [];
+        if (metric === 'position') {
+            datasets = datasets.length ? [datasets[0]] : [];
+        } else {
+            datasets = datasets.filter(function (ds) {
+                return childChartDatasetMatchesPreset(ds.label, preset);
+            });
+        }
+        return {
+            labels: (apiData && apiData.labels) || [],
+            datasets: datasets.map(function (ds) {
+                return styleChildChartDataset(ds, metric);
+            }),
+        };
+    }
+
+    function childChartNumericValues(datasets) {
+        const vals = [];
+        datasets.forEach(function (ds) {
+            if (ds.hidden) {
+                return;
+            }
+            (ds.data || []).forEach(function (v) {
+                if (v != null && !isNaN(v)) {
+                    vals.push(v);
+                }
+            });
+        });
+        return vals;
+    }
+
+    function childChartYScaleOptions(datasets, metric) {
+        if (metric !== 'position') {
+            return { min: 0, max: 100 };
+        }
+        const vals = childChartNumericValues(datasets);
+        if (!vals.length) {
+            return { min: 0, suggestedMax: 50 };
+        }
+        let minV = Math.min.apply(null, vals);
+        let maxV = Math.max.apply(null, vals);
+        const span = maxV - minV || 8;
+        const pad = Math.max(span * 0.15, 1);
+        return {
+            min: Math.max(0, Math.floor(minV - pad)),
+            max: Math.ceil(maxV + pad),
+        };
+    }
+
+    function getChartSettings() {
+        if (window.cabinetMonV2ChartSettings) {
+            return window.cabinetMonV2ChartSettings.get();
+        }
+        return { periodDays: 90, range: 'weeks', metric: 'top', seriesPreset: '10' };
+    }
+
+    function childChartDateRangeParam(chartCfg) {
+        const days = (chartCfg && chartCfg.periodDays) || 90;
+        if (typeof moment === 'undefined') {
+            return '';
+        }
+        const end = moment();
+        const start = moment().subtract(days, 'days');
+        return start.format('DD-MM-YYYY') + ' - ' + end.format('DD-MM-YYYY');
+    }
+
+    function getWrapChartSettings($wrap) {
+        const stored = $wrap.data('chartSettings');
+        if (stored) {
+            return Object.assign({}, stored);
+        }
+        return getChartSettings();
+    }
+
+    function readChildSeriesPreset($wrap) {
+        const $active = $wrap.find('[data-child-chart-setting="seriesPreset"].active');
+        return $active.data('series-preset') || '10';
+    }
+
+    function syncChildChartControls($wrap, settings) {
+        const s = settings || getWrapChartSettings($wrap);
+        $wrap.find('.cabinet-mon-v2-child-chart-period').val(String(s.periodDays));
+        $wrap.find('.cabinet-mon-v2-child-chart-range').val(s.range);
+        $wrap.find('.cabinet-mon-v2-child-chart-metric').val(s.metric);
+        $wrap.find('[data-child-chart-setting="seriesPreset"]').each(function () {
+            $(this).toggleClass('active', $(this).data('series-preset') === s.seriesPreset);
+        });
+        $wrap.find('.cabinet-mon-v2-child-chart-series-presets').toggleClass('d-none', s.metric === 'position');
+    }
+
+    function wireChildChartControls($wrap) {
+        if ($wrap.data('chartControlsWired')) {
+            return;
+        }
+        $wrap.data('chartControlsWired', 1);
+        syncChildChartControls($wrap, getWrapChartSettings($wrap));
+
+        $wrap.on(
+            'change',
+            '.cabinet-mon-v2-child-chart-period, .cabinet-mon-v2-child-chart-range, .cabinet-mon-v2-child-chart-metric',
+            function () {
+                const next = {
+                    periodDays: parseInt($wrap.find('.cabinet-mon-v2-child-chart-period').val(), 10),
+                    range: $wrap.find('.cabinet-mon-v2-child-chart-range').val(),
+                    metric: $wrap.find('.cabinet-mon-v2-child-chart-metric').val(),
+                    seriesPreset: readChildSeriesPreset($wrap),
+                };
+                $wrap.data('chartSettings', next);
+                $wrap.attr('data-chart-local', '1');
+                syncChildChartControls($wrap, next);
+                if (!$wrap.hasClass('d-none')) {
+                    fetchChildChartData($wrap);
+                }
+            }
+        );
+
+        $wrap.on('click', '[data-child-chart-setting="seriesPreset"]', function () {
+            const preset = $(this).data('series-preset');
+            $wrap.find('[data-child-chart-setting="seriesPreset"]').removeClass('active');
+            $(this).addClass('active');
+            const next = {
+                periodDays: parseInt($wrap.find('.cabinet-mon-v2-child-chart-period').val(), 10),
+                range: $wrap.find('.cabinet-mon-v2-child-chart-range').val(),
+                metric: $wrap.find('.cabinet-mon-v2-child-chart-metric').val(),
+                seriesPreset: preset,
+            };
+            $wrap.data('chartSettings', next);
+            $wrap.attr('data-chart-local', '1');
+            if (!$wrap.hasClass('d-none')) {
+                fetchChildChartData($wrap);
+            }
+        });
+
+        $wrap.on('click', '.cabinet-mon-v2-child-chart-reset-global', function () {
+            $wrap.removeData('chartSettings');
+            $wrap.removeAttr('data-chart-local');
+            syncChildChartControls($wrap, getChartSettings());
+            if (!$wrap.hasClass('d-none')) {
+                fetchChildChartData($wrap);
+            }
+        });
+    }
+
+    function ensureChildRegionChart(canvas, metric, preset) {
+        let chart = childChartStoreGet(canvas);
+        const isPercent = metric === 'top';
+        if (chart) {
+            return chart;
+        }
+        chart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        display: false,
+                        position: 'top',
+                        labels: { usePointStyle: true, boxWidth: 12, padding: 16 },
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                const y = ctx.parsed.y;
+                                if (y == null) {
+                                    return ctx.dataset.label;
+                                }
+                                return isPercent
+                                    ? ctx.dataset.label + ': ' + y + '%'
+                                    : ctx.dataset.label + ': ' + y;
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            callback: function (v) {
+                                return isPercent ? v + '%' : v;
+                            },
+                        },
+                        grid: { color: 'rgba(0, 0, 0, 0.07)' },
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 0 },
+                        grid: { display: false },
+                    },
+                },
+            },
+        });
+        childChartStoreSet(canvas, chart);
+        return chart;
+    }
+
+    function updateChildRegionChart(canvas, chartData, metric, preset) {
+        const datasets = chartData.datasets || [];
+        const yBounds = childChartYScaleOptions(datasets, metric);
+        const isPercent = metric === 'top';
+        const chart = ensureChildRegionChart(canvas, metric, preset);
+        chart.data.labels = chartData.labels || [];
+        chart.data.datasets = datasets;
+        chart.options.plugins.legend.display =
+            metric === 'top' && (chart.data.datasets || []).length > 1;
+        chart.options.scales.y.min = yBounds.min;
+        chart.options.scales.y.max = yBounds.max;
+        chart.options.scales.y.ticks.callback = function (v) {
+            return isPercent ? v + '%' : v;
+        };
+        chart.update();
+    }
+
+    function resolveChildChartProjectId($wrap) {
+        const fromWrap = $wrap.attr('data-project-id') || $wrap.data('projectId');
+        if (fromWrap) {
+            return fromWrap;
+        }
+        const $card = $wrap.closest('.cabinet-mon-v2-card');
+        if ($card.length) {
+            return $card.data('project-id');
+        }
+        return null;
+    }
+
+    function fetchChildChartData($wrap) {
+        const canvas = $wrap.find('canvas.cabinet-mon-v2-child-chart').get(0);
+        if (!canvas || typeof Chart === 'undefined') {
+            return;
+        }
+        const projectId = resolveChildChartProjectId($wrap);
+        const engineId = $wrap.attr('data-engine-id');
+        if (!projectId || !engineId) {
+            return;
+        }
+
+        const chartCfg = getWrapChartSettings($wrap);
+        const metric = chartCfg.metric || 'top';
+        const preset = chartCfg.seriesPreset || '10';
+        const chartType = metric === 'position' ? 'middle' : 'top';
+        const rangeVal = chartCfg.range || 'weeks';
+
+        $wrap.addClass('cabinet-mon-v2-child-chart-wrap--loading');
+
+        $.get(cfg.chartsUrl || '/monitoring/charts', {
+            projectId: projectId,
+            regionId: engineId,
+            dateRange: childChartDateRangeParam(chartCfg),
+            range: rangeVal,
+            chart: chartType,
+        })
+            .done(function (apiData) {
+                const normalized = normalizeChildChartApiData(apiData, preset, metric);
+                updateChildRegionChart(canvas, normalized, metric, preset);
+            })
+            .fail(function () {
+                if (typeof toastr !== 'undefined') {
+                    toastr.error(cfg.i18n.loadError);
+                }
+            })
+            .always(function () {
+                $wrap.removeClass('cabinet-mon-v2-child-chart-wrap--loading');
+            });
+    }
+
+    function applyChildRegionChart($wrap) {
+        fetchChildChartData($wrap);
+    }
+
+    function wireChildChartPanel($wrap) {
+        wireChildChartControls($wrap);
+        $wrap.data('chartPanelWired', 1);
+    }
+
+    function destroyChildRegionChart(canvas) {
+        const chart = childChartStoreGet(canvas);
+        if (chart) {
+            chart.destroy();
+            childChartStoreDelete(canvas);
+        }
+    }
+
+    function wireChildRowsCharts($root, projectId) {
+        assignChildChartProjectIds($root, projectId);
+        $root.find('.cabinet-mon-v2-child-chart-toggle').each(function () {
+            const $btn = $(this);
+            if ($btn.data('wired')) {
+                return;
+            }
+            $btn.data('wired', 1);
+            const $card = $btn.closest('.card');
+            const $wrap = $card.find('.cabinet-mon-v2-child-chart-wrap').first();
+            const $label = $btn.find('.cabinet-mon-v2-child-chart-toggle-label');
+            $btn.on('click', function () {
+                const hidden = $wrap.hasClass('d-none');
+                if (hidden) {
+                    $wrap.removeClass('d-none');
+                    $label.text(cfg.i18n.childChartHide);
+                    wireChildChartPanel($wrap);
+                    applyChildRegionChart($wrap);
+                } else {
+                    $wrap.addClass('d-none');
+                    $label.text(cfg.i18n.childChartShow);
+                    destroyChildRegionChart($wrap.find('canvas.cabinet-mon-v2-child-chart').get(0));
+                }
+            });
+        });
     }
 
     function decorateChildRowsHtml(html) {
@@ -2067,6 +2555,7 @@
         tr.addClass('shown');
         icon.removeClass('fa-plus-circle fa-spinner fa-spin').addClass('fa-minus-circle');
         $content.find('.tooltip-child-table').tooltip({ animation: false, trigger: 'hover' });
+        wireChildRowsCharts($content, row.data().id);
     }
 
     function showChildRows(tr, row, icon) {
@@ -2075,7 +2564,9 @@
             return;
         }
 
-        const cached = tr.data('childRowsHtml') || childRowsHtmlCache[String(rowData.id)];
+        const cached =
+            (tr.data('childRowsHtmlGen') === CHILD_ROWS_HTML_GEN && tr.data('childRowsHtml')) ||
+            getChildRowsCachedHtml(rowData.id);
         if (cached) {
             revealChildRows(tr, row, icon, cached);
             return;
@@ -2143,19 +2634,42 @@
         scheduleChildRowsPrefetch($(this));
     });
 
-    function applyChildRowsHtml($detail, html) {
-        const $content = $(html);
-        $content.find('.top').each(function () {
-            const str = $(this).text();
-            if (str.indexOf('+') > 0) {
-                $(this).addClass('cabinet-mon-v2-grow');
+    function wrapCardDetailTables($root) {
+        $root.find('.card-body > table').each(function () {
+            const $table = $(this);
+            if ($table.parent().hasClass('cabinet-mon-v2-card__detail-scroll')) {
+                return;
             }
-            if (str.indexOf('-') > 0) {
-                $(this).addClass('cabinet-mon-v2-shrink');
-            }
+            $table.wrap('<div class="cabinet-mon-v2-card__detail-scroll"></div>');
         });
+    }
+
+    function setCardRegionsOpen($card, open) {
+        $card.toggleClass('cabinet-mon-v2-card--regions-open', !!open);
+    }
+
+    function applyChildRowsHtml($detail, html) {
+        const $content = decorateChildRowsHtml(html);
+        wrapCardDetailTables($content);
+        const $card = $detail.closest('.cabinet-mon-v2-card');
         $detail.html($content).removeClass('d-none');
         $detail.find('.tooltip-child-table').tooltip({ animation: false, trigger: 'hover' });
+        wireChildRowsCharts($detail);
+        if ($card.length) {
+            setCardRegionsOpen($card, true);
+        }
+    }
+
+    function assignChildChartProjectIds($root, projectId) {
+        if (!projectId) {
+            return;
+        }
+        $root.find('.cabinet-mon-v2-child-chart-wrap').each(function () {
+            const $w = $(this);
+            if (!$w.attr('data-project-id')) {
+                $w.attr('data-project-id', projectId);
+            }
+        });
     }
 
     function toggleExpand($btn) {
@@ -2163,10 +2677,11 @@
         const $detail = $card.find('.cabinet-mon-v2-card__detail');
         const expanded = $btn.attr('data-expanded') === '1';
         const id = $card.data('project-id');
-        const cachedHtml = $card.data('childRowsHtml') || childRowsHtmlCache[String(id)];
+        const cachedHtml = getCardChildRowsHtml($card, id);
 
         if (expanded) {
             $detail.addClass('d-none');
+            setCardRegionsOpen($card, false);
             $btn.attr('data-expanded', '0');
             $btn.find('span').text(cfg.i18n.expandRegions);
             $btn.find('i').removeClass('bi-chevron-up').addClass('bi-chevron-down');
@@ -2196,8 +2711,7 @@
         fetchChildRowsHtml(id)
             .then(function (html) {
                 applyChildRowsHtml($detail, html);
-                $card.data('childRowsHtml', html);
-                childRowsHtmlCache[String(id)] = html;
+                setCardChildRowsHtml($card, id, html);
                 $btn.attr('data-expanded', '1');
                 $btn.find('span').text(cfg.i18n.collapseRegions);
                 $btn.find('i').removeClass('bi-chevron-down').addClass('bi-chevron-up');
@@ -2362,6 +2876,17 @@
             }
         });
     }
+
+    $(document).on('cabinet-mon-v2-chart-settings-changed', function () {
+        $('.cabinet-mon-v2-child-chart-wrap:not(.d-none)').each(function () {
+            const $wrap = $(this);
+            if ($wrap.attr('data-chart-local')) {
+                return;
+            }
+            syncChildChartControls($wrap, getChartSettings());
+            fetchChildChartData($wrap);
+        });
+    });
 
     setViewMode(getViewMode(), true);
     loadProjects();

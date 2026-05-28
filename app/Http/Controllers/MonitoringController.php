@@ -352,9 +352,14 @@ class MonitoringController extends Controller
 
     /**
      * @param Collection|null $priceByKeyword предзагруженные цены (monitoring_keyword_id => row)
+     * @param bool $withinMonthDelta true — дельта в скобках: первая vs вторая проверка внутри месяца (legacy)
      */
-    public function calculateTopPercent(Collection $positions, $model, $priceByKeyword = null)
-    {
+    public function calculateTopPercent(
+        Collection $positions,
+        $model,
+        $priceByKeyword = null,
+        bool $withinMonthDelta = true
+    ) {
         $engine = clone $model;
 
         $percents = [
@@ -374,8 +379,13 @@ class MonitoringController extends Controller
 
         foreach ($percents as $name => $percent) {
             $first = Helper::calculateTopPercentByPositions($pos->pluck('first.position'), $percent);
-            $last = Helper::calculateTopPercentByPositions($pos->pluck('last.position'), $percent);
-            $engine->$name = $first . Helper::differentTopPercent($first, $last);
+            if ($withinMonthDelta) {
+                $last = Helper::calculateTopPercentByPositions($pos->pluck('last.position'), $percent);
+                $engine->$name = $first . Helper::differentTopPercent($first, $last);
+            } else {
+                $engine->{$name . '_raw'} = $first;
+                $engine->$name = (string) $first;
+            }
         }
         $engine->middle_position = round($pos->pluck('first')->sum('position') / $pos->pluck('first')->count(), 2);
         $engine->latest_created = $pos->pluck('first')->last()->created_at;
