@@ -317,8 +317,8 @@ class MonitoringV2Controller extends Controller
                 return response('', 404);
             }
 
-            if ($force) {
-                $service->refresh($project, true, true);
+            if ($force || $service->absolutePath($project) === null) {
+                $service->refresh($project, $force, true);
             }
 
             $path = $service->absolutePath($project);

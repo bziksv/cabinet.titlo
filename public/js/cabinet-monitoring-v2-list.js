@@ -241,7 +241,11 @@
             return update.favicon_src_project_id;
         }
         const url = update.favicon_url || '';
-        const m = url.match(/monitoring-favicons\/(\d+)\.png/i);
+        let m = url.match(/monitoring-favicons\/(\d+)\.png/i);
+        if (m) {
+            return parseInt(m[1], 10);
+        }
+        m = url.match(/[?&]project=(\d+)/i);
         if (m) {
             return parseInt(m[1], 10);
         }
@@ -282,6 +286,16 @@
         }
     }
 
+    function faviconRouteFallbackSrc(failedSrc) {
+        const m =
+            String(failedSrc || '').match(/monitoring-favicons\/(\d+)\.png/i) ||
+            String(failedSrc || '').match(/[?&]project=(\d+)/i);
+        if (!m || !cfg.faviconProjectUrlTemplate) {
+            return '';
+        }
+        return cfg.faviconProjectUrlTemplate.replace('__ID__', m[1]) + '&refresh=1';
+    }
+
     function wireFaviconImages(root) {
         const imgs = (root || document).querySelectorAll('img.cabinet-mon-v2-project-cell__favicon');
         imgs.forEach(function (img) {
@@ -290,9 +304,18 @@
             }
             img.setAttribute('data-favicon-wired', '1');
             img.addEventListener('error', function onFaviconError() {
+                const failed = img.src;
+                if (img.getAttribute('data-favicon-retried') !== '1') {
+                    const retry = faviconRouteFallbackSrc(failed);
+                    if (retry && retry !== failed) {
+                        img.setAttribute('data-favicon-retried', '1');
+                        img.src = retry;
+                        return;
+                    }
+                }
                 img.removeEventListener('error', onFaviconError);
                 if (window.console && console.warn) {
-                    console.warn('[monitoring-v2] favicon load failed', img.src);
+                    console.warn('[monitoring-v2] favicon load failed', failed);
                 }
                 showFaviconFallback(img);
             });

@@ -17,7 +17,7 @@ class MonitoringProjectListSerializer
     private const CACHE_TTL_SECONDS = 120;
 
     /** Смена схемы ответа — сброс старого кэша с пустыми снимками. */
-    private const CACHE_KEY_SUFFIX = 's14';
+    private const CACHE_KEY_SUFFIX = 's15';
 
     /** Фоновая догрузка метрик — отдельный endpoint, не в list. */
     /** Один проект за HTTP — иначе таймаут 90 с на тяжёлых ProjectData. */

@@ -99,14 +99,60 @@ class ProjectFaviconService
     }
 
     /**
-     * Относительный URL PNG в public/storage (без auth — иначе &lt;img&gt; ловит 302 на login).
+     * URL для &lt;img&gt;: через Laravel (response-&gt;file), не прямой /storage/ —
+     * на FastPanel статика из public/storage часто 403 при рабочем файле в storage/app/public.
      */
     private function faviconRouteUrl(int $projectId, MonitoringProject $cacheBustSource): string
     {
-        $url = '/storage/' . self::STORAGE_DIR . '/' . $projectId . '.png';
+        $url = '/monitoring-v2/favicon?project=' . $projectId;
         $ts = $this->faviconTimestamp($cacheBustSource);
 
-        return $ts > 0 ? $url . '?v=' . $ts : $url;
+        return $ts > 0 ? $url . '&v=' . $ts : $url;
+    }
+
+    /**
+     * Импорт PNG с legacy-кабинета (lk) — только из artisan, не из HTTP/.env.
+     */
+    public function importFaviconFromLegacyBase(MonitoringProject $project, string $legacyBaseUrl): bool
+    {
+        if ($this->absolutePath($project) !== null) {
+            return true;
+        }
+
+        if (!$project->favicon_path) {
+            return false;
+        }
+
+        $relative = ltrim(str_replace('\\', '/', (string) $project->favicon_path), '/');
+        if ($relative === '') {
+            return false;
+        }
+
+        $remote = rtrim($legacyBaseUrl, '/');
+        if ($remote === '' || strpos($remote, 'http') !== 0) {
+            return false;
+        }
+
+        $url = $remote . '/storage/' . $relative;
+        $ctx = stream_context_create([
+            'http' => [
+                'timeout' => 10,
+                'user_agent' => 'DatagonCabinetFaviconImport/1',
+                'follow_location' => 1,
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+        $bytes = @file_get_contents($url, false, $ctx);
+        if ($bytes === false || !$this->isAcceptableFaviconBytes(strlen($bytes))) {
+            return false;
+        }
+
+        Storage::disk('public')->put($relative, $bytes);
+
+        return is_file(storage_path('app/public/' . $relative));
     }
 
     /**

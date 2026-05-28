@@ -64,7 +64,7 @@
                 fillFaviconsUrl: @json(route('monitoring.v2.favicons.fill')),
                 listColumns: @json($listColumns ?? []),
                 showUrlTemplate: @json(url('/monitoring/__ID__')),
-                faviconProjectUrlTemplate: @json('/storage/monitoring-favicons/__ID__.png'),
+                faviconProjectUrlTemplate: @json(url('/monitoring-v2/favicon?project=__ID__')),
                 faviconHostUrlTemplate: @json(url('/monitoring-v2/favicon?host=__HOST__')),
                 childRowsUrlTemplate: @json(url('/monitoring/__ID__/child-rows/get')),
                 csrf: @json(csrf_token()),
