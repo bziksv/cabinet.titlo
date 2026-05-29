@@ -46,6 +46,9 @@ class MonitoringChartPositionSeries
         if ($range === 'weeks') {
             return self::BUCKET_WEEK;
         }
+        if ($range === 'days') {
+            return self::BUCKET_DAY;
+        }
 
         $days = $start->diffInDays($end) + 1;
         if ($days > 120) {
@@ -108,6 +111,53 @@ class MonitoringChartPositionSeries
     }
 
     /**
+     * % ключей в ТОП-N по регионам (одна линия на регион).
+     *
+     * @param int[] $engineIds
+     *
+     * @return array<int, Collection<string, float>> engineId => [label => percent]
+     */
+    public static function topPercentSeriesByEngines(
+        int $projectId,
+        ?int $groupId,
+        array $engineIds,
+        Carbon $start,
+        Carbon $end,
+        string $bucket,
+        int $top,
+        int $keywordCount,
+        ?array $keywordIds = null
+    ): array {
+        $engineIds = array_values(array_unique(array_map('intval', $engineIds)));
+        if ($engineIds === [] || $keywordCount <= 0) {
+            return [];
+        }
+
+        $rows = self::aggregatedRows($projectId, $groupId, $keywordIds, $engineIds, $start, $end, $bucket, false);
+        $out = [];
+
+        foreach ($rows->groupBy('monitoring_searchengine_id') as $engineId => $engineRows) {
+            $series = collect();
+            foreach ($engineRows->groupBy(function ($row) use ($bucket) {
+                return self::labelFromBucket($row->pos_bucket, $bucket);
+            }) as $label => $items) {
+                $positions = $items->unique('monitoring_keyword_id')->pluck('position')->map(function ($pos) {
+                    return (int) $pos;
+                });
+                $inTop = $positions->filter(function ($pos) use ($top) {
+                    return $pos <= $top;
+                })->count();
+                $series->put($label, min(100, round(($inTop / $keywordCount) * 100, 1)));
+            }
+            $out[(int) $engineId] = $series->sortBy(function ($_, $label) {
+                return self::labelSortKey((string) $label);
+            });
+        }
+
+        return $out;
+    }
+
+    /**
      * Последние позиции ключей по дням (для % в ТОП и распределения).
      *
      * @return Collection<string, Collection<int, int>>
@@ -126,7 +176,7 @@ class MonitoringChartPositionSeries
         return $rows->groupBy(function ($row) use ($bucket) {
             return self::labelFromBucket($row->pos_bucket, $bucket);
         })->map(function ($items) {
-            return $items->pluck('position')->map(function ($pos) {
+            return $items->unique('monitoring_keyword_id')->pluck('position')->map(function ($pos) {
                 return (int) $pos;
             })->values();
         })->sortBy(function ($_, $label) {
@@ -179,14 +229,15 @@ class MonitoringChartPositionSeries
             ->joinSub($keywords->select('id'), 'mk', 'mk.id', '=', 'mp.monitoring_keyword_id')
             ->whereIn('mp.monitoring_searchengine_id', $engineIds)
             ->whereBetween('mp.created_at', [$start, $end])
-            ->selectRaw('mp.monitoring_keyword_id, mp.monitoring_searchengine_id, ' . $bucketExpr . ' as pos_bucket, MAX(mp.created_at) as max_created')
+            ->selectRaw(
+                'mp.monitoring_keyword_id, mp.monitoring_searchengine_id, '
+                . $bucketExpr . ' as pos_bucket, MAX(mp.id) as latest_id'
+            )
             ->groupBy('mp.monitoring_keyword_id', 'mp.monitoring_searchengine_id', DB::raw($bucketExpr));
 
         $query = DB::table('monitoring_positions as p')
             ->joinSub($latestSub, 'latest', function ($join) {
-                $join->on('p.monitoring_keyword_id', '=', 'latest.monitoring_keyword_id')
-                    ->on('p.monitoring_searchengine_id', '=', 'latest.monitoring_searchengine_id')
-                    ->on('p.created_at', '=', 'latest.max_created');
+                $join->on('p.id', '=', 'latest.latest_id');
             });
 
         if ($aggregateMiddle) {
@@ -198,7 +249,7 @@ class MonitoringChartPositionSeries
         }
 
         return $query
-            ->selectRaw('p.monitoring_searchengine_id, latest.pos_bucket, p.position')
+            ->selectRaw('p.monitoring_keyword_id, p.monitoring_searchengine_id, latest.pos_bucket, p.position')
             ->orderBy('latest.pos_bucket')
             ->get();
     }

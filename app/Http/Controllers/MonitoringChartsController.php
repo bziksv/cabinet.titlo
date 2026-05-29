@@ -111,6 +111,10 @@ class MonitoringChartsController extends Controller
             return $this->wrapChartMeta($request, $this->getMiddlePositionAllRegions($request));
         }
 
+        if ($request->input('chart') === 'regions_top') {
+            return $this->wrapChartMeta($request, $this->getTopPercentAllRegions($request));
+        }
+
         $this->region = $this->resolveSearchengine($request);
         if ($this->region === null || $this->keywords->isEmpty()) {
             return (new AreaChartData([]))->setData([])->get();
@@ -263,6 +267,7 @@ class MonitoringChartsController extends Controller
         $engineIds = $this->project->searchengines->pluck('id')->map(function ($id) {
             return (int) $id;
         })->all();
+        $keywordIds = $this->keywordIds();
 
         $seriesByEngine = MonitoringChartPositionSeries::middleSeriesByEngines(
             (int) $this->project->id,
@@ -271,23 +276,115 @@ class MonitoringChartsController extends Controller
             $start,
             $end,
             $bucket,
-            $this->keywordIds()
+            $keywordIds
         );
 
-        if ($seriesByEngine === []) {
+        $labels = $this->mergeSeriesLabels($seriesByEngine);
+        if (count($labels) < 2) {
+            $extendedStart = $end->copy()->subDays(89)->startOfDay();
+            if ($extendedStart->lt($start)) {
+                $seriesByEngine = MonitoringChartPositionSeries::middleSeriesByEngines(
+                    (int) $this->project->id,
+                    $groupId,
+                    $engineIds,
+                    $extendedStart,
+                    $end,
+                    $bucket,
+                    $keywordIds
+                );
+                $labels = $this->mergeSeriesLabels($seriesByEngine);
+            }
+        }
+
+        if ($seriesByEngine === [] || $labels === []) {
             return (new AreaChartData([]))->setData([])->get();
         }
 
-        $labels = [];
-        foreach ($seriesByEngine as $series) {
-            foreach ($series->keys() as $label) {
-                $labels[] = $label;
+        $chart = new AreaChartData($labels);
+        $seriesIndex = 0;
+        foreach ($this->project->searchengines as $engine) {
+            $series = $seriesByEngine[(int) $engine->id] ?? null;
+            if ($series === null || $series->isEmpty()) {
+                continue;
+            }
+
+            $dataByLabel = [];
+            foreach ($labels as $label) {
+                $dataByLabel[$label] = $series->has($label) ? $series->get($label) : null;
+            }
+
+            $color = MonitoringChartPalette::lineColor($seriesIndex++);
+            $chart->setBackgroundColor($color)
+                ->setHidden(false)
+                ->setBorderColor($color)
+                ->setLabel(MonitoringLocationLabel::chartLegend($engine))
+                ->setDataForLabels($labels, $dataByLabel);
+        }
+
+        return $chart->get();
+    }
+
+    protected function getTopPercentAllRegions(Request $request)
+    {
+        if ($this->project->searchengines->count() <= 1) {
+            return (new AreaChartData([]))->setData([])->get();
+        }
+
+        $topN = (int) $request->input('topN', 10);
+        if ($topN < 1) {
+            $topN = 10;
+        }
+        if ($topN > 100) {
+            $topN = 100;
+        }
+
+        $keywordCount = $this->keywords->count();
+        if ($keywordCount === 0) {
+            return (new AreaChartData([]))->setData([])->get();
+        }
+
+        [$start, $end] = MonitoringChartPositionSeries::parseDateRange($request->input('dateRange', null));
+        $bucket = MonitoringChartPositionSeries::resolveBucket($request->input('range'), $start, $end);
+        $groupId = $request->filled('group') ? (int) $request->input('group') : null;
+        $engineIds = $this->project->searchengines->pluck('id')->map(function ($id) {
+            return (int) $id;
+        })->all();
+        $keywordIds = $this->keywordIds();
+
+        $seriesByEngine = MonitoringChartPositionSeries::topPercentSeriesByEngines(
+            (int) $this->project->id,
+            $groupId,
+            $engineIds,
+            $start,
+            $end,
+            $bucket,
+            $topN,
+            $keywordCount,
+            $keywordIds
+        );
+
+        $labels = $this->mergeSeriesLabels($seriesByEngine);
+        if (count($labels) < 2) {
+            $extendedStart = $end->copy()->subDays(89)->startOfDay();
+            if ($extendedStart->lt($start)) {
+                $seriesByEngine = MonitoringChartPositionSeries::topPercentSeriesByEngines(
+                    (int) $this->project->id,
+                    $groupId,
+                    $engineIds,
+                    $extendedStart,
+                    $end,
+                    $bucket,
+                    $topN,
+                    $keywordCount,
+                    $keywordIds
+                );
+                $labels = $this->mergeSeriesLabels($seriesByEngine);
             }
         }
-        $labels = array_values(array_unique($labels));
-        usort($labels, function ($a, $b) {
-            return strtotime(str_replace('.', '-', $a)) <=> strtotime(str_replace('.', '-', $b));
-        });
+
+        if ($seriesByEngine === [] || $labels === []) {
+            return (new AreaChartData([]))->setData([])->get();
+        }
 
         $chart = new AreaChartData($labels);
         $seriesIndex = 0;
@@ -403,10 +500,35 @@ class MonitoringChartsController extends Controller
     public function calculatePercentPositionsInTop(Collection $positions, $top)
     {
         $items = $this->keywords->count();
-        $count = $positions->filter(function ($val) use ($top){
+        if ($items === 0) {
+            return 0;
+        }
+
+        $count = $positions->filter(function ($val) use ($top) {
             return $val <= $top;
         })->count();
 
-        return round(($count / $items) * 100, 1);
+        return min(100, round(($count / $items) * 100, 1));
+    }
+
+    /**
+     * @param array<int, \Illuminate\Support\Collection<string, int>> $seriesByEngine
+     *
+     * @return list<string>
+     */
+    private function mergeSeriesLabels(array $seriesByEngine): array
+    {
+        $labels = [];
+        foreach ($seriesByEngine as $series) {
+            foreach ($series->keys() as $label) {
+                $labels[] = $label;
+            }
+        }
+        $labels = array_values(array_unique($labels));
+        usort($labels, function ($a, $b) {
+            return strtotime(str_replace('.', '-', $a)) <=> strtotime(str_replace('.', '-', $b));
+        });
+
+        return $labels;
     }
 }

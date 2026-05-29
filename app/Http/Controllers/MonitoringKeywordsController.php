@@ -11,6 +11,7 @@ use App\MonitoringKeywordPrice;
 use App\MonitoringOccurrence;
 use App\MonitoringPosition;
 use App\MonitoringProject;
+use App\MonitoringProjectColumnsSetting;
 use App\MonitoringProjectSettings;
 use App\MonitoringSearchengine;
 use App\User;
@@ -833,7 +834,9 @@ class MonitoringKeywordsController extends Controller
     {
         apply_team_permissions($id);
 
-        return view('monitoring.keywords.controls');
+        $columnSettings = MonitoringProjectColumnsSetting::visibilityMapForProject((int) $id);
+
+        return view('monitoring.keywords.controls', compact('columnSettings'));
     }
 
     /**

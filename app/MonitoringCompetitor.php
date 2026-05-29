@@ -13,8 +13,10 @@ class MonitoringCompetitor extends Model
     public static function getCompetitors(array $request, $targetId): ?string
     {
         $project = MonitoringProject::findOrFail($request['projectId']);
-        $words = MonitoringKeyword::where('monitoring_project_id', $request['projectId'])->get(['query'])->toArray();
-        $words = array_chunk($words, 100);
+        $keywordRows = MonitoringKeyword::where('monitoring_project_id', $request['projectId'])->get(['query'])->toArray();
+        $allQueries = array_column($keywordRows, 'query');
+        $totalKeywords = count($allQueries);
+        $words = array_chunk($keywordRows, 100);
         $competitors = [];
 
         if ($request['region'] == '') {
@@ -25,23 +27,35 @@ class MonitoringCompetitor extends Model
 
         foreach ($days as $day) {
             foreach ($words as $keywords) {
+                $queries = array_column($keywords, 'query');
                 $results = DB::table(DB::raw('search_indices use index(search_indices_query_index, search_indices_lr_index, search_indices_position_index)'))
                     ->where('search_indices.lr', $day['engine']['lr'])
-                    ->where('search_indices.position', '<=', 10)
+                    ->where('search_indices.position', '<=', 100)
                     ->whereDate('search_indices.created_at', $day['dateOnly'])
-                    ->whereIn('search_indices.query', $keywords)
+                    ->whereIn('search_indices.query', $queries)
                     ->orderBy('search_indices.id', 'desc')
                     ->get()
                     ->toArray();
 
                 foreach ($results as $result) {
                     $host = parse_url(Common::domainFilter($result->url))['host'];
+                    $position = (int) $result->position;
+                    $query = $result->query;
+
+                    if (!isset($competitors[$host]['positions'][$query]) || $position < $competitors[$host]['positions'][$query]) {
+                        $competitors[$host]['positions'][$query] = $position;
+                    }
+
+                    if ($position > 10) {
+                        continue;
+                    }
+
                     if (isset($request['targetDomain'])) {
                         if ($host === $request['targetDomain']) {
-                            $competitors[$host]['urls'][$result->query][$day['engine']['engine']][] = [$day['engine']['location']['name'] => Common::domainFilter($result->url)];
+                            $competitors[$host]['urls'][$query][$day['engine']['engine']][] = [$day['engine']['location']['name'] => Common::domainFilter($result->url)];
                         }
                     } else {
-                        $competitors[$host]['urls'][$day['engine']['engine']][$result->query][] = [$day['engine']['location']['name'] => Common::domainFilter($result->url)];
+                        $competitors[$host]['urls'][$day['engine']['engine']][$query][] = [$day['engine']['location']['name'] => Common::domainFilter($result->url)];
                     }
                 }
             }
@@ -52,6 +66,45 @@ class MonitoringCompetitor extends Model
         }
 
         foreach ($competitors as $key => $urls) {
+            $positionsRaw = $urls['positions'] ?? [];
+            $hasTop10 = false;
+            foreach ($positionsRaw as $position) {
+                if ($position <= 10) {
+                    $hasTop10 = true;
+                    break;
+                }
+            }
+
+            if (!$hasTop10) {
+                unset($competitors[$key]);
+                continue;
+            }
+
+            $positions = [];
+            foreach ($allQueries as $query) {
+                $positions[] = $positionsRaw[$query] ?? 101;
+            }
+
+            $intersectionCount = 0;
+            foreach ($positions as $position) {
+                if ($position <= 100) {
+                    $intersectionCount++;
+                }
+            }
+
+            $competitors[$key]['intersectionCount'] = $intersectionCount;
+            $competitors[$key]['intersectionPct'] = $totalKeywords > 0
+                ? round($intersectionCount / $totalKeywords * 100, 1)
+                : 0;
+            $competitors[$key]['top_3'] = Common::percentHitIn(3, $positions, true);
+            $competitors[$key]['top_10'] = Common::percentHitIn(10, $positions, true);
+            $competitors[$key]['top_100'] = Common::percentHitIn(100, $positions, true);
+            $competitors[$key]['avgPosition'] = $totalKeywords > 0
+                ? round(array_sum($positions) / $totalKeywords, 1)
+                : 0;
+
+            unset($competitors[$key]['positions']);
+
             $total = 0;
             $yandex = [];
             $google = [];

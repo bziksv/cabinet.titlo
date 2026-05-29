@@ -12,12 +12,18 @@
     var cfg = window.cabinetMonProjectConfig || {};
     var storageKey = 'cabinet-mon-project-view-v2';
 
-    function relayoutKeywordsTable() {
+    function relayoutKeywordsTable(done) {
         if (!window.jQuery || !jQuery.fn.DataTable) {
+            if (typeof done === 'function') {
+                done();
+            }
             return;
         }
         var $table = jQuery('#monitoringTable');
         if (!$table.length || !jQuery.fn.DataTable.isDataTable($table)) {
+            if (typeof done === 'function') {
+                done();
+            }
             return;
         }
         var api = $table.DataTable();
@@ -26,21 +32,46 @@
             var $wrapper = $table.closest('.dataTables_wrapper');
             var $body = $wrapper.find('.dataTables_scrollBody');
             var $head = $wrapper.find('.dataTables_scrollHead');
+            var $headInner = $head.find('.dataTables_scrollHeadInner');
+            var $bodyTable = $body.find('table');
             if ($body.length && $head.length) {
-                $head.width($body.outerWidth());
+                var bodyW = $body.outerWidth();
+                $head.width(bodyW);
+                if ($headInner.length && $bodyTable.length) {
+                    var tableW = $bodyTable.outerWidth();
+                    $headInner.width(tableW);
+                    $headInner.find('table').width(tableW);
+                }
+            }
+            if (typeof done === 'function') {
+                done();
             }
         };
         requestAnimationFrame(function () {
             requestAnimationFrame(run);
         });
-        setTimeout(run, 100);
-        setTimeout(run, 320);
     }
 
     var relayoutTimer;
-    function scheduleRelayoutKeywordsTable() {
+    function scheduleRelayoutKeywordsTable(options) {
+        options = options || {};
         clearTimeout(relayoutTimer);
-        relayoutTimer = setTimeout(relayoutKeywordsTable, 50);
+        relayoutTimer = setTimeout(function () {
+            relayoutKeywordsTable(function () {
+                if (typeof options.done === 'function') {
+                    options.done();
+                }
+            });
+        }, 0);
+    }
+
+    function setTablePanelCollapsed(collapsed) {
+        var panel = document.getElementById('cabinet-mon-show-table-host');
+        if (!panel) {
+            return;
+        }
+        panel.classList.toggle('cabinet-mon-view-panel--collapsed', collapsed);
+        panel.classList.remove('d-none');
     }
 
     function setView(mode) {
@@ -65,7 +96,12 @@
 
         root.querySelectorAll('[data-mon-view-panel]').forEach(function (panel) {
             var panelMode = panel.getAttribute('data-mon-view-panel');
-            panel.classList.toggle('d-none', panelMode !== mode);
+            var show = panelMode === mode;
+            if (panel.id === 'cabinet-mon-show-table-host') {
+                setTablePanelCollapsed(!show);
+                return;
+            }
+            panel.classList.toggle('d-none', !show);
         });
 
         root.querySelectorAll('[data-mon-view-hint]').forEach(function (hint) {
@@ -203,6 +239,12 @@
                 hintEl.textContent = cfg.i18n && cfg.i18n.kpiSnapshotProject ? cfg.i18n.kpiSnapshotProject : '';
             }
         }
+
+        if (summary.scope_label) {
+            root.querySelectorAll('.cabinet-mon-project-kpi__scope').forEach(function (el) {
+                el.textContent = summary.scope_label;
+            });
+        }
     }
 
     function loadKpi() {
@@ -215,7 +257,8 @@
             cfg.statsUrl +
             (cfg.statsUrl.indexOf('?') >= 0 ? '&' : '?') +
             'projectId=' +
-            encodeURIComponent(cfg.projectId);
+            encodeURIComponent(cfg.projectId) +
+            '&summaryOnly=1';
         var params = new URLSearchParams(window.location.search);
         if (params.get('region')) {
             url += '&regionId=' + encodeURIComponent(params.get('region'));
@@ -241,7 +284,12 @@
             });
     }
 
-    loadKpi();
+    if (cfg.initialSummary) {
+        fillKpi(cfg.initialSummary);
+        hideKpiLoader();
+    } else {
+        loadKpi();
+    }
 
     window.addEventListener('resize', function () {
         if (root.getAttribute('data-view') === 'keywords') {
@@ -251,8 +299,12 @@
 
     window.cabinetMonitoringShowChrome = {
         relayoutKeywordsTable: relayoutKeywordsTable,
-        onTableReady: function (api) {
+        onTableReady: function (api, options) {
+            options = options || {};
             window.__cabinetMonKeywordsTableApi = api;
+            if (options.skipRelayout) {
+                return;
+            }
             if (root.getAttribute('data-view') === 'keywords') {
                 scheduleRelayoutKeywordsTable();
             }

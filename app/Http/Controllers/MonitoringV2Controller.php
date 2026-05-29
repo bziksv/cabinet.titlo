@@ -413,9 +413,17 @@ class MonitoringV2Controller extends Controller
         $project = $this->findAccessibleProject((int) $request->input('projectId'));
 
         $regionId = $request->filled('regionId') ? (int) $request->input('regionId') : null;
+        $summary = MonitoringProjectPageSummary::build($project, $regionId);
+
+        if ($request->boolean('summaryOnly')) {
+            return response()->json([
+                'summary' => $summary,
+                'share' => $this->shareStateForProject($project),
+            ]);
+        }
 
         $payload = MonitoringProjectPublicStats::buildForExport($project);
-        $payload['summary'] = MonitoringProjectPageSummary::build($project, $regionId);
+        $payload['summary'] = $summary;
         $payload['share'] = $this->shareStateForProject($project);
 
         return response()->json($payload);

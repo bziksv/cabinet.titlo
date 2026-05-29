@@ -1,840 +1,370 @@
-@component('component.card', ['title' => __('Project') . " $project->name" ])
-
+@component('component.card', [
+    'title' => $project->name,
+    'titleHtml' => '<span class="visually-hidden">' . e($project->name) . '</span>',
+])
     @slot('css')
-        <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-        <!-- DataTables -->
         @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
-
-        <!-- daterange picker -->
-        <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
-        <style>
-            .exist-position {
-                color: #28a745 !important;
-                font-weight: bold;
-            }
-
-            .custom-info-bg {
-                background-color: rgba(23, 162, 184, 0.5) !important;
-            }
-
-            #table > thead > tr > th.sorting_disabled.sorting_asc:before {
-                display: none;
-            }
-
-            #table > thead > tr > th.sorting_disabled.sorting_asc:after {
-                display: none;
-            }
-
-            #table > tbody > tr > td:nth-child(4) {
-                width: 37.5%;
-            }
-
-            #table > thead > tr > th:nth-child(1) {
-                width: 100px !important;
-                min-width: 100px !important;
-                max-width: 100px !important;
-            }
-
-            #start-analyse-region {
-                border-radius: 0;
-            }
-
-            .fa.fa-trash:hover {
-                cursor: pointer;
-                color: black;
-            }
-        </style>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time() }}">
     @endslot
 
-    <div id="toast-container" class="toast-top-right info-message" style="display:none;">
-        <div class="toast toast-info" aria-live="polite">
-            <div class="toast-message"></div>
-        </div>
-    </div>
+    <div class="cabinet-mon-project-page cabinet-mon-competitors-page" id="cabinet-mon-competitors-root">
+        @include('monitoring.partials.show.project-chrome', [
+            'project' => $project,
+            'activeModule' => 'competitors',
+            'showViewTabs' => false,
+        ])
 
-    <div class="row">
-        @foreach($navigations as $navigation)
-            <div class="col-lg-2 col-6">
-                <a href="{{ $navigation['href'] }}" class="small-box {{ $navigation['bg'] }}" style="min-height: 137px">
-                    <div class="inner">
-                        @if($navigation['h3'])
-                            <h3 class="mb-0">{{ $navigation['h3'] }}</h3>
-                        @endif
+        <div class="cabinet-mon-project-page__body">
+            <section class="cabinet-mon-competitors-workspace card" aria-labelledby="competitors-workspace-title">
+                <div class="cabinet-mon-competitors-workspace__intro">
+                    <h2 class="cabinet-mon-competitors-workspace__title h6 mb-0" id="competitors-workspace-title">
+                        {{ __('Domains ranked in the top 10') }}
+                    </h2>
+                    <p class="cabinet-mon-competitors-workspace__hint text-secondary small mb-0">
+                        {{ __('Monitoring competitors page hint') }}
+                    </p>
+                    <p class="cabinet-mon-competitors-workspace__date text-secondary small mb-0 d-none" id="competitors-date-line">
+                        {{ __('The date of withdrawal of positions used') }}: <span id="dateOnly"></span>
+                    </p>
+                </div>
 
-                        {!! $navigation['content'] !!}
-
-                        @isset($navigation['small'])
-                            <small>{{ $navigation['small'] }}</small>
-                        @endisset
-                    </div>
-                    <div class="icon">
-                        <i class="{{ $navigation['icon'] }}"></i>
-                    </div>
-                </a>
-            </div>
-        @endforeach
-    </div>
-
-    <div class="d-flex flex-row mb-3 mt-3 btn-group col-6 p-0">
-        <button class="btn btn-outline-secondary" id="competitors-button">
-            Список конкурентов (<span id="counter-competitors">{{ count($competitors) }}</span>)
-        </button>
-        <a class="btn btn-outline-secondary" href="{{ route('monitoring.competitors.positions', $project->id) }}">
-            {{ __('Comparison with competitors') }}
-        </a>
-
-        <div class="btn-group">
-            <button class="btn btn-outline-secondary" id="searchCompetitors" data-bs-toggle="modal"
-                    data-bs-target="#competitorsModal" disabled>
-                {{ __('Search for competitors') }}
-            </button>
-            <button type="button" class="btn btn-secondary">
-                <span class="__helper-link ui_tooltip_w">
-                    <i class="fa fa-question-circle" style="color:white;"></i>
-                    <span class="ui_tooltip __right" style="width: 200px;">
-                        <span class="ui_tooltip_content">
-                            {{ __('We will automatically identify 5 of your closest competitors') }}
+                <ol class="cabinet-mon-competitors-steps" id="competitors-steps" aria-label="{{ __('Monitoring competitors steps label') }}">
+                    <li class="cabinet-mon-competitors-steps__item is-active" data-competitors-step="1">
+                        <span class="cabinet-mon-competitors-steps__num" aria-hidden="true">1</span>
+                        <span class="cabinet-mon-competitors-steps__body">
+                            <span class="cabinet-mon-competitors-steps__title">{{ __('Monitoring competitors step1 title') }}</span>
+                            <span class="cabinet-mon-competitors-steps__desc">{{ __('Monitoring competitors step1 desc') }}</span>
                         </span>
-                    </span>
-                </span>
-            </button>
-        </div>
-    </div>
+                    </li>
+                    <li class="cabinet-mon-competitors-steps__item" data-competitors-step="2">
+                        <span class="cabinet-mon-competitors-steps__num" aria-hidden="true">2</span>
+                        <span class="cabinet-mon-competitors-steps__body">
+                            <span class="cabinet-mon-competitors-steps__title">{{ __('Monitoring competitors step2 title') }}</span>
+                            <span class="cabinet-mon-competitors-steps__desc">{{ __('Monitoring competitors step2 desc') }}</span>
+                        </span>
+                    </li>
+                    <li class="cabinet-mon-competitors-steps__item" data-competitors-step="3">
+                        <span class="cabinet-mon-competitors-steps__num" aria-hidden="true">3</span>
+                        <span class="cabinet-mon-competitors-steps__body">
+                            <span class="cabinet-mon-competitors-steps__title">{{ __('Monitoring competitors step3 title') }}</span>
+                            <span class="cabinet-mon-competitors-steps__desc">{{ __('Monitoring competitors step3 desc') }}</span>
+                        </span>
+                    </li>
+                </ol>
 
-    <div class="card w-25" id="competitors-block" style="display: none">
-        <div class="card-header">
-            <h3 class="card-title">Список конкурентов у проекта {{ $project->name }}</h3>
-        </div>
-        <div class="card-body" style="padding: 0">
-            <table class="table table-striped border" id="competitors-info">
-                <thead>
-                <tr>
-                    <td>Конкурент</td>
-                    <td></td>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($competitors as $competitor)
-                    <tr>
-                        <td>
-                            <b>{{ $competitor['url'] }}</b>
-                        </td>
-                        <td>
-                            <div class="d-flex justify-content-end">
-                                <button class="btn btn-default remove-competitor-button"
+                <div class="cabinet-mon-competitors-workspace__form">
+                    <div class="cabinet-mon-competitors-field cabinet-mon-competitors-field--region">
+                        <label class="cabinet-mon-competitors-field__label" for="searchEngines">{{ __('Region') }}</label>
+                        <select name="region" class="form-select form-select-sm" id="searchEngines">
+                            @if($project->searchengines->count() > 1)
+                                <option value="">{{ __('All search engine and regions') }}</option>
+                            @endif
+                            @foreach($project->searchengines as $search)
+                                <option value="{{ $search->id }}" @if($search->id == request('region')) selected @endif>
+                                    {{ \App\Classes\Monitoring\MonitoringLocationLabel::filterOption($search) }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="cabinet-mon-competitors-field cabinet-mon-competitors-field--action">
+                        <button type="button" class="btn btn-primary btn-sm w-100" id="start-analyse-region">
+                            <i class="bi bi-play-fill me-1" aria-hidden="true"></i>{{ __('Analyse') }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="cabinet-mon-competitors-panel">
+                    <div class="cabinet-mon-competitors-panel__head">
+                        <div class="cabinet-mon-competitors-panel__title">
+                            <i class="bi bi-people me-1" aria-hidden="true"></i>
+                            {{ __('My competitors') }}
+                            <span class="badge text-bg-secondary ms-1" id="counter-competitors" data-mon-competitors-count>{{ count($competitors) }}</span>
+                        </div>
+                        <div class="cabinet-mon-competitors-panel__actions">
+                            @if(count($competitors) > 0)
+                            <a class="btn btn-success btn-sm" id="compare-competitors-positions"
+                               href="{{ route('monitoring.competitors.positions', $project->id) }}">
+                                <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>{{ __('Comparison with competitors') }}
+                            </a>
+                            @endif
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="add-competitor-manual"
+                                    data-bs-toggle="modal" data-bs-target="#addCompetitorManualModal">
+                                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>{{ __('Monitoring competitors add manual') }}
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="searchCompetitors"
+                                    title="{{ __('Monitoring competitors suggest disabled hint') }}">
+                                <i class="bi bi-magic me-1" aria-hidden="true"></i>{{ __('Monitoring competitors suggest from top') }}
+                            </button>
+                            @if(count($competitors) === 0)
+                            <a class="btn btn-outline-secondary btn-sm" id="compare-competitors-positions"
+                               href="{{ route('monitoring.competitors.positions', $project->id) }}">
+                                <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>{{ __('Comparison with competitors') }}
+                            </a>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="cabinet-mon-competitors-panel__chips" id="competitors-chips">
+                        @forelse($competitors as $competitor)
+                            <span class="cabinet-mon-competitors-chip">
+                                <span class="cabinet-mon-competitors-chip__domain">{{ $competitor['url'] }}</span>
+                                <button type="button" class="btn btn-sm remove-competitor-button cabinet-mon-competitors-chip__remove"
                                         data-id="{{ $competitor['id'] }}"
                                         data-name="{{ $competitor['url'] }}"
                                         data-bs-toggle="modal"
-                                        data-bs-target="#removeCompetitor">
-                                    <i class="fa fa-trash"></i>
+                                        data-bs-target="#removeCompetitor"
+                                        title="{{ __('Remove') }}">
+                                    <i class="bi bi-x-lg" aria-hidden="true"></i>
                                 </button>
-                            </div>
-                        </td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
+                            </span>
+                        @empty
+                            <span class="cabinet-mon-competitors-panel__empty text-secondary small" id="competitors-chips-empty">
+                                {{ __('Monitoring competitors chips empty') }}
+                            </span>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="cabinet-mon-competitors-dt-bar d-none" id="competitors-dt-bar">
+                    <div id="competitors-dt-filter"></div>
+                    <div id="competitors-dt-length"></div>
+                </div>
+
+                <div class="cabinet-mon-competitors-workspace__body" id="competitors-workspace-body">
+                    <div class="cabinet-mon-competitors-empty" id="competitors-empty-state">
+                        <div class="cabinet-mon-competitors-empty__icon" aria-hidden="true">
+                            <i class="bi bi-1-circle"></i>
+                        </div>
+                        <h3 class="cabinet-mon-competitors-empty__title h6">{{ __('Monitoring competitors empty title') }}</h3>
+                        <p class="cabinet-mon-competitors-empty__text text-secondary">{{ __('Monitoring competitors empty text') }}</p>
+                    </div>
+
+                    <div class="cabinet-mon-competitors-ready d-none" id="competitors-ready-state">
+                        <div class="cabinet-mon-competitors-ready__icon" aria-hidden="true">
+                            <i class="bi bi-bar-chart-line"></i>
+                        </div>
+                        <h3 class="cabinet-mon-competitors-ready__title h5 mb-2">{{ __('Monitoring competitors ready title') }}</h3>
+                        <p class="cabinet-mon-competitors-ready__text text-secondary mb-3">
+                            {{ __('Monitoring competitors ready text') }}
+                            <span class="fw-semibold" id="competitors-ready-count">{{ count($competitors) }}</span>
+                        </p>
+                        <div class="cabinet-mon-competitors-ready__actions">
+                            <a class="btn btn-success" id="compare-competitors-ready"
+                               href="{{ route('monitoring.competitors.positions', $project->id) }}">
+                                <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>{{ __('Monitoring competitors next cta button') }}
+                            </a>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="competitors-run-analysis-from-ready">
+                                <i class="bi bi-play-fill me-1" aria-hidden="true"></i>{{ __('Monitoring competitors ready analyze') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="cabinet-mon-competitors-loading d-none" id="competitors-loading" role="status" aria-live="polite">
+                        @include('monitoring.partials.show.loader', ['label' => __('loading results')])
+                        <span id="render-state" class="cabinet-mon-competitors-loading__text">{{ __('loading results') }}</span>
+                    </div>
+
+                    <div class="cabinet-mon-competitors-table-host d-none" id="tableBlock">
+                        <div class="cabinet-mon-competitors-table-hint" id="competitors-table-hint" role="note">
+                            <i class="bi bi-check2-square me-1" aria-hidden="true"></i>
+                            {{ __('Monitoring competitors table hint') }}
+                        </div>
+                        <div class="table-responsive">
+                            <table id="table" class="table table-hover table-sm mb-0 w-100 cabinet-mon-competitors-table">
+                                <thead>
+                                <tr>
+                                    <th scope="col" class="cabinet-mon-competitors-col-check" title="{{ __('Monitoring competitors col check hint') }}">
+                                        {{ __('Monitoring competitors col check') }}
+                                    </th>
+                                    <th scope="col">{{ __('Domain') }}</th>
+                                    <th scope="col">{{ __('Search engines') }}</th>
+                                    <th scope="col" class="cabinet-mon-competitors-metric-col" title="{{ __('Monitoring competitors col intersection hint') }}">
+                                        {{ __('Monitoring competitors col intersection') }}
+                                    </th>
+                                    <th scope="col" class="cabinet-mon-competitors-metric-col" title="{{ __('In the TOP columns, you will see the result as a percentage of how many words fall into the TOP 3/5/10/30/100. The higher the percentage of phrases, the better. Thanks to grouping by regions and days, you will be able to see its dynamics in comparison with 30/90/180/365 days earlier, if the result for this period is in the system.') }}">
+                                        {{ __('Monitoring competitors col top3') }}
+                                    </th>
+                                    <th scope="col" class="cabinet-mon-competitors-metric-col">{{ __('Monitoring competitors col top10') }}</th>
+                                    <th scope="col" class="cabinet-mon-competitors-metric-col">{{ __('Monitoring competitors col top100') }}</th>
+                                    <th scope="col" class="cabinet-mon-competitors-metric-col" title="{{ __('In this column, the average position on the search engine of a certain region/city. We consider it in the classical way: the sum of all positions divided by the number of words. Thanks to grouping by region and day, you will be able to see its dynamics. The closer the average value is to 1, the better.') }}">
+                                        {{ __('Average position') }}
+                                    </th>
+                                    <th scope="col">{{ __('Visibility by selected regions') }}</th>
+                                </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="cabinet-mon-competitors-next d-none" id="competitors-next-cta" role="region"
+                 aria-label="{{ __('Monitoring competitors next cta region') }}">
+                <div class="cabinet-mon-competitors-next__inner">
+                    <span class="cabinet-mon-competitors-next__text">
+                        <i class="bi bi-check-circle-fill text-success me-1" aria-hidden="true"></i>
+                        {{ __('Monitoring competitors next cta text') }}
+                    </span>
+                    <a class="btn btn-success btn-sm cabinet-mon-competitors-next__btn"
+                       id="compare-competitors-sticky"
+                       href="{{ route('monitoring.competitors.positions', $project->id) }}">
+                        {{ __('Monitoring competitors next cta button') }}
+                        <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+                    </a>
+                    <button type="button" class="btn-close cabinet-mon-competitors-next__close"
+                            id="competitors-next-cta-close" aria-label="{{ __('Close') }}"></button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="modal fade" id="removeCompetitor" tabindex="-1" aria-labelledby="removeCompetitorLabel"
-         aria-hidden="true">
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3 info-message d-none" style="z-index: 1080;">
+        <div class="toast align-items-center text-bg-info border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body toast-message"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="{{ __('Close') }}"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="removeCompetitor" tabindex="-1" aria-labelledby="removeCompetitorLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="removeCompetitorLabel">Подтвердите действие</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <h5 class="modal-title" id="removeCompetitorLabel">{{ __('Monitoring competitors remove confirm title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                 </div>
                 <div class="modal-body">
-                    Вы собираетесь удалить конкурента <span id="competitor-name"></span>
+                    {{ __('Monitoring competitors remove confirm body') }} <strong id="competitor-name"></strong>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="remove-competitor"
-                            data-bs-dismiss="modal">{{ __('Remove') }}</button>
-                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-danger" id="remove-competitor" data-bs-dismiss="modal">{{ __('Remove') }}</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">{{ __('Region filter') }}</h3>
-        </div>
-        <div class="card-body">
-            <div class="d-flex flex-row justify-content-start align-items-center">
-                <div class="input-group col-5 pl-0 ml-0"><span class="input-group-text">
-                                    <i class="far fa-calendar-alt"></i>
-                                </span>
-
-                    <select name="region" class="form-select" id="searchEngines">
-                        @if($project->searchengines->count() > 1)
-                            <option value="">{{ __('All search engine and regions') }}</option>
-                        @endif
-
-                        @foreach($project->searchengines as $search)
-                            @if($search->id == request('region'))
-                                <option value="{{ $search->id }}"
-                                        selected>{{ strtoupper($search->engine) }} {{ $search->location->name }}
-                                    [{{$search->lr}}]
-                                </option>
-                            @else
-                                <option
-                                    value="{{ $search->id }}">{{ strtoupper($search->engine) }} {{ $search->location->name }}
-                                    [{{$search->lr}}]
-                                </option>
-                            @endif
-                        @endforeach
-                    </select>
-                    <button class="btn btn-secondary" id="start-analyse-region">{{ __("Analyse") }}</button>
-                </div>
-                <div id="download-results" style="display: none">
-                    <div class="d-flex justify-content-center align-items-center">
-                        <img src="/img/1485.gif" style="width: 20px; height: 20px;">
-                    </div>
-                    <div id="render-state">
-                        {{ __('loading results') }}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="competitorsModal" tabindex="-1" aria-labelledby="competitorsModalLabel"
-         aria-hidden="true">
+    <div class="modal fade" id="addCompetitorManualModal" tabindex="-1" aria-labelledby="addCompetitorManualModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="competitorsModalLabel">{{ __('Adding new competitors') }}</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <h5 class="modal-title" id="addCompetitorManualModalLabel">{{ __('Monitoring competitors add manual title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                 </div>
                 <div class="modal-body">
-                    <div>
-                        <label for="competitors-textarea"><b>{{ __('Your closest competitors') }}</b></label>
-                        <textarea name="competitors-textarea"
-                                  id="competitors-textarea"
-                                  class="form form-control"
-                                  cols="8" rows="8"></textarea>
+                    <p class="text-secondary small">{{ __('Monitoring competitors add manual help') }}</p>
+                    <label class="form-label fw-semibold" for="competitor-manual-input">{{ __('Domain') }}</label>
+                    <textarea id="competitor-manual-input" class="form-control" rows="5"
+                              placeholder="{{ __('Monitoring competitors add manual placeholder') }}"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-primary" id="save-competitor-manual">
+                        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>{{ __('Add') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="competitorsModal" tabindex="-1" aria-labelledby="competitorsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="competitorsModalLabel">{{ __('Monitoring competitors suggest modal title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-secondary small">{{ __('Monitoring competitors suggest modal help') }}</p>
+                    <div class="mb-3">
+                        <label for="competitors-textarea" class="form-label fw-semibold">{{ __('Your closest competitors') }}</label>
+                        <textarea name="competitors-textarea" id="competitors-textarea" class="form-control" rows="8"></textarea>
                     </div>
-                    <div class="mt-3">
-                        <button class="btn btn-default mb-3" type="button" data-bs-toggle="collapse"
+                    <div class="mb-3">
+                        <button class="btn btn-outline-secondary btn-sm mb-2" type="button" data-bs-toggle="collapse"
                                 data-bs-target="#collapseIgnoredDomains" aria-expanded="false"
                                 aria-controls="collapseIgnoredDomains">
                             {{ __('Ignored domains') }}
                         </button>
                         <div class="collapse" id="collapseIgnoredDomains">
-                        <textarea id="ignored-domains" name="ignored-domains" class="form form-control" cols="8"
-                                  rows="8" disabled>{{ $ignoredDomains }}</textarea>
+                            <textarea id="ignored-domains" name="ignored-domains" class="form-control" rows="6" readonly>{{ $ignoredDomains }}</textarea>
                         </div>
-
                     </div>
-                    <div class="mt-3">
-                        <div>
-                            <b>{{ __('Domain') }}: {{ __('How many times have I met') }}</b>
-                        </div>
-                        <div id="competitors-list"></div>
-
+                    <div>
+                        <p class="fw-semibold small mb-1">{{ __('Domain') }}: {{ __('How many times have I met') }}</p>
+                        <div id="competitors-list" class="small text-secondary"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
-                    <button type="button" id="add-competitors" class="btn btn-secondary"
-                            data-bs-dismiss="modal">{{ __('Add') }} </button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" id="add-competitors" class="btn btn-primary" data-bs-dismiss="modal">{{ __('Add') }}</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="tableBlock" style="height: 0; opacity: 0">
-        <h3>{{ __('Domains ranked in the top 10') }}</h3>
-        <p>{{ __('The date of withdrawal of positions used') }}: <span id="dateOnly"></span></p>
-        <table id="table" class="table table-bordered no-footer">
-            <thead style="top: 0; position: sticky; background-color: white">
-            <tr>
-                <th style="min-width: 100px; max-width: 100px;">{{ __('Competitor') }}?</th>
-                <th>{{ __('Domain') }}</th>
-                <th>{{ __('Search engines') }}</th>
-                <th>{{ __('Visibility by selected regions') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
-    </div>
     @slot('js')
-        <!-- DataTables  & Plugins -->
+        <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         @include('monitoring.partials.smart-search-script')
-
         <script src="{{ asset('plugins/datatables-buttons/js/buttons.excel.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-buttons/js/buttons.html5.js') }}"></script>
-
         <script>
-            let interval
-
-            function changeCellState(elem) {
-                let targetBlock = $(elem)
-                let url = targetBlock.attr('data-target')
-                let targetInput = targetBlock.children('input').eq(0)
-                let state = targetBlock.attr('data-order') === 'true'
-
-                if (!state) {
-                    if (confirm(`{{ __('Are you going to add the domain') }} "${url}" {{ __('in competitors') }}`)) {
-                        $.ajax({
-                            type: "POST",
-                            dataType: "json",
-                            url: "{{ route('monitoring.add.competitor') }}",
-                            data: {
-                                '_token': $('meta[name="csrf-token"]').attr('content'),
-                                'url': url,
-                                'projectId': {{ $project->id }}
-                            },
-                            success: function () {
-                                targetInput.prop('checked', true)
-                                targetBlock.attr('data-order', 'true')
-                            },
-                        });
-                    } else {
-                        targetInput.prop('checked', false)
-                    }
-                } else {
-                    if (confirm(`{{ __('Are you going to remove the domain') }} "${url}" {{ __('from competitors') }}`)) {
-                        $.ajax({
-                            type: "POST",
-                            dataType: "json",
-                            url: "{{ route('monitoring.remove.competitor') }}",
-                            data: {
-                                '_token': $('meta[name="csrf-token"]').attr('content'),
-                                'url': url,
-                                'projectId': {{ $project->id }}
-                            },
-                            success: function (response) {
-                                targetInput.prop('checked', false)
-                                targetBlock.attr('data-order', 'false')
-                            },
-                        });
-                    } else {
-                        targetInput.prop('checked', true)
-                    }
-                }
-            }
-
-            $(document).ready(function () {
-                let filter = localStorage.getItem('lr_redbox_monitoring_selected_filter')
-
-                if (filter !== null) {
-                    filter = JSON.parse(filter)
-                    $('#searchEngines option[value=' + filter.val + ']').attr('selected', 'selected')
-                }
-
-                $('#searchEngines').on('change', function () {
-                    let val = $(this).val()
-                    if (val !== '') {
-                        localStorage.setItem('lr_redbox_monitoring_selected_filter', JSON.stringify({
-                            val: val,
-                        }))
-                    } else {
-                        localStorage.removeItem('lr_redbox_monitoring_selected_filter')
-                    }
-                })
-
-                $('#searchCompetitors').on('click', function () {
-                    let table = $('#table').DataTable()
-                    table.on('draw.dt', function () {
-                        let competitors = getMaxValues()
-
-                        let textAreaText = ''
-                        let competitorsList = ''
-
-                        for (let i = 0; i < competitors.length; i++) {
-                            textAreaText += competitors[i][0] + "\n"
-                            competitorsList += "<div>" + competitors[i][0] + ": " + competitors[i][1] + "</div>"
-                        }
-
-                        $('#competitors-textarea').text(textAreaText)
-                        $('#competitors-list').html(competitorsList)
-
-                        table.off('draw.dt');
-                    });
-
-                    table.order([3, 'desc']).draw();
-                })
-
-                $('#add-competitors').on('click', function () {
-                    $.ajax({
-                        type: "POST",
-                        dataType: "json",
-                        url: "{{ route('monitoring.add.competitors') }}",
-                        data: {
-                            '_token': $('meta[name="csrf-token"]').attr('content'),
-                            'projectId': {{ $project->id }},
-                            'domains': $('#competitors-textarea').val().split('\n')
-                        },
-                        success: function (response) {
-                            $.each(response.urls, function (k, domain) {
-                                $("input[data-target='" + domain + "']").prop('checked', true)
-                                $("td[data-target='" + domain + "']").attr('data-order', 'true')
-                            })
-
-                            refreshMethods()
-                        },
-                    });
-                })
-
-                $('#start-analyse-region').on('click', function () {
-                    getCompetitors()
-                })
-            })
-
-            function getCompetitorsInfo() {
-                $.ajax({
-                    type: "get",
-                    dataType: "json",
-                    url: "/monitoring-competitors/{{ $project->id }}",
-                    success: function (response) {
-                        let trs = ''
-
-                        $.each(response, function (index, competitor) {
-                            trs +=
-                                '<tr>' +
-                                '    <td>' +
-                                '        <b>' + competitor.url + '</b>' +
-                                '    </td>' +
-                                '    <td>' +
-                                '        <div class="d-flex justify-content-end">' +
-                                '            <button class="btn btn-default remove-competitor-button"' +
-                                '                    data-id="' + competitor.id + '"' +
-                                '                    data-name="' + competitor.url + '"' +
-                                '                    data-bs-toggle="modal"' +
-                                '                    data-bs-target="#removeCompetitor">' +
-                                '                <i class="fa fa-trash"></i>' +
-                                '            </button>' +
-                                '        </div>' +
-                                '    </td>' +
-                                '</tr>'
-                        })
-
-                        $('#competitors-info tbody').html(trs)
-                        $('#counter-competitors').html(response.length)
-                    },
-                });
-            }
-
-            function getCompetitors() {
-                getCompetitorsArray()
-
-                $.ajax({
-                    type: "POST",
-                    dataType: "json",
-                    url: "{{ route('monitoring.get.competitors') }}",
-                    data: {
-                        '_token': $('meta[name="csrf-token"]').attr('content'),
-                        'projectId': {{ $project->id }},
-                        'region': $('#searchEngines').val()
-                    },
-                    beforeSend: function () {
-                        if ($.fn.DataTable.fnIsDataTable($('#table'))) {
-                            $('#table').dataTable().fnDestroy();
-                        }
-
-                        $('#download-results').show()
-                        $('#table > tbody').html('')
-                        $('#searchCompetitors').prop('disabled', true)
-                        $('#tableBlock').hide()
-                        $('#render-state').html("{{ __('In progress') }}")
-                    },
-                    success: function (response) {
-                        if (response.state === 'ready') {
-                            renderTableRows(response)
-                        } else if (response.state === 'in process' || response.state === 'in queue') {
-                            waitFinishResult(response)
-                        }
-
-                        if (response.newScan) {
-                            $('#toast-container').show(300)
-                            $('.toast-message').html('{{ __('New withdrawals of positions were discovered.') }} <br> {{ __('The analysis of fresh data has been launched.') }} <br>')
-                            setTimeout(() => {
-                                $('#toast-container').hide(300)
-                            }, 10000)
-                        }
-                    },
-                });
-            }
-
-            function waitFinishResult(response) {
-                clearInterval(interval)
-                $('#download-results').show()
-                $('#render-state').html("{{ __('In queue') }}")
-                getCompetitorsArray()
-
-                interval = setInterval(() => {
-                    $.ajax({
-                        url: "/monitoring/wait-result",
-                        method: "POST",
-                        data: {
-                            id: response.id,
-                        },
-                        success: function (response) {
-                            if (response.state === 'ready') {
-                                renderTableRows(response)
-                                clearInterval(interval)
-                            } else {
-                                $('#render-state').html("{{ __('In queue') }}")
-                            }
-                        },
-                    });
-                }, 5000)
-            }
-
-            function getCompetitorsArray(array) {
-                $.ajax({
-                    url: "/monitoring/get-competitors-array/{{ $project->id }}",
-                    method: "get",
-                    success: function (response) {
-                        sessionStorage.setItem('competitorsArray', JSON.stringify(response))
-                    },
-                });
-
-                return array;
-            }
-
-            function renderTableRows(response) {
-                let competitors = JSON.parse(sessionStorage.getItem('competitorsArray'))
-                let data = JSON.parse(response.result)
-                $('#dateOnly').parent().hide()
-
-                try {
-                    JSON.parse(response.date)
-                } catch (e) {
-                    $('#dateOnly').html(response.date)
-                    $('#dateOnly').parent().show()
-                }
-
-                $('#render-state').html("{{ __('Render data') }}")
-
-                let tableRows = []
-                if (data !== []) {
-                    $.each(data, function (key, val) {
-                        let bool = false
-                        let input = ''
-                        if (val.mainPage) {
-                            input = "{{ __('Your website') }}"
-                        } else {
-                            if (competitors.indexOf(key) != -1) {
-                                input = '<input type="checkbox" data-target="' + key + '" checked>'
-                                bool = true
-                            } else {
-                                input = '<input type="checkbox" data-target="' + key + '">'
-                            }
-                        }
-
-                        let stub = key + '<i class="ml-2 fa fa-plus-circle get-more-info" data-target="' + key + '">'
-
-                        let engines = ''
-                        let firstBlock = false
-
-                        $.each(val.urls, function (engine, v) {
-                            if (engine === 'yandex') {
-                                engines += '<i class="fab fa-yandex fa-sm mr-2"></i>'
-                            }
-                            if (engine === 'google') {
-                                engines += '<i class="fab fa-google fa-sm mr-2"></i>'
-                            }
-                        })
-
-                        let google = renderRegions(val.visibilityGoogle)
-                        let yandex = renderRegions(val.visibilityYandex)
-
-                        let visibilityCell =
-                            '<div class="d-flex flex-row justify-content-between">'
-
-                        if (google !== 0) {
-                            firstBlock = true
-                            visibilityCell += '<div class="w-50 p-2"> Google: ' + google + '</div>'
-                        }
-                        if (yandex !== 0) {
-                            let border = 'border-0'
-                            if (firstBlock) {
-                                border = 'border-left'
-                            }
-                            visibilityCell += '<div class="w-50 p-2 ' + border + '"> Yandex: ' + yandex + '</div>'
-                        }
-
-                        tableRows.push('<tr>' +
-                            '    <td style="max-width: 100px; min-width: 100px; width: 100px;" data-order="' + bool + '" onclick="changeCellState(this)" data-target="' + key + '">' + input + '</td>' +
-                            '    <td data-order="' + key + '">' + stub + '</td>' +
-                            '    <td>' + engines + '</td>' +
-                            '    <td class="p-0 m-0" data-order="' + Number(val.visibility) + '" data-action="' + key + '">' + visibilityCell + '</td>' +
-                            '</tr>')
-                    })
-                }
-
-                $('#table > tbody').html(tableRows.join(' '))
-
-                $('#table').DataTable({
-                    "order": [[3, 'desc']],
-                    lengthMenu: [10, 25, 50, 100],
-                    pageLength: 50,
-                    language: {
-                        lengthMenu: "_MENU_",
-                        search: "_INPUT_",
-                        searchPlaceholder: "{{ __('Search') }}",
-                        paginate: {
-                            "first": "«",
-                            "last": "»",
-                            "next": "»",
-                            "previous": "«"
-                        },
-                        "emptyTable": "{{ __('Empty') }}"
-                    },
-                    columnDefs: [
-                        {
-                            orderable: false, targets: [0, 2]
-                        },
-                    ],
-                    initComplete: function () {
-                        if (window.cabinetMonitoringSearch) {
-                            window.cabinetMonitoringSearch.dataTableInitComplete.call(this);
-                        }
-                    },
-                })
-
-                $('#table').on('draw.dt', function () {
-                    refreshMethods()
-                });
-
-                setTimeout(() => {
-                    $('#tableBlock').css({
-                        'height': 'auto',
-                        'opacity': 1,
-                    }).show()
-                    $('#download-results').hide()
-                    $('#table_wrapper').show()
-                    $('#searchCompetitors').prop('disabled', false)
-                    refreshMethods()
-                }, 300)
-            }
-
-            function refreshMethods() {
-                $('.fa-plus-circle.get-more-info').unbind().on('click', function () {
-                    $(this).attr('class', 'ml-2 fa fa-minus-circle get-more-info')
-                    let parent = $(this).parents().eq(1)
-                    let targetDomain = $(this).attr('data-target')
-
-                    $.ajax({
-                        type: "POST",
-                        dataType: "json",
-                        url: "{{ route('monitoring.get.competitors.domain') }}",
-                        data: {
-                            '_token': $('meta[name="csrf-token"]').attr('content'),
-                            'projectId': {{ $project->id }},
-                            'targetDomain': targetDomain,
-                            'region': $('#searchEngines').val(),
-                        },
-                        beforeSend: function () {
-                            parent.after(
-                                '<tr class="progress-render" data-id="' + targetDomain + '">' +
-                                '   <td colspan="' + {{ $countQuery + 1 }} + '">' +
-                                '       <img src="/img/1485.gif" style="width: 50px; height: 50px;">' +
-                                '   </td>' +
-                                '</tr>'
-                            )
-                        },
-                        success: function (response) {
-                            let rows = ''
-                            let yandexTh = false
-                            let googleTh = false
-
-                            $.each(response, function (phrase, engines) {
-                                let yandex = ''
-                                let google = ''
-
-                                rows += '<tr><td>' + phrase + '</td>'
-
-                                $.each(engines, function (engine, urls) {
-                                    if (engine === 'yandex') {
-                                        yandexTh = true
-                                        $.each(urls, function (key, url) {
-                                            $.each(url, function (region, link) {
-                                                yandex += `<div><a href="${link}" target="_blank">${link}<a>(${region})</div>` + "\n\r"
-                                            })
-                                        })
-                                    }
-                                    if (engine === 'google') {
-                                        googleTh = true
-                                        $.each(urls, function (key, url) {
-                                            $.each(url, function (region, link) {
-                                                google += `<div><a href="${link}" target="_blank">${link}<a>(${region})</div>` + "\n\r"
-                                            })
-                                        })
-                                    }
-                                })
-                                if (yandexTh) {
-                                    rows += '<td>' + yandex + '</td>'
-                                }
-
-                                if (googleTh) {
-                                    rows += '<td>' + google + '</td>'
-                                }
-
-                                rows += '</tr>'
-                            })
-
-                            let table =
-                                '<table class="table table-hover table-bordered no-footer custom-table">' +
-                                '    <thead>' +
-                                '        <tr>' +
-                                '            <th style="min-width:200px; max-width:200px;"> {{ __('Phrase') }} </th>'
-
-                            if (yandexTh) {
-                                table += '<th> {{ __('Yandex') }} </th>'
-                            }
-                            if (googleTh) {
-                                table += '<th> {{ __('Google') }} </th>'
-                            }
-                            table += '</tr>' +
-                                '</thead>' +
-                                '    <tbody>' +
-                                rows +
-                                '    </tbody>' +
-                                '</table>'
-
-                            $('#table').find(`.progress-render[data-id='${targetDomain}']`).remove()
-                            parent.after(
-                                '<tr class="custom-render" data-id="' + targetDomain + '">' +
-                                '   <td colspan="' + {{ $countQuery + 1 }} + '">'
-                                + table +
-                                '   </td>' +
-                                '</tr>'
-                            )
-
-                            $.each($('.custom-table'), function () {
-                                if (!$.fn.DataTable.fnIsDataTable($(this))) {
-                                    $(this).DataTable({
-                                        dom: 'lBfrtip',
-                                        buttons: [
-                                            'copy', 'csv', 'excel'
-                                        ],
-                                        language: {
-                                            lengthMenu: "_MENU_",
-                                            search: "_INPUT_",
-                                            searchPlaceholder: "{{ __('Search') }}",
-                                            paginate: {
-                                                "first": "«",
-                                                "last": "»",
-                                                "next": "»",
-                                                "previous": "«"
-                                            },
-                                        },
-                                        initComplete: function () {
-                                            if (window.cabinetMonitoringSearch) {
-                                                window.cabinetMonitoringSearch.dataTableInitComplete.call(this);
-                                            }
-                                        },
-                                    })
-                                }
-                            })
-                        },
-                    });
-
-                    refreshMethods()
-                })
-
-                $('.fa-minus-circle.get-more-info').unbind().on('click', function () {
-                    let dataTarget = $(this).attr('data-target')
-                    $('#table').find(`[data-id='${dataTarget}']`).remove()
-
-                    $(this).attr('class', 'ml-2 fa fa-plus-circle get-more-info')
-                    refreshMethods()
-                })
-            }
-
-            function getMaxValues() {
-                let domains = []
-                let ignoredDomains = $('#ignored-domains').val().split('\n')
-
-                $.each($('#table > tbody > tr > td:nth-child(4)'), function (k, v) {
-                    if (
-                        !ignoredDomains.includes($(this).attr('data-action')) &&
-                        $(this).parent('tr').eq(0).children('td').eq(0).children('input').length !== 0 &&
-                        !$(this).parent('tr').eq(0).children('td').eq(0).children('input').eq(0).is(':checked')
-                    ) {
-                        domains[$(this).attr('data-action')] = Number($(this).attr('data-order'))
-                    }
-                })
-
-                let tuples = [];
-
-                for (let key in domains) tuples.push([key, domains[key]]);
-
-                tuples.sort(function (a, b) {
-                    a = a[1];
-                    b = b[1];
-
-                    return a < b ? -1 : (a > b ? 1 : 0);
-                });
-
-                return tuples.reverse().slice(0, 5);
-            }
-
-            function renderRegions(val) {
-                let region
-                if (val.length !== 0) {
-                    region = '<div>'
-                    $.each(val, function (lr, count) {
-                        region += `<div>${count}<span class="text-muted" title="${lr}"> ${lr.split(',')[0]}</span></div>`
-                    })
-                    region += '</div>'
-                } else {
-                    region = 0
-                }
-
-                return region
-            }
+            window.cabinetMonCompetitorsConfig = {
+                projectId: {{ (int) $project->id }},
+                initialCompetitorsCount: {{ count($competitors) }},
+                countQuery: {{ (int) $countQuery }},
+                tableColCount: 9,
+                suggestLimit: {{ (int) config('cabinet-monitoring.competitors_suggest_limit', 10) }},
+                ignoredDomainsExtra: @json(config('cabinet-monitoring.competitors_ignored_domains', [])),
+                csrf: @json(csrf_token()),
+                routes: {
+                    addCompetitor: @json(route('monitoring.add.competitor')),
+                    removeCompetitor: @json(route('monitoring.remove.competitor')),
+                    addCompetitors: @json(route('monitoring.add.competitors')),
+                    getCompetitors: @json(route('monitoring.get.competitors')),
+                    getCompetitorsDomain: @json(route('monitoring.get.competitors.domain')),
+                    competitorsInfo: @json(url('/monitoring-competitors/' . $project->id)),
+                    competitorsArray: @json(url('/monitoring/get-competitors-array/' . $project->id)),
+                    waitResult: @json(url('/monitoring/wait-result')),
+                },
+                i18n: {
+                    addConfirm: @json(__('Are you going to add the domain')),
+                    inCompetitors: @json(__('in competitors')),
+                    removeConfirm: @json(__('Are you going to remove the domain')),
+                    fromCompetitors: @json(__('from competitors')),
+                    inProgress: @json(__('In progress')),
+                    inQueue: @json(__('In queue')),
+                    renderData: @json(__('Render data')),
+                    newScanToast: @json(__('New withdrawals of positions were discovered.') . ' ' . __('The analysis of fresh data has been launched.')),
+                    yourWebsite: @json(__('Your website')),
+                    search: @json(__('Search')),
+                    empty: @json(__('Empty')),
+                    phrase: @json(__('Phrase')),
+                    yandex: @json(__('Yandex')),
+                    google: @json(__('Google')),
+                    show: @json(__('show')),
+                    chipsEmpty: @json(__('Monitoring competitors chips empty')),
+                    added: @json(__('Monitoring competitors added')),
+                    addError: @json(__('Monitoring competitors add error')),
+                    suggestDisabled: @json(__('Monitoring competitors suggest disabled hint')),
+                    suggestStarting: @json(__('Monitoring competitors suggest starting')),
+                    coachAnalyzeTitle: @json(__('Monitoring competitors coach analyze title')),
+                    coachAnalyzeBody: @json(__('Monitoring competitors coach analyze body')),
+                    coachPickTitle: @json(__('Monitoring competitors coach pick title')),
+                    coachPickBody: @json(__('Monitoring competitors coach pick body')),
+                    coachCompareTitle: @json(__('Monitoring competitors coach compare title')),
+                    coachCompareBody: @json(__('Monitoring competitors coach compare body')),
+                    coachOk: @json(__('Got it')),
+                    tableInfo: @json(__('Monitoring dt table info')),
+                    tableInfoEmpty: @json(__('Monitoring dt table info empty')),
+                    tableInfoFiltered: @json(__('Monitoring dt table info filtered')),
+                },
+            };
         </script>
-        <script>
-            let removedRow
-            $('#competitors-button').on('click', function () {
-                if ($('#competitors-block').is(':visible')) {
-                    $('#competitors-block').hide()
-                } else {
-                    $('#competitors-block').show()
-                }
-            })
-
-            $(document).on('click', '.remove-competitor-button', function () {
-                $('#competitor-name').html($(this).attr('data-name'))
-                removedRow = $(this).parents().eq(2)
-            })
-
-            $('#remove-competitor').on('click', function () {
-                $.ajax({
-                    type: "POST",
-                    dataType: "json",
-                    url: "{{ route('monitoring.remove.competitor') }}",
-                    data: {
-                        '_token': $('meta[name="csrf-token"]').attr('content'),
-                        'url': $('#competitor-name').html(),
-                        'projectId': {{ $project->id }}
-                    },
-                    success: function (response) {
-                        removedRow.remove()
-                        $('#counter-competitors').html(
-                            Number($('#counter-competitors').html()) - 1
-                        )
-                        $('#app > div > div > div.card-body > div.row > div:nth-child(2) > a > div.inner > h3').html(
-                            Number($('#app > div > div > div.card-body > div.row > div:nth-child(2) > a > div.inner > h3').html()) - 1
-                        )
-                    },
-                });
-            })
-        </script>
+        <script src="{{ asset('js/cabinet-monitoring-competitors.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-competitors.js')) ?: time() }}"></script>
     @endslot
 @endcomponent

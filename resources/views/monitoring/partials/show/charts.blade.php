@@ -1,30 +1,31 @@
 @php
-    $multiRegion = $project->searchengines->count() > 1 && empty(request('region'));
+    $regionCount = $project->searchengines->count();
+    $multiRegion = $regionCount > 1 && empty(request('region'));
+    $manyRegions = $multiRegion && $regionCount >= 4;
 @endphp
-<div class="card card-charts cabinet-mon-project-charts" data-mon-view-panel="overview">
+<div class="card card-charts cabinet-mon-project-charts" data-mon-view-panel="overview"@if($manyRegions) data-many-regions="1"@endif>
     <div class="cabinet-mon-project-charts__intro">
         <h2 class="cabinet-mon-project-charts__title mb-1">
             @if($multiRegion)
-                {{ __('Monitoring show chart title regions') }}
+                {{ __('Monitoring show chart title regions compare') }}
             @else
                 {{ __('Monitoring show chart title project') }}
             @endif
         </h2>
-        <p class="cabinet-mon-project-charts__hint mb-0 text-secondary">
-            @if($multiRegion)
-                {{ __('Monitoring show chart hint regions') }}
-            @else
+        @unless($multiRegion)
+            <p class="cabinet-mon-project-charts__hint mb-0 text-secondary">
                 {{ __('Monitoring show chart hint single') }}
-            @endif
-            {{ __('Monitoring show chart position axis note') }}
-        </p>
+                {{ __('Monitoring show chart position axis note') }}
+            </p>
+        @endunless
     </div>
 
     <div class="card-header">
         <div class="card-title mb-0">
             <ul class="nav nav-pills">
                 @if($multiRegion)
-                    <li class="nav-item"><a class="nav-link active" href="#tab_1" data-bs-toggle="tab">{{ __('Monitoring show chart regions') }}</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="#tab_regions_top" data-bs-toggle="tab">{{ __('Monitoring show chart top percent') }}</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#tab_regions_middle" data-bs-toggle="tab">{{ __('Monitoring show chart avg position') }}</a></li>
                 @else
                     <li class="nav-item"><a class="nav-link active" href="#tab_1" data-bs-toggle="tab">{{ __('Monitoring show chart top percent') }}</a></li>
                     <li class="nav-item"><a class="nav-link" href="#tab_2" data-bs-toggle="tab">{{ __('Monitoring show chart avg position') }}</a></li>
@@ -32,7 +33,7 @@
                 @endif
             </ul>
         </div>
-        <select class="form-select form-select-sm" id="chartFilterPeriod" @if($multiRegion) hidden @endif>
+        <select class="form-select form-select-sm" id="chartFilterPeriod">
             <option value="days" selected>{{ __('Monitoring show chart by days') }}</option>
             <option value="weeks">{{ __('Monitoring show chart by weeks') }}</option>
             <option value="month">{{ __('Monitoring show chart by months') }}</option>
@@ -46,7 +47,15 @@
 
         <div class="tab-content">
             @if($multiRegion)
-                <div class="tab-pane active" id="tab_1">
+                <div class="tab-pane active" id="tab_regions_top">
+                    @unless($manyRegions)
+                        @include('monitoring.partials.show.chart-top-presets', ['regionsMode' => true, 'manyRegions' => false])
+                    @endunless
+                    <div class="chart" style="position: relative; height: min(38vh, 320px); width: 100%">
+                        <canvas id="topPercentRegions"></canvas>
+                    </div>
+                </div>
+                <div class="tab-pane" id="tab_regions_middle">
                     <div class="chart" style="position: relative; height: min(38vh, 320px); width: 100%">
                         <canvas id="middlePositionRegions"></canvas>
                     </div>

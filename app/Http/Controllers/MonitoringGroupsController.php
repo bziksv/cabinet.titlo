@@ -34,10 +34,20 @@ class MonitoringGroupsController extends Controller
 
         $this->fillFields($request, $id);
 
-        if($request->ajax())
-            return $this->getDataTable();
+        if (!$this->project) {
+            abort(404);
+        }
 
-        return view('monitoring.groups.index');
+        if ($request->ajax()) {
+            return $this->getDataTable();
+        }
+
+        return view('monitoring.groups.index', [
+            'project' => $this->project->load(['searchengines.location']),
+            'canCreate' => $this->user->can('create_groups_monitoring'),
+            'canEdit' => $this->user->can('edit_groups_monitoring'),
+            'canDelete' => $this->user->can('delete_groups_monitoring'),
+        ]);
     }
 
     public function action(Request $request, $id)
@@ -119,33 +129,39 @@ class MonitoringGroupsController extends Controller
     {
         $user = $this->user;
         $this->project = $user->monitoringProjects()->find($projectId);
-        $model = $this->project->groups();
 
-        if($request->has('search')){
+        if (!$this->project) {
+            return;
+        }
+
+        $model = $this->project->groups()->with(['users'])->withCount('keywords');
+
+        if ($request->has('search')) {
             $search = $request->input('search');
-            if($search = $search['value'])
+            if ($search = $search['value']) {
                 $model->where('name', 'like', '%' . $search . '%');
+            }
         }
 
         $this->groups = $model->get();
 
-        $this->groups->transform(function($item){
-
-            $item->DT_RowId = "row_" . $item->id;
-            $item->queries = $item->keywords->count();
+        $this->groups->transform(function ($item) {
+            $item->DT_RowId = 'row_' . $item->id;
+            $item->queries = (int) $item->keywords_count;
             $item->created = $item->created_at->diffForHumans();
 
             return $item;
         });
 
-        if($request->has('order')){
+        if ($request->has('order')) {
             $order = collect($request->input('order'))->first();
             $column = $request->input('columns')[$order['column']]['name'];
 
-            if($order['dir'] == 'asc')
+            if ($order['dir'] == 'asc') {
                 $this->groups = $this->groups->sortBy($column)->values();
-            else
+            } else {
                 $this->groups = $this->groups->sortByDesc($column)->values();
+            }
         }
     }
 

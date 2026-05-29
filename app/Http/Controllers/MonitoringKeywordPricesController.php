@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\Monitoring\MonitoringLocationLabel;
 use App\MonitoringKeywordPrice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,8 +30,9 @@ class MonitoringKeywordPricesController extends Controller
         $user = $this->user;
 
         $this->project = $user->monitoringProjects()->find($request['id']);
-        if(!$this->project)
-            abort('404');
+        if (!$this->project) {
+            abort(404);
+        }
 
         $this->regions = $this->project->searchengines()
             ->with(['location:id,lr,name'])
@@ -42,23 +44,34 @@ class MonitoringKeywordPricesController extends Controller
     {
         $this->initField($request);
 
-        if($request->ajax())
+        if ($request->ajax()) {
             return $this->getDataTable();
+        }
 
-        $project = $this->project;
+        $project = $this->project->load(['searchengines.location']);
+        $regions = $this->formatRegions($this->regions);
 
-        return view('monitoring.price.index', compact('project'));
+        return view('monitoring.price.index', [
+            'project' => $project,
+            'regions' => $regions,
+            'canEditPrice' => $this->user->can('update_price_monitoring'),
+            'canEditBudget' => $this->user->can('update_budget_monitoring'),
+        ]);
     }
 
     public function action(Request $request)
     {
         $this->initField($request);
 
-        switch ($request->input('action')) {
-            case 'edit':
-                return $this->updateOrCreate();
-                break;
+        if (!$this->user->can('update_price_monitoring')) {
+            abort(403);
         }
+
+        if ($request->input('action') === 'edit') {
+            return $this->updateOrCreate();
+        }
+
+        return collect(['data' => []]);
     }
 
     public function updateOrCreate()
@@ -68,8 +81,8 @@ class MonitoringKeywordPricesController extends Controller
         $region = $request->input('region', null);
         $data = $request->input('data', []);
 
-        foreach ($data as $id => $val){
-            $collect = collect($val)->filter(function($val){
+        foreach ($data as $id => $val) {
+            $collect = collect($val)->filter(function ($val) {
                 return is_numeric($val);
             });
 
@@ -80,7 +93,7 @@ class MonitoringKeywordPricesController extends Controller
         }
 
         return collect([
-            'data' => []
+            'data' => [],
         ]);
     }
 
@@ -88,7 +101,7 @@ class MonitoringKeywordPricesController extends Controller
     {
         $collection = collect([]);
 
-        foreach($keywords as $keyword){
+        foreach ($keywords as $keyword) {
             $data = [];
 
             $data['DT_RowId'] = $keyword->id;
@@ -102,10 +115,11 @@ class MonitoringKeywordPricesController extends Controller
             $data['top50'] = '';
             $data['top100'] = '';
 
-            if($keyword->price){
-                foreach($keyword->price->toArray() as $key => $price) {
-                    if (isset($data[$key]))
+            if ($keyword->price) {
+                foreach ($keyword->price->toArray() as $key => $price) {
+                    if (isset($data[$key])) {
                         $data[$key] = $price;
+                    }
                 }
             }
 
@@ -120,30 +134,22 @@ class MonitoringKeywordPricesController extends Controller
         $request = $this->request;
         $region = $request->input('region', $this->regions->first()['id']);
 
-        $model = $this->project->keywords()->with(['price' => function($query) use ($region){
+        $model = $this->project->keywords()->with(['price' => function ($query) use ($region) {
             $query->where('monitoring_searchengine_id', $region);
         }]);
 
-        if($search = $request->input('search')['value'])
-            $model->where('query', 'like', '%'.$search.'%');
+        if ($search = $request->input('search')['value']) {
+            $model->where('query', 'like', '%' . $search . '%');
+        }
 
         $page = ($request->input('start') / $request->input('length')) + 1;
         $keywords = $model->paginate($request->input('length', 1), ['*'], 'page', $page);
 
         $data = $this->format($keywords);
 
-        $regions = collect([]);
-        $searchengines = $this->regions->pluck('location.name', 'id');
-        foreach($searchengines as $id => $name){
-            $regions->push([
-                'id' => $id,
-                'name' => $name,
-            ]);
-        }
-
         $collection = collect([]);
         $collection->put('data', $data);
-        $collection->put('regions', $regions);
+        $collection->put('regions', $this->formatRegions($this->regions));
         $collection->put('draw', $this->request->input('draw'));
 
         $records = $keywords->total();
@@ -155,9 +161,28 @@ class MonitoringKeywordPricesController extends Controller
 
     public function storeBudget(Request $request)
     {
-        if($this->user->monitoringProjects()->find($request['id'])->update(['budget' => $request['budget']]))
-            return "success";
+        apply_team_permissions($request['id']);
 
-        return "fail";
+        if (!$this->user->can('update_budget_monitoring')) {
+            abort(403);
+        }
+
+        $project = $this->user->monitoringProjects()->findOrFail($request['id']);
+
+        if ($project->update(['budget' => $request->input('budget')])) {
+            return response()->json(['ok' => true]);
+        }
+
+        return response()->json(['ok' => false], 422);
+    }
+
+    private function formatRegions($regions)
+    {
+        return collect($regions)->map(function ($se) {
+            return [
+                'id' => $se->id,
+                'name' => MonitoringLocationLabel::filterOption($se),
+            ];
+        })->values();
     }
 }

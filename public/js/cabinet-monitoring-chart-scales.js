@@ -170,6 +170,96 @@
             });
             return chartData;
         },
+
+        defaultLegendLabels: function (chart) {
+            var Chart = global.Chart;
+            if (!Chart || !Chart.defaults || !chart) {
+                return [];
+            }
+            return Chart.defaults.plugins.legend.labels.generateLabels(chart);
+        },
+
+        styleLegendItemHidden: function (item, hidden) {
+            if (!hidden) {
+                item.hidden = false;
+                item.strikethrough = false;
+                return item;
+            }
+            item.fillStyle = '#e9ecef';
+            item.strokeStyle = '#ced4da';
+            item.lineWidth = Math.max(item.lineWidth || 1, 2);
+            item.fontColor = '#adb5bd';
+            item.hidden = true;
+            item.strikethrough = true;
+            return item;
+        },
+
+        lineLegendLabels: function (chart) {
+            return api.defaultLegendLabels(chart).map(function (item) {
+                return api.styleLegendItemHidden(item, !!item.hidden);
+            });
+        },
+
+        distributionLegendLabels: function (chart) {
+            var data = chart.data;
+            if (!data.labels || !data.datasets[0]) {
+                return [];
+            }
+            var meta = chart.getDatasetMeta(0);
+            var ds = data.datasets[0];
+            return data.labels.map(function (label, i) {
+                var hidden = typeof chart.getDataVisibility === 'function'
+                    ? !chart.getDataVisibility(i)
+                    : !!(meta.data[i] && meta.data[i].hidden);
+                var bg = ds.backgroundColor[i];
+                var item = {
+                    text: label + ': ' + ds.data[i] + '%',
+                    fillStyle: bg,
+                    strokeStyle: bg,
+                    lineWidth: 1,
+                    hidden: hidden,
+                    index: i,
+                    datasetIndex: 0,
+                };
+                return api.styleLegendItemHidden(item, hidden);
+            });
+        },
+
+        legendPlugin: function (overrides, sliceToggle) {
+            var Chart = global.Chart;
+            var base = {
+                display: true,
+                onClick: function (e, legendItem, legend) {
+                    var chart = legend.chart;
+                    if (
+                        sliceToggle
+                        && legendItem.index !== undefined
+                        && typeof chart.toggleDataVisibility === 'function'
+                    ) {
+                        chart.toggleDataVisibility(legendItem.index);
+                        chart.update();
+                        return;
+                    }
+                    if (Chart && Chart.defaults.plugins.legend.onClick) {
+                        Chart.defaults.plugins.legend.onClick.call(this, e, legendItem, legend);
+                    }
+                    chart.update();
+                },
+                labels: {
+                    generateLabels: function (chart) {
+                        return api.lineLegendLabels(chart);
+                    },
+                },
+            };
+            if (!overrides) {
+                return base;
+            }
+            var out = Object.assign({}, base, overrides);
+            if (overrides.labels) {
+                out.labels = Object.assign({}, base.labels, overrides.labels);
+            }
+            return out;
+        },
     };
 
     global.cabinetMonitoringChartScales = api;

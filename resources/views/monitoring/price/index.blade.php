@@ -1,289 +1,139 @@
-@component('component.card', ['title' => __('Monitoring position groups')])
-
+@component('component.card', [
+    'title' => $project->name,
+    'titleHtml' => '<span class="visually-hidden">' . e($project->name) . '</span>',
+])
     @slot('css')
-        <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-        <!-- DataTables -->
-        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css-editor'])
-
-        <!-- Select2 -->
-        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
-        <!-- daterange picker -->
-        <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
-
-        <style>
-            .DTE_Field div.multi-value,
-            .DTE_Field div.multi-restore {
-                border: 1px dotted #666;
-                border-radius: 3px;
-            }
-
-            #select-region {
-                margin-right: 0.5em;
-                display: inline-block;
-                width: auto;
-            }
-            .card-header label {
-                margin-bottom: 0px!important;
-            }
-            .form-select-sm {
-                font-size: 86%!important;
-            }
-        </style>
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time() }}">
     @endslot
 
-    <div class="row">
-        <div class="col-2 mb-3">
-            <a href="{{ route('monitoring.show', request('id')) }}" class="btn btn-block btn-default">Вернутся в проект</a>
-        </div>
-        <div class="col-4">
-            @can('update_budget_monitoring')
-                <div class="input-group mb-3"><span class="input-group-text">
-                          {{ __('Budget') }}
-                        </span>
+    <div class="cabinet-mon-project-page cabinet-mon-prices-page" id="cabinet-mon-prices-root">
+        @include('monitoring.partials.show.project-chrome', [
+            'project' => $project,
+            'activeModule' => 'prices',
+            'showViewTabs' => false,
+            'pageHint' => __('Monitoring prices page hint'),
+        ])
 
-                    <input type="number" min="0" step="0.01" placeholder="{{ __('Projects budget') }}" value="{{ $project['budget'] }}" class="form-control">
-                    <button type="button" class="btn btn-success budget">{{ __('Save') }}</button>
+        <div class="cabinet-mon-project-page__body">
+            <section class="cabinet-mon-prices-workspace card" aria-labelledby="prices-workspace-title">
+                <div class="cabinet-mon-prices-workspace__head">
+                    <div class="cabinet-mon-prices-workspace__region">
+                        <label class="cabinet-mon-prices-workspace__label" for="select-region">{{ __('Region') }}</label>
+                        <select id="select-region" class="form-select form-select-sm">
+                            @foreach($regions as $region)
+                                <option value="{{ $region['id'] }}">{{ $region['name'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @can('update_budget_monitoring')
+                        <div class="cabinet-mon-prices-workspace__budget">
+                            <label class="cabinet-mon-prices-workspace__label" for="project-budget">{{ __('Budget') }}</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-wallet2" aria-hidden="true"></i></span>
+                                <input type="number" min="0" step="0.01" id="project-budget" class="form-control"
+                                       value="{{ $project->budget }}" placeholder="{{ __('Projects budget') }}">
+                                <button type="button" class="btn btn-primary" id="save-budget">{{ __('Save') }}</button>
+                            </div>
+                        </div>
+                    @endcan
                 </div>
-            @endcan
+
+                @if($canEditPrice)
+                    <div class="cabinet-mon-prices-workspace__actions">
+                        <div class="cabinet-mon-prices-workspace__action-btns">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="prices-select-all">
+                                {{ __('Monitoring prices select all page') }}
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="prices-select-none">
+                                {{ __('Monitoring prices clear selection') }}
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="prices-bulk-edit" disabled
+                                    data-bs-toggle="modal" data-bs-target="#pricesBulkEditModal">
+                                {{ __('Monitoring prices bulk edit') }}
+                                <span class="badge text-bg-secondary ms-1" id="prices-selected-count">0</span>
+                            </button>
+                        </div>
+                        <p class="cabinet-mon-prices-workspace__hint mb-0">{{ __('Monitoring prices inline hint') }}</p>
+                    </div>
+                @endif
+
+                <div class="cabinet-mon-prices-dt-bar">
+                    <div id="prices-dt-filter"></div>
+                    <div id="prices-dt-length"></div>
+                </div>
+
+                <div class="cabinet-mon-prices-table-host" id="cabinet-mon-prices-table-host">
+                    <div class="cabinet-mon-prices-table-host__loader d-none" id="cabinetMonPricesLoader" role="status" aria-live="polite">
+                        @include('monitoring.partials.show.loader', ['label' => __('Monitoring prices table loading')])
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0 w-100 cabinet-mon-prices-table" id="prices"></table>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-12 card-table">
-            <div class="card">
-                <table class="table table-hover" id="prices"></table>
+    @if($canEditPrice)
+        <div class="modal fade" id="pricesBulkEditModal" tabindex="-1" aria-labelledby="pricesBulkEditModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="pricesBulkEditModalLabel">{{ __('Monitoring prices bulk edit title') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-secondary small">{{ __('Monitoring prices bulk edit hint') }}</p>
+                        <div class="row g-3" id="prices-bulk-fields">
+                            @foreach(['top1' => 1, 'top3' => 3, 'top5' => 5, 'top10' => 10, 'top20' => 20, 'top50' => 50, 'top100' => 100] as $field => $top)
+                                <div class="col-md-4 col-6">
+                                    <label class="form-label" for="bulk-{{ $field }}">TOP {{ $top }}</label>
+                                    <input type="number" min="0" step="0.01" class="form-control form-control-sm prices-bulk-field"
+                                           id="bulk-{{ $field }}" data-field="{{ $field }}" placeholder="—">
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                        <button type="button" class="btn btn-primary" id="prices-bulk-save">
+                            <i class="bi bi-check-lg me-1" aria-hidden="true"></i>{{ __('Save') }}
+                        </button>
+                    </div>
+                </div>
             </div>
-            <!-- /.card -->
         </div>
-    </div>
+    @endif
 
     @slot('js')
-        <!-- Toastr -->
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
-        <!-- Bootstrap 4 -->
-        <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min-editor'])
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         @include('monitoring.partials.smart-search-script')
-
-        <!-- Select2 -->
-        <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
-        <!-- InputMask -->
-        <script src="{{ asset('plugins/moment/moment.min.js') }}"></script>
-        <script src="{{ asset('plugins/inputmask/jquery.inputmask.min.js') }}"></script>
-        <!-- date-range-picker -->
-        <script src="{{ asset('plugins/daterangepicker/daterangepicker.js') }}"></script>
-
         <script>
-            toastr.options = {
-                "preventDuplicates": true,
-                "timeOut": "5000"
-            };
-
-            let editor = new $.fn.dataTable.Editor( {
-                ajax: {
-                    url: "{{ route('prices.action', request('id')) }}",
-                    data: function(data){
-                        data.region = $('#select-region').val();
-                    },
+            window.cabinetMonPricesConfig = {
+                projectId: {{ (int) $project->id }},
+                canEditPrice: @json($canEditPrice),
+                canEditBudget: @json($canEditBudget),
+                csrf: @json(csrf_token()),
+                routes: {
+                    list: @json(route('prices.index', $project->id)),
+                    action: @json(route('prices.action', $project->id)),
+                    budget: @json(route('prices.budget', $project->id)),
                 },
-                table: "#prices",
-                fields: [
-                    {
-                        label: "TOP 1:",
-                        name: "top1",
-                    },
-                    {
-                        label: "TOP 3:",
-                        name: "top3",
-                    },
-                    {
-                        label: "TOP 5:",
-                        name: "top5",
-                    },
-                    {
-                        label: "TOP 10:",
-                        name: "top10",
-                    },
-                    {
-                        label: "TOP 20:",
-                        name: "top20",
-                    },
-                    {
-                        label: "TOP 50:",
-                        name: "top50",
-                    },
-                    {
-                        label: "TOP 100:",
-                        name: "top100",
-                    },
-
-                ],
+                priceFields: ['top1', 'top3', 'top5', 'top10', 'top20', 'top50', 'top100'],
                 i18n: {
-                    "multi": {
-                        "title": "Несколько значений",
-                        "info": "Выбранные элементы содержат разные значения для этого входа. Чтобы отредактировать и установить для всех элементов этого ввода одинаковое значение, нажмите здесь, в противном случае они сохранят свои индивидуальные значения.",
-                        "restore": "Отменить изменения",
-                        "noMulti": "Этот вход можно редактировать индивидуально, но не как часть группы."
-                    },
-                }
-            } );
-
-            let editIcon = function ( data, type, row ) {
-                if ( type === 'display' && '{{ auth()->user()->can('update_price_monitoring') }}') {
-                    return data + ' <i class="fa fa-pencil" style="opacity: 0.5;font-size: 12px;cursor: pointer;"/>';
-                }
-
-                return data;
+                    query: @json(__('Phrase')),
+                    search: @json(__('Search')),
+                    saved: @json(__('Saved')),
+                    saveError: @json(__('Monitoring prices save error')),
+                    selectRows: @json(__('Monitoring prices select rows first')),
+                    bulkEmpty: @json(__('Monitoring prices bulk empty')),
+                },
             };
-
-            $('#prices').on( 'click', 'td i', function (e) {
-                e.stopImmediatePropagation();
-
-                editor.inline( $(this).parent(), {
-                    onBlur: 'submit',
-                } );
-            } );
-
-            editor.on('initEdit', function(event, row, data, el, type) {
-                if (type === 'inline') {
-                    setTimeout(() => el.find('input').select(), 50);
-                }
-            });
-
-            $('#prices').DataTable( {
-                dom: '<"card-header"<"card-title"B><"float-right"f><"float-right"l>><"card-body p-0"rt><"card-footer clearfix"p><"clear">',
-                autoWidth: false,
-                ordering: false,
-                paging: true,
-                lengthMenu: [10, 30, 50, 100, 500, 1000],
-                pageLength: 500,
-                pagingType: "simple_numbers",
-                language: {
-                    lengthMenu: "_MENU_",
-                    search: "_INPUT_",
-                    searchPlaceholder: "Найти запрос",
-                    paginate: {
-                        "first":      "«",
-                        "last":       "»",
-                        "next":       "»",
-                        "previous":   "«"
-                    },
-                    processing: '<img src="/img/1485.gif" style="width: 50px; height: 50px;">',
-                },
-                processing: true,
-                serverSide: true,
-                ajax: {
-                    url: "{{ route('prices.index', request('id')) }}",
-                    type: 'GET',
-                    data: function(data){
-                        data.region = $('#select-region').val();
-                    },
-                },
-                columns: [
-                    {
-                        title: 'Query',
-                        data: "query"
-                    },
-                    {
-                        title: 'TOP 1',
-                        data: "top1",
-                        render: editIcon,
-                    },
-                    {
-                        title: 'TOP 3',
-                        data: "top3",
-                        render: editIcon,
-                    },
-                    {
-                        title: 'TOP 5',
-                        data: "top5",
-                        render: editIcon,
-                    },
-                    {
-                        title: 'TOP 10',
-                        data: "top10",
-                        render: editIcon,
-                    },
-                    {
-                        title: 'TOP 20',
-                        data: "top20",
-                        render: editIcon,
-                    },
-                    {
-                        title: 'TOP 50',
-                        data: "top50",
-                        render: editIcon,
-                    },
-                    {
-                        title: 'TOP 100',
-                        data: "top100",
-                        render: editIcon,
-                    },
-                ],
-                select: {
-                    style: 'multi'
-                },
-                buttons: [
-                    {
-                        text: "Выбрать всё",
-                        className: "btn-default btn-sm",
-                        extend: "selectAll",
-                    },
-                    {
-                        text: "Отменить выбранные",
-                        className: "btn-default btn-sm",
-                        extend: "selectNone",
-                    },
-                    {
-                        text: "Редактировать выбранные",
-                        className: "btn-default btn-sm",
-                        extend: "edit",
-                        editor: editor,
-                        available: function () {
-                            return {{ auth()->user()->can('update_price_monitoring') }}
-                        }
-                    },
-                ],
-                initComplete: function(){
-                    let api = this.api();
-
-                    if (window.cabinetMonitoringSearch) {
-                        window.cabinetMonitoringSearch.wireGlobalDataTableSearch(api);
-                    }
-
-                    let json = api.ajax.json();
-                    let card = this.closest('.card');
-
-                    let container = $('<div />').addClass('float-right');
-
-                    let regions = $('<select />', { id: 'select-region'}).addClass('form-select form-select-sm');
-
-                    $.each(json.regions, function (i, val) {
-                        let option = $('<option />').val(val.id).text(val.name);
-                        regions.append(option);
-                    });
-
-                    regions.change(() => api.ajax.reload());
-
-                    card.find('.card-header').append(container.html(regions));
-                },
-            });
-
-            $('.budget').click(function(){
-                let budget = $(this).closest('.input-group').find('input').val();
-                axios.post('prices/budget', {
-                    budget: budget,
-                }).then(function (response) {
-                    toastr.success('{{ __('Saved') }}');
-                }).catch(function (error) {
-                    toastr.error('Something is going wrong');
-                });
-            });
         </script>
+        <script src="{{ asset('js/cabinet-monitoring-prices.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-prices.js')) ?: time() }}"></script>
     @endslot
-
-
 @endcomponent

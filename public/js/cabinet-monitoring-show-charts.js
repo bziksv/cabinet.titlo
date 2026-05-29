@@ -160,11 +160,20 @@
         return preset;
     }
 
+    function regionsTopPresetNumber() {
+        var preset = getPreset();
+        if (preset === '1' || preset === '3' || preset === '10') {
+            return parseInt(preset, 10);
+        }
+        return 10;
+    }
+
     global.cabinetMonitoringShowCharts = {
         getPreset: getPreset,
         setPreset: setPreset,
         applyTopPreset: applyTopPreset,
         wirePresets: wirePresets,
         presetTopNumbers: presetTopNumbers,
+        regionsTopPresetNumber: regionsTopPresetNumber,
     };
 })(window);

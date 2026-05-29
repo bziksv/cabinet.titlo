@@ -26,7 +26,7 @@
             return false;
         }
         if (toggle === 'modal' || toggle === 'dropdown' || toggle === 'tab') {
-            return target.charAt(0) === '#';
+            return target.charAt(0) === '#' || (toggle === 'modal' && target.charAt(0) === '.');
         }
         if (toggle === 'collapse') {
             return target.charAt(0) === '#';

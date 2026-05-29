@@ -12,18 +12,39 @@
     @endslot
 
     <div class="cabinet-mon-project-page" id="cabinet-mon-project-root" data-view="keywords">
+        <script>
+            (function () {
+                var el = document.getElementById('cabinet-mon-project-root');
+                if (!el) {
+                    return;
+                }
+                var mode = 'keywords';
+                var hash = window.location.hash;
+                if (hash === '#overview') {
+                    mode = 'overview';
+                } else if (hash !== '#keywords' && hash !== '#detailed') {
+                    try {
+                        var saved = localStorage.getItem('cabinet-mon-project-view-v2');
+                        if (saved === 'overview') {
+                            mode = 'overview';
+                        }
+                    } catch (e) {}
+                }
+                el.setAttribute('data-view', mode);
+            })();
+        </script>
         @include('monitoring.partials.show.project-chrome', ['project' => $project])
 
         <div class="cabinet-mon-project-page__body">
-            @include('monitoring.partials.show.project-kpi')
+            @include('monitoring.partials.show.project-kpi', ['kpiSummary' => $kpiSummary ?? null])
 
             @include('monitoring.partials.show.project-toolbar')
 
-            <div data-mon-view-panel="overview">
+            <div data-mon-view-panel="overview" class="cabinet-mon-view-panel--overview">
                 @include('monitoring.partials.show.charts')
             </div>
 
-            <div class="cabinet-mon-project-table-panel card-table" id="cabinet-mon-show-table-host" data-mon-view-panel="keywords">
+            <div class="cabinet-mon-project-table-panel card-table is-table-booting" id="cabinet-mon-show-table-host" data-mon-view-panel="keywords">
                 <div class="cabinet-mon-project-table-panel__loader" id="cabinetMonShowTableLoader">
                     @include('monitoring.partials.show.loader', ['label' => __('Monitoring show table loading')])
                 </div>
@@ -33,6 +54,11 @@
     </div>
 
     @include('monitoring.keywords.modal.main')
+    @include('monitoring.keywords.modal.delete-confirm')
+
+    <div id="cabinetMonTableControlsTpl" hidden aria-hidden="true">
+        @include('monitoring.keywords.controls', ['columnSettings' => $columnSettings ?? []])
+    </div>
 
     @slot('js')
         @php
@@ -57,6 +83,8 @@
                 projectId: {{ (int) $project->id }},
                 baseGroupId: @json(request('group') ? (int) request('group') : null),
                 baseRegion: @json($monBaseRegion),
+                initialSummary: @json($kpiSummary ?? null),
+                columnSettings: @json($columnSettings ?? []),
                 statsUrl: @json(route('monitoring.v2.project.stats')),
                 projectsListUrl: @json(route('monitoring.v2.projects.list')),
                 groupsUrl: @json(url('/monitoring/creator/groups')),
@@ -75,6 +103,8 @@
                     compareMissingRegionAvailable: @json(__('Monitoring show compare missing region available')),
                     compareIntersectHint: @json(__('Monitoring show compare intersect hint')),
                     compareIntersectEmpty: @json(__('Monitoring show compare intersect empty')),
+                    deleteConfirmSingle: @json(__('Monitoring keyword delete confirm single')),
+                    deleteConfirmPlural: @json(__('Monitoring keyword delete confirm plural')),
                 },
             };
         </script>
@@ -199,9 +229,124 @@
             }
 
             let table = $('#monitoringTable');
+            var monTableBoot = { controlsReady: false, revealed: false };
 
-            function cabinetMonShowHideTableLoader() {
-                $('#cabinetMonShowTableLoader').remove();
+            function monitoringTableHasBodyRows() {
+                return $('#monitoringTable_wrapper').find('.dataTables_scrollBody tbody tr, #monitoringTable_wrapper tbody tr').filter(function () {
+                    return $(this).find('td').length > 0;
+                }).length > 0;
+            }
+
+            function monitoringTableIsProcessing() {
+                var $proc = $('#monitoringTable_processing');
+                return $proc.length && $proc.is(':visible');
+            }
+
+            function tryRevealMonitoringTable(api) {
+                if (monTableBoot.revealed || !monTableBoot.controlsReady || !api) {
+                    return;
+                }
+                if (monitoringTableIsProcessing()) {
+                    return;
+                }
+                var info = api.page.info();
+                if (info.recordsTotal > 0 && !monitoringTableHasBodyRows()) {
+                    return;
+                }
+
+                monTableBoot.revealed = true;
+
+                var unveil = function () {
+                    api.columns.adjust();
+                    var done = function () {
+                        $('#cabinet-mon-show-table-host').removeClass('is-table-booting');
+                        $('#cabinetMonShowTableLoader').remove();
+                        if (window.cabinetMonitoringShowChrome) {
+                            window.cabinetMonitoringShowChrome.onTableReady(api, { skipRelayout: true });
+                        }
+                    };
+                    if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutKeywordsTable) {
+                        window.cabinetMonitoringShowChrome.relayoutKeywordsTable(done);
+                    } else {
+                        window.requestAnimationFrame(function () {
+                            window.requestAnimationFrame(done);
+                        });
+                    }
+                };
+
+                unveil();
+            }
+
+            function cabinetMonShowTableLoadError() {
+                var loader = $('#cabinetMonShowTableLoader');
+                loader.addClass('is-error');
+                loader.find('.cabinet-mon-loader__icon').remove();
+                loader.find('.cabinet-mon-loader__label').text(@json(__('Monitoring show table load error')));
+            }
+
+            function monColumnVisible(name) {
+                var settings = (window.cabinetMonProjectConfig && window.cabinetMonProjectConfig.columnSettings) || {};
+                if (Object.prototype.hasOwnProperty.call(settings, name)) {
+                    return !!settings[name];
+                }
+                return true;
+            }
+
+            function cabinetMonMountTableControls(container) {
+                var tpl = document.getElementById('cabinetMonTableControlsTpl');
+                if (tpl && tpl.innerHTML.trim()) {
+                    container.html(tpl.innerHTML);
+                    return Promise.resolve();
+                }
+                return axios.get('/monitoring/keywords/show/controls/' + PROJECT_ID).then(function (response) {
+                    container.html(response.data);
+                });
+            }
+
+            var monTablePrefetch = null;
+            var monTablePrefetchUsed = false;
+
+            function monTableAjaxPayload(payload) {
+                payload = payload || {};
+                payload.region_id = REGION_ID;
+                payload.dates_range = DATES;
+                payload.mode_range = MODE;
+                if (GROUP_ID) {
+                    payload.columns = payload.columns || [];
+                    var groupCol = null;
+                    payload.columns.forEach(function (col) {
+                        if (col.data === 'group') {
+                            groupCol = col;
+                        }
+                    });
+                    if (groupCol) {
+                        groupCol.search = groupCol.search || {};
+                        groupCol.search.value = String(GROUP_ID);
+                    } else {
+                        payload.columns.push({
+                            data: 'group',
+                            name: 'group',
+                            searchable: true,
+                            orderable: true,
+                            search: { value: String(GROUP_ID) },
+                        });
+                    }
+                }
+                return payload;
+            }
+
+            function monTableBootstrapPayload() {
+                return monTableAjaxPayload({
+                    draw: 1,
+                    start: 0,
+                    length: parseInt(PAGE_LENGTH, 10) || 100,
+                    search: { value: '' },
+                    columns: [],
+                });
+            }
+
+            function monTableFetch(payload) {
+                return axios.post('/monitoring/' + PROJECT_ID + '/table', monTableAjaxPayload(payload));
             }
 
             toastr.options = {
@@ -209,13 +354,10 @@
                 "timeOut": "5000"
             };
 
-            axios.post(`/monitoring/${PROJECT_ID}/table`, {
-                length: PAGE_LENGTH,
-                region_id: REGION_ID,
-                dates_range: DATES,
-                mode_range: MODE,
-            }).then(function (response) {
+            axios.post('/monitoring/' + PROJECT_ID + '/table', monTableBootstrapPayload()).then(function (response) {
+                monTablePrefetch = response.data;
 
+                let tableRegions = response.data.region || [];
                 let columns = [];
 
                 $.each(response.data.columns, function (i, item) {
@@ -227,7 +369,7 @@
                     let orderable = false;
 
                     if (i === 'query') {
-                        width = '300px';
+                        width = '380px';
                         orderable = true;
                     }
 
@@ -241,11 +383,13 @@
                         'data': i,
                         'width': width,
                         'orderable': orderable,
+                        'visible': monColumnVisible(i),
+                        'className': i === 'query' ? 'cabinet-mon-col-query' : '',
                     });
                 });
 
                 let dTable = table.DataTable({
-                    dom: '<"card-header d-flex align-items-center"<"card-title"><"float-right"l>><"card-body p-0"<"mailbox-controls">rt<"mailbox-controls">><"card-footer clearfix"p><"clear">',
+                    dom: '<"card-header d-flex align-items-center"<"card-title"><"float-right"l>><"card-body p-0"<"mailbox-controls">rt><"card-footer clearfix"p><"clear">',
                     scrollX: true,
                     lengthMenu: LENGTH_MENU,
                     pageLength: PAGE_LENGTH,
@@ -266,14 +410,26 @@
                     },
                     processing: true,
                     serverSide: true,
-                    ajax: {
-                        url: `/monitoring/${PROJECT_ID}/table`,
-                        type: 'POST',
-                        data: {
-                            region_id: REGION_ID,
-                            dates_range: DATES,
-                            mode_range: MODE,
-                        },
+                    ajax: function (data, callback) {
+                        if (monTablePrefetch && !monTablePrefetchUsed) {
+                            monTablePrefetchUsed = true;
+                            var cached = monTablePrefetch;
+                            monTablePrefetch = null;
+                            cached.draw = data.draw;
+                            callback(cached);
+                            return;
+                        }
+                        monTableFetch(data).then(function (resp) {
+                            callback(resp.data);
+                        }).catch(function () {
+                            cabinetMonShowTableLoadError();
+                            callback({
+                                data: [],
+                                draw: data.draw,
+                                recordsTotal: 0,
+                                recordsFiltered: 0,
+                            });
+                        });
                     },
                     columns: columns,
                     //rowReorder: true,
@@ -284,7 +440,6 @@
                         {orderable: false, targets: '_all'},
                     ],
                     initComplete: function () {
-                        cabinetMonShowHideTableLoader();
                         let api = this.api();
 
                         if (window.cabinetMonitoringSearch) {
@@ -294,12 +449,8 @@
                         let url = new URL(window.location.href);
                         let params = new URLSearchParams(url.search);
 
-                        axios.get(`/monitoring/keywords/show/controls/${PROJECT_ID}`).then(function (response) {
-
+                        cabinetMonMountTableControls($('.mailbox-controls').first()).then(function () {
                             let container = $('.mailbox-controls').first();
-                            let content = response.data;
-
-                            container.html(content);
 
                             let checkbox = container.find('.checkbox-toggle');
 
@@ -323,21 +474,16 @@
                             deletes.click(function () {
 
                                 let checkboxes = $('.table tbody tr').find('input[type="checkbox"]:checked');
-                                if (checkboxes.length) {
-
-                                    if (window.confirm(@json(__('Do you really want to delete?')))) {
-
-                                        $.each(checkboxes, function (i, checkbox) {
-                                            let id = $(checkbox).val();
-
-                                            axios.delete(`/monitoring/keywords/${id}`);
-                                        });
-
-                                        window.location.reload();
-                                    }
-                                } else {
-                                    toastr.error('Выберите хотя бы один элемент.');
+                                if (!checkboxes.length) {
+                                    toastr.error(@json(__('Monitoring keyword delete select one')));
+                                    return;
                                 }
+
+                                let ids = [];
+                                checkboxes.each(function () {
+                                    ids.push(parseInt($(this).val(), 10));
+                                });
+                                openKeywordDeleteConfirm({ ids: ids });
                             });
 
                             container.find('.parse-positions').click(function () {
@@ -449,23 +595,10 @@
                                     name: name,
                                     state: !visible,
                                 });
+                                if (window.cabinetMonProjectConfig && window.cabinetMonProjectConfig.columnSettings) {
+                                    window.cabinetMonProjectConfig.columnSettings[name] = !visible;
+                                }
                             });
-
-                            axios.post('/monitoring/project/get/column/settings', {monitoring_project_id: PROJECT_ID})
-                                .then(function (response) {
-
-                                    $.each(response.data, function (i, item) {
-                                        let column = api.column(item.name + ':name');
-                                        let visible = !!item.state;
-
-                                        if (!visible) {
-                                            column.visible(false);
-                                        }
-
-                                        setColumnToggleState(item.name, visible);
-                                    });
-                                });
-                        });
 
                         $('.search-button').click(function () {
                             let a = $(this);
@@ -514,15 +647,9 @@
                                 let col = item.name;
                                 let val = item.value;
 
-                                console.log(col, val);
-
                                 api.column(col + ':name').search(val).draw();
                             });
                         });
-
-                        if (params.has('group')) {
-                            setTimeout(() => api.column('group:name').search(params.get('group')).draw(), 1000);
-                        }
 
                         let notValidateUrl = $('<div />', {
                             class: 'cabinet-mon-filter-switch custom-control custom-switch custom-switch-off-danger custom-switch-on-success',
@@ -591,7 +718,7 @@
                         }
                         var $tableTitle = $dtHeader.find('.card-title').first();
 
-                        if (response.data.region.length === 1) {
+                        if (tableRegions.length === 1) {
                             var $headerFilters = $('<div />', {
                                 class: 'cabinet-mon-table-header-filters ms-auto d-flex align-items-center flex-wrap',
                             });
@@ -603,14 +730,16 @@
                         $dtHeader.find('label').css('margin-bottom', 0);
                         $('.dataTables_length').find('select').removeClass('form-select form-select-sm');
                         $tableTitle.addClass('flex-grow-1').text(PROJECT_NAME);
-
-                        if (window.cabinetMonitoringShowChrome) {
-                            window.cabinetMonitoringShowChrome.onTableReady(api);
-                        }
+                        }).finally(function () {
+                            monTableBoot.controlsReady = true;
+                            tryRevealMonitoringTable(api);
+                        });
                     },
                     drawCallback: function () {
-                        cabinetMonShowHideTableLoader();
                         let api = this.api();
+                        if (!monTableBoot.revealed && monTableBoot.controlsReady) {
+                            tryRevealMonitoringTable(api);
+                        }
                         let data = api.data();
 
                         $('tbody > tr', table).each(function (i, item) {
@@ -639,8 +768,11 @@
                     },
                 });
 
-                $('.modal').on('show.bs.modal', function (event) {
+                $('#cabinetMonKeywordsModal').on('show.bs.modal', function (event) {
                     let button = $(event.relatedTarget);
+                    if (!button.length) {
+                        button = $($(this).data('monTriggerEl'));
+                    }
 
                     let type = button.data('type');
 
@@ -680,8 +812,8 @@
 
                                     modal.find('.modal-content').html(content);
 
-                                    modal.find('h5').text('Выберите хотябы один элемент.');
-                                    modal.find('p').text('Чтобы массово отредактировать элементы, нужно выбрать хотябы один элемент.');
+                                    modal.find('.cabinet-mon-keyword-modal__alert-title').text('Выберите хотя бы один элемент.');
+                                    modal.find('.cabinet-mon-keyword-modal__alert-text').text('Чтобы массово отредактировать элементы, нужно выбрать хотя бы один элемент.');
                                 });
                             }
                             break;
@@ -808,10 +940,7 @@
                     }
                 });
             }).catch(function () {
-                let loader = $('#cabinetMonShowTableLoader');
-                loader.addClass('is-error');
-                loader.find('.cabinet-mon-loader__icon').remove();
-                loader.find('.cabinet-mon-loader__label').text(@json(__('Monitoring show table load error')));
+                cabinetMonShowTableLoadError();
                 toastr.error(@json(__('Monitoring show table load error')));
             });
 
@@ -1005,20 +1134,131 @@
                 });
             });
 
-            $('.table').on('click', '.delete-keyword', function () {
-                let item = $(this);
-                let id = item.data('id');
-
-                if (window.confirm("{{__('Do you really want to delete?')}}")) {
-                    axios.delete(`/monitoring/keywords/${id}`);
-                    item.closest('tr').remove();
+            function openMonKeywordModal(triggerEl) {
+                var modalEl = document.getElementById('cabinetMonKeywordsModal');
+                if (!modalEl) {
+                    return;
                 }
+                $(modalEl).data('monTriggerEl', triggerEl);
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                } else {
+                    $(modalEl).modal('show');
+                }
+            }
+
+            var pendingKeywordDelete = null;
+
+            function hideKeywordDeleteModal() {
+                var modalEl = document.getElementById('cabinetMonKeywordDeleteModal');
+                if (!modalEl) {
+                    return;
+                }
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    var instance = bootstrap.Modal.getInstance(modalEl);
+                    if (instance) {
+                        instance.hide();
+                    }
+                } else {
+                    $(modalEl).modal('hide');
+                }
+            }
+
+            function refreshKeywordsTableAfterDelete() {
+                if ($.fn.dataTable.isDataTable('#monitoringTable')) {
+                    $('#monitoringTable').DataTable().draw(false);
+                }
+            }
+
+            function runPendingKeywordDelete() {
+                if (!pendingKeywordDelete || !pendingKeywordDelete.ids || !pendingKeywordDelete.ids.length) {
+                    return;
+                }
+                var ids = pendingKeywordDelete.ids.slice();
+                var closeEditModal = !!pendingKeywordDelete.closeEditModal;
+                pendingKeywordDelete = null;
+
+                Promise.all(ids.map(function (id) {
+                    return axios.delete('/monitoring/keywords/' + id);
+                })).then(function () {
+                    hideKeywordDeleteModal();
+                    if (closeEditModal) {
+                        var editModalEl = document.getElementById('cabinetMonKeywordsModal');
+                        if (editModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            var editInstance = bootstrap.Modal.getInstance(editModalEl);
+                            if (editInstance) {
+                                editInstance.hide();
+                            }
+                        } else if (editModalEl) {
+                            $(editModalEl).modal('hide');
+                        }
+                    }
+                    refreshKeywordsTableAfterDelete();
+                }).catch(function () {
+                    toastr.error(@json(__('Something is going wrong')));
+                });
+            }
+
+            function openKeywordDeleteConfirm(options) {
+                var modalEl = document.getElementById('cabinetMonKeywordDeleteModal');
+                var textEl = document.getElementById('cabinetMonKeywordDeleteText');
+                if (!modalEl || !textEl || !options || !options.ids || !options.ids.length) {
+                    return;
+                }
+                var i18n = (window.cabinetMonProjectConfig && window.cabinetMonProjectConfig.i18n) || {};
+                var count = options.ids.length;
+                textEl.textContent = count === 1
+                    ? (i18n.deleteConfirmSingle || @json(__('Monitoring keyword delete confirm single')))
+                    : (i18n.deleteConfirmPlural || @json(__('Monitoring keyword delete confirm plural'))).replace(':count', String(count));
+                pendingKeywordDelete = options;
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                } else {
+                    $(modalEl).modal('show');
+                }
+            }
+
+            $('#cabinetMonKeywordDeleteConfirm').on('click', function () {
+                runPendingKeywordDelete();
+            });
+
+            $('#cabinetMonKeywordsModal').on('click', '.cabinet-mon-keyword-delete', function () {
+                var id = $(this).data('id');
+                if (!id) {
+                    return;
+                }
+                openKeywordDeleteConfirm({
+                    ids: [parseInt(id, 10)],
+                    closeEditModal: true,
+                });
+            });
+
+            $('#monitoringTable').on('click', '.cabinet-mon-keyword-edit', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openMonKeywordModal(this);
+            });
+
+            $('#monitoringTable').on('click', '.delete-keyword', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var id = $(this).data('id');
+                if (!id) {
+                    return;
+                }
+                openKeywordDeleteConfirm({
+                    ids: [parseInt(id, 10)],
+                });
             });
 
             let charts = {};
             var monPositionYScale = window.cabinetMonitoringChartScales
                 ? window.cabinetMonitoringChartScales.lineY()
                 : { reverse: true, ticks: { stepSize: 5 } };
+
+            var monLegendPlugin = window.cabinetMonitoringChartScales
+                ? window.cabinetMonitoringChartScales.legendPlugin()
+                : { display: true };
 
             if ($('#topPercent').length) {
                 $.extend(charts, {
@@ -1033,9 +1273,6 @@
                                 position: 'left',
                             },
                             maintainAspectRatio: false,
-                            legend: {
-                                display: true
-                            },
                             scales: {
                                 x: {
                                     grid: {
@@ -1043,12 +1280,15 @@
                                     }
                                 },
                                 y: {
+                                    min: 0,
+                                    max: 100,
                                     ticks: {
-                                        stepSize: 5
-                                    }
-                                }
+                                        stepSize: 10,
+                                    },
+                                },
                             },
                             plugins: {
+                                legend: monLegendPlugin,
                                 crosshair: {
                                     sync: {
                                         enabled: false
@@ -1091,9 +1331,6 @@
                                 position: 'left',
                             },
                             maintainAspectRatio: false,
-                            legend: {
-                                display: true
-                            },
                             scales: {
                                 x: {
                                     grid: {
@@ -1103,6 +1340,7 @@
                                 y: monPositionYScale,
                             },
                             plugins: {
+                                legend: monLegendPlugin,
                                 crosshair: {
                                     sync: {
                                         enabled: false
@@ -1145,9 +1383,6 @@
                                 position: 'left',
                             },
                             maintainAspectRatio: false,
-                            legend: {
-                                display: true
-                            },
                             scales: {
                                 x: {
                                     grid: {
@@ -1157,6 +1392,7 @@
                                 y: monPositionYScale,
                             },
                             plugins: {
+                                legend: monLegendPlugin,
                                 crosshair: {
                                     sync: {
                                         enabled: false
@@ -1172,6 +1408,64 @@
                                     callbacks: {
                                         afterZoom: function () {
                                             charts.regions_middle.options.plugins.crosshair.zoom.enabled = false;
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    animation: false,
+                                    mode: "index",
+                                    intersect: false,
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            if ($('#topPercentRegions').length) {
+                $.extend(charts, {
+                    'regions_top': {
+                        el: $('#topPercentRegions').get(0).getContext('2d'),
+                        type: 'line',
+                        chart: 'regions_top',
+                        options: {
+                            title: {
+                                display: true,
+                                text: '% Ключевых слов в ТОП',
+                                position: 'left',
+                            },
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false,
+                                    }
+                                },
+                                y: {
+                                    min: 0,
+                                    max: 100,
+                                    ticks: {
+                                        stepSize: 10,
+                                    },
+                                },
+                            },
+                            plugins: {
+                                legend: monLegendPlugin,
+                                crosshair: {
+                                    sync: {
+                                        enabled: false
+                                    },
+                                    snapping: {
+                                        enabled: true,
+                                    },
+                                    zoom: {
+                                        enabled: true,
+                                        zoomButtonText: @json(__('Reset')),
+                                        zoomButtonClass: 'reset-zoom btn btn-default btn-sm',
+                                    },
+                                    callbacks: {
+                                        afterZoom: function () {
+                                            charts.regions_top.options.plugins.crosshair.zoom.enabled = false;
                                         }
                                     }
                                 },
@@ -1269,6 +1563,11 @@
                 }
                 if (REGION_LR) {
                     params.matchLr = REGION_LR;
+                }
+                if (chartType === 'regions_top') {
+                    params.topN = window.cabinetMonitoringShowCharts
+                        ? window.cabinetMonitoringShowCharts.regionsTopPresetNumber()
+                        : 10;
                 }
                 return params;
             }
@@ -1373,32 +1672,26 @@
                                 return value + '%';
                             },
                         },
-                        legend: {
-                            position: 'left',
-                            labels: {
-                                boxWidth: 14,
-                                padding: 10,
-                                usePointStyle: true,
-                                pointStyle: 'rectRounded',
-                                font: {
-                                    size: 13,
+                        legend: window.cabinetMonitoringChartScales
+                            ? window.cabinetMonitoringChartScales.legendPlugin({
+                                position: 'left',
+                                labels: {
+                                    boxWidth: 14,
+                                    padding: 10,
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    font: {
+                                        size: 13,
+                                    },
+                                    generateLabels: function (chart) {
+                                        return window.cabinetMonitoringChartScales.distributionLegendLabels(chart);
+                                    },
                                 },
-                                generateLabels: function (chart) {
-                                    var data = chart.data;
-                                    return data.labels.map(function (label, i) {
-                                        var ds = data.datasets[0];
-                                        var value = ds.data[i];
-                                        return {
-                                            text: label + ': ' + value + '%',
-                                            fillStyle: ds.backgroundColor[i],
-                                            strokeStyle: ds.backgroundColor[i],
-                                            hidden: ds.hidden,
-                                            index: i,
-                                        };
-                                    });
-                                },
+                            }, true)
+                            : {
+                                position: 'left',
+                                display: true,
                             },
-                        },
                     },
                 };
             }
@@ -1512,7 +1805,8 @@
                     if (
                         obj.chart === 'top' ||
                         obj.chart === 'middle' ||
-                        obj.chart === 'regions_middle'
+                        obj.chart === 'regions_middle' ||
+                        obj.chart === 'regions_top'
                     ) {
                         payload = window.cabinetMonitoringChartScales.applyDistinctLineColors(payload);
                     }
@@ -1584,8 +1878,13 @@
             });
 
             if (window.cabinetMonitoringShowCharts && $('.cabinet-mon-top-presets').length) {
+                if ($('.cabinet-mon-project-charts[data-many-regions="1"]').length) {
+                    window.cabinetMonitoringShowCharts.setPreset('10');
+                }
                 window.cabinetMonitoringShowCharts.wirePresets($('.cabinet-mon-top-presets'), function () {
-                    if (topChartRawBase) {
+                    if ($('#topPercentRegions').length && chartInstances.regions_top) {
+                        loadChartData(chartInstances.regions_top, charts.regions_top, chartFilterPeriod.val());
+                    } else if (topChartRawBase) {
                         applyTopChartFromRaw();
                     } else if (topChartRef && chartFilterPeriod.length) {
                         loadChartData(topChartRef, { chart: 'top' }, chartFilterPeriod.val());
@@ -1596,7 +1895,8 @@
 
             $('.cabinet-mon-project-charts .nav-pills a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
                 var target = $(e.target).attr('href') || '';
-                var showPeriod = target === '#tab_1' || target === '#tab_2';
+                var showPeriod = target === '#tab_1' || target === '#tab_2'
+                    || target === '#tab_regions_middle' || target === '#tab_regions_top';
                 chartFilterPeriod.toggleClass('d-none', !showPeriod);
             });
 

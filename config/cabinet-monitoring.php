@@ -6,7 +6,15 @@
  * @see App\Http\Controllers\MonitoringV2Controller
  */
 return [
-    'version' => '3.5.48-dev',
+    'version' => '3.5.92-dev',
+
+    /** Подбор конкурентов из таблицы («Подобрать из топ-10»): сколько доменов предложить. */
+    'competitors_suggest_limit' => 10,
+
+    /** Дополнительно к `monitoring_settings.ignored_domains` — всегда исключаются из подбора. */
+    'competitors_ignored_domains' => [
+        'yandex.ru',
+    ],
 
     /** Сроки публичной ссылки (дни; 0 — бессрочно). */
     'public_share_ttl_days' => [30, 90, 180, 365, 0],

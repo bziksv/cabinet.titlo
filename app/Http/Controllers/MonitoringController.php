@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\Monitoring\MonitoringProjectPageSummary;
 use App\Classes\Monitoring\Helper;
 use App\Classes\Monitoring\Mastered;
 use App\Classes\Monitoring\PanelButtons\SimpleButtonsFactory;
@@ -487,7 +488,11 @@ class MonitoringController extends Controller
         $length = $this->getLength($project->id);
         $lengthMenu = $this->getPaginationMenu();
 
-        return view('monitoring.show', compact('navigations', 'project', 'length', 'lengthMenu'));
+        $kpiRegionId = request()->filled('region') ? (int) request('region') : null;
+        $kpiSummary = MonitoringProjectPageSummary::build($project, $kpiRegionId);
+        $columnSettings = MonitoringProjectColumnsSetting::visibilityMapForProject((int) $project->id);
+
+        return view('monitoring.show', compact('navigations', 'project', 'length', 'lengthMenu', 'kpiSummary', 'columnSettings'));
     }
 
     public function getPaginationMenu()
@@ -635,13 +640,12 @@ class MonitoringController extends Controller
         apply_team_permissions($project->id);
 
         $project->loadCount('competitors');
+        $project->load(['searchengines.location']);
         $countQuery = $project->keywords()->count();
-        $navigations = $this->navigations($project);
-        $ignoredDomains = MonitoringSettings::where('name', 'ignored_domains')->value('value');
+        $ignoredDomains = self::monitoringCompetitorsIgnoredDomains();
         $competitors = $project->competitors()->get()->toArray();
 
         return view('monitoring.competitors.index', compact(
-            'navigations',
             'countQuery',
             'ignoredDomains',
             'project',
@@ -925,6 +929,30 @@ class MonitoringController extends Controller
     public function getProjectCompetitors(MonitoringProject $project): array
     {
         return array_column($project->competitors->toArray(), 'url');
+    }
+
+    private static function monitoringCompetitorsIgnoredDomains(): string
+    {
+        $ignoredDomains = MonitoringSettings::where('name', 'ignored_domains')->value('value') ?? '';
+        $extra = config('cabinet-monitoring.competitors_ignored_domains', []);
+
+        if (!is_array($extra) || $extra === []) {
+            return $ignoredDomains;
+        }
+
+        $existing = array_map('strtolower', array_filter(array_map('trim', preg_split('/\R/u', $ignoredDomains) ?: [])));
+        $lines = $ignoredDomains !== '' ? preg_split('/\R/u', rtrim($ignoredDomains)) : [];
+
+        foreach ($extra as $domain) {
+            $domain = trim((string) $domain);
+            if ($domain === '' || in_array(strtolower($domain), $existing, true)) {
+                continue;
+            }
+            $lines[] = $domain;
+            $existing[] = strtolower($domain);
+        }
+
+        return implode("\n", $lines);
     }
 
 }
