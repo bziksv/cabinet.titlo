@@ -249,10 +249,14 @@
     height: 0.45rem;
     border-radius: 50%;
     background: var(--mon-v2-accent);
-    opacity: 0.2;
-    transform: translateY(0);
-    animation: cabinet-mon-v2-trend-dot 1.4s ease-in-out infinite;
-    animation-delay: calc(var(--dot-i) * 0.08s);
+    opacity: 0.18;
+    transform: translateY(0) scale(1);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.cabinet-mon-v2-trend-loader__dot--on {
+    opacity: 1;
+    transform: translateY(-0.35rem) scale(1.15);
 }
 
 .cabinet-mon-v2-trend-build {

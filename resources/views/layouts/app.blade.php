@@ -156,6 +156,10 @@
         var ytApiQueue = [];
 
         function playModuleVideo($el) {
+            if ($el.find('video.module-video-selfhosted, iframe').length) {
+                return;
+            }
+
             var localSrc = $el.attr('data-local');
             if (localSrc) {
                 $el.html(
@@ -207,7 +211,11 @@
             document.head.appendChild(tag);
         }
 
-        $(document).on('click', '#video-course, .video-course', function () {
+        $(document).on('click', '#video-course, .video-course', function (e) {
+            // Клик по плееру — нативная пауза/seek; не пересоздавать <video> (сброс в 0:00).
+            if ($(e.target).closest('video.module-video-selfhosted, iframe').length) {
+                return;
+            }
             playModuleVideo($(this));
         });
     });

@@ -64,7 +64,15 @@
                         <p class="cabinet-mon-v2-trend-loader__detail mb-2" data-trend-loader-detail></p>
                         <p class="cabinet-mon-v2-trend-loader__stage mb-2" data-trend-loader-stage></p>
                         <p class="cabinet-mon-v2-trend-loader__elapsed mb-3" data-trend-loader-elapsed aria-live="polite"></p>
-                        <div class="cabinet-mon-v2-trend-loader__track" aria-hidden="true">
+                        <div
+                            class="cabinet-mon-v2-trend-loader__track"
+                            data-trend-loader-track
+                            role="progressbar"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="0"
+                            aria-label="{{ __('Monitoring v2 portfolio trend loading title') }}"
+                        >
                             <div class="cabinet-mon-v2-trend-loader__bar" data-trend-loader-bar></div>
                         </div>
                         <div class="cabinet-mon-v2-trend-loader__timeline" aria-hidden="true">

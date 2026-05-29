@@ -415,18 +415,57 @@
         window._cabinetMonV2TrendLoadStarted = performance.now();
     }
 
+    function estimateTrendLoadSec(projectCount, periodDays) {
+        const n = Math.max(1, projectCount || 1);
+        const days = periodDays || 90;
+        return Math.min(180, Math.max(30, Math.round(12 + n * 0.85 + days * 0.12)));
+    }
+
+    function updateTrendLoaderDots(percent) {
+        const dots = document.querySelectorAll('.cabinet-mon-v2-trend-loader__dot');
+        if (!dots.length) {
+            return;
+        }
+        const activeCount = Math.max(0, Math.min(dots.length, Math.ceil((percent / 100) * dots.length)));
+        dots.forEach(function (dot, index) {
+            dot.classList.toggle('cabinet-mon-v2-trend-loader__dot--on', index < activeCount);
+        });
+    }
+
+    function startTrendLoaderProgressEstimate(etaSec) {
+        clearTrendLoaderProgressTimer();
+        const eta = Math.max(30, etaSec || 90);
+        window._cabinetMonV2TrendEtaSec = eta;
+        trendLoaderProgressTimer = window.setInterval(function () {
+            const elapsed = trendLoaderElapsedSec();
+            const pct = Math.min(94, Math.round((elapsed / eta) * 100));
+            setTrendLoaderBar(pct);
+            updateTrendLoaderDots(pct);
+            const ctx = window._cabinetMonV2TrendStageCtx || {};
+            ctx.percent = pct;
+            ctx.eta = eta;
+            window._cabinetMonV2TrendStageCtx = ctx;
+            setTrendLoaderStage(window._cabinetMonV2TrendStageKey || 'db', ctx);
+        }, 400);
+    }
+
     function setTrendLoaderStage(stageKey, context) {
         const stageEl = document.querySelector('[data-trend-loader-stage]');
         const elapsedEl = document.querySelector('[data-trend-loader-elapsed]');
+        const track = document.querySelector('[data-trend-loader-track]');
         const i18n = cfg.i18n || {};
         let text = '';
         const ctx = context || {};
         const elapsed = trendLoaderElapsedSec();
+        const eta = ctx.eta || window._cabinetMonV2TrendEtaSec || 90;
+        const percent = ctx.percent != null ? ctx.percent : 0;
 
         if (stageKey === 'db' && i18n.portfolioTrendStageDbSingle) {
             text = i18n.portfolioTrendStageDbSingle
                 .replace(':total', String(ctx.total || 0))
-                .replace(':elapsed', String(elapsed));
+                .replace(':percent', String(percent))
+                .replace(':elapsed', String(elapsed))
+                .replace(':eta', String(eta));
         } else if (stageKey === 'agg' && i18n.portfolioTrendStageAgg) {
             text = i18n.portfolioTrendStageAgg
                 .replace(':done', String(ctx.done || 0))
@@ -444,7 +483,16 @@
             stageEl.textContent = text;
         }
         if (elapsedEl) {
-            elapsedEl.textContent = elapsed + ' с';
+            if (stageKey === 'db') {
+                elapsedEl.textContent = percent + '% · ' + elapsed + ' / ~' + eta + ' с';
+            } else {
+                elapsedEl.textContent = elapsed + ' с';
+            }
+        }
+        if (track) {
+            track.setAttribute('aria-valuenow', String(percent));
+            track.setAttribute('aria-valuemin', '0');
+            track.setAttribute('aria-valuemax', '100');
         }
     }
 
@@ -469,7 +517,7 @@
         }
     }
 
-    function showTrendLoader(projectCount) {
+    function showTrendLoader(projectCount, periodDays) {
         const loader = document.getElementById('cabinet-mon-v2-trend-loader');
         const build = document.getElementById('cabinet-mon-v2-trend-build');
         const detail = document.querySelector('[data-trend-loader-detail]');
@@ -477,9 +525,13 @@
         if (!loader) {
             return;
         }
+        const s = chartSettings();
+        const n = projectCount || 0;
+        const etaSec = estimateTrendLoadSec(n, periodDays != null ? periodDays : s.periodDays);
+
         resetTrendLoaderClock();
-        window._cabinetMonV2TrendStageKey = 'wait';
-        window._cabinetMonV2TrendStageCtx = { total: projectCount || 0 };
+        window._cabinetMonV2TrendStageKey = 'db';
+        window._cabinetMonV2TrendStageCtx = { total: n, eta: etaSec, percent: 0 };
         hideTrendBuildProgress();
         destroyMain();
         $panel.addClass('cabinet-mon-v2-portfolio__chart-panel--loading');
@@ -488,29 +540,16 @@
         if (build) {
             build.setAttribute('hidden', '');
         }
-        setTrendLoaderBar(4);
-        setTrendLoaderStage('wait', window._cabinetMonV2TrendStageCtx);
+        setTrendLoaderBar(2);
+        updateTrendLoaderDots(0);
+        setTrendLoaderStage('db', window._cabinetMonV2TrendStageCtx);
         startTrendLoaderElapsedTicker();
-        clearTrendLoaderProgressTimer();
-        trendLoaderProgressTimer = window.setInterval(function () {
-            const bar = document.querySelector('[data-trend-loader-bar]');
-            if (!bar) {
-                return;
-            }
-            const current = parseFloat(bar.style.width) || 4;
-            const cap = window._cabinetMonV2TrendProgressCap || 88;
-            if (current >= cap) {
-                return;
-            }
-            setTrendLoaderBar(current + 2 + Math.random() * 4);
-        }, 450);
-
-        const s = chartSettings();
-        const n = projectCount || 0;
+        startTrendLoaderProgressEstimate(etaSec);
         if (detail && cfg.i18n && cfg.i18n.portfolioTrendLoadingDetail) {
             detail.textContent = cfg.i18n.portfolioTrendLoadingDetail
                 .replace(':projects', String(n))
-                .replace(':days', String(s.periodDays));
+                .replace(':days', String(s.periodDays))
+                .replace(':eta', String(etaSec));
         }
 
         const $hint = $('#cabinet-mon-v2-dash-hint');
@@ -866,12 +905,9 @@
         const loadSeq = ++trendLoadSeq;
         trendLoading = true;
         clearTrendRevealTimer();
-        showTrendLoader(ids.length);
+        showTrendLoader(ids.length, s.periodDays);
 
         const started = performance.now();
-        window._cabinetMonV2TrendStageKey = 'db';
-        window._cabinetMonV2TrendStageCtx = { total: ids.length };
-        setTrendLoaderStage('db', window._cabinetMonV2TrendStageCtx);
 
         trendDebug('info', 'ajax.trend.start', {
             projects: ids.length,
@@ -897,12 +933,15 @@
                     from_cache: data && data.from_cache,
                     build_ms: data && data.build_ms,
                 });
+                setTrendLoaderBar(100);
+                updateTrendLoaderDots(100);
                 if (data && data.from_cache) {
                     window._cabinetMonV2TrendStageKey = 'cache';
-                    setTrendLoaderStage('cache', {});
+                    setTrendLoaderStage('cache', { percent: 100 });
+                } else {
+                    window._cabinetMonV2TrendStageKey = 'chart';
+                    setTrendLoaderStage('chart', { percent: 100 });
                 }
-                window._cabinetMonV2TrendStageKey = 'chart';
-                setTrendLoaderStage('chart', {});
                 hideTrendLoader();
                 if (data && data.error) {
                     renderTrendChart({ labels: [], values: [], empty: true });
