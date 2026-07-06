@@ -518,6 +518,6 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $username = config('app.telegram_bot_username', 'TitloServiceBot');
 
-        return 'https://t.me/' . $username . '?start=' . base64_encode($this->email);
+        return 'https://t.me/' . $username . '?start=' . \App\Support\TelegramStartPayload::encodeEmail($this->email);
     }
 }
