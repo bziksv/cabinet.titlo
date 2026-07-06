@@ -100,6 +100,181 @@ class SupervisorAdminService
     }
 
     /**
+     * Сводка «воркеры vs очередь jobs» — снимок, не история.
+     *
+     * @param array<string, mixed> $queueSnapshot QueueInventoryService::getSnapshot()
+     * @return array<string, mixed>
+     */
+    public function capacityOverview(array $queueSnapshot): array
+    {
+        $processes = $this->processes();
+        $queueRows = is_array($queueSnapshot['queues'] ?? null) ? $queueSnapshot['queues'] : [];
+        $prefix = (string) config('cabinet-cluster.queue_prefix', '');
+        $programs = config('cabinet-supervisor-admin.program_capacity', []);
+        $backlogPerWorker = max(1, (int) config('cabinet-supervisor-admin.capacity_backlog_per_worker', 3));
+        $busyPercent = max(1, min(100, (int) config('cabinet-supervisor-admin.capacity_busy_percent', 75)));
+
+        $workersByProgram = [];
+        foreach ($processes as $proc) {
+            $base = preg_replace('/:.*$/', '', (string) ($proc['name'] ?? '')) ?: '';
+            if ($base === '') {
+                continue;
+            }
+            if (! isset($workersByProgram[$base])) {
+                $workersByProgram[$base] = ['total' => 0, 'running' => 0];
+            }
+            $workersByProgram[$base]['total']++;
+            if (strtoupper((string) ($proc['status'] ?? '')) === 'RUNNING') {
+                $workersByProgram[$base]['running']++;
+            }
+        }
+
+        $queueStats = [];
+        foreach ($queueRows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $queueName = (string) ($row['queue'] ?? '');
+            $baseQueue = (string) ($row['base_queue'] ?? $queueName);
+            if ($prefix !== '' && Str::startsWith($queueName, $prefix)) {
+                $baseQueue = substr($queueName, strlen($prefix)) ?: $baseQueue;
+            }
+            $stat = [
+                'pending' => (int) ($row['available'] ?? 0),
+                'reserved' => (int) ($row['reserved'] ?? 0),
+                'total' => (int) ($row['total'] ?? 0),
+            ];
+            $queueStats[$queueName] = $stat;
+            if ($baseQueue !== '' && $baseQueue !== $queueName) {
+                $queueStats[$baseQueue] = $stat;
+            }
+        }
+
+        $out = [];
+        $totals = [
+            'workers_total' => 0,
+            'workers_running' => 0,
+            'jobs_pending' => 0,
+            'jobs_reserved' => 0,
+            'programs_backlog' => 0,
+            'programs_idle' => 0,
+        ];
+
+        if (! is_array($programs)) {
+            $programs = [];
+        }
+
+        foreach ($programs as $program => $def) {
+            if (! is_array($def)) {
+                continue;
+            }
+
+            $workers = $workersByProgram[$program] ?? ['total' => 0, 'running' => 0];
+            $running = (int) $workers['running'];
+            $total = (int) $workers['total'];
+            $pending = 0;
+            $reserved = 0;
+
+            foreach ((array) ($def['queues'] ?? []) as $queueName) {
+                $queueName = (string) $queueName;
+                $stats = $queueStats[$queueName]
+                    ?? ($prefix !== '' ? ($queueStats[$prefix . $queueName] ?? null) : null);
+                if ($stats === null) {
+                    continue;
+                }
+                $pending += (int) $stats['pending'];
+                $reserved += (int) $stats['reserved'];
+            }
+
+            $utilization = $running > 0 ? (int) min(100, round(($reserved / $running) * 100)) : 0;
+            $pendingPerWorker = $running > 0 ? $pending / $running : (float) $pending;
+
+            if ($running === 0) {
+                $load = 'stopped';
+            } elseif ($pending === 0 && $reserved === 0 && $running > 0) {
+                $load = 'idle';
+            } elseif ($pendingPerWorker >= $backlogPerWorker) {
+                $load = 'backlog';
+            } elseif ($utilization >= $busyPercent) {
+                $load = 'busy';
+            } else {
+                $load = 'ok';
+            }
+
+            $module = $this->moduleForProgram($program);
+
+            $out[] = [
+                'program' => $program,
+                'module_label' => $module['label'],
+                'module_url' => $module['url'],
+                'queues' => array_values((array) ($def['queues'] ?? [])),
+                'workers_total' => $total,
+                'workers_running' => $running,
+                'numprocs_lk' => (int) ($def['numprocs_lk'] ?? 0),
+                'jobs_pending' => $pending,
+                'jobs_reserved' => $reserved,
+                'utilization' => $utilization,
+                'pending_per_worker' => round($pendingPerWorker, 1),
+                'load' => $load,
+                'hint' => $this->capacityHint($load, $running, $total, (int) ($def['numprocs_lk'] ?? 0)),
+            ];
+
+            $totals['workers_total'] += $total;
+            $totals['workers_running'] += $running;
+            $totals['jobs_pending'] += $pending;
+            $totals['jobs_reserved'] += $reserved;
+            if ($load === 'backlog') {
+                $totals['programs_backlog']++;
+            }
+            if ($load === 'idle') {
+                $totals['programs_idle']++;
+            }
+        }
+
+        usort($out, static function (array $a, array $b) {
+            $order = ['backlog' => 0, 'stopped' => 1, 'busy' => 2, 'ok' => 3, 'idle' => 4];
+            $la = $order[$a['load'] ?? 'ok'] ?? 5;
+            $lb = $order[$b['load'] ?? 'ok'] ?? 5;
+            if ($la !== $lb) {
+                return $la <=> $lb;
+            }
+
+            return strcmp($a['program'] ?? '', $b['program'] ?? '');
+        });
+
+        return [
+            'generated_at' => (string) ($queueSnapshot['generated_at'] ?? now()->toDateTimeString()),
+            'programs' => $out,
+            'totals' => $totals,
+        ];
+    }
+
+    private function capacityHint(string $load, int $running, int $total, int $numprocsLk): string
+    {
+        switch ($load) {
+            case 'backlog':
+                return __('Supervisor capacity hint backlog');
+            case 'busy':
+                return __('Supervisor capacity hint busy');
+            case 'idle':
+                return $total > 1
+                    ? __('Supervisor capacity hint idle reduce', ['count' => max(0, $total - 1)])
+                    : __('Supervisor capacity hint idle ok');
+            case 'stopped':
+                return __('Supervisor capacity hint stopped');
+            default:
+                if ($numprocsLk > 0 && $total > $numprocsLk) {
+                    return __('Supervisor capacity hint over lk', ['lk' => $numprocsLk, 'now' => $total]);
+                }
+                if ($numprocsLk > 0 && $total < $numprocsLk && $running > 0) {
+                    return __('Supervisor capacity hint under lk', ['lk' => $numprocsLk, 'now' => $total]);
+                }
+
+                return __('Supervisor capacity hint ok');
+        }
+    }
+
+    /**
      * @return array{ok:bool, message:string}
      */
     public function control(string $program, string $action): array

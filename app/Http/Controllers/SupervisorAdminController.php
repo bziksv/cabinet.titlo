@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Queue\QueueInventoryService;
 use App\Services\Supervisor\SupervisorAdminService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,16 +15,20 @@ class SupervisorAdminController extends Controller
         $this->middleware(['role:Super Admin|admin']);
     }
 
-    public function index(SupervisorAdminService $supervisor): View
+    public function index(SupervisorAdminService $supervisor, QueueInventoryService $queues): View
     {
         $probe = $supervisor->probe();
         $processes = $probe['ok'] ? $supervisor->processes() : [];
+        $queueSnapshot = $queues->getSnapshot(request()->boolean('fresh'));
+        $capacity = $probe['ok'] ? $supervisor->capacityOverview($queueSnapshot) : null;
         $logProgram = (string) request()->query('log', '');
         $logTail = $logProgram !== '' ? $supervisor->tailLog($logProgram) : null;
 
         return view('admin.supervisor.index', [
             'probe' => $probe,
             'processes' => $processes,
+            'capacity' => $capacity,
+            'queueSnapshot' => $queueSnapshot,
             'logTail' => $logTail,
             'logProgram' => $logProgram,
         ]);

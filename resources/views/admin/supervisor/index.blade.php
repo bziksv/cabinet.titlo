@@ -71,6 +71,98 @@
             </div>
         @endif
 
+        @if($capacity)
+            @php
+                $capTotals = $capacity['totals'] ?? [];
+                $capPrograms = $capacity['programs'] ?? [];
+            @endphp
+            <div class="card mb-3">
+                <div class="card-header py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <strong>{{ __('Supervisor capacity title') }}</strong>
+                    <span class="small text-secondary">
+                        {{ __('Supervisor capacity snapshot at', ['time' => $capacity['generated_at'] ?? '—']) }}
+                        · <a href="{{ route('admin.queue.index') }}">{{ __('Queue management') }}</a>
+                    </span>
+                </div>
+                <div class="card-body pb-2">
+                    <p class="text-secondary small mb-3">{{ __('Supervisor capacity intro') }}</p>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="cabinet-supervisor-cap-card">
+                                <div class="small text-secondary">{{ __('Supervisor capacity workers') }}</div>
+                                <div class="h5 mb-0">{{ $capTotals['workers_running'] ?? 0 }}<span class="text-secondary fs-6"> / {{ $capTotals['workers_total'] ?? 0 }}</span></div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="cabinet-supervisor-cap-card">
+                                <div class="small text-secondary">{{ __('Supervisor capacity jobs pending') }}</div>
+                                <div class="h5 mb-0">{{ number_format($capTotals['jobs_pending'] ?? 0, 0, '.', ' ') }}</div>
+                                <div class="small text-secondary">{{ __('Reserved') }}: {{ number_format($capTotals['jobs_reserved'] ?? 0, 0, '.', ' ') }}</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="cabinet-supervisor-cap-card cabinet-supervisor-cap-card--warn">
+                                <div class="small text-secondary">{{ __('Supervisor capacity programs backlog') }}</div>
+                                <div class="h5 mb-0 text-warning">{{ $capTotals['programs_backlog'] ?? 0 }}</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="cabinet-supervisor-cap-card">
+                                <div class="small text-secondary">{{ __('Supervisor capacity programs idle') }}</div>
+                                <div class="h5 mb-0">{{ $capTotals['programs_idle'] ?? 0 }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 cabinet-supervisor-cap-table">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('Supervisor program') }}</th>
+                                    <th>{{ __('Supervisor module') }}</th>
+                                    <th>{{ __('Supervisor capacity workers') }}</th>
+                                    <th>{{ __('Supervisor capacity lk ref') }}</th>
+                                    <th>{{ __('Supervisor capacity reserved') }}</th>
+                                    <th>{{ __('Supervisor capacity pending') }}</th>
+                                    <th>{{ __('Supervisor capacity utilization') }}</th>
+                                    <th>{{ __('Supervisor capacity hint col') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($capPrograms as $cap)
+                                    @php
+                                        $load = $cap['load'] ?? 'ok';
+                                        $rowClass = $load === 'backlog' ? 'cabinet-supervisor-cap-row--danger' : ($load === 'idle' ? 'cabinet-supervisor-cap-row--muted' : ($load === 'busy' ? 'cabinet-supervisor-cap-row--ok' : ''));
+                                        $barClass = $load === 'backlog' ? 'bg-danger' : ($cap['utilization'] ?? 0) >= 75 ? 'bg-success' : 'bg-primary';
+                                    @endphp
+                                    <tr class="{{ $rowClass }}">
+                                        <td class="font-monospace small">{{ $cap['program'] ?? '' }}</td>
+                                        <td>
+                                            @if(!empty($cap['module_url']))
+                                                <a href="{{ $cap['module_url'] }}" class="cabinet-supervisor-admin-module-link">{{ $cap['module_label'] ?? '—' }}</a>
+                                            @else
+                                                {{ $cap['module_label'] ?? '—' }}
+                                            @endif
+                                        </td>
+                                        <td>{{ $cap['workers_running'] ?? 0 }}/{{ $cap['workers_total'] ?? 0 }}</td>
+                                        <td class="text-secondary">{{ $cap['numprocs_lk'] ?? '—' }}</td>
+                                        <td>{{ number_format($cap['jobs_reserved'] ?? 0, 0, '.', ' ') }}</td>
+                                        <td>{{ number_format($cap['jobs_pending'] ?? 0, 0, '.', ' ') }}</td>
+                                        <td style="min-width: 7rem;">
+                                            <div class="cabinet-supervisor-cap-bar" title="{{ $cap['utilization'] ?? 0 }}%">
+                                                <div class="cabinet-supervisor-cap-bar__fill {{ $barClass }}" style="width: {{ min(100, max(0, (int) ($cap['utilization'] ?? 0))) }}%"></div>
+                                            </div>
+                                            <span class="small text-secondary">{{ $cap['utilization'] ?? 0 }}%</span>
+                                        </td>
+                                        <td class="small">{{ $cap['hint'] ?? '' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <div class="card mb-3">
             <div class="card-header py-2">
                 <strong>{{ __('Supervisor processes') }}</strong>

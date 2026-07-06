@@ -6,7 +6,13 @@
  * @see App\Services\Supervisor\SupervisorAdminService
  */
 return [
-    'version' => '1.2.0s',
+    'version' => '1.3.0s',
+
+    /** Порог «очередь растёт»: pending jobs на один RUNNING-воркер */
+    'capacity_backlog_per_worker' => (int) env('SUPERVISOR_CAPACITY_BACKLOG_PER_WORKER', 3),
+
+    /** Занятость воркеров (% reserved/running), выше — «все заняты» */
+    'capacity_busy_percent' => (int) env('SUPERVISOR_CAPACITY_BUSY_PERCENT', 75),
 
     /** false — страница только для чтения с подсказкой по установке */
     'enabled' => filter_var(env('SUPERVISOR_ADMIN_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
@@ -48,6 +54,65 @@ return [
         'cabinet-titlo-competitor-analyse' => ['label' => 'Competitor analysis', 'route' => 'competitor.analysis'],
         'cabinet-titlo-ai-generation' => ['label' => 'Supervisor module ai generation', 'route' => 'ai.generation.story'],
         'cabinet-titlo-websockets' => ['label' => 'Supervisor module websockets', 'route' => null],
+    ],
+
+    /**
+     * Очереди Laravel, которые слушает каждая программа (для сопоставления с jobs).
+     * numprocs_lk — эталон с lk.redbox.su для сравнения.
+     */
+    'program_capacity' => [
+        'cabinet-titlo-default' => [
+            'queues' => ['default', 'cluster_high', 'high', 'medium'],
+            'numprocs_lk' => 6,
+        ],
+        'cabinet-titlo-cluster-child' => [
+            'queues' => ['child_cluster'],
+            'numprocs_lk' => 6,
+        ],
+        'cabinet-titlo-cluster-main' => [
+            'queues' => ['main_cluster'],
+            'numprocs_lk' => 3,
+        ],
+        'cabinet-titlo-cluster-wait' => [
+            'queues' => ['cluster_wait'],
+            'numprocs_lk' => 6,
+        ],
+        'cabinet-titlo-position' => [
+            'queues' => ['position_high', 'position_low'],
+            'numprocs_lk' => 6,
+        ],
+        'cabinet-titlo-relevance' => [
+            'queues' => ['relevance_high_priority', 'relevance_medium_priority', 'relevance_normal_priority'],
+            'numprocs_lk' => 6,
+        ],
+        'cabinet-titlo-monitoring-helper' => [
+            'queues' => ['monitoring_helper'],
+            'numprocs_lk' => 5,
+        ],
+        'cabinet-titlo-monitoring-change-dates' => [
+            'queues' => ['monitoring_change_dates'],
+            'numprocs_lk' => 2,
+        ],
+        'cabinet-titlo-monitoring-wait' => [
+            'queues' => ['monitoring_wait'],
+            'numprocs_lk' => 2,
+        ],
+        'cabinet-titlo-monitoring-competitors-stat' => [
+            'queues' => ['monitoring_competitors_stat'],
+            'numprocs_lk' => 1,
+        ],
+        'cabinet-titlo-competitor-analyse' => [
+            'queues' => ['competitor_analyse'],
+            'numprocs_lk' => 5,
+        ],
+        'cabinet-titlo-ai-generation' => [
+            'queues' => ['ai_generation'],
+            'numprocs_lk' => 5,
+        ],
+        'cabinet-titlo-websockets' => [
+            'queues' => [],
+            'numprocs_lk' => 1,
+        ],
     ],
 
     /** Логи воркеров относительно корня проекта (storage/logs/...) */

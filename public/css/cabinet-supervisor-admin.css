@@ -25,3 +25,46 @@
 .cabinet-supervisor-admin-module-link:hover {
     text-decoration: underline;
 }
+
+.cabinet-supervisor-cap-card {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+    height: 100%;
+    border-left: 4px solid var(--bs-primary);
+}
+
+.cabinet-supervisor-cap-card--warn {
+    border-left-color: var(--bs-warning);
+}
+
+.cabinet-supervisor-cap-table td,
+.cabinet-supervisor-cap-table th {
+    vertical-align: middle;
+}
+
+.cabinet-supervisor-cap-row--danger {
+    --bs-table-bg: rgba(var(--bs-danger-rgb), 0.07);
+}
+
+.cabinet-supervisor-cap-row--ok {
+    --bs-table-bg: rgba(var(--bs-success-rgb), 0.06);
+}
+
+.cabinet-supervisor-cap-row--muted {
+    --bs-table-bg: rgba(var(--bs-secondary-rgb), 0.06);
+}
+
+.cabinet-supervisor-cap-bar {
+    height: 0.45rem;
+    background: var(--bs-secondary-bg);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 0.15rem;
+}
+
+.cabinet-supervisor-cap-bar__fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.2s ease;
+}
