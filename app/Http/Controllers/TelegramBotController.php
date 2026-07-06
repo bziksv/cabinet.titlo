@@ -6,13 +6,12 @@ use App\Services\TelegramConnectBonusService;
 use App\Services\TelegramBotService;
 use App\Support\TelegramStartPayload;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class TelegramBotController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request)
     {
         $message = $request->json('message') ?? $request->input('message');
         $reply = null;
@@ -23,20 +22,30 @@ class TelegramBotController extends Controller
             $reply = $this->buildReplyForMessage($message, $chatId);
         }
 
+        if ($chatId !== null && $reply !== null && $reply !== '' && function_exists('fastcgi_finish_request')) {
+            response('ok', 200)->send();
+            fastcgi_finish_request();
+            $this->sendTelegramReply($chatId, $reply);
+            exit(0);
+        }
+
         if ($chatId !== null && $reply !== null && $reply !== '') {
-            register_shutdown_function(static function () use ($chatId, $reply) {
-                try {
-                    (new TelegramBotService($chatId))->sendMsg($reply);
-                } catch (\Throwable $e) {
-                    Log::warning('Telegram webhook reply failed', [
-                        'chat_id' => $chatId,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            });
+            $this->sendTelegramReply($chatId, $reply);
         }
 
         return response('ok', 200);
+    }
+
+    private function sendTelegramReply(int $chatId, string $reply): void
+    {
+        try {
+            (new TelegramBotService($chatId))->sendMsg($reply);
+        } catch (\Throwable $e) {
+            Log::warning('Telegram webhook reply failed', [
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function buildReplyForMessage(array $message, int $chatId): ?string
