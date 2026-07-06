@@ -6,7 +6,7 @@
  * @see App\Services\Supervisor\SupervisorAdminService
  */
 return [
-    'version' => '1.3.1s',
+    'version' => '1.3.2s',
 
     /** Порог «очередь растёт»: pending jobs на один RUNNING-воркер */
     'capacity_backlog_per_worker' => (int) env('SUPERVISOR_CAPACITY_BACKLOG_PER_WORKER', 3),

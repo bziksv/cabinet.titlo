@@ -393,44 +393,67 @@ class SupervisorAdminService
     }
 
     /**
-     * @return array{name:string, exists:bool, tail:string, path:string}
+     * @return array{name:string, program:string, exists:bool, empty:bool, tail:string, path:string, size_bytes:int}
      */
     public function tailLog(string $program, int $lines = 80): array
     {
-        $base = preg_replace('/:.*$/', '', $program) ?: $program;
-        $base = preg_replace('/_\d+$/', '', $base) ?: $base;
-
-        $logFiles = config('cabinet-supervisor-admin.log_files', []);
-        $relative = $logFiles[$base] ?? null;
-
-        if ($relative === null) {
-            foreach ($logFiles as $key => $path) {
-                if (Str::startsWith($base, $key) || Str::startsWith($program, $key)) {
-                    $relative = $path;
-                    break;
-                }
-            }
-        }
-
-        $path = $relative ? base_path($relative) : '';
+        $program = trim($program);
+        $programBase = $this->programBaseName($program);
+        $relative = $this->logFileRelative($programBase);
+        $path = $relative !== '' ? base_path($relative) : '';
 
         if ($path === '' || ! is_readable($path)) {
             return [
                 'name' => $program,
+                'program' => $programBase,
                 'exists' => false,
+                'empty' => true,
                 'tail' => '',
-                'path' => $path,
+                'path' => $relative,
+                'size_bytes' => 0,
             ];
         }
 
+        $size = @filesize($path);
+        $size = $size === false ? 0 : (int) $size;
         $content = $this->readTail($path, max(10, min($lines, 400)));
 
         return [
             'name' => $program,
+            'program' => $programBase,
             'exists' => true,
+            'empty' => trim($content) === '',
             'tail' => $content,
             'path' => $relative,
+            'size_bytes' => $size,
         ];
+    }
+
+    public function programBaseName(string $program): string
+    {
+        $base = preg_replace('/:.*$/', '', trim($program)) ?: trim($program);
+
+        return $base;
+    }
+
+    private function logFileRelative(string $programBase): string
+    {
+        $logFiles = config('cabinet-supervisor-admin.log_files', []);
+        if (! is_array($logFiles)) {
+            return '';
+        }
+
+        if (isset($logFiles[$programBase])) {
+            return (string) $logFiles[$programBase];
+        }
+
+        foreach ($logFiles as $key => $path) {
+            if (Str::startsWith($programBase, (string) $key)) {
+                return (string) $path;
+            }
+        }
+
+        return '';
     }
 
     public function isProgramAllowed(string $program): bool

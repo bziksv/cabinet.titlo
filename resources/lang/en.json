@@ -259,6 +259,8 @@
   "Supervisor read only": "read only",
   "Supervisor log tail": "Log tail",
   "Supervisor log missing": "Log file not found or not created yet.",
+  "Supervisor log empty": "Log is empty.",
+  "Supervisor log empty hint": "The worker writes queue:work output here — lines appear after jobs run or on PHP errors.",
   "Supervisor program not allowed": "This program is not in the whitelist (cabinet-titlo-*).",
   "Supervisor invalid action": "Invalid action.",
   "Supervisor command failed": "supervisorctl command failed.",

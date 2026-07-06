@@ -53,6 +53,10 @@
             </div>
         @endif
 
+        @if(!empty($logProgram) && $logTail)
+            @include('admin.supervisor.partials.log-panel', ['logProgram' => $logProgram, 'logTail' => $logTail])
+        @endif
+
         @if(!($probe['enabled'] ?? false))
             <div class="alert alert-warning">
                 <strong>{{ __('Supervisor not configured') }}</strong>
@@ -234,7 +238,10 @@
                                                         </button>
                                                     </form>
                                                 @endforeach
-                                                <a href="{{ route('admin.supervisor.index', ['log' => $proc['name']]) }}" class="btn btn-sm btn-link">
+                                                @php
+                                                    $logProgramKey = preg_replace('/:.*$/', '', $proc['name'] ?? '') ?: ($proc['name'] ?? '');
+                                                @endphp
+                                                <a href="{{ route('admin.supervisor.index', ['log' => $logProgramKey]) }}#supervisor-log-panel" class="btn btn-sm btn-link">
                                                     {{ __('Log') }}
                                                 </a>
                                             @else
@@ -251,23 +258,6 @@
                 @endif
             </div>
         </div>
-
-        @if($logTail)
-            <div class="card">
-                <div class="card-header py-2 d-flex justify-content-between align-items-center">
-                    <strong>{{ __('Supervisor log tail') }}: {{ $logProgram }}</strong>
-                    <a href="{{ route('admin.supervisor.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Close') }}</a>
-                </div>
-                <div class="card-body p-0">
-                    @if($logTail['exists'] ?? false)
-                        <pre class="cabinet-supervisor-admin-log mb-0">{{ $logTail['tail'] }}</pre>
-                        <p class="small text-secondary px-3 pb-2 mb-0">{{ $logTail['path'] }}</p>
-                    @else
-                        <p class="text-secondary small p-3 mb-0">{{ __('Supervisor log missing') }}</p>
-                    @endif
-                </div>
-            </div>
-        @endif
 
         <div class="alert alert-light border small mb-0">
             <strong>{{ __('Supervisor fastpanel note title') }}</strong>

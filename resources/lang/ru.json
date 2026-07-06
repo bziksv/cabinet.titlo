@@ -4584,6 +4584,8 @@
     "Supervisor read only": "только просмотр",
     "Supervisor log tail": "Хвост лога",
     "Supervisor log missing": "Лог-файл не найден или ещё не создан.",
+    "Supervisor log empty": "Лог пока пуст.",
+    "Supervisor log empty hint": "Воркер пишет сюда вывод queue:work — строки появятся после обработки jobs или ошибок PHP.",
     "Supervisor program not allowed": "Эта программа не в whitelist (cabinet-titlo-*).",
     "Supervisor invalid action": "Недопустимое действие.",
     "Supervisor command failed": "Команда supervisorctl завершилась с ошибкой.",
