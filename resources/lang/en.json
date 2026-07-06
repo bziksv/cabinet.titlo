@@ -106,6 +106,7 @@
   "Telegram connect start hint": "To link your account, open «Subscribe to notifications» in the Titlo cabinet (Profile → Telegram) and tap Start in the bot.",
   "Telegram connect start invalid": "This link is invalid. Open Titlo cabinet → Profile → Telegram and tap «Subscribe to notifications».",
   "Telegram connect start user not found": "Account not found. Make sure you use the subscribe button from your profile while logged in with the same email.",
+  "Telegram connect polling notice": "Linking is not instant: tap Start in the bot and wait up to 1 minute. Refresh this page for status; a confirmation will arrive in Telegram.",
   "DNS CHANGED": "DNS CHANGED",
   "Notification of the expiration of the registration period": "Domain registration expiration notice",
   "Registration date": "Registration date",

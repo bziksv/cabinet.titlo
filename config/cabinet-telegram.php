@@ -16,6 +16,9 @@ return [
     /** getUpdates по cron — на VPS входящий webhook от Telegram часто недоступен. */
     'poll_updates' => true,
 
+    /** Не пробовать direct к api.telegram.org, если настроен прокси (VPS). */
+    'skip_direct_outbound' => env('TELEGRAM_SKIP_DIRECT', null),
+
     'modules' => [
         [
             'slug' => 'profile',

@@ -279,7 +279,33 @@ class TelegramBotService
             $attempts[] = ['send_via' => 'direct', 'proxy' => null];
         }
 
+        if ($this->shouldSkipDirectOutbound()) {
+            $attempts = array_values(array_filter($attempts, static function (array $attempt) {
+                return $attempt['send_via'] !== 'direct';
+            }));
+        }
+
+        if ($attempts === []) {
+            $attempts[] = ['send_via' => 'direct', 'proxy' => null];
+        }
+
         return $attempts;
+    }
+
+    private function shouldSkipDirectOutbound(): bool
+    {
+        $configured = config('cabinet-telegram.skip_direct_outbound');
+        if ($configured !== null) {
+            return (bool) $configured;
+        }
+
+        if (TelegramProxyRegistry::enabled() !== []) {
+            return true;
+        }
+
+        $envProxy = config('app.telegram_proxy');
+
+        return $envProxy !== null && $envProxy !== '';
     }
 
     /**

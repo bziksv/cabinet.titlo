@@ -242,7 +242,10 @@
                                     @endif
                                 </div>
                                 @if (!($telegramConnected ?? false))
-                                    <p class="small text-secondary mt-3 mb-0">{{ __('After subscribing in Telegram, refresh this page.') }}</p>
+                                    <div class="alert alert-info border-info small mt-3 mb-0" role="note">
+                                        <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
+                                        {{ __('Telegram connect polling notice') }}
+                                    </div>
                                 @endif
                             </div>
 

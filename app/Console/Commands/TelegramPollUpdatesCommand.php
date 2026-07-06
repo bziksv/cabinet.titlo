@@ -50,7 +50,13 @@ class TelegramPollUpdatesCommand extends Command
             $reply = $handler->handleMessage($update['message']);
 
             if ($chatId > 0 && $reply !== null && $reply !== '') {
-                (new TelegramBotService($chatId))->sendMsg($reply);
+                $sent = (new TelegramBotService($chatId))->sendMsg($reply);
+                if (!$sent) {
+                    Log::warning('Telegram poll reply failed', [
+                        'chat_id' => $chatId,
+                        'error' => TelegramBotService::$lastError,
+                    ]);
+                }
             }
 
             $processed++;

@@ -43,10 +43,10 @@
                             {{ __('Clustering and analysis completion alerts') }}
                         </li>
                     </ul>
-                    <p class="small text-secondary mt-3 mb-0">
-                        {{ __('After subscribing in Telegram, refresh the page or open your profile.') }}
-                        <a href="{{ route('profile.index') }}#telegram">{{ __('Profile') }}</a>
-                    </p>
+                    <div class="alert alert-info border-info small mt-3 mb-0" role="note">
+                        <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
+                        {{ __('Telegram connect polling notice') }}
+                    </div>
                 </div>
                 <div class="modal-footer border-0 flex-wrap gap-2 justify-content-between">
                     <button type="button" class="btn btn-outline-secondary" id="cabinet-telegram-connect-snooze">
