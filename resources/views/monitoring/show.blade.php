@@ -8,6 +8,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time() }}">
     @endslot
 
@@ -57,7 +58,10 @@
     @include('monitoring.keywords.modal.delete-confirm')
 
     <div id="cabinetMonTableControlsTpl" hidden aria-hidden="true">
-        @include('monitoring.keywords.controls', ['columnSettings' => $columnSettings ?? []])
+        @include('monitoring.keywords.controls', [
+            'columnSettings' => $columnSettings ?? [],
+            'isMultiRegionView' => !request('region') && $project->searchengines->count() > 1,
+        ])
     </div>
 
     @slot('js')
@@ -83,6 +87,7 @@
                 projectId: {{ (int) $project->id }},
                 baseGroupId: @json(request('group') ? (int) request('group') : null),
                 baseRegion: @json($monBaseRegion),
+                multiRegionView: @json(!request('region') && $project->searchengines->count() > 1),
                 initialSummary: @json($kpiSummary ?? null),
                 columnSettings: @json($columnSettings ?? []),
                 statsUrl: @json(route('monitoring.v2.project.stats')),
@@ -112,13 +117,15 @@
         @include('monitoring.partials.smart-search-script')
         <script src="{{ asset('js/cabinet-monitoring-show-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-show-charts.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-monitoring-show-compare.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-show-compare.js')) ?: time() }}"></script>
-        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         <!-- Bootstrap 4 -->
         <script src="{{ asset('plugins/bootstrap-modal-form-templates/bootstrap-modal-form-templates.js') }}"></script>
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
+        <script src="{{ asset('plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js') }}"></script>
+        <script src="{{ asset('plugins/datatables-fixedcolumns/js/fixedColumns.bootstrap4.min.js') }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time() }}"></script>
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
@@ -162,6 +169,116 @@
             const PAGE_LENGTH = '{{ $length }}';
             const LENGTH_MENU = JSON.parse('{{ $lengthMenu }}');
             const MAIN_COLUMNS_COUNT = 7;
+            const MON_KEYWORD_COUNT = {{ (int) ($kpiSummary['words'] ?? 0) }};
+
+            function monModalSetBusy($modal, busy, busyLabel) {
+                const $btn = $modal.find('.modal-footer .btn-success');
+                if (!$btn.length) {
+                    return;
+                }
+                if (busy) {
+                    if (!$btn.data('orig-text')) {
+                        $btn.data('orig-text', $btn.text());
+                    }
+                    $btn.prop('disabled', true).addClass('disabled');
+                    if (busyLabel) {
+                        $btn.text(busyLabel);
+                    }
+                    return;
+                }
+                $btn.prop('disabled', false).removeClass('disabled');
+                if ($btn.data('orig-text')) {
+                    $btn.text($btn.data('orig-text'));
+                }
+            }
+
+            function monRegionOptions(yandexOnly) {
+                const opts = [];
+                $('#searchengines option[value!=""]').each(function () {
+                    const $opt = $(this);
+                    if (yandexOnly && $opt.data('engine') !== 'yandex') {
+                        return;
+                    }
+                    opts.push({
+                        val: $opt.val(),
+                        text: $opt.text(),
+                        selected: $opt.prop('selected'),
+                    });
+                });
+                return opts;
+            }
+
+            function monYandexRegionOptions() {
+                return monRegionOptions(true);
+            }
+
+            function monPickRegion(onPick, options) {
+                options = options || {};
+                const yandexOnly = !!options.yandexOnly;
+                const title = options.title || @json(__('Monitoring position pick region'));
+
+                const current = $('#searchengines').val();
+                if (current && String(current).length) {
+                    onPick(String(current));
+                    return;
+                }
+
+                const params = monRegionOptions(yandexOnly);
+                if (!params.length) {
+                    toastr.error(yandexOnly
+                        ? @json(__('Monitoring occurrence yandex only'))
+                        : @json(__('Monitoring parse select region')));
+                    return;
+                }
+
+                if (params.length === 1) {
+                    onPick(String(params[0].val));
+                    return;
+                }
+
+                $('.modal.general').modal('show').BootstrapModalFormTemplates({
+                    title: title,
+                    fields: [
+                        {
+                            type: 'select',
+                            name: 'region',
+                            label: @json(__('Search engine')),
+                            params: params,
+                        },
+                    ],
+                    onAgree: function (m) {
+                        const region = m.find('select[name=region]').val();
+                        if (!region) {
+                            toastr.error(@json(__('Monitoring parse select region single')));
+                            return;
+                        }
+                        m.modal('hide');
+                        onPick(String(region));
+                    },
+                });
+            }
+
+            function monPickYandexRegion(onPick) {
+                monPickRegion(onPick, {
+                    yandexOnly: true,
+                    title: @json(__('Monitoring occurrence pick region')),
+                });
+            }
+
+            function monOccurrenceBtnBusy($btn, busy) {
+                if (busy) {
+                    if (!$btn.data('orig-html')) {
+                        $btn.data('orig-html', $btn.html());
+                    }
+                    $btn.data('busy', true).prop('disabled', true).addClass('disabled');
+                    $btn.html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + @json(__('Monitoring parse queue enqueueing')));
+                    return;
+                }
+                $btn.data('busy', false).prop('disabled', false).removeClass('disabled');
+                if ($btn.data('orig-html')) {
+                    $btn.html($btn.data('orig-html'));
+                }
+            }
 
             function chartDateRange() {
                 if (DATES && String(DATES).trim()) {
@@ -232,25 +349,48 @@
             var monTableBoot = { controlsReady: false, revealed: false };
 
             function monitoringTableHasBodyRows() {
-                return $('#monitoringTable_wrapper').find('.dataTables_scrollBody tbody tr, #monitoringTable_wrapper tbody tr').filter(function () {
+                return $('#monitoringTable_wrapper').find(
+                    '.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr, #monitoringTable_wrapper tbody tr'
+                ).filter(function () {
                     return $(this).find('td').length > 0;
                 }).length > 0;
             }
 
-            function monitoringTableIsProcessing() {
-                var $proc = $('#monitoringTable_processing');
-                return $proc.length && $proc.is(':visible');
+            function monitoringTableHasLoadedData(api) {
+                if (!api) {
+                    return monitoringTableHasBodyRows();
+                }
+                try {
+                    if (api.page.info().recordsTotal > 0) {
+                        return true;
+                    }
+                } catch (e) {}
+                return monitoringTableHasBodyRows();
+            }
+
+            function monitoringTableShowLoadErrorToast() {
+                var api = window.__cabinetMonKeywordsTableApi;
+                if (!api && $.fn.dataTable.isDataTable('#monitoringTable')) {
+                    api = $('#monitoringTable').DataTable();
+                }
+                if (monitoringTableHasLoadedData(api)) {
+                    return;
+                }
+                cabinetMonShowTableLoadError();
+                toastr.error(@json(__('Monitoring show table load error')));
+            }
+
+            function monitoringTableHideProcessing() {
+                $('#monitoringTable_wrapper .dataTables_processing').hide();
             }
 
             function tryRevealMonitoringTable(api) {
                 if (monTableBoot.revealed || !monTableBoot.controlsReady || !api) {
                     return;
                 }
-                if (monitoringTableIsProcessing()) {
-                    return;
-                }
+                monitoringTableHideProcessing();
                 var info = api.page.info();
-                if (info.recordsTotal > 0 && !monitoringTableHasBodyRows()) {
+                if (info.recordsTotal > 0 && !monitoringTableHasLoadedData(api)) {
                     return;
                 }
 
@@ -259,14 +399,21 @@
                 var unveil = function () {
                     api.columns.adjust();
                     var done = function () {
+                        monitoringTableHideProcessing();
                         $('#cabinet-mon-show-table-host').removeClass('is-table-booting');
                         $('#cabinetMonShowTableLoader').remove();
                         if (window.cabinetMonitoringShowChrome) {
                             window.cabinetMonitoringShowChrome.onTableReady(api, { skipRelayout: true });
                         }
                     };
-                    if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutKeywordsTable) {
-                        window.cabinetMonitoringShowChrome.relayoutKeywordsTable(done);
+                    if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.finalizeMonTableLayout) {
+                        window.cabinetMonitoringShowChrome.finalizeMonTableLayout(api);
+                        done();
+                    } else if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutKeywordsTable) {
+                        window.cabinetMonitoringShowChrome.relayoutKeywordsTable(done, {
+                            adjustColumns: true,
+                            rebuildFixedColumns: true,
+                        });
                     } else {
                         window.requestAnimationFrame(function () {
                             window.requestAnimationFrame(done);
@@ -284,7 +431,70 @@
                 loader.find('.cabinet-mon-loader__label').text(@json(__('Monitoring show table load error')));
             }
 
+            function monColumnWidth(name) {
+                var widths = {
+                    checkbox: '46px',
+                    btn: '62px',
+                    query: '380px',
+                    url: '140px',
+                    group: '140px',
+                    target_url: '160px',
+                    target: '96px',
+                    dynamics: '88px',
+                    base: '36px',
+                    phrasal: '56px',
+                    exact: '60px',
+                };
+                if (widths[name]) {
+                    return widths[name];
+                }
+                if (String(name).indexOf('col_') === 0) {
+                    return '88px';
+                }
+                if (String(name).indexOf('engine_') === 0) {
+                    return '96px';
+                }
+                return null;
+            }
+
+            function monColumnClassName(name) {
+                var map = {
+                    query: 'cabinet-mon-col-query',
+                    url: 'cabinet-mon-col-url',
+                    group: 'cabinet-mon-col-group',
+                    target_url: 'cabinet-mon-col-target-url',
+                    target: 'cabinet-mon-col-target',
+                    dynamics: 'cabinet-mon-col-dynamics',
+                    base: 'cabinet-mon-col-base',
+                    phrasal: 'cabinet-mon-col-phrasal',
+                    exact: 'cabinet-mon-col-exact',
+                };
+                if (map[name]) {
+                    return map[name];
+                }
+                if (String(name).indexOf('col_') === 0) {
+                    return 'cabinet-mon-col-date';
+                }
+                if (String(name).indexOf('engine_') === 0) {
+                    return 'cabinet-mon-col-engine';
+                }
+                return '';
+            }
+
+            function monIsMultiRegionView() {
+                if (REGION_ID && String(REGION_ID).length) {
+                    return false;
+                }
+                if (window.cabinetMonProjectConfig && window.cabinetMonProjectConfig.multiRegionView) {
+                    return true;
+                }
+                return (window.__cabinetMonTableRegions || []).length > 1;
+            }
+
             function monColumnVisible(name) {
+                if (monIsMultiRegionView() && ['dynamics', 'base', 'phrasal', 'exact'].indexOf(name) >= 0) {
+                    return false;
+                }
                 var settings = (window.cabinetMonProjectConfig && window.cabinetMonProjectConfig.columnSettings) || {};
                 if (Object.prototype.hasOwnProperty.call(settings, name)) {
                     return !!settings[name];
@@ -358,6 +568,7 @@
                 monTablePrefetch = response.data;
 
                 let tableRegions = response.data.region || [];
+                window.__cabinetMonTableRegions = tableRegions;
                 let columns = [];
 
                 $.each(response.data.columns, function (i, item) {
@@ -365,11 +576,10 @@
                         return;
                     }
 
-                    let width = null;
+                    let width = monColumnWidth(i);
                     let orderable = false;
 
                     if (i === 'query') {
-                        width = '380px';
                         orderable = true;
                     }
 
@@ -384,13 +594,38 @@
                         'width': width,
                         'orderable': orderable,
                         'visible': monColumnVisible(i),
-                        'className': i === 'query' ? 'cabinet-mon-col-query' : '',
+                        'className': monColumnClassName(i),
                     });
                 });
 
-                let dTable = table.DataTable({
+                let monColumnWidthTargets = [];
+                columns.forEach(function (col, idx) {
+                    if (col.width) {
+                        monColumnWidthTargets.push({ width: col.width, targets: idx });
+                    }
+                });
+
+                let monFixedLeftCols = (function () {
+                    let idx = columns.findIndex(function (col) {
+                        return col.name === 'query';
+                    });
+                    return idx >= 0 ? idx + 1 : 3;
+                })();
+
+                let dTable;
+                try {
+                dTable = table.DataTable({
                     dom: '<"card-header d-flex align-items-center"<"card-title"><"float-right"l>><"card-body p-0"<"mailbox-controls">rt><"card-footer clearfix"p><"clear">',
                     scrollX: true,
+                    scrollY: '1020px',
+                    scrollCollapse: false,
+                    fixedColumns: {
+                        leftColumns: monFixedLeftCols,
+                        heightMatch: 'auto',
+                    },
+                    columnDefs: monColumnWidthTargets.concat([
+                        { orderable: false, targets: '_all' },
+                    ]),
                     lengthMenu: LENGTH_MENU,
                     pageLength: PAGE_LENGTH,
                     pagingType: "simple_numbers",
@@ -421,8 +656,12 @@
                         }
                         monTableFetch(data).then(function (resp) {
                             callback(resp.data);
-                        }).catch(function () {
-                            cabinetMonShowTableLoadError();
+                        }).catch(function (err) {
+                            console.error('monitoring table fetch failed', err);
+                            monitoringTableHideProcessing();
+                            if (!monitoringTableHasLoadedData(window.__cabinetMonKeywordsTableApi)) {
+                                cabinetMonShowTableLoadError();
+                            }
                             callback({
                                 data: [],
                                 draw: data.draw,
@@ -436,11 +675,12 @@
                     order: [
                         [columns.findIndex((elem) => elem.data === 'query'), 'asc'],
                     ],
-                    columnDefs: [
-                        {orderable: false, targets: '_all'},
-                    ],
                     initComplete: function () {
                         let api = this.api();
+
+                        if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.ensureFixedColumns) {
+                            window.cabinetMonitoringShowChrome.ensureFixedColumns(api);
+                        }
 
                         if (window.cabinetMonitoringSearch) {
                             window.cabinetMonitoringSearch.wireGlobalDataTableSearch(api);
@@ -500,7 +740,7 @@
                                 });
 
                                 $('.modal.general').modal('show').BootstrapModalFormTemplates({
-                                    title: "Обновить регионы",
+                                    title: @json(__('Monitoring position pick regions')),
                                     fields: [
                                         {
                                             type: 'checkbox',
@@ -510,61 +750,194 @@
                                         },
                                     ],
                                     onAgree: function (m) {
+                                        if (m.data('monParseBusy')) {
+                                            return;
+                                        }
+
                                         const formData = new FormData(m.find('form').get(0));
                                         let regions = formData.getAll('regions');
 
-                                        axios.get(`/monitoring/${PROJECT_ID}/count`).then(function (response) {
-                                            let limits = (response.data.queries * regions.length);
+                                        if (!regions.length) {
+                                            toastr.error(@json(__('Monitoring parse select region')));
+                                            return;
+                                        }
 
-                                            if (!limits || !window.confirm(`Будет списанно ${limits} лимитов`)) {
-                                                m.modal('hide');
-                                                return false;
+                                        const limits = (MON_KEYWORD_COUNT || 0) * regions.length;
+
+                                        if (!limits || !window.confirm(@json(__('Monitoring parse limits confirm')) + ' ' + limits)) {
+                                            return;
+                                        }
+
+                                        m.data('monParseBusy', true);
+                                        monModalSetBusy(m, true, @json(__('Monitoring parse queue enqueueing')));
+
+                                        axios.post('/monitoring/parse/positions/project', {
+                                            projectId: PROJECT_ID,
+                                            regions: regions,
+                                        }).then(function (response) {
+                                            m.modal('hide');
+                                            if (response.data.status) {
+                                                toastr.success(response.data.msg + ' -' + response.data.count);
+                                            } else {
+                                                toastr.error(response.data.error || @json(__('Monitoring parse queue error')));
                                             }
-
-                                            axios.post('/monitoring/parse/positions/project', {
-                                                projectId: PROJECT_ID,
-                                                regions: regions,
-                                            }).then(function (response) {
-                                                m.modal('hide');
-                                                if (response.data.status)
-                                                    toastr.success(response.data.msg + " -" + response.data.count);
-                                                else
-                                                    toastr.error(response.data.error);
-                                            });
+                                        }).catch(function () {
+                                            toastr.error(@json(__('Monitoring parse queue error')));
+                                        }).finally(function () {
+                                            m.data('monParseBusy', false);
+                                            monModalSetBusy(m, false);
                                         });
                                     }
                                 });
                             });
 
-                            container.find('.parse-positions-keys').click(function () {
-
-                                let arrKeys = [];
-                                let keys = $('.table tbody tr').find('input[type="checkbox"]:checked');
-                                let region = $('#searchengines').val();
-
-                                if (!region.length) {
-                                    toastr.error('Нужно выбрать регион!');
-                                    return false;
+                            container.find('.parse-occurrence-all').click(function () {
+                                const $btn = $(this);
+                                if ($btn.data('busy')) {
+                                    return;
                                 }
 
-                                $.each(keys, function (i, item) {
-                                    arrKeys.push($(item).val())
+                                const YW_COUNT = 3;
+
+                                axios.get('/monitoring/' + PROJECT_ID + '/count').then(function (response) {
+                                    const yandexRegions = response.data.region_yandex || 0;
+                                    const queries = response.data.queries || 0;
+
+                                    if (!yandexRegions) {
+                                        toastr.error(@json(__('Monitoring occurrence yandex only')));
+                                        return;
+                                    }
+
+                                    const limits = queries * yandexRegions * YW_COUNT;
+                                    const confirmMsg = @json(__('Monitoring parse limits confirm')) + ' ' + limits
+                                        + '\n' + @json(__('Monitoring occurrence limits hint'))
+                                        + '\n' + @json(__('Monitoring occurrence queue async hint'));
+
+                                    if (!limits || !window.confirm(confirmMsg)) {
+                                        return;
+                                    }
+
+                                    monOccurrenceBtnBusy($btn, true);
+
+                                    axios.post('/monitoring/occurrence', {
+                                        id: PROJECT_ID,
+                                    }, { timeout: 45000 }).then(function (postResponse) {
+                                        if (postResponse.data.status) {
+                                            toastr.success(postResponse.data.msg + ' -' + postResponse.data.count);
+                                        } else {
+                                            toastr.error(postResponse.data.error || @json(__('Monitoring parse queue error')));
+                                        }
+                                    }).catch(function (err) {
+                                        toastr.error((err.response && err.response.data && err.response.data.error)
+                                            || @json(__('Monitoring parse queue error')));
+                                    }).finally(function () {
+                                        monOccurrenceBtnBusy($btn, false);
+                                    });
+                                }).catch(function () {
+                                    toastr.error(@json(__('Monitoring parse queue error')));
+                                });
+                            });
+
+                            container.find('.parse-occurrence-keys').click(function () {
+                                const $btn = $(this);
+                                if ($btn.data('busy')) {
+                                    return;
+                                }
+
+                                const YW_COUNT = 3;
+                                const arrKeys = [];
+                                const seen = {};
+                                $('#monitoringTable_wrapper input[type="checkbox"]:checked').each(function () {
+                                    const id = parseInt($(this).val(), 10);
+                                    if (id > 0 && !seen[id]) {
+                                        seen[id] = true;
+                                        arrKeys.push(String(id));
+                                    }
                                 });
 
-                                if (!window.confirm(`Будет списанно ${arrKeys.length} лимитов`)) {
+                                if (!arrKeys.length) {
+                                    toastr.error(@json(__('Monitoring keyword delete select one')));
                                     return false;
                                 }
 
-                                axios.post('/monitoring/parse/positions/project/keys', {
-                                    projectId: PROJECT_ID,
-                                    keys: arrKeys,
-                                    region: region,
-                                }).then(function (response) {
-                                    if (response.data.status) {
-                                        toastr.success(response.data.msg + " -" + response.data.count);
-                                        keys.prop('checked', false);
-                                    } else
-                                        toastr.error(response.data.error);
+                                monPickYandexRegion(function (region) {
+                                    const limits = arrKeys.length * YW_COUNT;
+                                    const confirmMsg = @json(__('Monitoring parse limits confirm')) + ' ' + limits
+                                        + '\n' + @json(__('Monitoring occurrence limits hint'))
+                                        + '\n' + @json(__('Monitoring occurrence queue async hint'));
+
+                                    if (!limits || !window.confirm(confirmMsg)) {
+                                        return;
+                                    }
+
+                                    monOccurrenceBtnBusy($btn, true);
+
+                                    axios.post('/monitoring/occurrence/keys', {
+                                        projectId: PROJECT_ID,
+                                        keys: arrKeys,
+                                        region: region,
+                                    }, { timeout: 45000 }).then(function (response) {
+                                        if (response.data.status) {
+                                            toastr.success(response.data.msg + ' -' + response.data.count);
+                                            $('#monitoringTable_wrapper input[type="checkbox"]:checked').prop('checked', false);
+                                        } else {
+                                            toastr.error(response.data.error || @json(__('Monitoring parse queue error')));
+                                        }
+                                    }).catch(function (err) {
+                                        toastr.error((err.response && err.response.data && err.response.data.error)
+                                            || @json(__('Monitoring parse queue error')));
+                                    }).finally(function () {
+                                        monOccurrenceBtnBusy($btn, false);
+                                    });
+                                });
+                            });
+
+                            container.find('.parse-positions-keys').click(function () {
+                                const $btn = $(this);
+                                if ($btn.data('busy')) {
+                                    return;
+                                }
+
+                                const arrKeys = [];
+                                const seen = {};
+                                $('#monitoringTable_wrapper input[type="checkbox"]:checked').each(function () {
+                                    const id = parseInt($(this).val(), 10);
+                                    if (id > 0 && !seen[id]) {
+                                        seen[id] = true;
+                                        arrKeys.push(String(id));
+                                    }
+                                });
+
+                                if (!arrKeys.length) {
+                                    toastr.error(@json(__('Monitoring keyword delete select one')));
+                                    return false;
+                                }
+
+                                monPickRegion(function (region) {
+                                    if (!window.confirm(@json(__('Monitoring parse limits confirm')) + ' ' + arrKeys.length)) {
+                                        return false;
+                                    }
+
+                                    $btn.data('busy', true).prop('disabled', true).addClass('disabled');
+                                    const origHtml = $btn.html();
+                                    $btn.html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + @json(__('Monitoring parse queue enqueueing')));
+
+                                    axios.post('/monitoring/parse/positions/project/keys', {
+                                        projectId: PROJECT_ID,
+                                        keys: arrKeys,
+                                        region: region,
+                                    }).then(function (response) {
+                                        if (response.data.status) {
+                                            toastr.success(response.data.msg + ' -' + response.data.count);
+                                            $('#monitoringTable_wrapper input[type="checkbox"]:checked').prop('checked', false);
+                                        } else {
+                                            toastr.error(response.data.error || @json(__('Monitoring parse queue error')));
+                                        }
+                                    }).catch(function () {
+                                        toastr.error(@json(__('Monitoring parse queue error')));
+                                    }).finally(function () {
+                                        $btn.data('busy', false).prop('disabled', false).removeClass('disabled').html(origHtml);
+                                    });
                                 });
                             });
 
@@ -581,22 +954,79 @@
                                     .attr('aria-pressed', visible ? 'true' : 'false');
                             }
 
+                            function monApplyMultiRegionColumnRules(isMultiRegion) {
+                                if (!isMultiRegion) {
+                                    return;
+                                }
+
+                                ['dynamics', 'base', 'phrasal', 'exact'].forEach(function (name) {
+                                    const col = api.column(name + ':name');
+                                    if (col.length) {
+                                        col.visible(false, false);
+                                        setColumnToggleState(name, false);
+                                    }
+                                });
+
+                                const hints = {
+                                    dynamics: @json(__('Monitoring column dynamics multi region')),
+                                    base: @json(__('Monitoring column occurrence multi region')),
+                                    phrasal: @json(__('Monitoring column occurrence multi region')),
+                                    exact: @json(__('Monitoring column occurrence multi region')),
+                                };
+
+                                Object.keys(hints).forEach(function (name) {
+                                    container.find('.column-visible[data-column="' + name + '"]')
+                                        .prop('disabled', true)
+                                        .addClass('disabled')
+                                        .attr('title', hints[name]);
+                                });
+
+                                if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.queueColumnVisibilityRelayout) {
+                                    window.cabinetMonitoringShowChrome.queueColumnVisibilityRelayout(api);
+                                } else {
+                                    api.draw(false);
+                                }
+                            }
+
+                            monApplyMultiRegionColumnRules(monIsMultiRegionView());
+
                             container.find('.column-visible').click(function () {
+                                if ($(this).prop('disabled')) {
+                                    return;
+                                }
 
                                 let name = $(this).data('column');
+                                if (monIsMultiRegionView() && ['dynamics', 'base', 'phrasal', 'exact'].indexOf(name) >= 0) {
+                                    toastr.info(@json(__('Monitoring column occurrence multi region')));
+                                    return;
+                                }
                                 let column = api.column(name + ':name');
+                                if (!column.length) {
+                                    toastr.error(@json(__('Monitoring column unavailable')));
+                                    return;
+                                }
                                 let visible = column.visible();
+                                let nextVisible = !visible;
 
-                                column.visible(!visible);
-                                setColumnToggleState(name, !visible);
+                                column.visible(nextVisible, false);
+                                setColumnToggleState(name, nextVisible);
 
                                 axios.post('/monitoring/project/set/column/settings', {
                                     monitoring_project_id: PROJECT_ID,
                                     name: name,
-                                    state: !visible,
+                                    state: nextVisible,
                                 });
                                 if (window.cabinetMonProjectConfig && window.cabinetMonProjectConfig.columnSettings) {
-                                    window.cabinetMonProjectConfig.columnSettings[name] = !visible;
+                                    window.cabinetMonProjectConfig.columnSettings[name] = nextVisible;
+                                }
+
+                                if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.queueColumnVisibilityRelayout) {
+                                    window.cabinetMonitoringShowChrome.queueColumnVisibilityRelayout(api);
+                                } else if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutAfterColumnToggle) {
+                                    api.draw(false);
+                                    window.cabinetMonitoringShowChrome.relayoutAfterColumnToggle(api);
+                                } else {
+                                    api.draw(false);
                                 }
                             });
 
@@ -737,12 +1167,14 @@
                     },
                     drawCallback: function () {
                         let api = this.api();
+                        monitoringTableHideProcessing();
                         if (!monTableBoot.revealed && monTableBoot.controlsReady) {
                             tryRevealMonitoringTable(api);
                         }
                         let data = api.data();
+                        let $bodyRows = $('#monitoringTable_wrapper .dataTables_scrollBody tbody tr');
 
-                        $('tbody > tr', table).each(function (i, item) {
+                        $bodyRows.each(function (i, item) {
                             let target = 0;
                             if ('target' in data[i]) {
                                 target = $('<div />').html(data[i].target).text();
@@ -765,8 +1197,21 @@
                         $('.pagination').addClass('pagination-sm');
 
                         cabinetMonWirePopovers(table[0]);
+
+                        if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.afterMonTableDraw) {
+                            try {
+                                window.cabinetMonitoringShowChrome.afterMonTableDraw(api);
+                            } catch (drawLayoutErr) {
+                                console.error('monitoring table layout failed', drawLayoutErr);
+                            }
+                        }
                     },
                 });
+                } catch (tableInitErr) {
+                    console.error('monitoring DataTable init failed', tableInitErr);
+                    monitoringTableShowLoadErrorToast();
+                    return;
+                }
 
                 $('#cabinetMonKeywordsModal').on('show.bs.modal', function (event) {
                     let button = $(event.relatedTarget);
@@ -939,9 +1384,9 @@
                         });
                     }
                 });
-            }).catch(function () {
-                cabinetMonShowTableLoadError();
-                toastr.error(@json(__('Monitoring show table load error')));
+            }).catch(function (err) {
+                console.error('monitoring table bootstrap request failed', err);
+                monitoringTableShowLoadErrorToast();
             });
 
             $('#reservation').daterangepicker({
@@ -1914,26 +2359,7 @@
             }
 
             $('#occurrence-update').click(function () {
-                let action = 'all';
-                let YWCount = 3;
-
-                axios.get(`/monitoring/${PROJECT_ID}/count`).then(function (response) {
-                    let limits = (response.data.queries * response.data.region_yandex) * YWCount;
-
-                    if (!limits || !window.confirm(`Будет списанно ${limits} лимитов`)) {
-                        return false;
-                    }
-
-                    axios.post('/monitoring/occurrence', {
-                        action: action,
-                        id: PROJECT_ID,
-                    }).then(function (response) {
-                        if (response.data.status) {
-                            toastr.success(response.data.msg + " -" + response.data.count);
-                        } else
-                            toastr.error(response.data.error);
-                    });
-                });
+                $('.mailbox-controls .parse-occurrence-all').first().trigger('click');
             });
         </script>
     @endslot

@@ -419,6 +419,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Monitoring keywords occurrence
     Route::post('/monitoring/occurrence', 'MonitoringOccurrenceController@update');
+    Route::post('/monitoring/occurrence/keys', 'MonitoringOccurrenceController@updateKeys');
 
     // Monitoring export
     Route::get('/monitoring/{id}/export', 'MonitoringExportsController@download');

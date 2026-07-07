@@ -167,6 +167,13 @@
             </div>
         @endif
 
+        @include('admin.supervisor.partials.daily-stats', [
+            'dailyReport' => $dailyReport ?? null,
+            'dailyRecent' => $dailyRecent ?? [],
+            'statsDay' => $statsDay ?? null,
+            'logProgram' => $logProgram ?? '',
+        ])
+
         <div class="card mb-3">
             <div class="card-header py-2 cabinet-supervisor-processes-header">
                 <strong>{{ __('Supervisor processes') }}</strong>

@@ -17,6 +17,8 @@ use App\Classes\Cron\RelevancePublicSharesDelete;
 use App\Classes\Cron\RelevanceCleaningResults;
 use App\Classes\Cron\SiteMonitoringPublicSharesDelete;
 use App\Classes\Cron\TextAnalyzerPublicSharesDelete;
+use App\Classes\Cron\QueueDailyStatsRollup;
+use App\Classes\Cron\QueueStatsSampler;
 use App\Classes\Cron\UserStatisticsStore;
 use App\Classes\Monitoring\ProjectData;
 use App\Console\Commands\SearchIndicesDelete;
@@ -67,6 +69,9 @@ class Kernel extends ConsoleKernel
         $this->autoUpdateMonitoringPositions($schedule);
 
         $schedule->call(new UserStatisticsStore())->dailyAt('00:10');
+
+        $schedule->call(new QueueStatsSampler())->everyFiveMinutes();
+        $schedule->call(new QueueDailyStatsRollup())->dailyAt('00:05');
 
         // Delete relevance histories (see relevance_analysis_config.cleaning_interval)
         $schedule->call(new RelevanceCleaningResults())->daily();

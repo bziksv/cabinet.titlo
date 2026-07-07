@@ -1,12 +1,26 @@
 @php
     $columnSettings = $columnSettings ?? \App\MonitoringProjectColumnsSetting::DEFAULT_VISIBILITY;
-    $colChipState = function (string $name, string $default) use ($columnSettings): array {
+    $isMultiRegionView = $isMultiRegionView ?? false;
+    $multiRegionDisabledColumns = ['dynamics', 'base', 'phrasal', 'exact'];
+    $colChipState = function (string $name, string $default) use ($columnSettings, $isMultiRegionView, $multiRegionDisabledColumns): array {
+        if ($isMultiRegionView && in_array($name, $multiRegionDisabledColumns, true)) {
+            return [
+                'class' => 'is-off disabled',
+                'pressed' => 'false',
+                'disabled' => true,
+                'title' => $name === 'dynamics'
+                    ? __('Monitoring column dynamics multi region')
+                    : __('Monitoring column occurrence multi region'),
+            ];
+        }
         $visible = array_key_exists($name, $columnSettings)
             ? (bool) $columnSettings[$name]
             : ($default === 'on');
         return [
             'class' => $visible ? 'is-on' : 'is-off',
             'pressed' => $visible ? 'true' : 'false',
+            'disabled' => false,
+            'title' => __('Monitoring show column toggle'),
         ];
     };
 @endphp
@@ -38,18 +52,35 @@
                 @endcan
             </div>
 
-            <div class="btn-group positions-controls">
-                @can('update_position_monitoring')
-                    <button type="button" class="btn btn-default btn-sm parse-positions-keys tooltip-on" title="Добавить в очередь выбранные">
-                        <i class="fas fa-layer-group"></i>
-                    </button>
-                @endcan
+            <div class="cabinet-mon-keywords-toolbar__action-group">
+                <span class="cabinet-mon-keywords-toolbar__action-group-label">{{ __('Monitoring toolbar label positions') }}</span>
+                <div class="btn-group positions-controls" role="group" aria-label="{{ __('Monitoring toolbar label positions') }}">
+                    @can('update_position_monitoring')
+                        <button type="button" class="btn btn-default btn-sm parse-positions-keys tooltip-on" title="{{ __('Monitoring position selected keys') }}">
+                            <i class="fas fa-crosshairs"></i>
+                        </button>
+                    @endcan
 
-                @can('update_position_all_monitoring')
-                    <button type="button" class="btn btn-default btn-sm parse-positions tooltip-on" title="Добавить в очередь все">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                @endcan
+                    @can('update_position_all_monitoring')
+                        <button type="button" class="btn btn-default btn-sm parse-positions tooltip-on" title="{{ __('Monitoring position all keys') }}">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    @endcan
+                </div>
+            </div>
+
+            <div class="cabinet-mon-keywords-toolbar__action-group">
+                <span class="cabinet-mon-keywords-toolbar__action-group-label">{{ __('Monitoring toolbar label occurrence') }}</span>
+                <div class="btn-group occurrence-controls" role="group" aria-label="{{ __('Monitoring toolbar label occurrence') }}">
+                    @can('update_occurrence_monitoring')
+                        <button type="button" class="btn btn-default btn-sm parse-occurrence-all tooltip-on" title="{{ __('Monitoring occurrence all keys') }}">
+                            <i class="fas fa-chart-line"></i>
+                        </button>
+                        <button type="button" class="btn btn-default btn-sm parse-occurrence-keys tooltip-on" title="{{ __('Monitoring occurrence selected keys') }}">
+                            <i class="fas fa-chart-bar"></i>
+                        </button>
+                    @endcan
+                </div>
             </div>
         </div>
 
@@ -75,8 +106,9 @@
                             class="cabinet-mon-col-chip column-visible {{ $chip['class'] }}"
                             data-default="{{ $col['default'] }}"
                             data-column="{{ $col['name'] }}"
-                            title="{{ __('Monitoring show column toggle') }}"
-                            aria-pressed="{{ $chip['pressed'] }}">
+                            title="{{ $chip['title'] }}"
+                            aria-pressed="{{ $chip['pressed'] }}"
+                            @if($chip['disabled']) disabled @endif>
                         <span class="cabinet-mon-col-chip__mark" aria-hidden="true"></span>
                         <span class="cabinet-mon-col-chip__text">{{ $col['text'] }}</span>
                     </button>

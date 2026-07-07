@@ -24,6 +24,27 @@
     overflow-x: clip;
 }
 
+.cabinet-mon-project-page[data-view='keywords'] {
+    min-height: calc(100vh - 3.5rem);
+    display: flex;
+    flex-direction: column;
+}
+
+.cabinet-mon-project-page[data-view='keywords'] .cabinet-mon-project-chrome {
+    flex-shrink: 0;
+}
+
+.cabinet-mon-project-page[data-view='keywords'] .cabinet-mon-project-page__body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.cabinet-mon-project-page[data-view='keywords'] .cabinet-mon-project-page__body > :not(#cabinet-mon-show-table-host) {
+    flex-shrink: 0;
+}
+
 .cabinet-mon-project-page__body {
     padding: 0 1rem 1.25rem;
 }
@@ -586,6 +607,26 @@ button.cabinet-btn-busy:disabled {
     flex-shrink: 0;
 }
 
+.cabinet-mon-keywords-toolbar__action-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding-left: 0.15rem;
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+    margin-left: 0.15rem;
+}
+
+.cabinet-mon-keywords-toolbar__action-group-label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+    white-space: nowrap;
+    user-select: none;
+}
+
 .cabinet-mon-column-toggles--inline {
     flex: 1 1 12rem;
     display: flex;
@@ -702,6 +743,13 @@ button.cabinet-btn-busy:disabled {
     color: #495057;
 }
 
+.cabinet-mon-col-chip.disabled,
+.cabinet-mon-col-chip:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .cabinet-mon-col-chip.is-on:hover,
 .cabinet-mon-col-chip.is-on:focus {
     background: #e9ecef;
@@ -786,11 +834,357 @@ button.cabinet-btn-busy:disabled {
     flex-shrink: 0;
 }
 
-.cabinet-mon-project-page #monitoringTable .cabinet-mon-col-query {
-    min-width: 22rem;
-    max-width: 28rem;
-    text-align: left;
+.cabinet-mon-project-page .dataTables_scrollHead th.cabinet-mon-col-query,
+.cabinet-mon-project-page .DTFC_LeftHeadWrapper th.cabinet-mon-col-query {
+    text-align: center !important;
+    white-space: nowrap;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHead th.cabinet-mon-col-query > span,
+.cabinet-mon-project-page .DTFC_LeftHeadWrapper th.cabinet-mon-col-query > span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    width: 100%;
+}
+
+.cabinet-mon-project-page #monitoringTable td.cabinet-mon-col-query,
+.cabinet-mon-project-page .dataTables_scrollBody td.cabinet-mon-col-query,
+.cabinet-mon-project-page .DTFC_LeftBodyLiner td.cabinet-mon-col-query {
+    text-align: left !important;
     white-space: normal;
+}
+
+.cabinet-mon-project-page .cabinet-mon-query-cell {
+    display: block;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-url {
+    min-width: 140px;
+    width: 140px;
+    max-width: 140px;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-group {
+    min-width: 140px;
+    width: 140px;
+    max-width: 140px;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-target-url {
+    min-width: 160px;
+    width: 160px;
+    max-width: 160px;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-target {
+    min-width: 96px;
+    width: 96px;
+    max-width: 96px;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-dynamics {
+    min-width: 88px;
+    width: 88px;
+    max-width: 88px;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-base {
+    min-width: 36px;
+    width: 36px;
+    max-width: 36px;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-phrasal {
+    min-width: 56px;
+    width: 56px;
+    max-width: 56px;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-exact {
+    min-width: 60px;
+    width: 60px;
+    max-width: 60px;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-date,
+.cabinet-mon-project-page th.cabinet-mon-col-date,
+.cabinet-mon-project-page td.cabinet-mon-col-date {
+    min-width: 88px !important;
+    width: 88px !important;
+    max-width: 88px !important;
+    white-space: nowrap;
+}
+
+.cabinet-mon-project-page .cabinet-mon-col-engine,
+.cabinet-mon-project-page th.cabinet-mon-col-engine,
+.cabinet-mon-project-page td.cabinet-mon-col-engine {
+    min-width: 96px !important;
+    width: 96px !important;
+    max-width: 96px !important;
+    white-space: nowrap;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-col-engine,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.cabinet-mon-col-engine {
+    text-align: center !important;
+}
+
+.cabinet-mon-project-page .cabinet-mon-region-head {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    max-width: 100%;
+    line-height: 1.2;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.cabinet-mon-project-page .cabinet-mon-region-head__icon {
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.cabinet-mon-project-page .cabinet-mon-region-head__city {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cabinet-mon-project-page .cabinet-mon-cell-clip {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+/* FixedColumns: чекбокс, кнопки и «Запрос» — отдельный блок слева, без наложения при scrollX */
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scroll {
+    position: relative;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftWrapper {
+    z-index: 12;
+    overflow: visible !important;
+    box-shadow: 6px 0 10px -6px rgba(15, 23, 42, 0.18);
+}
+
+/* FixedColumns держит LeftWrapper высотой 1px — overflow:hidden на нём обрезает клон */
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyWrapper {
+    overflow: hidden !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.cabinet-mon-col-query {
+    box-shadow: inset -1px 0 0 #dee2e6, inset 0 -1px 0 var(--mon-proj-border);
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td.cabinet-mon-col-query {
+    box-shadow: inset -1px 0 0 #dee2e6;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scroll-edge-col {
+    border-left: 1px solid #dee2e6 !important;
+    box-shadow: inset 0 -1px 0 var(--mon-proj-border);
+}
+
+.cabinet-mon-project-page .dataTables_scrollBody tbody td.cabinet-mon-scroll-edge-col {
+    border-left: 1px solid #dee2e6 !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper {
+    z-index: 13;
+    background: #fff;
+}
+
+/* В основной шапке/теле левые колонки скрыты — их показывает только DTFC-блок */
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden {
+    visibility: hidden !important;
+    color: transparent !important;
+    border-left-color: transparent !important;
+    border-right-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: hidden;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden::before,
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden::after {
+    display: none !important;
+}
+
+.cabinet-mon-project-page .dataTables_scrollBody tbody td.cabinet-mon-scrollbody-left-hidden {
+    visibility: hidden !important;
+    color: transparent !important;
+    border-left-color: transparent !important;
+    border-right-color: transparent !important;
+    background: transparent !important;
+    overflow: hidden;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_ScrollWrapper {
+    position: relative;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyWrapper {
+    background: #fff;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper {
+    box-sizing: border-box;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper table,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner table {
+    table-layout: fixed;
+    margin-bottom: 0 !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td {
+    box-sizing: border-box;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th {
+    background: #fff;
+    box-shadow: inset 0 -1px 0 var(--mon-proj-border);
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.sorting,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.sorting_asc,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.sorting_desc {
+    padding-right: 1.75rem;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th:first-child,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th:nth-child(2),
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td:first-child,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td:nth-child(2) {
+    text-align: center !important;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr.is-row-hover td,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover td {
+    background-color: var(--bs-table-hover-bg, #f8fafc) !important;
+}
+
+.cabinet-mon-project-page .dataTables_scrollBody tbody td,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td {
+    box-sizing: border-box;
+    overflow: hidden !important;
+    vertical-align: middle;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+
+.cabinet-mon-project-page .dataTables_scrollBody tbody td .badge,
+.cabinet-mon-project-page .dataTables_scrollBody tbody td .cabinet-mon-url-badge,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td .badge,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td .cabinet-mon-url-badge {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.cabinet-mon-project-page .dataTables_scrollBody tbody td .cabinet-mon-url-badge,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td .cabinet-mon-url-badge {
+    display: inline-flex;
+}
+
+/* scrollY: шапка в scrollHead, тело в scrollBody */
+.cabinet-mon-project-page .dataTables_scrollHead {
+    z-index: 8;
+    background: #fff;
+    overflow: hidden;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHeadInner {
+    box-sizing: content-box;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHead table.dataTable,
+.cabinet-mon-project-page .dataTables_scrollBody table.dataTable {
+    table-layout: fixed;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHead thead th {
+    background: #fff;
+    box-shadow: inset 0 -1px 0 var(--mon-proj-border);
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHead thead th.sorting,
+.cabinet-mon-project-page .dataTables_scrollHead thead th.sorting_asc,
+.cabinet-mon-project-page .dataTables_scrollHead thead th.sorting_desc,
+.cabinet-mon-project-page .dataTables_scrollHead thead th.sorting_asc_disabled,
+.cabinet-mon-project-page .dataTables_scrollHead thead th.sorting_desc_disabled {
+    padding-right: 1.75rem;
+}
+
+.cabinet-mon-project-page .dataTables_scrollBody {
+    overflow: auto !important;
+    max-width: 100%;
+}
+
+.cabinet-mon-project-page .dataTables_scrollFoot {
+    display: none;
+}
+
+.cabinet-mon-project-page[data-view='keywords'] .cabinet-mon-project-table-panel:not(.cabinet-mon-view-panel--collapsed) {
+    flex: 1 1 auto;
+    min-height: 18rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.cabinet-mon-project-page[data-view='keywords'] .cabinet-mon-project-table-panel:not(.cabinet-mon-view-panel--collapsed) .dataTables_wrapper {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.cabinet-mon-project-page .dataTables_scroll {
+    position: relative;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.cabinet-mon-project-page .dataTables_scrollBody table.dataTable {
+    margin-bottom: 0 !important;
 }
 
 .cabinet-mon-project-page #monitoringTable .query-string {
@@ -999,14 +1393,14 @@ button.cabinet-btn-busy:disabled {
     border: 1px solid var(--mon-proj-border);
     border-radius: 0.5rem;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-    overflow: hidden;
+    overflow: visible;
 }
 
 .cabinet-mon-project-table-panel__loader {
     position: absolute;
     inset: 0;
     z-index: 3;
-    display: flex;
+    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -1023,7 +1417,7 @@ button.cabinet-btn-busy:disabled {
 
 .cabinet-mon-project-page #monitoringTable_wrapper {
     max-width: 100%;
-    overflow-x: auto;
+    overflow: hidden;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scroll {
@@ -1032,7 +1426,6 @@ button.cabinet-btn-busy:disabled {
 }
 
 .cabinet-mon-project-page #monitoringTable {
-    width: 100% !important;
     margin: 0;
 }
 
@@ -1091,18 +1484,6 @@ button.cabinet-btn-busy:disabled {
     overflow-y: auto;
 }
 
-.cabinet-mon-project-page .dataTables_scrollHead {
-    position: relative;
-    z-index: 1;
-    background: #fff;
-    overflow: hidden;
-}
-
-.cabinet-mon-project-page .dataTables_scrollBody {
-    overflow-x: auto !important;
-    max-width: 100%;
-}
-
 .cabinet-mon-project-page #monitoringTable_wrapper .card-header {
     background: #f8fafc;
     border-bottom: 1px solid var(--mon-proj-border);
@@ -1114,9 +1495,9 @@ button.cabinet-btn-busy:disabled {
     border-top: 1px solid var(--mon-proj-border);
 }
 
+/* DataTables processing: глобальный datatable.css ставит блок в середину таблицы — не используем */
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_processing {
-    background: rgba(255, 255, 255, 0.9);
-    border: none;
+    display: none !important;
 }
 
 /* Вкладки «Обзор» / «Ключевые слова» — без моргания до chrome.js */
@@ -1147,11 +1528,6 @@ button.cabinet-btn-busy:disabled {
 .cabinet-mon-project-table-panel.is-table-booting .cabinet-mon-project-table-panel__loader {
     display: flex;
     z-index: 10;
-}
-
-/* Ключевые слова: таблица на весь экран */
-.cabinet-mon-project-page[data-view='keywords'] .cabinet-mon-project-table-panel:not(.cabinet-mon-view-panel--collapsed) {
-    min-height: min(70vh, 720px);
 }
 
 /* DataTables scrollX: не display:none — иначе ломается ширина колонок при возврате */

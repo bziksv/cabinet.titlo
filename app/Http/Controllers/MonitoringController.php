@@ -183,22 +183,37 @@ class MonitoringController extends Controller
 
         $project = $user->monitoringProjects()->find($request->input('projectId'));
 
-        if (!$project)
-            return collect(['status' => false]);
+        if (!$project) {
+            return response()->json(['status' => false]);
+        }
 
-        $engines = $project->searchengines()->whereIn('id', $request->input('regions'))->get();
+        $regionIds = array_values(array_map('intval', (array) $request->input('regions', [])));
+        $engines = $project->searchengines()->whereIn('id', $regionIds)->get();
+
+        if ($engines->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'error' => __('Monitoring parse select region'),
+            ]);
+        }
 
         if ($userAdmin = (new MonitoringUserService())->getMonitoringAdminUser($project)) {
             $user = $userAdmin;
         }
 
+        $jobCount = (int) $project->keywords()->count() * $engines->count();
         $queue = new PositionsDispatch($user['id'], 'position_high');
+        $queue->reserveLimits($jobCount);
 
-        foreach ($engines as $engine) {
-            foreach ($project->keywords as $query)
-                $queue->addQueryWithRegion($query, $engine);
+        if (!$queue->wasReserved()) {
+            return $queue->notify();
         }
-        $queue->dispatch();
+
+        \App\Jobs\EnqueueMonitoringPositionsJob::dispatch(
+            (int) $project->id,
+            $engines->pluck('id')->all(),
+            'position_high'
+        );
 
         return $queue->notify();
     }
@@ -209,19 +224,39 @@ class MonitoringController extends Controller
         $user = $this->user;
 
         $project = $user->monitoringProjects()->find($request->input('projectId'));
-        $keywords = $project->keywords()->whereIn('id', $request->input('keys'))->get();
-        $engine = $project->searchengines()->find($request->input('region'));
+        if (!$project) {
+            return response()->json(['status' => false]);
+        }
+
+        $keywordIds = array_values(array_map('intval', (array) $request->input('keys', [])));
+        $regionId = (int) $request->input('region');
+        $engine = $project->searchengines()->find($regionId);
+
+        if ($engine === null || $keywordIds === []) {
+            return response()->json([
+                'status' => false,
+                'error' => __('Monitoring parse select region'),
+            ]);
+        }
 
         if ($userAdmin = (new MonitoringUserService())->getMonitoringAdminUser($project)) {
             $user = $userAdmin;
         }
 
+        $jobCount = count($keywordIds);
         $queue = new PositionsDispatch($user['id'], 'position_high');
+        $queue->reserveLimits($jobCount);
 
-        foreach ($keywords as $keyword)
-            $queue->addQueryWithRegion($keyword, $engine);
+        if (!$queue->wasReserved()) {
+            return $queue->notify();
+        }
 
-        $queue->dispatch();
+        \App\Jobs\EnqueueMonitoringPositionsKeysJob::dispatch(
+            (int) $project->id,
+            $regionId,
+            $keywordIds,
+            'position_high'
+        );
 
         return $queue->notify();
     }

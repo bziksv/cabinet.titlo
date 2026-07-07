@@ -27,6 +27,9 @@ class MonitoringKeywordsController extends Controller
 {
     const GROUP_NAME = 'group_name';
 
+    /** Короткий формат даты в заголовках колонок таблицы позиций (влезает в ~88px). */
+    private const MONITORING_TABLE_DATE_FORMAT = 'd.m.y';
+
     protected $user;
     protected $project;
     protected $projectID;
@@ -146,13 +149,16 @@ class MonitoringKeywordsController extends Controller
 
         $this->loadPositions($dates);
 
-        $this->setOccurrence();
+        if (!$this->isMainView()) {
+            $this->setOccurrence();
+        }
 
         if ($this->regions && $this->regions->isNotEmpty()) {
-            if($this->isMainView()){
+            if ($this->isMainView()) {
+                $this->setUrls();
                 $this->mainView();
-                $this->columns->forget(['url', 'dynamics']);
-            }else{
+                $this->columns->forget(['dynamics', 'base', 'phrasal', 'exact']);
+            } else {
                 $this->setUrls();
                 $this->getLatestPositions()->updateDynamics();
             }
@@ -193,9 +199,14 @@ class MonitoringKeywordsController extends Controller
                 }
 
                 $city = stristr($reg->location->name, ',', true);
-                $icon = '<i class="fab d-block fa-' . $reg->engine . ' fa-sm"></i>';
+                if ($city === false) {
+                    $city = $reg->location->name;
+                }
 
-                $mainColumns->put($col, implode(' ', [$icon, $city]));
+                $mainColumns->put($col, view('monitoring.partials.show.header.region', [
+                    'engine' => $reg->engine,
+                    'city' => $city,
+                ])->render());
             }
 
             $item->positions_view = $lastPosition;
@@ -323,7 +334,7 @@ class MonitoringKeywordsController extends Controller
                     $row->put('group', view('monitoring.partials.show.group', ['group' => $keyword->group])->render());
                     break;
                 case 'target_url':
-                    $row->put('target_url', $keyword->page);
+                    $row->put('target_url', view('monitoring.partials.show.target_url', ['url' => $keyword->page])->render());
                     break;
                 case 'target':
                     $row->put('target', view('monitoring.partials.show.target', ['key' => $keyword])->render());
@@ -431,9 +442,9 @@ class MonitoringKeywordsController extends Controller
         foreach ($this->queries as &$keyword) {
 
             $grouped = $keyword->positions->groupBy(function ($item) {
-                return $item->created_at->format('d.m.Y');
+                return $item->created_at->format(self::MONITORING_TABLE_DATE_FORMAT);
             })->sortByDesc(function ($i, $k) {
-                return Carbon::parse($k)->timestamp;
+                return Carbon::createFromFormat(self::MONITORING_TABLE_DATE_FORMAT, $k)->timestamp;
             });
 
             $grouped->transform(function ($item) {
@@ -451,7 +462,7 @@ class MonitoringKeywordsController extends Controller
 
         $columnCollection = collect([]);
         foreach ($dateCollection->sortByDesc(function ($i) {
-            return Carbon::parse($i)->timestamp;
+            return Carbon::createFromFormat(self::MONITORING_TABLE_DATE_FORMAT, $i)->timestamp;
         }) as $col_idx => $col_date)
             $columnCollection->put('col_' . $col_idx, $col_date);
 
@@ -497,7 +508,7 @@ class MonitoringKeywordsController extends Controller
 
                 $dateOfColumns = collect([]);
                 foreach ($getDateForColumns as $i => $m)
-                    $dateOfColumns->put('col_' . $i, $m->format('d.m.Y'));
+                    $dateOfColumns->put('col_' . $i, $m->format(self::MONITORING_TABLE_DATE_FORMAT));
 
                 $this->setColumns($dateOfColumns);
 
@@ -834,9 +845,11 @@ class MonitoringKeywordsController extends Controller
     {
         apply_team_permissions($id);
 
+        $project = MonitoringProject::query()->withCount('searchengines')->findOrFail($id);
         $columnSettings = MonitoringProjectColumnsSetting::visibilityMapForProject((int) $id);
+        $isMultiRegionView = !request('region') && $project->searchengines_count > 1;
 
-        return view('monitoring.keywords.controls', compact('columnSettings'));
+        return view('monitoring.keywords.controls', compact('columnSettings', 'isMultiRegionView'));
     }
 
     /**

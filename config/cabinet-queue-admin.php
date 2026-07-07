@@ -6,7 +6,22 @@
  * @see App\Services\Queue\QueueInventoryService
  */
 return [
-    'version' => '1.0.3s',
+    'version' => '1.0.4s',
+
+    /** Суточная статистика очередей (сэмплы + JobProcessed/JobFailed) */
+    'stats_enabled' => filter_var(env('CABINET_QUEUE_STATS_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+
+    /** Интервал сэмпла воркеров/очереди, секунды (cron everyFiveMinutes) */
+    'stats_sample_interval' => (int) env('CABINET_QUEUE_STATS_SAMPLE_INTERVAL', 300),
+
+    /** Хранение сырых сэмплов, дней */
+    'stats_sample_retention_days' => (int) env('CABINET_QUEUE_STATS_SAMPLE_RETENTION', 8),
+
+    /** Хранение почасовых счётчиков jobs, дней */
+    'stats_hourly_retention_days' => (int) env('CABINET_QUEUE_STATS_HOURLY_RETENTION', 14),
+
+    /** Хранение суточных агрегатов, дней */
+    'stats_daily_retention_days' => (int) env('CABINET_QUEUE_STATS_DAILY_RETENTION', 90),
 
     /** Кэш снимка, секунды */
     'snapshot_cache_seconds' => (int) env('CABINET_QUEUE_ADMIN_CACHE', 30),

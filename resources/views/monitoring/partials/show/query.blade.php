@@ -1,3 +1,4 @@
+<span class="cabinet-mon-query-cell">
 <span class="query-string">
     {{ $key->query }}
 </span>
@@ -16,3 +17,4 @@
         <span class="visually-hidden">Целевой URL</span>
     </a>
 @endif
+</span>

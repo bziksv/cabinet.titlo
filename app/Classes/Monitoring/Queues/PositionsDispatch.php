@@ -21,14 +21,32 @@ class PositionsDispatch extends QueueDispatcher
         $queries = $this->getData();
         $this->countOff = count($queries);
 
-        //Проверка лимитов
+        if (!$this->reserveLimits($this->countOff)) {
+            return;
+        }
+
+        foreach ($queries as $ar) {
+            dispatch((new AutoUpdatePositionQueue($ar['query'], $ar['region']))->onQueue($this->queue));
+        }
+    }
+
+    public function reserveLimits(int $count): bool
+    {
+        $this->countOff = max(0, $count);
         $limit = new PositionLimit($this->user['id']);
-        if($this->status = $limit->check($this->countOff)){
+        if ($this->status = $limit->check($this->countOff)) {
             $this->msg = __('Job added to queue');
-            //Отправка очереди
-            foreach ($queries as $ar)
-                dispatch((new AutoUpdatePositionQueue($ar['query'], $ar['region']))->onQueue($this->queue));
-        }else
-            $this->error = __('Limit exhausted');
+
+            return true;
+        }
+
+        $this->error = __('Limit exhausted');
+
+        return false;
+    }
+
+    public function wasReserved(): bool
+    {
+        return (bool) $this->status;
     }
 }

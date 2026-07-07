@@ -6,7 +6,7 @@
                 <option value="">{{ __('All search engine and regions') }}</option>
             @endif
             @foreach($project->searchengines as $search)
-                <option value="{{ $search->id }}" @if($search->id == request('region')) selected @endif>
+                <option value="{{ $search->id }}" data-engine="{{ $search->engine }}" @if($search->id == request('region')) selected @endif>
                     {{ \App\Classes\Monitoring\MonitoringLocationLabel::filterOption($search) }}
                 </option>
             @endforeach

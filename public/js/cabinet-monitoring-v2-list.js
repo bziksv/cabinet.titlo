@@ -2423,7 +2423,7 @@
         }
     }
 
-    function applyChildRowsHtml($detail, html) {
+    function toggleExpand($btn) {
         const $card = $btn.closest('.cabinet-mon-v2-card');
         const $detail = $card.find('.cabinet-mon-v2-card__detail');
         const expanded = $btn.attr('data-expanded') === '1';

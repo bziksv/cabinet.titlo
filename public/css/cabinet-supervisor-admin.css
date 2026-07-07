@@ -88,3 +88,11 @@
     border-radius: 999px;
     transition: width 0.2s ease;
 }
+
+.cabinet-supervisor-stats-recent__today {
+    --bs-table-bg: rgba(var(--bs-primary-rgb), 0.06);
+}
+
+.cabinet-supervisor-daily-stats input[type="date"] {
+    max-width: 11rem;
+}

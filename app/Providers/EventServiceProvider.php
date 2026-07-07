@@ -8,9 +8,13 @@ use App\Listeners\AssignAdminMonitoringRoleForAuthUser;
 use App\Listeners\AssignRoleRegisteredUser;
 use App\Listeners\RefreshMonitoringProjectFavicon;
 use App\Listeners\RemoveAllRolesMonitoringProjectUsers;
-use Illuminate\Auth\Events\Verified;
+use App\Listeners\RecordQueueJobFailed;
+use App\Listeners\RecordQueueJobProcessed;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
@@ -34,6 +38,12 @@ class EventServiceProvider extends ServiceProvider
         ],
         MonitoringProjectBeforeDelete::class => [
             RemoveAllRolesMonitoringProjectUsers::class,
+        ],
+        JobProcessed::class => [
+            RecordQueueJobProcessed::class,
+        ],
+        JobFailed::class => [
+            RecordQueueJobFailed::class,
         ],
     ];
 
