@@ -437,8 +437,8 @@ button.cabinet-btn-busy:disabled {
     flex-wrap: wrap;
     align-items: center;
     gap: 0.35rem;
-    flex: 1 1 16rem;
-    min-width: 12rem;
+    flex: 1 1 20rem;
+    min-width: 0;
 }
 
 .cabinet-mon-project-toolbar__compare .form-select {
@@ -686,6 +686,8 @@ button.cabinet-btn-busy:disabled {
     border-radius: 0.25rem;
     border: 1px solid transparent;
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
@@ -881,15 +883,21 @@ button.cabinet-btn-busy:disabled {
 }
 
 .cabinet-mon-project-page .cabinet-mon-col-target {
-    min-width: 96px;
-    width: 96px;
-    max-width: 96px;
+    min-width: 112px;
+    width: 112px;
+    max-width: 112px;
 }
 
 .cabinet-mon-project-page .cabinet-mon-col-dynamics {
-    min-width: 88px;
-    width: 88px;
-    max-width: 88px;
+    min-width: 104px;
+    width: 104px;
+    max-width: 104px;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-col-target,
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-col-dynamics {
+    font-size: 0.75rem;
+    letter-spacing: -0.01em;
 }
 
 .cabinet-mon-project-page .cabinet-mon-col-base {

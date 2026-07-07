@@ -74,7 +74,18 @@
                     <li class="nav-item d-none d-xl-block cabinet-header-module-limit"
                         id="cabinet-header-module-limit"
                         data-limit-code="{{ $headerModuleLimit['code'] }}">
-                        <span class="nav-link @if($headerModuleLimit['exhausted']) text-danger @else text-warning-emphasis @endif">
+                        @php
+                            $limitTitle = $headerModuleLimit['name'];
+                            if ($headerModuleLimit['unlimited']) {
+                                $limitTitle .= ': ' . __('No restrictions');
+                            } elseif ($headerModuleLimit['exhausted']) {
+                                $limitTitle .= ': ' . __('Your limits are exhausted this month');
+                            } else {
+                                $limitTitle .= ': ' . __('Left') . ' ' . $headerModuleLimit['left'] . ' ' . __('from') . ' ' . $headerModuleLimit['limit'];
+                            }
+                        @endphp
+                        <span class="nav-link @if($headerModuleLimit['exhausted']) text-danger @else text-warning-emphasis @endif"
+                              title="{{ $limitTitle }}">
                             <i class="bi bi-pie-chart me-1" aria-hidden="true"></i>
                             @if($headerModuleLimit['unlimited'])
                                 <span class="text-secondary">{{ $headerModuleLimit['name'] }}:</span>

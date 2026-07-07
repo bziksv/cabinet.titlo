@@ -108,7 +108,7 @@
 
 #header-nav-bar.cabinet-header .cabinet-header-module-limit .nav-link {
     cursor: default;
-    max-width: 15rem;
+    max-width: min(32rem, 48vw);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
