@@ -141,7 +141,7 @@ class TariffLimitRegistry
             [
                 'code' => 'IndexCheck',
                 'module' => __('Index check'),
-                'hint' => __('Monthly index checks (2 units per URL per search engine).'),
+                'hint' => __('Monthly index checks: 1 URL in one search engine = 1 unit.'),
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [

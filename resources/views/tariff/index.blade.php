@@ -10,6 +10,7 @@
         'RelevanceAnalysis',
         'TextAnalyzer',
         'CompetitorAnalysisPhrases',
+        'IndexCheck',
         'Clusters',
         'domainMonitoringProject',
         'monitoring',
@@ -251,6 +252,7 @@
                     </h3>
                     <p class="text-secondary small mb-0 mt-2">
                         {{ __('Site monitoring tariff compare footnote') }}
+                        {{ __('Index check tariff compare footnote') }}
                     </p>
                 </div>
                 <div class="card-body p-0">

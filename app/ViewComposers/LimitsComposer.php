@@ -99,31 +99,31 @@ class LimitsComposer
                     'count' => ClusterLimit::where('user_id', '=', Auth::id())
                             ->where('date', '=', "$now->year-$month")
                             ->first('count')->count ?? 0,
-                    'position' => 4
+                    'position' => 5
                 ];
 
             case 'domainMonitoringProject':
                 return [
                     'count' => (int)DomainMonitoring::where('user_id', '=', $user->id)->count(),
-                    'position' => 5
+                    'position' => 6
                 ];
 
             case 'monitoring':
                 return [
                     'count' => (new PositionLimit($user))->getCounter(),
-                    'position' => 6,
+                    'position' => 7,
                 ];
 
             case 'DomainInformation':
                 return [
                     'count' => (int)DomainInformation::where('user_id', '=', $user->id)->count(),
-                    'position' => 7
+                    'position' => 8
                 ];
 
             case 'MetaTagsProject':
                 return [
                     'count' => MetaTag::where('user_id', '=', Auth::id())->count(),
-                    'position' => 8,
+                    'position' => 9,
                 ];
 
             case 'MetaTagsPages':
@@ -135,7 +135,7 @@ class LimitsComposer
                                 ->where('user_id', $user->id);
                         })
                         ->count(),
-                    'position' => 9,
+                    'position' => 10,
                 ];
 
             case 'PasswordGenerator':
@@ -213,7 +213,7 @@ class LimitsComposer
             case 'IndexCheck':
                 return [
                     'count' => \App\Support\IndexCheckLimits::usedForUser($user),
-                    'position' => 23,
+                    'position' => 4,
                 ];
 
             case 'GeneratorWords':
@@ -248,22 +248,22 @@ class LimitsComposer
                 return 3;
 
             case 'Clusters':
-                return 4;
-
-            case 'domainMonitoringProject':
                 return 5;
 
-            case 'monitoring':
+            case 'domainMonitoringProject':
                 return 6;
 
-            case 'DomainInformation':
+            case 'monitoring':
                 return 7;
 
-            case 'MetaTagsProject':
+            case 'DomainInformation':
                 return 8;
 
-            case 'MetaTagsPages':
+            case 'MetaTagsProject':
                 return 9;
+
+            case 'MetaTagsPages':
+                return 10;
 
             case 'BacklinkProject':
                 return 11;
@@ -274,11 +274,11 @@ class LimitsComposer
             case 'ListComparison':
                 return 14;
 
+            case 'IndexCheck':
+                return 4;
+
             case 'HttpHeaders':
                 return 15;
-
-            case 'IndexCheck':
-                return 24;
 
             case 'TextLength':
                 return 16;

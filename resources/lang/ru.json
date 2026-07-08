@@ -2184,6 +2184,7 @@
     "Site monitoring notify off cabinet hint": "Если галочка снята — о сбоях вы узнаете только здесь, в кабинете, при просмотре таблицы.",
     "Site monitoring cabinet only flash": "Проект добавлен. Внешних оповещений не будет: подключите Telegram в профиле и включите уведомления у проекта — иначе статус только в таблице мониторинга.",
     "Site monitoring tariff compare footnote": "Строки «…: оповещения» (мониторинг сайтов, срок регистрации доменов, отслеживание ссылок): на Free — Telegram после подключения бота в профиле; email — на платных тарифах.",
+    "Index check tariff compare footnote": "Проверка индексации: 1 URL в одной поисковой системе (Яндекс или Google) = 1 лимит; пакет до 500 URL за запуск.",
     "Site monitoring tab": "Проекты",
     "Add monitoring project": "Добавить проект",
     "Monitoring frequency": "Периодичность",
