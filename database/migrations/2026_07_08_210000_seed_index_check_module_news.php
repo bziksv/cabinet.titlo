@@ -15,7 +15,7 @@ class SeedIndexCheckModuleNews extends Migration
             'user_id' => self::AUTHOR_ID,
             'content' => <<<'HTML'
 <p>Доброго дня!</p>
-<p><strong>Запустили новый модуль «Проверка индексации страницы (Яндекс и Google)»</strong> — массовая проверка URL через выдачу <code>site:</code>. Кратко, что внутри (Станислав):</p>
+<p><strong>Запустили новый модуль «Проверка индексации страницы (Яндекс и Google)»</strong> — массовая проверка URL через выдачу <code>site:</code>. Кратко, что внутри:</p>
 <ul>
 <li><strong>Пакетный режим</strong> — до 500 адресов в одном запуске; в таблице результатов — «Да» / «Нет» по каждой поисковой системе.</li>
 <li><strong>Яндекс и Google</strong> — можно включить обе ПС или одну; для Google выбирается домен (<code>google.ru</code>, <code>google.com</code> и др.).</li>
@@ -26,7 +26,7 @@ class SeedIndexCheckModuleNews extends Migration
 </ul>
 <p>Модуль в меню кабинета: <strong><a href="https://cabinet.titlo.ru/index-check">cabinet.titlo.ru/index-check</a></strong>. На сайте — описание и демо без регистрации: <strong><a href="https://titlo.ru/proverka-indeksacii/">titlo.ru/proverka-indeksacii</a></strong>.</p>
 <p>Версия модуля в кабинете: <strong>1.0.3s</strong>. Если интерфейс выглядит по-старому — обновите страницу с полной перезагрузкой (<strong>Ctrl+Shift+R</strong> / <strong>Cmd+Shift+R</strong>).</p>
-<p>Вопросы и предложения — <a href="mailto:info@titlo.ru">info@titlo.ru</a>.</p>
+<p>При обнаружении ошибок просим писать в <a href="/support">службу поддержки</a>. Если есть идеи по улучшению — в <a href="/ideas">раздел идей</a>.</p>
 HTML,
             'files' => null,
             'number_of_likes' => 0,
