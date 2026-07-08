@@ -10,7 +10,7 @@ class AddIndexCheckModule extends Migration
     private const HTTP_HEADERS_PROJECT_ID = 11;
 
     private const TARIFF_LIMITS = [
-        'Free' => 3,
+        'Free' => 5,
         'Optimal' => 600,
         'Ultimate' => 1500,
         'Maximum' => 2400,
