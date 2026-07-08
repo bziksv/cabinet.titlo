@@ -250,10 +250,6 @@
                     <h3 class="card-title mb-0">
                         <i class="bi bi-table me-1"></i>{{ __('Compare features') }}
                     </h3>
-                    <p class="text-secondary small mb-0 mt-2">
-                        {{ __('Site monitoring tariff compare footnote') }}
-                        {{ __('Index check tariff compare footnote') }}
-                    </p>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
