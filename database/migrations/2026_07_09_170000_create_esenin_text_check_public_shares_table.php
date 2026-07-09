@@ -19,12 +19,12 @@ class CreateEseninTextCheckPublicSharesTable extends Migration
             $table->timestamp('revoked_at')->nullable();
             $table->timestamps();
 
-            $table->foreign('user_id')
+            $table->foreign('user_id', 'esenin_pub_shares_user_fk')
                 ->references('id')
                 ->on('users')
                 ->onDelete('cascade');
 
-            $table->foreign('esenin_text_check_session_id')
+            $table->foreign('esenin_text_check_session_id', 'esenin_pub_shares_session_fk')
                 ->references('id')
                 ->on('esenin_text_check_sessions')
                 ->onDelete('cascade');

@@ -31,7 +31,7 @@ class AddEseninTextCheckSessions extends Migration
             $table->timestamps();
 
             $table->index(['session_id', 'id']);
-            $table->foreign('session_id')
+            $table->foreign('session_id', 'esenin_versions_session_fk')
                 ->references('id')
                 ->on('esenin_text_check_sessions')
                 ->onDelete('cascade');
