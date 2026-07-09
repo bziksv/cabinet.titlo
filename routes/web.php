@@ -209,6 +209,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::match(['get', 'post'], 'esenin-text-check', 'EseninTextCheckController@index')->name('pages.esenin-text-check')->middleware('permission:Esenin text check');
     Route::post('esenin-text-check/save', 'EseninTextCheckController@save')->name('pages.esenin-text-check.save')->middleware('permission:Esenin text check');
+    Route::get('esenin-text-check/sessions', 'EseninTextCheckController@listSessions')->name('pages.esenin-text-check.sessions')->middleware('permission:Esenin text check');
     Route::get('esenin-text-check/sessions/{session}', 'EseninTextCheckController@showSession')->name('pages.esenin-text-check.session')->middleware('permission:Esenin text check');
     Route::get('esenin-text-check/sessions/{session}/versions/{version}', 'EseninTextCheckController@loadVersion')->name('pages.esenin-text-check.version')->middleware('permission:Esenin text check');
     Route::post('esenin-text-check/public-share', 'EseninTextCheckController@createPublicShare')->name('pages.esenin-text-check.public.share.create')->middleware('permission:Esenin text check');

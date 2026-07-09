@@ -36,6 +36,37 @@ class EseninTextCheckSessionService
             ->first();
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public static function listSessionsForUser(int $userId, int $limit = 30): array
+    {
+        if (! self::tablesReady()) {
+            return [];
+        }
+
+        return EseninTextCheckSession::query()
+            ->where('user_id', $userId)
+            ->orderByDesc('updated_at')
+            ->limit(max(1, $limit))
+            ->get()
+            ->map(static function (EseninTextCheckSession $session) {
+                $latest = $session->versions()->orderByDesc('id')->first();
+
+                return [
+                    'id' => (int) $session->id,
+                    'name' => $session->name,
+                    'source' => $session->source,
+                    'updated_at' => optional($session->updated_at)->format('c'),
+                    'updated_at_label' => optional($session->updated_at)->format('d.m.Y H:i'),
+                    'versions_count' => $session->versions()->count(),
+                    'latest_version' => $latest ? self::versionMeta($latest) : null,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     public static function defaultName(string $text): string
     {
         $plain = preg_replace('/\s+/u', ' ', trim(strip_tags($text))) ?? '';

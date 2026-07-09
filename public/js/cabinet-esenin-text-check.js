@@ -57,10 +57,16 @@
     var autosaveDebounceMs = config.autosaveDebounceMs || 2500;
     var saveUrl = (config.urls && config.urls.save) || '/esenin-text-check/save';
     var sessionBaseUrl = (config.urls && config.urls.session) || '/esenin-text-check/sessions';
+    var sessionsListUrl = (config.urls && config.urls.sessions) || sessionBaseUrl;
+    var SESSION_STORAGE_KEY = 'cabinet_esenin_last_session_id';
 
     var taskNameEl = root.querySelector('[data-esenin-task-name]');
     var versionTabsEl = root.querySelector('[data-esenin-version-tabs]');
     var sessionLabelEl = root.querySelector('[data-esenin-session-label]');
+    var sessionsMenuEl = root.querySelector('[data-esenin-sessions-menu]');
+    var sessionsWrapEl = root.querySelector('[data-esenin-sessions-wrap]');
+    var hintsEl = root.querySelector('[data-esenin-hints]');
+    var hintsBodyEl = root.querySelector('[data-esenin-hints-body]');
     var autosaveStatusEl = root.querySelector('[data-esenin-autosave-status]');
     var staleBannerEl = root.querySelector('[data-esenin-stale-banner]');
     var recheckBtn = root.querySelector('[data-esenin-recheck]');
@@ -290,11 +296,22 @@
         sessionId = data.session_id || sessionId;
         sessionVersions = Array.isArray(data.versions) ? data.versions : sessionVersions;
 
+        if (sessionId) {
+            persistSessionUrl(sessionId);
+            try {
+                window.localStorage.setItem(SESSION_STORAGE_KEY, String(sessionId));
+            } catch (e) {
+                /* ignore */
+            }
+        }
+
         if (taskNameEl && data.name) {
             taskNameEl.value = data.name;
         }
 
         renderVersionTabs(data.active_version ? data.active_version.id : activeVersionId);
+
+        refreshSessionsMenu();
 
         if (restoreEditors && data.active_version && data.active_version.text !== undefined) {
             suppressAutosave = true;
@@ -431,15 +448,36 @@
         if (taskNameEl) {
             taskNameEl.value = '';
         }
+        try {
+            window.localStorage.removeItem(SESSION_STORAGE_KEY);
+        } catch (e) {
+            /* ignore */
+        }
+        if (window.history && window.URL) {
+            try {
+                var url = new URL(window.location.href);
+                url.searchParams.delete('session');
+                window.history.replaceState({}, '', url);
+            } catch (e2) {
+                /* ignore */
+            }
+        }
     }
 
-    function tryResumeSessionFromUrl() {
-        var match = window.location.search.match(/(?:\?|&)session=(\d+)/);
-        if (!match) {
+    function persistSessionUrl(id) {
+        if (!id || !window.history || !window.URL) {
             return;
         }
+        try {
+            var url = new URL(window.location.href);
+            url.searchParams.set('session', String(id));
+            window.history.replaceState({}, '', url);
+        } catch (e) {
+            /* ignore */
+        }
+    }
 
-        var id = parseInt(match[1], 10);
+    function loadSession(id, restoreEditors) {
         if (!id) {
             return;
         }
@@ -448,7 +486,7 @@
             if (!data || !data.ok) {
                 return;
             }
-            applySessionPayload(data, true);
+            applySessionPayload(data, restoreEditors !== false);
             if (data.source) {
                 setSource(data.source);
             }
@@ -463,6 +501,82 @@
         }).catch(function () {
             /* ignore */
         });
+    }
+
+    function renderSessionsMenu(sessions) {
+        if (!sessionsMenuEl) {
+            return;
+        }
+
+        sessionsMenuEl.innerHTML = '';
+        if (!sessions || !sessions.length) {
+            var emptyItem = document.createElement('li');
+            emptyItem.innerHTML = '<span class="dropdown-item-text small text-secondary">Нет сохранённых заданий</span>';
+            sessionsMenuEl.appendChild(emptyItem);
+            return;
+        }
+
+        sessions.forEach(function (session) {
+            var item = document.createElement('li');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'dropdown-item small' + (sessionId === session.id ? ' active' : '');
+            var label = session.name || ('Задание #' + session.id);
+            if (session.updated_at_label) {
+                label += ' · ' + session.updated_at_label;
+            }
+            btn.textContent = label;
+            btn.addEventListener('click', function () {
+                loadSession(session.id, true);
+            });
+            item.appendChild(btn);
+            sessionsMenuEl.appendChild(item);
+        });
+    }
+
+    function refreshSessionsMenu() {
+        if (!sessionsAvailable || !sessionsMenuEl) {
+            if (sessionsWrapEl) {
+                sessionsWrapEl.classList.add('d-none');
+            }
+            return;
+        }
+
+        if (sessionsWrapEl) {
+            sessionsWrapEl.classList.remove('d-none');
+        }
+
+        getJson(sessionsListUrl).then(function (data) {
+            if (data && data.ok) {
+                renderSessionsMenu(data.sessions || []);
+            }
+        }).catch(function () {
+            renderSessionsMenu([]);
+        });
+    }
+
+    function tryResumeSessionFromUrl() {
+        var match = window.location.search.match(/(?:\?|&)session=(\d+)/);
+        if (match) {
+            var id = parseInt(match[1], 10);
+            if (id) {
+                loadSession(id, true);
+                return;
+            }
+        }
+
+        if (!sessionsAvailable) {
+            return;
+        }
+
+        try {
+            var stored = window.localStorage.getItem(SESSION_STORAGE_KEY);
+            if (stored) {
+                loadSession(parseInt(stored, 10), true);
+            }
+        } catch (e) {
+            /* ignore */
+        }
     }
 
     function formatNumber(value) {
@@ -895,6 +1009,32 @@
         tipPopoverEl.style.left = left + 'px';
     }
 
+    function showHintPanel(mark) {
+        if (!hintsEl || !hintsBodyEl || !mark) {
+            return;
+        }
+
+        var text = mark.getAttribute('data-esenin-tip') || '';
+        if (!text) {
+            return;
+        }
+
+        var fragment = (mark.textContent || '').replace(/!+$/g, '').trim();
+        hintsBodyEl.innerHTML =
+            '<p class="fw-semibold mb-1">' + escapeHtml(fragment || 'Фрагмент') + '</p>' +
+            '<p class="mb-0 text-secondary">' + escapeHtml(text) + '</p>';
+        hintsEl.classList.remove('d-none');
+    }
+
+    function hideHintPanel() {
+        if (hintsEl) {
+            hintsEl.classList.add('d-none');
+        }
+        if (hintsBodyEl) {
+            hintsBodyEl.innerHTML = '';
+        }
+    }
+
     function initMarkTooltips(container) {
         if (!container) {
             return;
@@ -934,6 +1074,11 @@
                     tipShowTimer = null;
                 }
                 tipHideTimer = setTimeout(hideMarkTip, 80);
+            });
+
+            mark.addEventListener('click', function (event) {
+                event.preventDefault();
+                showHintPanel(mark);
             });
         });
     }
@@ -1109,11 +1254,12 @@
     }
 
     var blockLegends = {
-        risk: 'Цветом показаны все найденные проблемы. Красный «!» у фрагмента — наведите курсор, чтобы прочитать, что не так и что сделать.',
+        risk: 'Цветом показаны все найденные проблемы. Красный «!» у фрагмента — наведите или нажмите, чтобы прочитать подсказку.',
         frequency: 'Фиолетовым — частые слова и фразы. Справа таблица «Слова» и «Словосочетания». Наведите на «!» — подробности.',
-        style: 'Жёлтым — стилистические штампы и канцеляризмы. Наведите на «!» — как лучше переписать.',
-        keywords: 'Синим — повторяющиеся SEO-фразы. Наведите на «!» — как разбавить текст.',
-        readability: 'Зелёным — слишком длинные слова. Наведите на «!» — как упростить.'
+        style: 'Жёлтым — стилистические штампы и канцеляризмы. Нажмите на фрагмент — подсказка появится справа.',
+        keywords: 'Синим — повторяющиеся SEO-фразы (3+ слова). Наведите на «!» — как разбавить текст.',
+        formality: 'Фиолетовым — стоп-слова, светлее — общие «пустые» слова. Наведите на «!» — что изменить.',
+        readability: 'Бирюзовым — длинные предложения, зелёным — длинные слова. Нажмите фрагмент — подсказка справа.'
     };
 
     function renderFrequencyLists(result) {
@@ -1366,6 +1512,7 @@
             legendEl.classList.add('d-none');
             legendEl.textContent = '';
         }
+        hideHintPanel();
         if (frequencyListsEl) {
             frequencyListsEl.classList.add('d-none');
         }
@@ -1444,6 +1591,16 @@
                 renderFrequencyLists(lastResult);
             } else {
                 frequencyListsEl.classList.add('d-none');
+            }
+        }
+
+        if (hintsEl) {
+            if (block === 'style' || block === 'readability') {
+                if (!hintsBodyEl || !hintsBodyEl.innerHTML) {
+                    hintsEl.classList.add('d-none');
+                }
+            } else {
+                hideHintPanel();
             }
         }
 
@@ -1643,6 +1800,7 @@
     initPublicShare();
     updateCharCount();
     updateCkeditorFloatVisibility();
+    refreshSessionsMenu();
 
     window.addEventListener('scroll', debounce(updateCkeditorFloatVisibility, 100), { passive: true });
     tryResumeSessionFromUrl();

@@ -95,6 +95,23 @@ class EseninTextCheckController extends Controller
         return response()->json(array_merge(['ok' => true], EseninTextCheckSessionService::sessionPayload($model)));
     }
 
+    public function listSessions(): JsonResponse
+    {
+        $userId = (int) Auth::id();
+        if ($userId <= 0) {
+            return response()->json(['error' => 'auth', 'message' => 'Требуется авторизация'], 401);
+        }
+
+        if (! EseninTextCheckSessionService::tablesReady()) {
+            return response()->json(['error' => 'unavailable', 'message' => 'Хранение заданий временно недоступно'], 503);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'sessions' => EseninTextCheckSessionService::listSessionsForUser($userId),
+        ]);
+    }
+
     public function loadVersion(int $session, int $version): JsonResponse
     {
         $userId = (int) Auth::id();

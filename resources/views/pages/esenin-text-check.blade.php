@@ -22,13 +22,28 @@
 
         <div class="cabinet-esenin-input" data-esenin-input>
             <div class="mb-3">
-                <label class="form-label fw-semibold mb-1" for="cabinet-esenin-task-name">{{ __('Esenin text check task name label') }}</label>
+                <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-1">
+                    <label class="form-label fw-semibold mb-0" for="cabinet-esenin-task-name">{{ __('Esenin text check task name label') }}</label>
+                    <div class="dropdown" data-esenin-sessions-wrap>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                data-esenin-sessions-toggle
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                            {{ __('Esenin text check my tasks') }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end cabinet-esenin-sessions-menu" data-esenin-sessions-menu>
+                            <li><span class="dropdown-item-text small text-secondary">{{ __('Esenin text check sessions loading') }}</span></li>
+                        </ul>
+                    </div>
+                </div>
                 <input type="text"
                        id="cabinet-esenin-task-name"
                        class="form-control"
                        maxlength="120"
                        data-esenin-task-name
                        placeholder="{{ __('Esenin text check task name placeholder') }}">
+                <p class="small text-secondary mb-0 mt-1">{{ __('Esenin text check sessions hint') }}</p>
             </div>
 
             <ul class="nav nav-tabs mb-3 cabinet-esenin-tabs" role="tablist">
@@ -127,6 +142,10 @@
                                 <div class="cabinet-esenin-frequency-panel" data-esenin-frequency-panel="words"></div>
                                 <div class="cabinet-esenin-frequency-panel d-none" data-esenin-frequency-panel="phrases"></div>
                             </div>
+                            <div class="cabinet-esenin-hints mt-3 d-none" data-esenin-hints>
+                                <h6 class="small fw-semibold text-uppercase text-secondary mb-2">{{ __('Esenin text check hints title') }}</h6>
+                                <div class="cabinet-esenin-hints__body small" data-esenin-hints-body></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -151,6 +170,7 @@
         'urls' => [
             'save' => route('pages.esenin-text-check.save'),
             'session' => url('/esenin-text-check/sessions'),
+            'sessions' => url('/esenin-text-check/sessions'),
             'version' => url('/esenin-text-check/sessions'),
             'shareCreate' => route('pages.esenin-text-check.public.share.create'),
             'shareRevoke' => route('pages.esenin-text-check.public.share.revoke'),

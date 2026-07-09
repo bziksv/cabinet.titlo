@@ -159,7 +159,7 @@ final class EseninAnalyzer
         $styleQuanta = array_sum(array_column($styleMatches, 'weight'));
         $styleDensity = $totalWords > 0 ? round($styleQuanta / $totalWords, 2) : 0.0;
 
-        $keywordPhrases = self::detectKeywordPhrases($lemmaTokens);
+        $keywordPhrases = self::detectKeywordPhrases($words);
         $keywordCoverage = self::keywordCoverage($plain, $keywordPhrases);
 
         $andCount = $lemmaCounts['и'] ?? ($wordCounts['и'] ?? 0);
@@ -634,8 +634,50 @@ final class EseninAnalyzer
                 $plain,
                 $row['word'],
                 'readability',
-                'Длинное слово (' . $row['length'] . ' букв) — упростите формулировку'
+                'Длинное слово (' . $row['length'] . ' букв) — упростите формулировку',
+                'word'
             ));
+        }
+
+        foreach ($metrics['long_sentences'] as $row) {
+            $marks = array_merge($marks, self::markPhraseOccurrences(
+                $plain,
+                (string) $row['sentence'],
+                'readability',
+                'Длинное предложение (' . (int) $row['words'] . ' слов) — разбейте на 2–3 коротких',
+                'sentence'
+            ));
+        }
+
+        $genericLookup = array_flip(array_map(static function ($word) {
+            return mb_strtolower($word, 'UTF-8');
+        }, config('esenin-generic-words', [])));
+
+        foreach ($wordCounts as $word => $count) {
+            if ($count <= 0) {
+                continue;
+            }
+
+            if (TextAnalyzerStopWords::isPhraseStopWord($word)) {
+                $marks = array_merge($marks, self::markWordOccurrences(
+                    $plain,
+                    $word,
+                    'formality',
+                    'Стоп-слово — разбавьте текст конкретикой',
+                    'stop'
+                ));
+                continue;
+            }
+
+            if (isset($genericLookup[$word])) {
+                $marks = array_merge($marks, self::markWordOccurrences(
+                    $plain,
+                    $word,
+                    'formality',
+                    'Общее («пустое») слово — замените на конкретику',
+                    'generic'
+                ));
+            }
         }
 
         return $marks;
@@ -672,7 +714,7 @@ final class EseninAnalyzer
     /**
      * @return array<int, array<string, mixed>>
      */
-    private static function markWordOccurrences(string $plain, string $word, string $block, string $hint): array
+    private static function markWordOccurrences(string $plain, string $word, string $block, string $hint, string $variant = ''): array
     {
         $marks = [];
         $pattern = '/(?<![\p{L}\p{N}])' . preg_quote($word, '/') . '(?![\p{L}\p{N}])/ui';
@@ -687,6 +729,7 @@ final class EseninAnalyzer
                 'length' => mb_strlen($match[0], 'UTF-8'),
                 'block' => $block,
                 'hint' => $hint,
+                'variant' => $variant,
                 'weight' => 1,
             ];
         }
@@ -697,7 +740,7 @@ final class EseninAnalyzer
     /**
      * @return array<int, array<string, mixed>>
      */
-    private static function markPhraseOccurrences(string $plain, string $phrase, string $block, string $hint): array
+    private static function markPhraseOccurrences(string $plain, string $phrase, string $block, string $hint, string $variant = ''): array
     {
         $marks = [];
         $lower = mb_strtolower($plain, 'UTF-8');
@@ -709,6 +752,7 @@ final class EseninAnalyzer
                 'length' => mb_strlen($needle, 'UTF-8'),
                 'block' => $block,
                 'hint' => $hint,
+                'variant' => $variant,
                 'weight' => 1,
             ];
             $offset = $pos + 1;
@@ -773,7 +817,12 @@ final class EseninAnalyzer
             $start = (int) $mark['offset'];
             $length = (int) $mark['length'];
             $fragment = mb_substr($html, $start, $length, 'UTF-8');
-            $class = 'esenin-mark esenin-mark--' . htmlspecialchars((string) ($mark['block'] ?? 'style'), ENT_QUOTES, 'UTF-8');
+            $blockName = (string) ($mark['block'] ?? 'style');
+            $variant = (string) ($mark['variant'] ?? '');
+            $class = 'esenin-mark esenin-mark--' . htmlspecialchars($blockName, ENT_QUOTES, 'UTF-8');
+            if ($variant !== '') {
+                $class .= ' esenin-mark--' . htmlspecialchars($blockName . '-' . $variant, ENT_QUOTES, 'UTF-8');
+            }
             $title = htmlspecialchars((string) ($mark['hint'] ?? ''), ENT_QUOTES, 'UTF-8');
             $replacement = '<mark class="' . $class . '" data-esenin-tip="' . $title . '" data-esenin-mark="' . htmlspecialchars((string) ($mark['block'] ?? ''), ENT_QUOTES, 'UTF-8') . '">' .
                 htmlspecialchars($fragment, ENT_QUOTES, 'UTF-8') .
