@@ -186,8 +186,8 @@ class Relevance
         $this->searchWordForms();
         $this->processingOfGeneralInformation();
         RelevanceProgress::editProgress(82, $this->request);
-        $this->prepareAnalysedSitesTable();
         $this->prepareUnigramTable();
+        $this->prepareAnalysedSitesTable();
         RelevanceProgress::editProgress(85, $this->request);
         $this->analyseRecommendations();
         $this->preparePhrasesTable();
@@ -427,7 +427,15 @@ class Relevance
     public function analyseRecommendations()
     {
         foreach ($this->wordForms as $wordForm) {
+            if (empty($wordForm['total']) || !is_array($wordForm['total'])) {
+                continue;
+            }
+
             foreach ($wordForm as $word => $form) {
+                if ($word === 'total') {
+                    continue;
+                }
+
                 if ($wordForm['total']['avgInTotalCompetitors'] >= 10) {
                     $recommendationMin = ceil($wordForm['total']['avgInTotalCompetitors'] * 0.9);
                     $recommendationMax = ceil($wordForm['total']['avgInTotalCompetitors'] * 1.1);
@@ -2003,6 +2011,10 @@ class Relevance
         $densityMain = 0;
         $testMainIterator = 0;
         foreach ($this->wordForms as $wordForm) {
+            if (empty($wordForm['total']) || !is_array($wordForm['total'])) {
+                continue;
+            }
+
             $countRepeatInPage = 0;
             foreach ($wordForm as $word => $form) {
                 if ($word == 'total') {
@@ -2016,7 +2028,8 @@ class Relevance
                         $countRepeatInPage += $array[$w] ?? 0;
                     }
 
-                    $points = ($wordForm['total']['avgInTotalCompetitors']) ? min($countRepeatInPage / ($wordForm['total']['avgInTotalCompetitors'] / 100), 100) : 0;
+                    $avg = (float) ($wordForm['total']['avgInTotalCompetitors'] ?? 0);
+                    $points = $avg > 0 ? min($countRepeatInPage / ($avg / 100), 100) : 0;
                     $densityMain += $points;
 
                     break;
