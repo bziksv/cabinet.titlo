@@ -58,6 +58,17 @@ final class EseninExternalAnalyzer
             $learning = EseninStyleLearning::recordComparison($localResult, $turgenev['data']);
             $localResult = self::blendTurgenevScores($localResult, $turgenev['data']);
             self::queueReportLearning($turgenev['data']);
+
+            $learningCfg = EseninTextCheckSettingsRegistry::learningConfig();
+            $reportBlocks = is_array($learningCfg['report_blocks'] ?? null)
+                ? $learningCfg['report_blocks']
+                : ['style', 'readability'];
+            if (! empty($learningCfg['report_fetch_enabled'])) {
+                $reportMarks = TurgenevReportParser::marksFromTurgenevData($plain, $turgenev['data'], $reportBlocks);
+                if ($reportMarks !== []) {
+                    $extraMarks = array_merge($extraMarks, $reportMarks);
+                }
+            }
         }
         $providers['learning'] = $learning;
 
@@ -79,7 +90,12 @@ final class EseninExternalAnalyzer
 
         if ($extraMarks !== []) {
             $localResult['marks'] = EseninMarkMerger::merge($localResult['marks'] ?? [], $extraMarks);
-            $localResult = self::rebuildHighlights($localResult, $plain, $options['source_html'] ?? '');
+            $localResult = self::rebuildHighlights(
+                $localResult,
+                $plain,
+                (string) ($options['source_html'] ?? ''),
+                (string) ($options['active_block'] ?? 'risk')
+            );
         }
 
         return $localResult;
@@ -179,7 +195,7 @@ final class EseninExternalAnalyzer
      * @param array<string, mixed> $result
      * @return array<string, mixed>
      */
-    private static function rebuildHighlights(array $result, string $plain, string $sourceHtml): array
+    private static function rebuildHighlights(array $result, string $plain, string $sourceHtml, string $activeBlock = 'risk'): array
     {
         $marks = $result['marks'] ?? [];
         $highlights = [];
@@ -192,7 +208,6 @@ final class EseninExternalAnalyzer
         }
 
         $result['highlights'] = $highlights;
-        $activeBlock = (string) ($options['active_block'] ?? 'risk');
         $result['highlighted_html'] = $highlights[$activeBlock] ?? ($highlights['risk'] ?? '');
 
         return $result;

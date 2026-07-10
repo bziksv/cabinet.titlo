@@ -348,6 +348,14 @@ body.esenin-hide-ck-float > .cke_float {
     background: rgba(255, 193, 7, 0.35);
 }
 
+.cabinet-esenin-text-view__content mark.esenin-mark--style-slop1 {
+    background: rgba(25, 135, 84, 0.22);
+}
+
+.cabinet-esenin-text-view__content mark.esenin-mark--style-slop2 {
+    background: rgba(255, 193, 7, 0.45);
+}
+
 .cabinet-esenin-text-view__content mark.esenin-mark--frequency {
     background: rgba(111, 66, 193, 0.22);
     border-bottom: 2px solid rgba(111, 66, 193, 0.55);

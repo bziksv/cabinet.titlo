@@ -94,6 +94,85 @@ final class TurgenevReportParser
     }
 
     /**
+     * @param array<string, mixed> $turgenevData
+     * @param array<int, string> $blocks
+     * @return array<int, array<string, mixed>>
+     */
+    public static function marksFromTurgenevData(string $plain, array $turgenevData, array $blocks = ['style', 'readability']): array
+    {
+        $plain = trim($plain);
+        if ($plain === '') {
+            return [];
+        }
+
+        $tokens = self::reportTokensFromData($turgenevData, $blocks);
+        if ($tokens === []) {
+            return [];
+        }
+
+        $marks = [];
+        foreach ($tokens as $token) {
+            $html = self::fetchReportHtml($token);
+            if ($html === null || $html === '') {
+                continue;
+            }
+
+            $marks = array_merge($marks, self::parseHtmlToMarks($html, $token, $plain));
+        }
+
+        return self::dedupeMarks($marks);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public static function parseHtmlToMarks(string $html, string $token, string $plain): array
+    {
+        $token = self::normalizeToken($token);
+        $block = self::blockFromToken($token);
+        $xHints = self::extractXHints($html);
+        $spans = self::extractSpans($html);
+        if ($spans === []) {
+            return [];
+        }
+
+        $hintsByRule = self::hintsByRuleId($xHints);
+        $marks = [];
+
+        foreach ($spans as $span) {
+            $text = trim((string) ($span['text'] ?? ''));
+            if (! self::isUsefulSpanText($text)) {
+                continue;
+            }
+
+            $located = self::locateInPlain($plain, $text);
+            if ($located === null) {
+                continue;
+            }
+
+            $ruleId = (string) ($span['rule_id'] ?? '');
+            $severity = (string) ($span['severity'] ?? 'slop1');
+            $hint = $hintsByRule[$ruleId] ?? 'Стилистическая проблема (Тургенев)';
+
+            $marks[] = [
+                'offset' => (int) $located['offset'],
+                'length' => (int) $located['length'],
+                'block' => $block,
+                'variant' => $severity === 'slop2' ? 'slop2' : 'slop1',
+                'hint' => $hint,
+                'weight' => $severity === 'slop2' ? 2 : 1,
+                'source' => 'turgenev',
+                'meta' => [
+                    'rule_id' => $ruleId,
+                    'token' => $token,
+                ],
+            ];
+        }
+
+        return $marks;
+    }
+
+    /**
      * @return array<int, array{phrase: string, hint: string, block: string, rule_id: string, weight: int, severity: string, examples: array<int, string>}>
      */
     public static function parseHtml(string $html, string $token): array
@@ -325,5 +404,114 @@ final class TurgenevReportParser
     private static function severityRank(string $severity): int
     {
         return $severity === 'slop2' ? 2 : 1;
+    }
+
+    /**
+     * @param array<string, array<int, array<string, mixed>>> $xHints
+     * @return array<string, string>
+     */
+    private static function hintsByRuleId(array $xHints): array
+    {
+        $hints = [];
+        foreach ($xHints as $ruleId => $rows) {
+            if (! is_array($rows) || $rows === []) {
+                continue;
+            }
+
+            $row = $rows[0];
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $hint = self::cleanComment($row['c'] ?? '');
+            if ($hint === '') {
+                $hint = self::cleanComment($row['t'] ?? '');
+            }
+            if ($hint === '') {
+                $hint = 'Стилистическая проблема (Тургенев)';
+            }
+
+            $hints[(string) $ruleId] = $hint;
+        }
+
+        return $hints;
+    }
+
+    /**
+     * @return array{offset: int, length: int}|null
+     */
+    private static function locateInPlain(string $plain, string $spanText): ?array
+    {
+        $spanText = preg_replace('/\s+/u', ' ', trim($spanText));
+        if ($spanText === '') {
+            return null;
+        }
+
+        $pos = mb_stripos($plain, $spanText, 0, 'UTF-8');
+        if ($pos !== false) {
+            return [
+                'offset' => $pos,
+                'length' => mb_strlen($spanText, 'UTF-8'),
+            ];
+        }
+
+        $pattern = '/\b' . preg_replace('/\s+/u', '\\s+', preg_quote($spanText, '/')) . '\b/iu';
+        if (preg_match($pattern, $plain, $matches, PREG_OFFSET_CAPTURE)) {
+            $byteOffset = (int) ($matches[0][1] ?? -1);
+            if ($byteOffset >= 0) {
+                $offset = mb_strlen(substr($plain, 0, $byteOffset), 'UTF-8');
+                $matched = (string) ($matches[0][0] ?? '');
+
+                return [
+                    'offset' => $offset,
+                    'length' => mb_strlen($matched, 'UTF-8'),
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $marks
+     * @return array<int, array<string, mixed>>
+     */
+    private static function dedupeMarks(array $marks): array
+    {
+        if ($marks === []) {
+            return [];
+        }
+
+        usort($marks, static function ($a, $b) {
+            $severityA = (($a['variant'] ?? '') === 'slop2') ? 2 : 1;
+            $severityB = (($b['variant'] ?? '') === 'slop2') ? 2 : 1;
+
+            return ($severityB <=> $severityA)
+                ?: ((int) ($b['length'] ?? 0) <=> (int) ($a['length'] ?? 0))
+                ?: ((int) ($a['offset'] ?? 0) <=> (int) ($b['offset'] ?? 0));
+        });
+
+        $occupied = [];
+        $accepted = [];
+        foreach ($marks as $mark) {
+            $start = (int) ($mark['offset'] ?? 0);
+            $end = $start + (int) ($mark['length'] ?? 0);
+            $overlap = false;
+            for ($i = $start; $i < $end; $i++) {
+                if (! empty($occupied[$i])) {
+                    $overlap = true;
+                    break;
+                }
+            }
+            if ($overlap) {
+                continue;
+            }
+            for ($i = $start; $i < $end; $i++) {
+                $occupied[$i] = true;
+            }
+            $accepted[] = $mark;
+        }
+
+        return $accepted;
     }
 }
