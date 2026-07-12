@@ -1,0 +1,30 @@
+#main-footer .cabinet-footer-legal {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.35;
+  max-width: 22rem;
+}
+
+#main-footer .cabinet-footer-legal a {
+  color: var(--bs-secondary-color, #6c757d);
+  text-decoration: none;
+}
+
+#main-footer .cabinet-footer-legal a:hover {
+  color: var(--bs-body-color, #212529);
+  text-decoration: underline;
+}
+
+@media (min-width: 992px) {
+  #main-footer .cabinet-footer-legal {
+    align-items: flex-end;
+    text-align: right;
+    max-width: 18rem;
+  }
+}

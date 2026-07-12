@@ -10,6 +10,7 @@
     @include('layouts.partials.lte4-head')
     <link rel="stylesheet" href="{{ asset('css/cabinet-telegram-prompt.css') }}">
     <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-schedule-prompt.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/cabinet-app-footer.css') }}?v={{ @filemtime(public_path('css/cabinet-app-footer.css')) ?: time() }}">
     @yield('css')
     <script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>
 </head>
@@ -34,8 +35,10 @@
         </div>
     </main>
     <footer class="app-footer" id="main-footer">
-        <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-2 w-100">
-            <strong>&copy; 2021&ndash;{{ date('Y') }} <a href="https://titlo.ru/" class="text-decoration-none">Титло</a>. Все права защищены.</strong>
+        <div class="cabinet-app-footer-inner d-flex flex-column flex-lg-row align-items-start align-items-lg-end justify-content-between gap-3 w-100">
+            <div class="cabinet-app-footer-copy small mb-0">
+                <strong>&copy; 2021&ndash;{{ date('Y') }} <a href="https://titlo.ru/" class="text-decoration-none">Титло</a>. Все права защищены.</strong>
+            </div>
             @include('layouts.partials.app-footer-legal')
         </div>
     </footer>

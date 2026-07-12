@@ -6,8 +6,8 @@
         ['url' => $marketingBase . '/legal/doc/recommendation-rules/', 'label' => 'Правила применения рекомендательных технологий'],
     ];
 @endphp
-<nav class="cabinet-footer-legal d-flex flex-wrap gap-x-3 gap-y-1 small fw-normal" aria-label="Юридические документы">
+<nav class="cabinet-footer-legal" aria-label="Юридические документы">
     @foreach($legalLinks as $link)
-        <a href="{{ $link['url'] }}" class="text-body-secondary text-decoration-none" target="_blank" rel="noopener">{{ $link['label'] }}</a>
+        <a href="{{ $link['url'] }}" target="_blank" rel="noopener">{{ $link['label'] }}</a>
     @endforeach
 </nav>
