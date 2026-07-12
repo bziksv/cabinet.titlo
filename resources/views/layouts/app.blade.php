@@ -34,8 +34,10 @@
         </div>
     </main>
     <footer class="app-footer" id="main-footer">
-        <div class="float-end d-none d-sm-inline"></div>
-        <strong>&copy; 2021&ndash;{{ date('Y') }} <a href="https://titlo.ru/" class="text-decoration-none">Титло</a>. Все права защищены.</strong>
+        <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-2 w-100">
+            <strong>&copy; 2021&ndash;{{ date('Y') }} <a href="https://titlo.ru/" class="text-decoration-none">Титло</a>. Все права защищены.</strong>
+            @include('layouts.partials.app-footer-legal')
+        </div>
     </footer>
 </div>
 
