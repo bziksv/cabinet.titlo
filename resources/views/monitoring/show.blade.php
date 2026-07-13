@@ -9,7 +9,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc38' }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc39' }}">
     @endslot
 
     <div class="cabinet-mon-project-page" id="cabinet-mon-project-root" data-view="keywords">
@@ -166,7 +166,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/fixedColumns.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc38' }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc39' }}"></script>
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
@@ -1773,7 +1773,12 @@
                         monitoringTableHideProcessing();
                         if (!monTableBoot.revealed) {
                             tryRevealMonitoringTable(api);
-                        } else if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.resetMonTableBodyScroll) {
+                        }
+                        if (
+                            monitoringTableHasBodyRows()
+                            && window.cabinetMonitoringShowChrome
+                            && window.cabinetMonitoringShowChrome.resetMonTableBodyScroll
+                        ) {
                             window.cabinetMonitoringShowChrome.resetMonTableBodyScroll(api);
                         }
 

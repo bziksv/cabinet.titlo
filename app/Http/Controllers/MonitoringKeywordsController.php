@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class MonitoringKeywordsController extends Controller
@@ -89,7 +90,6 @@ class MonitoringKeywordsController extends Controller
                 'group' => function ($query) {
                     $query->without('users');
                 },
-                'prices',
             ]);
     }
 
@@ -100,10 +100,37 @@ class MonitoringKeywordsController extends Controller
 
         apply_team_permissions($id);
 
+        $cacheKey = $this->tableResponseCacheKey($id, $request);
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return $cached;
+        }
+
         $this->setProjectID($id);
         $request = collect($request->all());
 
-        return $this->dataPrepare($request)->generateDataTable($request->get('draw', 0));
+        $response = $this->dataPrepare($request)->generateDataTable($request->get('draw', 0));
+        Cache::put($cacheKey, $response, now()->addSeconds(20));
+
+        return $response;
+    }
+
+    private function tableResponseCacheKey(int $projectId, Request $request): string
+    {
+        $payload = $request->only([
+            'draw',
+            'start',
+            'length',
+            'region_id',
+            'dates_range',
+            'mode_range',
+            'search',
+            'columns',
+            'order',
+            'offset',
+        ]);
+
+        return 'monitoring.table.' . $projectId . '.' . Auth::id() . '.' . md5(json_encode($payload));
     }
 
     public function dataPrepare(Collection $collection)
@@ -142,7 +169,7 @@ class MonitoringKeywordsController extends Controller
         }
 
         if ($length > 1) {
-            $this->setSetting($this->getProjectID(), 'length', $length);
+            $this->persistPageLengthIfChanged($length);
         }
 
         $dates = null;
@@ -150,6 +177,7 @@ class MonitoringKeywordsController extends Controller
             $dates = explode(' - ', $datesRange, 2);
         }
 
+        $this->loadKeywordPricesForTable();
         $this->loadPositions($dates);
 
         if (!$this->isMainView()) {
@@ -158,11 +186,11 @@ class MonitoringKeywordsController extends Controller
 
         if ($this->regions && $this->regions->isNotEmpty()) {
             if ($this->isMainView()) {
-                $this->setUrls();
+                $this->setUrls($dates);
                 $this->mainView();
                 $this->columns->forget(['dynamics', 'base', 'phrasal', 'exact']);
             } else {
-                $this->setUrls();
+                $this->setUrls($dates);
                 $this->getLatestPositions()->updateDynamics();
             }
         }
@@ -675,7 +703,59 @@ class MonitoringKeywordsController extends Controller
         });
     }
 
-    private function setUrls()
+    private function persistPageLengthIfChanged(int $length): void
+    {
+        $projectId = $this->getProjectID();
+        $current = MonitoringProjectSettings::query()
+            ->where('monitoring_project_id', $projectId)
+            ->where('name', 'length')
+            ->value('value');
+
+        if ((string) $current === (string) $length) {
+            return;
+        }
+
+        $this->setSetting($projectId, 'length', (string) $length);
+    }
+
+    private function loadKeywordPricesForTable(): void
+    {
+        $regionIds = $this->regions->pluck('id')->filter();
+
+        $this->queries->load(['prices' => function ($query) use ($regionIds) {
+            $query->select([
+                'id',
+                'monitoring_keyword_id',
+                'monitoring_searchengine_id',
+                'top1',
+                'top3',
+                'top5',
+                'top10',
+                'top20',
+                'top50',
+                'top100',
+            ]);
+
+            if ($regionIds->isNotEmpty()) {
+                $query->whereIn('monitoring_searchengine_id', $regionIds);
+            }
+        }]);
+    }
+
+    private function positionsDateBounds(?array $dates): array
+    {
+        $start = Carbon::now()->subMonth()->startOfDay();
+        $end = Carbon::now()->endOfDay();
+
+        if ($dates && count($dates) >= 2) {
+            $start = Carbon::parse($dates[0])->startOfDay();
+            $end = Carbon::parse($dates[1])->endOfDay();
+        }
+
+        return [$start, $end];
+    }
+
+    private function setUrls(?array $dates = null)
     {
         $ids = $this->queries->pluck('id');
         $region = $this->regions->first();
@@ -685,13 +765,20 @@ class MonitoringKeywordsController extends Controller
         }
 
         // DISTINCT в SQL: иначе грузим всю историю позиций (сотни тысяч строк) ради unique('url') в PHP.
-        $rows = MonitoringPosition::query()
+        $query = MonitoringPosition::query()
             ->select('monitoring_keyword_id', 'url', DB::raw('MAX(created_at) as created_at'))
             ->where('monitoring_searchengine_id', $region['id'])
             ->whereNotNull('url')
             ->where('url', '!=', '')
-            ->whereIn('monitoring_keyword_id', $ids)
-            ->groupBy('monitoring_keyword_id', 'url')
+            ->whereIn('monitoring_keyword_id', $ids);
+
+        if ($dates && count($dates) >= 2) {
+            [$start, $end] = $this->positionsDateBounds($dates);
+            $query->where('created_at', '>=', $start)
+                ->where('created_at', '<=', $end);
+        }
+
+        $rows = $query->groupBy('monitoring_keyword_id', 'url')
             ->orderByDesc('created_at')
             ->get();
 
@@ -705,6 +792,75 @@ class MonitoringKeywordsController extends Controller
     }
 
     private function loadPositions($dates)
+    {
+        if ($this->mode === 'datesFind') {
+            $this->loadPositionsEager($dates);
+
+            return;
+        }
+
+        $regionIds = $this->regions->pluck('id')->filter()->values()->all();
+        $keywordIds = $this->queries->pluck('id')->values()->all();
+
+        if ($keywordIds === []) {
+            return;
+        }
+
+        [$start, $end] = $this->positionsDateBounds($dates);
+
+        $latestIdsQuery = DB::table('monitoring_positions')
+            ->selectRaw('MAX(id) as id')
+            ->whereIn('monitoring_keyword_id', $keywordIds)
+            ->where('created_at', '>=', $start)
+            ->where('created_at', '<=', $end);
+
+        if ($regionIds !== []) {
+            $latestIdsQuery->whereIn('monitoring_searchengine_id', $regionIds);
+        }
+
+        $latestIdsQuery->groupBy(
+            'monitoring_keyword_id',
+            'monitoring_searchengine_id',
+            DB::raw('DATE(created_at)')
+        );
+
+        $rows = DB::table('monitoring_positions')
+            ->select([
+                'id',
+                'monitoring_keyword_id',
+                'monitoring_searchengine_id',
+                'position',
+                'url',
+                'target',
+                'created_at',
+            ])
+            ->whereIn('id', $latestIdsQuery)
+            ->orderBy('created_at')
+            ->get()
+            ->groupBy('monitoring_keyword_id');
+
+        $this->queries->each(function ($keyword) use ($rows) {
+            $items = ($rows->get($keyword->id) ?? collect())->map(function ($row) {
+                $model = new MonitoringPosition([
+                    'monitoring_keyword_id' => $row->monitoring_keyword_id,
+                    'monitoring_searchengine_id' => $row->monitoring_searchengine_id,
+                    'position' => $row->position,
+                    'url' => $row->url,
+                    'target' => $row->target,
+                    'created_at' => $row->created_at,
+                ]);
+                $model->id = (int) $row->id;
+                $model->exists = true;
+                $model->created_at = Carbon::parse($row->created_at);
+
+                return $model;
+            })->values();
+
+            $keyword->setRelation('positions', $items);
+        });
+    }
+
+    private function loadPositionsEager($dates)
     {
         $regionIds = $this->regions->pluck('id')->filter();
 
@@ -723,11 +879,7 @@ class MonitoringKeywordsController extends Controller
                 $query->whereIn('monitoring_searchengine_id', $regionIds);
             }
 
-            if ($this->mode === 'datesFind') {
-                $query->dateFind($dates);
-            } else {
-                $query->dateRange($dates);
-            }
+            $query->dateFind($dates);
         }]);
     }
 
