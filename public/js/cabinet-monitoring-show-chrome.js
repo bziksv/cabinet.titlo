@@ -694,6 +694,20 @@
         $wrapper.data('monScrollWired', true);
     }
 
+    function monTableRowKey($tr) {
+        var $cb = $tr.find('input[type="checkbox"]').first();
+        if ($cb.length) {
+            return String($cb.val());
+        }
+        return 'idx:' + $tr.index();
+    }
+
+    function monTableRowsByKey($wrapper, key) {
+        return $wrapper.find('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr').filter(function () {
+            return monTableRowKey(jQuery(this)) === key;
+        });
+    }
+
     function wireMonTableRowHover(api) {
         if (!api || !window.jQuery) {
             return;
@@ -701,16 +715,17 @@
         var $wrapper = jQuery(api.table().container());
         $wrapper.off('.monRowHover');
         $wrapper.on('mouseenter.monRowHover', '.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr', function () {
-            var idx = jQuery(this).index();
+            var key = monTableRowKey(jQuery(this));
             $wrapper.find('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr').removeClass('is-row-hover');
-            $wrapper.find('.dataTables_scrollBody tbody tr').eq(idx).addClass('is-row-hover');
-            $wrapper.find('.DTFC_LeftBodyLiner tbody tr').eq(idx).addClass('is-row-hover');
+            monTableRowsByKey($wrapper, key).addClass('is-row-hover');
         });
-        $wrapper.on('mouseleave.monRowHover', '.dataTables_scrollBody tbody, .DTFC_LeftBodyLiner tbody', function (e) {
-            if (jQuery(e.relatedTarget).closest('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr').length) {
+        $wrapper.on('mouseleave.monRowHover', '.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr', function (e) {
+            var key = monTableRowKey(jQuery(this));
+            var $relatedRow = jQuery(e.relatedTarget).closest('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr');
+            if ($relatedRow.length && monTableRowKey($relatedRow) === key) {
                 return;
             }
-            $wrapper.find('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr').removeClass('is-row-hover');
+            monTableRowsByKey($wrapper, key).removeClass('is-row-hover');
         });
     }
 
@@ -893,6 +908,7 @@
         if (!api || monColumnTogglePending || monTableLayoutLocked || !monTableInitialLayoutDone) {
             return;
         }
+        wireMonTableRowHover(api);
         requestAnimationFrame(function () {
             if (monColumnTogglePending || monTableLayoutLocked) {
                 return;

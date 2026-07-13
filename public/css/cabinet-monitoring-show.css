@@ -1163,7 +1163,17 @@ button.cabinet-btn-busy:disabled {
 
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr.is-row-hover td,
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover td {
-    background-color: var(--bs-table-hover-bg, #f8fafc) !important;
+    background-color: #f1f5f9 !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper tr.is-row-hover td.cabinet-mon-col-query,
+.cabinet-mon-project-page #monitoringTable_wrapper tr.is-row-hover .cabinet-mon-query-cell,
+.cabinet-mon-project-page #monitoringTable_wrapper tr.is-row-hover .query-string {
+    background-color: #e8eef4 !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper tr.is-row-hover .query-string {
+    color: #0f172a;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody .table-hover > tbody > tr:hover > *,
