@@ -900,26 +900,31 @@ class TextAnalyzer extends Model
     public static function searchWordForms($array): array
     {
         $array = array_count_values($array);
-        asort($array);
-        $array = array_reverse($array);
+        arsort($array);
 
         $morphy = new Morphy();
-        $wordForms = [];
-        $result = [];
-        $will = [];
-
-        foreach ($array as $key => $item) {
-            if (!in_array($key, $will)) {
-                $will[] = $key;
-                $root = $morphy->base($key) ?? $key;
-                $result[$root][] = [
-                    $key => $item
-                ];
-            }
+        $candidates = [];
+        foreach (array_keys($array) as $key) {
+            $forms = $morphy->baseForms($key);
+            $candidates[$key] = $forms !== [] ? $forms : [mb_strtolower((string) $key, 'UTF-8')];
         }
 
-        foreach ($result as $wordForm) {
-            $wordForms[array_key_first($wordForm[0])] = $wordForm;
+        $resolvedRoots = $morphy->resolveRootsFromCandidates($candidates);
+        $groups = [];
+
+        foreach ($array as $key => $item) {
+            $root = $resolvedRoots[$key] ?? mb_strtolower((string) $key, 'UTF-8');
+            $groups[$root][$key] = $item;
+        }
+
+        $wordForms = [];
+        foreach ($groups as $root => $forms) {
+            $nested = [];
+            foreach ($forms as $word => $count) {
+                $nested[] = [$word => $count];
+            }
+
+            $wordForms[$root] = $nested;
         }
 
         return $wordForms;

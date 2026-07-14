@@ -24,7 +24,9 @@ class RelevanceStatisticsExport implements FromCollection
     {
         $history = ProjectRelevanceHistory::where('id', '=', $this->id)->first();
 
-        $results = $history->stories()->get([
+        $results = $history->stories()->with([
+            'results:id,project_id,average_values',
+        ])->get([
             'phrase', 'main_link', 'region',
             'last_check', 'points', 'position',
             'coverage', 'coverage_tf', 'density',
@@ -58,8 +60,9 @@ class RelevanceStatisticsExport implements FromCollection
         ];
 
         foreach ($results as $result) {
-            if (isset($result->results['average_values'])) {
-                $avg = json_decode($result->results['average_values'], true);
+            $averageValues = $result->results->average_values ?? null;
+            if ($averageValues !== null && $averageValues !== '') {
+                $avg = json_decode($averageValues, true);
             } else {
                 $avg = [];
             }

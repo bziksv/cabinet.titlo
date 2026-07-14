@@ -677,6 +677,35 @@ class Relevance
         return preg_replace('| +|', ' ', str_replace($search, $replace, $unicodeString));
     }
 
+    /**
+     * Сливает группы словоформ по выбранной лемме (на случай расхождения bucket-ключей).
+     *
+     * @param array<string, array<string, int>> $wordWorms
+     * @param array<string, string> $resolvedRoots
+     * @return array<string, array<string, int>>
+     */
+    private static function canonicalizeWordFormGroups(array $wordWorms, array $resolvedRoots): array
+    {
+        $merged = [];
+
+        foreach ($wordWorms as $root => $wordWorm) {
+            if (!is_array($wordWorm)) {
+                continue;
+            }
+
+            foreach ($wordWorm as $surface => $count) {
+                if (!is_string($surface) || $surface === 'total') {
+                    continue;
+                }
+
+                $canonical = $resolvedRoots[$surface] ?? (string) $root;
+                $merged[$canonical][$surface] = ($merged[$canonical][$surface] ?? 0) + (int) $count;
+            }
+        }
+
+        return $merged;
+    }
+
     public function searchWordForms()
     {
         $m = new Morphy();
@@ -686,6 +715,19 @@ class Relevance
         $array = array_count_values($array);
         arsort($array);
         $excludeLookup = self::excludedWordsLookup($this->request);
+
+        $candidates = [];
+        foreach (array_keys($array) as $key) {
+            if (self::isExcludedLemma((string) $key, $excludeLookup)) {
+                continue;
+            }
+
+            $forms = $m->baseForms($key);
+            $candidates[$key] = $forms !== [] ? $forms : [mb_strtolower((string) $key, 'UTF-8')];
+        }
+
+        $resolvedRoots = $m->resolveRootsFromCandidates($candidates);
+
         foreach ($array as $key => $item) {
             if (self::isExcludedLemma((string) $key, $excludeLookup)) {
                 continue;
@@ -693,10 +735,7 @@ class Relevance
             if (!in_array($key, $this->ignoredWords)) {
                 $this->ignoredWords[] = $key;
 
-                $root = $m->base($key);
-                if (empty($root)) {
-                    $root = $key;
-                }
+                $root = $resolvedRoots[$key] ?? mb_strtolower((string) $key, 'UTF-8');
 
                 $wordWorms[$root][$key] = $item;
 
@@ -706,9 +745,7 @@ class Relevance
             }
         }
 
-        foreach ($wordWorms as $wordWorm) {
-            $this->wordForms[array_key_first($wordWorm)] = $wordWorm;
-        }
+        $this->wordForms = self::canonicalizeWordFormGroups($wordWorms, $resolvedRoots);
 
         uasort($this->wordForms, function ($l, $r) {
             $first = array_sum($r);

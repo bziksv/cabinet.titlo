@@ -1557,7 +1557,11 @@
                 {
                     name: 'owner',
                     data: function (row) {
-                        return row.owner.email + '<br><span class="text-muted">' + row.owner.name + ' ' + row.owner.last_name + '</span>'
+                        var ownerName = [row.owner.name, row.owner.last_name].filter(function (part) {
+                            return part;
+                        }).join(' ');
+
+                        return row.owner.email + '<br><span class="text-muted">' + ownerName + '</span>'
                     },
                 },
                 {

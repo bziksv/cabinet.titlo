@@ -74,6 +74,36 @@
             i.fa.fa-copy {
                 cursor: pointer;
             }
+
+            .toast-top-right .toast-message a {
+                color: #fff;
+                font-weight: 700;
+                text-decoration: underline;
+                text-underline-offset: 2px;
+            }
+
+            .relevance-repeat-queue-status {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                max-width: 26rem;
+            }
+
+            .relevance-repeat-queue-status.d-none {
+                display: none !important;
+            }
+
+            .relevance-repeat-queue-status .loader {
+                flex-shrink: 0;
+            }
+
+            .relevance-repeat-queue-status.alert-success a,
+            .relevance-repeat-queue-status.alert-danger a {
+                color: inherit;
+                font-weight: 700;
+                text-decoration: underline;
+                text-underline-offset: 2px;
+            }
         </style>
     @endslot
 
@@ -129,7 +159,6 @@
     </div>
 
     <div class="card">
-        <div class="alert alert-primary pb-3" role="alert" id="primaryAlert" style="display: none"></div>
         @if(empty($publicShareToken))
         <div class="border-bottom d-flex p-0 justify-content-between w-100">
             <ul class="nav nav-pills p-2">
@@ -164,18 +193,9 @@
                     <a class="nav-link active" href="#tab_1" data-bs-toggle="tab"
                        id="firstTab">{{ __('Show details') }}</a>
                 </li>
-                <li class="nav-item" id="repeat-analyse-item"
-                    @if($object->state == 0) style="display:none;"@endif>
+                <li class="nav-item" id="repeat-analyse-item">
                     <a class="nav-link" href="#tab_2" data-bs-toggle="tab">{{ __('Repeat the analysis') }}
                     </a>
-                </li>
-                <li @if($object->state == 1) style="display:none;" @endif id="circleTab">
-                    <div class="three col d-flex align-items-center">
-                        {{ __('Standing in line for reanalysis') }}
-                        <div class="loader d-flex justify-content-center align-items-center" id="loader-1"
-                             style="height: 35px; width: 35px">
-                        </div>
-                    </div>
                 </li>
             </ul>
         </div>
@@ -624,55 +644,66 @@
                                 </div>
                             @endif
 
-                            <div class="d-flex flex-column">
-                                <div class="btn-group w-50 mb-2 mt-2">
-                                    <button class="btn btn-secondary" id="repeat-queue-scan">
-                                        {{ __('Repeat the analysis') }}
+                            <div class="relevance-analyse-actions d-flex flex-column mt-2">
+                                <div class="btn-group mb-2">
+                                    <button class="btn btn-secondary relevance-analyse-actions__main" id="repeat-queue-scan">
+                                        {{ __('Full analysis') }}
                                     </button>
-                                    <button type="button" class="btn btn-secondary col-2">
-                                    <span class="__helper-link ui_tooltip_w">
-                                        <i class="fa fa-question-circle"></i>
-                                        <span class="ui_tooltip __right">
-                                            <span class="ui_tooltip_content" style="width: 350px">
-                                                {{ __('A survey of the xml service will be conducted in order to get the relevant top sites of competitors. The landing page will also be parsed.') }} <br>
-                                                {{ __('Based on all the data received, an analysis will be performed.') }} <br>
+                                    <button type="button" class="btn btn-secondary relevance-analyse-actions__help" tabindex="-1" aria-hidden="true">
+                                        <span class="__helper-link ui_tooltip_w" tabindex="0" role="button" aria-label="{{ __('Help') }}">
+                                            <i class="fa fa-question-circle"></i>
+                                            <span class="ui_tooltip __left">
+                                                <span class="ui_tooltip_content relevance-analyse-actions__tooltip">
+                                                    {{ __('A survey of the xml service will be conducted in order to get the relevant top sites of competitors. The landing page will also be parsed.') }} <br>
+                                                    {{ __('Based on all the data received, an analysis will be performed.') }} <br>
+                                                </span>
                                             </span>
                                         </span>
-                                    </span>
                                     </button>
                                 </div>
-                                <div class="btn-group w-50 mb-2">
-                                    <button type="button" class="btn btn-secondary" id="repeat-queue-competitors-scan"
+                                <div class="btn-group mb-2">
+                                    <button type="button" class="btn btn-secondary relevance-analyse-actions__main"
+                                            id="repeat-queue-competitors-scan"
                                             @if($object['html_main_page'] == '') disabled @endif>
                                         {{ __('Repeated analysis of competitor sites') }}
                                     </button>
-                                    <button type="button" class="btn btn-secondary col-2">
-                                        <span class="__helper-link ui_tooltip_w">
+                                    <button type="button" class="btn btn-secondary relevance-analyse-actions__help" tabindex="-1" aria-hidden="true">
+                                        <span class="__helper-link ui_tooltip_w" tabindex="0" role="button" aria-label="{{ __('Help') }}">
                                             <i class="fa fa-question-circle"></i>
-                                            <span class="ui_tooltip __right">
-                                                <span class="ui_tooltip_content" style="width: 350px">
+                                            <span class="ui_tooltip __left">
+                                                <span class="ui_tooltip_content relevance-analyse-actions__tooltip">
                                                     {{ __('Updating the content of competitors that was received as a result of the last request') }}
                                                 </span>
                                             </span>
                                         </span>
                                     </button>
                                 </div>
-                                <div class="btn-group w-50 mb-2">
-                                    <button class="btn btn-secondary" id="repeat-queue-main-page-scan"
+                                <div class="btn-group mb-2">
+                                    <button class="btn btn-secondary relevance-analyse-actions__main"
+                                            id="repeat-queue-main-page-scan"
                                             @if($object['html_main_page'] == '') disabled @endif>
                                         {{ __('Repeated analysis of the landing page') }}
                                     </button>
-                                    <button type="button" class="btn btn-secondary col-2">
-                                        <span class="__helper-link ui_tooltip_w">
+                                    <button type="button" class="btn btn-secondary relevance-analyse-actions__help" tabindex="-1" aria-hidden="true">
+                                        <span class="__helper-link ui_tooltip_w" tabindex="0" role="button" aria-label="{{ __('Help') }}">
                                             <i class="fa fa-question-circle"></i>
-                                            <span class="ui_tooltip __right">
-                                                <span
-                                                    class="ui_tooltip_content"
-                                                    style="width: 350px">{{ __('We re-poll the landing page and take data from competitors websites that were received as a result of the last request') }}</span>
+                                            <span class="ui_tooltip __left">
+                                                <span class="ui_tooltip_content relevance-analyse-actions__tooltip">
+                                                    {{ __('We re-poll the landing page and take data from competitors websites that were received as a result of the last request') }}
+                                                </span>
                                             </span>
                                         </span>
                                     </button>
                                 </div>
+                            </div>
+
+                            <div id="repeat-queue-status"
+                                 class="alert alert-info relevance-repeat-queue-status mt-2 mb-0 d-none"
+                                 role="status"
+                                 aria-live="polite">
+                                <span id="repeat-queue-status-text">{{ __('Standing in line for reanalysis') }}</span>
+                                <div class="loader d-flex justify-content-center align-items-center" id="loader-repeat-queue"
+                                     style="height: 35px; width: 35px"></div>
                             </div>
                         </div>
                     @else
@@ -974,68 +1005,158 @@
                 }
             }
 
-            function checkQueueScanState(timeOut) {
+            function showRepeatQueueStatus() {
+                var repeatTab = document.querySelector('a[href="#tab_2"]');
+                if (repeatTab && typeof bootstrap !== 'undefined') {
+                    bootstrap.Tab.getOrCreateInstance(repeatTab).show();
+                } else if (repeatTab) {
+                    repeatTab.click();
+                }
+
+                var $banner = $('#repeat-queue-status');
+                $banner.removeClass('d-none alert-success alert-danger').addClass('alert-info');
+                $('#repeat-queue-status-text').text('{{ __('Standing in line for reanalysis') }}');
+                $('#loader-repeat-queue').show();
+
+                $('html, body').animate({
+                    scrollTop: $banner.offset().top - 80
+                }, {
+                    duration: 370,
+                    easing: 'linear'
+                });
+            }
+
+            function showRepeatQueueOutcome(html, type) {
+                var $banner = $('#repeat-queue-status');
+                $banner.removeClass('d-none alert-info alert-success alert-danger');
+
+                if (type === 'error') {
+                    $banner.addClass('alert-danger');
+                } else {
+                    $banner.addClass('alert-success');
+                }
+
+                $('#repeat-queue-status-text').html(html);
+                $('#loader-repeat-queue').hide();
+            }
+
+            function hideRepeatQueueStatus() {
+                $('#repeat-queue-status').addClass('d-none');
+            }
+
+            function showSuccessToast(html, hideAfterMs) {
+                var $toast = $('.toast-top-right.success-message');
+                $('#toast-message').html(html);
+                $toast.stop(true, true).show(300);
+                if (window.relevanceSuccessToastTimer) {
+                    clearTimeout(window.relevanceSuccessToastTimer);
+                }
+                if (hideAfterMs !== false) {
+                    window.relevanceSuccessToastTimer = setTimeout(function () {
+                        $toast.hide(300);
+                    }, hideAfterMs || 3500);
+                }
+            }
+
+            function showErrorToast(html, hideAfterMs) {
+                var $toast = $('.toast-top-right.error-message');
+                $('#message-error-info').html(html);
+                $toast.stop(true, true).show(300);
+                if (window.relevanceErrorToastTimer) {
+                    clearTimeout(window.relevanceErrorToastTimer);
+                }
+                window.relevanceErrorToastTimer = setTimeout(function () {
+                    $toast.hide(300);
+                }, hideAfterMs || 3500);
+            }
+
+            function stopAnalysisPolling() {
+                if (window.relevanceAnalysisPollTimer) {
+                    clearInterval(window.relevanceAnalysisPollTimer);
+                    window.relevanceAnalysisPollTimer = null;
+                }
+            }
+
+            function handleAnalysisPollResponse(response) {
+                if (response.message === 'wait') {
+                    return;
+                }
+
+                if (response.message === 'success') {
+                    var completedId = response.completedHistoryId
+                        || (response.newObject && response.newObject.id);
+                    var hasFreshResult = completedId && completedId > {{ $id }};
+
+                    if (!hasFreshResult) {
+                        return;
+                    }
+
+                    stopAnalysisPolling();
+
+                    var resultHtml = 'Ваши результаты готовы и размещены по ссылке ' +
+                        '<a target="_blank" rel="noopener" href="/show-history/' + completedId + '">Здесь</a>';
+
+                    showRepeatQueueOutcome(resultHtml, 'success');
+                    showSuccessToast(resultHtml, false);
+
+                    window.setTimeout(function () {
+                        window.location.href = '/show-history/' + completedId;
+                    }, 1200);
+
+                    return;
+                }
+
+                if (response.message === 'error') {
+                    stopAnalysisPolling();
+                    var errorHtml = '{{ __('An error has occurred, try again or contact the administrator') }}';
+                    showRepeatQueueOutcome(errorHtml, 'error');
+                    showErrorToast(errorHtml);
+                }
+            }
+
+            function pollAnalysisState() {
                 $.ajax({
                     type: "POST",
                     dataType: "json",
-                    url: '/check-queue-scan-state',
+                    url: '/check-state',
                     data: {
-                        _token: $('meta[name="csrf-token"]').attr('content'),
-                        id: $('#hiddenId').val()
+                        id: {{ $id }},
+                        since_id: window.relevanceAnalysisSinceId || {{ $id }},
                     },
                     success: function (response) {
-                        if (response.message === 'success') {
-                            $('#repeat-analyse-item').show();
-                            $('#circleTab').hide();
-                            clearInterval(timeOut)
-                            $('#primaryAlert').html(
-                                'Ваши результаты готовы и размещены по ссылке ' +
-                                '<a style="color: white; font-weight: bolder" target="_blank" href="/show-history/' + response.newProject.id + '">Здесь</a>'
-                            )
-                            $('#primaryAlert').show()
-                        }
+                        handleAnalysisPollResponse(response);
                     },
-
-                    error: function () {
-                        $('#toast-container').show(300)
-                        setInterval(function () {
-                            $('#toast-container').hide(300)
-                        }, 3500)
-                    }
                 });
+            }
+
+            function startAnalysisPolling() {
+                if (window.relevanceAnalysisPollTimer) {
+                    clearInterval(window.relevanceAnalysisPollTimer);
+                }
+                pollAnalysisState();
+                window.relevanceAnalysisPollTimer = setInterval(pollAnalysisState, 10000);
             }
 
             function successAjaxRequest(response) {
                 if (response.code === 415) {
-                    $('.toast-top-right.error-message').show()
-                    $('#message-error-info').html(response.message)
-                    setInterval(function () {
-                        $('.toast-top-right.error-message').hide(300)
-                    }, 3500)
+                    showErrorToast(response.message);
                 } else {
-                    $('#primaryAlert').hide()
-                    $('.toast-top-right.success-message').show(300)
-                    setInterval(function () {
-                        $('.toast-top-right.success-message').hide(300)
-                    }, 3500)
-
-                    $('#firstTab').trigger('click')
-                    $('html, body').animate({
-                        scrollTop: $('#header-nav-bar').offset().top
-                    }, {
-                        duration: 370,
-                        easing: "linear"
-                    });
-
-                    $('#repeat-analyse-item').hide();
-                    $('#circleTab').show();
-
-                    let timeOut = setInterval(() => {
-                        checkQueueScanState(timeOut)
-                    }, 10000)
+                    window.relevanceAnalysisSinceId = {{ $id }};
+                    window.relevanceAnalysisNotifyOnComplete = true;
+                    showSuccessToast('{{ __('Repeated analysis added to the queue') }}');
+                    showRepeatQueueStatus();
+                    startAnalysisPolling();
                 }
-
             }
+
+            @if($object->state == 0)
+            $(document).ready(function () {
+                window.relevanceAnalysisSinceId = {{ $id }};
+                window.relevanceAnalysisNotifyOnComplete = true;
+                showRepeatQueueStatus();
+                startAnalysisPolling();
+            });
+            @endif
         </script>
     @endslot
 @endcomponent

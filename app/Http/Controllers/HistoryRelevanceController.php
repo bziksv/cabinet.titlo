@@ -129,7 +129,7 @@ class HistoryRelevanceController extends Controller
         $totalRecords = (clone $query)->count();
 
         $records = $query->orderBy($columnName, $columnSortOrder)
-            ->with(array_merge(['user:id,email,name'], $this->historyListRelations()))
+            ->with(array_merge(['user:id,email,name,last_name'], $this->historyListRelations()))
             ->paginate($request->input('length'), ['*'], 'page', $pageNumber);
 
         return $this->prepareData($records, $totalRecords, $request, true);
@@ -177,7 +177,19 @@ class HistoryRelevanceController extends Controller
             ]);
         }
 
-        $results = $history->stories()->get([
+        return response()->json([
+            'stories' => $this->loadProjectStories($history),
+        ]);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, RelevanceHistory>
+     */
+    private function loadProjectStories(ProjectRelevanceHistory $history)
+    {
+        $results = $history->stories()->with([
+            'results:id,project_id,average_values',
+        ])->get([
             'phrase', 'main_link', 'region',
             'last_check', 'points', 'position',
             'coverage', 'coverage_tf', 'density',
@@ -187,15 +199,14 @@ class HistoryRelevanceController extends Controller
         ]);
 
         foreach ($results as $result) {
-            if (isset($result->results['average_values'])) {
-                $result['average_values'] = json_decode($result->results['average_values']);
+            $averageValues = $result->results->average_values ?? null;
+            if ($averageValues !== null && $averageValues !== '') {
+                $result['average_values'] = json_decode($averageValues, true);
             }
             unset($result->results);
         }
 
-        return response()->json([
-            'stories' => $results
-        ]);
+        return $results;
     }
 
     public function editGroupName(Request $request): JsonResponse
@@ -238,6 +249,8 @@ class HistoryRelevanceController extends Controller
         if (!isset($access) && $object->projectRelevanceHistory->user_id != Auth::id() && !$admin) {
             return abort(403, __("You don't have access to this object"));
         }
+
+        $this->reconcileQueueState($object);
 
         $object->request = json_decode($object->request, true);
         return view('relevance-analysis.show-history', [
@@ -811,6 +824,16 @@ class HistoryRelevanceController extends Controller
     {
         $object = RelevanceHistory::where('id', '=', $request->id)->first();
 
+        if ($object === null) {
+            return response()->json([
+                'message' => 'error',
+                'code' => 500,
+            ]);
+        }
+
+        $this->reconcileQueueState($object);
+        $object->refresh();
+
         if ($object->state == 0) {
             return response()->json([
                 'message' => 'wait',
@@ -823,12 +846,27 @@ class HistoryRelevanceController extends Controller
             ]);
         }
 
+        $latest = RelevanceHistory::where('project_relevance_history_id', '=', $object->project_relevance_history_id)
+            ->orderByDesc('id')
+            ->first();
+
+        $sinceId = (int) $request->input('since_id', 0);
+        if ($sinceId > 0 && ($latest === null || (int) $latest->id <= $sinceId)) {
+            return response()->json([
+                'message' => 'wait',
+                'code' => 200,
+            ]);
+        }
+
         try {
             return response()->json([
                 'message' => 'success',
-                'object' => $object->results->id,
                 'code' => 200,
-                'newObject' => RelevanceHistory::where('project_relevance_history_id', '=', $object->project_relevance_history_id)->latest()->first(),
+                'completedHistoryId' => $latest ? (int) $latest->id : (int) $object->id,
+                'newObject' => $latest ? [
+                    'id' => (int) $latest->id,
+                    'last_check' => $latest->last_check,
+                ] : null,
             ]);
         } catch (Throwable $e) {
             return response()->json([
@@ -837,6 +875,31 @@ class HistoryRelevanceController extends Controller
             ]);
         }
 
+    }
+
+    private function reconcileQueueState(RelevanceHistory $object): void
+    {
+        if ((int) $object->state !== 0) {
+            return;
+        }
+
+        $newerCompleted = RelevanceHistory::where('project_relevance_history_id', '=', $object->project_relevance_history_id)
+            ->where('id', '>', $object->id)
+            ->where('state', '=', 1)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($newerCompleted === null) {
+            return;
+        }
+
+        $newerCompletedAt = $newerCompleted->last_check ?? $newerCompleted->updated_at;
+        if ($newerCompletedAt < $object->updated_at) {
+            return;
+        }
+
+        $object->state = 1;
+        $object->save();
     }
 
     public function showMissingWords(RelevanceHistoryResult $result)
