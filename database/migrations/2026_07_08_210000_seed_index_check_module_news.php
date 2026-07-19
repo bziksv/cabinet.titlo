@@ -19,7 +19,7 @@ class SeedIndexCheckModuleNews extends Migration
 <ul>
 <li><strong>Пакетный режим</strong> — до 500 адресов в одном запуске; в таблице результатов — «Да» / «Нет» по каждой поисковой системе.</li>
 <li><strong>Яндекс и Google</strong> — можно включить обе ПС или одну; для Google выбирается домен (<code>google.ru</code>, <code>google.com</code> и др.).</li>
-<li><strong>Лимиты</strong> — 1 URL в одной ПС = 1 лимит в месяц. Free: 3 · Optimal: 600 · Ultimate: 1500 · Maximum: 2400.</li>
+<li><strong>Лимиты</strong> — 1 URL в одной ПС = 1 лимит в месяц. Бесплатный: 3 · Оптимальный: 600 · Ультимат: 1500 · Максимум: 2400.</li>
 <li><strong>Дубликаты в списке</strong> — повторяющиеся строки подсвечиваются; в проверку идут только уникальные URL (с учётом опции «www/http/https единым URL»).</li>
 <li><strong>Экспорт CSV</strong> — для отчёта заказчику или аудита после релиза.</li>
 <li><strong>Главная и варианты URL</strong> — для корня сайта учитываются <code>www</code>, <code>http/https</code>, <code>/index.php</code>; глубина разбора выдачи до 100 URL.</li>

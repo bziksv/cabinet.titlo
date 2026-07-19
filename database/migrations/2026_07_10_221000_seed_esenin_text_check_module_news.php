@@ -29,7 +29,7 @@ class SeedEseninTextCheckModuleNews extends Migration
 <li><strong>Общий риск и вкладки</strong> — балл по категориям с подсветкой проблем в тексте и HTML.</li>
 <li><strong>Редактор</strong> — визуальный режим и HTML-код, правки в результатах, автосохранение до 3 версий задания.</li>
 <li><strong>Текст и URL</strong> — проверка вставленного текста или страницы по адресу (с селектором контента).</li>
-<li><strong>Лимиты</strong> — 1 проверка = 1 лимит в месяц. Free: 5 · Optimal: 100 · Ultimate: 300 · Maximum: 700.</li>
+<li><strong>Лимиты</strong> — 1 проверка = 1 лимит в месяц. Бесплатный: 5 · Оптимальный: 100 · Ультимат: 300 · Максимум: 700.</li>
 <li><strong>Публичная ссылка</strong> — можно поделиться отчётом с заказчиком (срок по настройке).</li>
 </ul>
 <p>Модуль в меню кабинета: <strong><a href="https://cabinet.titlo.ru/esenin-text-check">cabinet.titlo.ru/esenin-text-check</a></strong>. На сайте — описание и демо без регистрации (2 проверки в сутки): <strong><a href="https://titlo.ru/proverka-teksta-esenin/">titlo.ru/proverka-teksta-esenin</a></strong>.</p>
