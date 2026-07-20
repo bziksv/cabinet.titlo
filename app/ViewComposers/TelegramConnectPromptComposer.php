@@ -3,6 +3,7 @@
 namespace App\ViewComposers;
 
 use App\Services\TelegramConnectBonusService;
+use App\Support\DemoCabinet;
 use App\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -13,7 +14,7 @@ class TelegramConnectPromptComposer
     {
         $user = Auth::user();
 
-        if (!$user instanceof User) {
+        if (!$user instanceof User || DemoCabinet::isDemoUser($user)) {
             $view->with([
                 'showTelegramConnectPrompt' => false,
                 'telegramBotSubscribeUrl' => null,

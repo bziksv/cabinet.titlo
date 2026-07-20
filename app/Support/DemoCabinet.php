@@ -537,6 +537,7 @@ class DemoCabinet
             // layout: учёт времени / кликов (иначе blur→alert→blur цикл на демо)
             'update-statistics',
             'click-tracking',
+            'broadcasting/auth',
             // релевантность — подгрузка готового снимка
             'get-details-history',
             'get-stories',

@@ -76,6 +76,7 @@
     );
     $showMonitoringSchedulePaidPrompt = $isMonitoringPositionsModule
         && auth()->check()
+        && ! \App\Support\DemoCabinet::isCurrentUser()
         && auth()->user()->shouldShowMonitoringSchedulePaidPrompt();
 @endphp
 @if($showMonitoringSchedulePaidPrompt)
@@ -247,7 +248,7 @@
 </script>
 
 @unless(request()->path() == 'utm-marks' || request()->path() == 'all-projects')
-    @if(config('app.env') === 'local')
+    @if(config('app.env') === 'local' || \App\Support\DemoCabinet::isCurrentUser())
         <script>window.__DISABLE_LARAVEL_ECHO__ = true;</script>
         <script src="{{ asset('js/echo-disable-pre.js') }}"></script>
     @else
@@ -259,10 +260,17 @@
     @endif
     @if(config('app.env') === 'local')
         <script>window.cabinetPleaseWaitMessage = @json(__('Cabinet please wait message'));</script>
+        @if(\App\Support\DemoCabinet::isCurrentUser())
+        <script src="{{ asset('js/cabinet-demo-readonly.js') }}?v={{ @filemtime(public_path('js/cabinet-demo-readonly.js')) ?: time() }}"></script>
+        @endif
         <script src="{{ asset('js/app.js') }}?v=no-ws-{{ @filemtime(public_path('js/app.js')) }}"></script>
         @include('partials.cabinet-please-wait-override')
     @else
         <script>window.cabinetPleaseWaitMessage = @json(__('Cabinet please wait message'));</script>
+        @if(\App\Support\DemoCabinet::isCurrentUser())
+        {{-- До app.js: перехват fetch/XHR/jQuery до старта Echo/axios-запросов --}}
+        <script src="{{ asset('js/cabinet-demo-readonly.js') }}?v={{ @filemtime(public_path('js/cabinet-demo-readonly.js')) ?: time() }}"></script>
+        @endif
         <script src="{{ mix('js/app.js') }}"></script>
         @include('partials.cabinet-please-wait-override')
     @endif
@@ -311,9 +319,6 @@
 
 @if(config('app.env') !== 'local')
 <script src="{{ asset('js/demo.js') }}"></script>
-@endif
-@if(\App\Support\DemoCabinet::isCurrentUser())
-<script src="{{ asset('js/cabinet-demo-readonly.js') }}?v={{ @filemtime(public_path('js/cabinet-demo-readonly.js')) ?: time() }}"></script>
 @endif
 @yield('js')
 
