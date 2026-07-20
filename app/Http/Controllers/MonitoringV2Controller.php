@@ -12,7 +12,6 @@ use App\Classes\Monitoring\MonitoringProjectPageSummary;
 use App\Support\MonitoringProjectPublicStats;
 use App\Support\MonitoringPublicShareTtl;
 use App\MonitoringV2UserPreference;
-use App\Support\DemoCabinet;
 use App\Support\MonitoringPositionsSchedule;
 use App\Support\MonitoringV2DebugLog;
 use App\User;
@@ -40,14 +39,6 @@ class MonitoringV2Controller extends Controller
     public function index()
     {
         App::setLocale('ru');
-
-        // Демо: сразу открываем готовый проект с позициями
-        if (DemoCabinet::isCurrentUser()) {
-            $showcase = DemoCabinet::monitoringShowcasePath();
-            if ($showcase) {
-                return redirect($showcase);
-            }
-        }
 
         /** @var User $user */
         $user = Auth::user();

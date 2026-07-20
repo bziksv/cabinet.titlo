@@ -62,13 +62,14 @@
             ];
         @endphp
         <script>
+            @php $isDemoCabinet = \App\Support\DemoCabinet::isCurrentUser(); @endphp
             window.cabinetMonV2Config = {
                 projectCount: {{ (int) $count }},
                 listUrl: @json(route('monitoring.v2.projects.list')),
                 portfolioTrendUrl: @json(route('monitoring.v2.portfolio.top10-trend')),
-                saveColumnsUrl: @json(route('monitoring.v2.preferences.list-columns')),
-                fillSnapshotsUrl: @json(route('monitoring.v2.snapshots.fill')),
-                fillFaviconsUrl: @json(route('monitoring.v2.favicons.fill')),
+                saveColumnsUrl: @json($isDemoCabinet ? null : route('monitoring.v2.preferences.list-columns')),
+                fillSnapshotsUrl: @json($isDemoCabinet ? null : route('monitoring.v2.snapshots.fill')),
+                fillFaviconsUrl: @json($isDemoCabinet ? null : route('monitoring.v2.favicons.fill')),
                 projectStatsUrl: @json(route('monitoring.v2.project.stats')),
                 listColumns: @json($listColumns ?? []),
                 showUrlTemplate: @json(url('/monitoring/__ID__')),
