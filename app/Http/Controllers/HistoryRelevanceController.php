@@ -287,7 +287,14 @@ class HistoryRelevanceController extends Controller
                 ]);
             } elseif (!$history->compressed) {
                 foreach ($history->getOriginal() as $key => $item) {
-                    if ($key != 'id' && $key != 'project_id' && $key != 'created_at' && $key != 'updated_at') {
+                    if ($key != 'id' && $key != 'project_id' && $key != 'created_at' && $key != 'updated_at' && $key != 'compressed' && $key != 'cleaning' && $key != 'hash') {
+                        // Уже сжатый блоб (base64 gz) повторно не трогаем.
+                        if (is_string($item) && $item !== '' && preg_match('/^[A-Za-z0-9+\/=]{32,}$/', $item) && @gzuncompress(base64_decode($item, true) ?: '') !== false) {
+                            continue;
+                        }
+                        if ($item === null || $item === '') {
+                            continue;
+                        }
                         $history[$key] = base64_encode(gzcompress($item, 9));
                     }
                 }

@@ -590,21 +590,32 @@ class SeedDemoCabinet extends Command
         ];
         $payload = ['project_id' => $history->id];
         foreach ($copyCols as $col) {
-            $payload[$col] = $sourceResult->{$col};
+            // Берём сырые значения из БД — без кастов/мутаторов.
+            $payload[$col] = $sourceResult->getAttributes()[$col] ?? $sourceResult->{$col};
         }
+        // Блобы уже в формате base64(gzcompress(...)). compressed=0 заставит
+        // getDetailsInfo сжать их повторно → пустая деталка.
         $payload['cleaning'] = 0;
-        $payload['compressed'] = 0;
+        $payload['compressed'] = 1;
 
         RelevanceHistoryResult::query()->create($payload);
 
+        // Smoke: однослойная распаковка должна давать массив.
+        $cloned = RelevanceHistoryResult::query()->where('project_id', $history->id)->first();
+        $probe = Relevance::uncompressItem($cloned->getAttributes()['unigram_table'] ?? '');
         $ageDays = (int) Carbon::parse($sourceResult->created_at ?: $source->created_at)->diffInDays($now);
-        $this->line(
-            'relevance: OK (клон ' . $sourceEmail
-            . ' history #' . $source->id
-            . ' → #' . $history->id
-            . ', проект ' . $projectName
-            . ', возраст ~' . $ageDays . ' дн., лимит ' . $maxAgeDays . ')'
-        );
+        if (! is_array($probe) || $probe === []) {
+            $this->warn('relevance: клон #' . $history->id . ' не распаковывается — удалите и пересоздайте с --fresh');
+        } else {
+            $this->line(
+                'relevance: OK (клон ' . $sourceEmail
+                . ' history #' . $source->id
+                . ' → #' . $history->id
+                . ', проект ' . $projectName
+                . ', unigram=' . count($probe)
+                . ', возраст ~' . $ageDays . ' дн., лимит ' . $maxAgeDays . ')'
+            );
+        }
     }
 
     /**
