@@ -534,6 +534,9 @@ class DemoCabinet
         return [
             'logout',
             'demo-cabinet/exit',
+            // layout: учёт времени / кликов (иначе blur→alert→blur цикл на демо)
+            'update-statistics',
+            'click-tracking',
             // релевантность — подгрузка готового снимка
             'get-details-history',
             'get-stories',

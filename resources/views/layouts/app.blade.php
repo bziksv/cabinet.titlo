@@ -270,7 +270,7 @@
 
 @include('partials.cabinet-layout-scripts')
 
-@if(optional(Auth::user())->statistic && ! cabinet_skip_heavy_web())
+@if(optional(Auth::user())->statistic && ! cabinet_skip_heavy_web() && ! \App\Support\DemoCabinet::isCurrentUser())
     <script>
         let secondsTrackingRedbox = 0;
         let timeTrackingRedboxInterval = startTracking();

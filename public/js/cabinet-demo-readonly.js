@@ -9,6 +9,13 @@
   var message =
     'Демо-кабинет только для просмотра. Запуски и изменения отключены — зарегистрируйтесь для своей работы.';
 
+  var alertedOnce = false;
+  function notifyReadonly() {
+    if (alertedOnce) return;
+    alertedOnce = true;
+    window.alert(message);
+  }
+
   var allowPrefixes = [];
   try {
     var raw = document.body.getAttribute('data-demo-readonly-allow');
@@ -23,6 +30,8 @@
     allowPrefixes = [
       'logout',
       'demo-cabinet/exit',
+      'update-statistics',
+      'click-tracking',
       'get-details-history',
       'get-stories',
       'get-stories-v2',
@@ -82,7 +91,7 @@
       if (isAllowedForm(e.target)) return;
       e.preventDefault();
       e.stopPropagation();
-      window.alert(message);
+      notifyReadonly();
     },
     true
   );
@@ -95,7 +104,7 @@
       var path = pathFromUrl(settings.url || '');
       if (isAllowedPath(path)) return;
       jqXHR.abort();
-      window.alert(message);
+      notifyReadonly();
     });
   }
 
@@ -107,7 +116,7 @@
       var url = typeof input === 'string' ? input : (input && input.url) || '';
       if (method !== 'GET' && method !== 'HEAD') {
         if (!isAllowedPath(pathFromUrl(url))) {
-          window.alert(message);
+          notifyReadonly();
           return Promise.reject(new Error('demo_readonly'));
         }
       }
