@@ -41,6 +41,12 @@
     flex-shrink: 0;
 }
 
+.cabinet-public-module-brand__icon--wl {
+    object-fit: contain;
+    border-radius: 8px;
+    background: #fff;
+}
+
 .cabinet-public-module-brand__text {
     display: flex;
     flex-direction: column;

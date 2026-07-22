@@ -33,6 +33,7 @@ class SiteAuditCrawl extends Model
         'share_white_label',
         'share_brand_name',
         'share_brand_url',
+        'share_brand_logo',
         'started_at',
         'finished_at',
     ];
@@ -124,7 +125,7 @@ class SiteAuditCrawl extends Model
     }
 
     /**
-     * @return array{enabled:bool,brand_name:?string,brand_url:?string}
+     * @return array{enabled:bool,brand_name:?string,brand_url:?string,brand_logo_url:?string}
      */
     public function whiteLabelMeta(): array
     {
@@ -134,11 +135,31 @@ class SiteAuditCrawl extends Model
             $url = 'https://' . $url;
         }
 
+        $logoUrl = null;
+        $logo = is_string($this->share_brand_logo) ? trim($this->share_brand_logo) : '';
+        if ($logo !== '' && \Illuminate\Support\Facades\Storage::disk('public')->exists($logo)) {
+            $logoUrl = asset('storage/' . ltrim($logo, '/'));
+        }
+
         return [
             'enabled' => $this->isWhiteLabelShare(),
             'brand_name' => $name !== '' ? mb_substr($name, 0, 120) : null,
             'brand_url' => $url !== '' ? mb_substr($url, 0, 255) : null,
+            'brand_logo_url' => $logoUrl,
         ];
+    }
+
+    public function clearWhiteLabelLogo(): void
+    {
+        $logo = is_string($this->share_brand_logo) ? trim($this->share_brand_logo) : '';
+        if ($logo !== '') {
+            try {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($logo);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+        }
+        $this->share_brand_logo = null;
     }
 
     /**

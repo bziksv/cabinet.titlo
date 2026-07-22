@@ -471,6 +471,7 @@ class SiteAuditController extends Controller
         $wantWhite = $request->boolean('white_label');
         $brandName = trim((string) $request->input('brand_name', ''));
         $brandUrl = trim((string) $request->input('brand_url', ''));
+        $clearLogo = $request->boolean('clear_logo');
 
         if ($wantWhite) {
             $user = Auth::user();
@@ -483,10 +484,31 @@ class SiteAuditController extends Controller
             $crawl->share_white_label = true;
             $crawl->share_brand_name = $brandName !== '' ? mb_substr($brandName, 0, 120) : null;
             $crawl->share_brand_url = $brandUrl !== '' ? mb_substr($brandUrl, 0, 255) : null;
+
+            if ($clearLogo) {
+                $crawl->clearWhiteLabelLogo();
+            } elseif ($request->hasFile('brand_logo')) {
+                $request->validate([
+                    'brand_logo' => 'file|mimes:png,jpg,jpeg,webp,gif,svg|max:1024',
+                ]);
+                $file = $request->file('brand_logo');
+                $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+                if (! in_array($ext, ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'], true)) {
+                    $ext = 'png';
+                }
+                $crawl->clearWhiteLabelLogo();
+                $path = $file->storeAs(
+                    'site-audit-wl',
+                    $crawl->id . '.' . $ext,
+                    'public'
+                );
+                $crawl->share_brand_logo = $path ?: null;
+            }
         } else {
             $crawl->share_white_label = false;
             $crawl->share_brand_name = null;
             $crawl->share_brand_url = null;
+            $crawl->clearWhiteLabelLogo();
         }
 
         if (! $crawl->share_token) {
@@ -504,6 +526,7 @@ class SiteAuditController extends Controller
             'white_label' => $wl['enabled'],
             'brand_name' => $wl['brand_name'],
             'brand_url' => $wl['brand_url'],
+            'brand_logo_url' => $wl['brand_logo_url'],
         ]);
     }
 

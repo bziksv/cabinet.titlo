@@ -123,6 +123,22 @@
                                    maxlength="255" placeholder="https://сайт-агентства (необяз.)"
                                    value="{{ $swl['brand_url'] ?? '' }}">
                         </div>
+                        <div class="col-12">
+                            <label class="form-label small mb-1" for="sa-share-logo">Логотип (PNG/JPG/WebP, до 1 МБ)</label>
+                            <input type="file" class="form-control form-control-sm" id="sa-share-logo"
+                                   accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml">
+                            @if(!empty($swl['brand_logo_url']))
+                                <div class="d-flex align-items-center mt-2" style="gap:10px" id="sa-share-logo-preview-wrap">
+                                    <img src="{{ $swl['brand_logo_url'] }}" alt="" width="40" height="40"
+                                         style="object-fit:contain;border:1px solid #e5e7eb;border-radius:6px;background:#fff"
+                                         id="sa-share-logo-preview">
+                                    <label class="form-check small mb-0">
+                                        <input type="checkbox" class="form-check-input" id="sa-share-clear-logo">
+                                        Убрать логотип
+                                    </label>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="sa-share-save-wl">
                         Сохранить оформление ссылки
@@ -545,6 +561,8 @@
                 var shareWl = document.getElementById('sa-share-wl');
                 var shareBrand = document.getElementById('sa-share-brand');
                 var shareBrandUrl = document.getElementById('sa-share-brand-url');
+                var shareLogo = document.getElementById('sa-share-logo');
+                var shareClearLogo = document.getElementById('sa-share-clear-logo');
                 var shareSaveWl = document.getElementById('sa-share-save-wl');
 
                 if (window.location.hash === '#sa-archive') {
@@ -567,6 +585,10 @@
                     fd.append('white_label', (shareWl && shareWl.checked) ? '1' : '0');
                     if (shareBrand) fd.append('brand_name', shareBrand.value || '');
                     if (shareBrandUrl) fd.append('brand_url', shareBrandUrl.value || '');
+                    if (shareClearLogo && shareClearLogo.checked) fd.append('clear_logo', '1');
+                    if (shareLogo && shareLogo.files && shareLogo.files[0]) {
+                        fd.append('brand_logo', shareLogo.files[0]);
+                    }
                     return fd;
                 }
 

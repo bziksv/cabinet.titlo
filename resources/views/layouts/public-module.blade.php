@@ -28,8 +28,12 @@
 <header class="cabinet-public-module-header">
     <div class="container-fluid cabinet-public-module-header__inner">
         @if($isWhiteLabel)
+            @php $wlLogo = !empty($wl['brand_logo_url']) ? (string) $wl['brand_logo_url'] : null; @endphp
             @if($wlUrl)
                 <a href="{{ $wlUrl }}" class="cabinet-public-module-brand text-decoration-none" target="_blank" rel="noopener">
+                    @if($wlLogo)
+                        <img src="{{ $wlLogo }}" alt="" class="cabinet-public-module-brand__icon cabinet-public-module-brand__icon--wl" width="44" height="44">
+                    @endif
                     <span class="cabinet-public-module-brand__text">
                         <span class="cabinet-public-module-brand__name">{{ $wlName }}</span>
                         <span class="cabinet-public-module-brand__tagline">Отчёт аудита сайта</span>
@@ -37,6 +41,9 @@
                 </a>
             @else
                 <div class="cabinet-public-module-brand">
+                    @if($wlLogo)
+                        <img src="{{ $wlLogo }}" alt="" class="cabinet-public-module-brand__icon cabinet-public-module-brand__icon--wl" width="44" height="44">
+                    @endif
                     <span class="cabinet-public-module-brand__text">
                         <span class="cabinet-public-module-brand__name">{{ $wlName }}</span>
                         <span class="cabinet-public-module-brand__tagline">Отчёт аудита сайта</span>
