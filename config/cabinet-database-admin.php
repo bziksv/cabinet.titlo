@@ -6,7 +6,7 @@
  * @see App\Services\Database\DatabaseInventoryService
  */
 return [
-    'version' => '1.2.1s',
+    'version' => '1.2.2s',
 
     /** Таймаут AJAX-превью строк, секунды */
     'row_preview_timeout_seconds' => 15,

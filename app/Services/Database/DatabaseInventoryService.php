@@ -21,9 +21,39 @@ class DatabaseInventoryService
             Cache::forget(self::CACHE_KEY);
         }
 
-        return Cache::remember(self::CACHE_KEY, $ttl, function () {
+        $snapshot = Cache::remember(self::CACHE_KEY, $ttl, function () {
             return $this->buildSnapshot(false);
         });
+
+        // Статусы OPTIMIZE не кэшируем вместе со снимком — иначе после F5 «Идёт…» пропадает
+        return $this->withLiveOptimizeStatus($snapshot);
+    }
+
+    /**
+     * @param array<string, mixed> $snapshot
+     * @return array<string, mixed>
+     */
+    private function withLiveOptimizeStatus(array $snapshot): array
+    {
+        if (! isset($snapshot['tables']) || ! is_array($snapshot['tables'])) {
+            return $snapshot;
+        }
+
+        try {
+            $latest = app(TableOptimizeService::class)->latestRunsByTable();
+        } catch (\Throwable $e) {
+            return $snapshot;
+        }
+
+        foreach ($snapshot['tables'] as $i => $table) {
+            $name = (string) ($table['name'] ?? '');
+            if ($name === '') {
+                continue;
+            }
+            $snapshot['tables'][$i]['optimize'] = $latest[$name] ?? null;
+        }
+
+        return $snapshot;
     }
 
     /**
