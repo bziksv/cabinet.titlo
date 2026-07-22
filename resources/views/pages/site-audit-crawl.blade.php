@@ -53,6 +53,8 @@
          data-status-url="{{ route('pages.site-audit.crawl.status', $crawl->id) }}"
          data-finished="{{ $crawl->isFinished() ? '1' : '0' }}">
 
+        @include('pages.partials.site-audit-beta-banner')
+
         <div class="d-flex flex-wrap justify-content-between align-items-start mb-3">
             <div>
                     <div class="h5 mb-1">{{ optional($project)->domain ?? '—' }}</div>

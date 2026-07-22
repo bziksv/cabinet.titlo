@@ -20,6 +20,8 @@
             <div class="alert alert-success py-2">{{ session('status') }}</div>
         @endif
 
+        @include('pages.partials.site-audit-beta-banner')
+
         <div class="mb-2 text-secondary small d-flex flex-wrap align-items-center" style="gap:8px">
             <span>
                 {{ optional($project)->domain }} ·

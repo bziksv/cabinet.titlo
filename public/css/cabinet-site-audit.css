@@ -16,6 +16,32 @@
   border-radius: 0.75rem;
 }
 
+.cabinet-sa-beta-banner {
+  background: #fffbeb;
+  border-color: #f59e0b !important;
+  color: #78350f;
+}
+
+.cabinet-sa-beta-banner__badge {
+  flex-shrink: 0;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f59e0b;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.cabinet-sa-beta-banner a {
+  font-weight: 600;
+  color: #92400e;
+  text-decoration: underline;
+}
+
 .cabinet-sa-lead__icon {
   display: inline-flex;
   align-items: center;

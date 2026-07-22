@@ -14,6 +14,8 @@
             <div class="alert alert-warning py-2">{{ session('error') }}</div>
         @endif
 
+        @include('pages.partials.site-audit-beta-banner')
+
         <div class="cabinet-sa-lead px-4 py-3 mb-3">
             <div class="d-flex gap-3 align-items-start">
                 <span class="cabinet-sa-lead__icon" aria-hidden="true"><i class="bi bi-clipboard2-pulse"></i></span>
