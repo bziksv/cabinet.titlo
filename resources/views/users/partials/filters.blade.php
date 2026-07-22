@@ -52,6 +52,9 @@
                         <option value="7d">{{ __('Last 7 days') }}</option>
                         <option value="30d">{{ __('Last 30 days') }}</option>
                         <option value="inactive30d">{{ __('Inactive over 30 days') }}</option>
+                        <option value="inactive180d">{{ __('Inactive over 180 days') }}</option>
+                        <option value="inactive360d">{{ __('Inactive over 360 days') }}</option>
+                        <option value="inactive2y">{{ __('Inactive over 2 years') }}</option>
                         <option value="never">{{ __('Never') }}</option>
                     </select>
                 </div>
@@ -104,6 +107,28 @@
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinet-users-filters-reset">
                             {{ __('Reset') }}
                         </button>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="border border-danger-subtle rounded-2 p-2 bg-danger-subtle">
+                        <div class="small text-secondary mb-2">
+                            <i class="bi bi-exclamation-triangle me-1 text-danger"></i>
+                            {{ __('Users inactive purge help') }}
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    id="cabinet-users-purge-2y"
+                                    data-years="2">
+                                <i class="bi bi-trash me-1"></i>{{ __('Users inactive purge 2 years') }}
+                            </button>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    id="cabinet-users-purge-3y"
+                                    data-years="3">
+                                <i class="bi bi-trash me-1"></i>{{ __('Users inactive purge 3 years') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

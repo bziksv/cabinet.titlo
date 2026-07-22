@@ -8,7 +8,7 @@ alwaysApply: true
 При **любом** выкате на prod (`155.212.171.103`, путь `/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru`) после `git pull` / `composer` / `config:cache` / `view:cache` **обязательно**:
 
 1. `sudo -u cabinet_titl_usr /opt/php74/bin/php artisan queue:restart`
-2. `supervisorctl restart` для **всех** групп `cabinet-titlo-*` (default, cluster-*, position, relevance, monitoring-*, competitor-analyse, ai-generation)
+2. `supervisorctl restart` для **всех** групп `cabinet-titlo-*` (default, cluster-*, position, relevance, monitoring-*, competitor-analyse, ai-generation, site-audit)
 
 **Почему:** `queue:work` держит PHP-процесс часами; без рестарта воркеры выполняют jobs **со старым кодом** (пример: XmlRiver после деплоя — частотность падает, failed_jobs растут).
 

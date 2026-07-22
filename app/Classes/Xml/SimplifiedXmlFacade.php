@@ -57,6 +57,22 @@ class SimplifiedXmlFacade extends XmlFacade
 
     public function getXMLResponse(string $searchEngine = 'yandex')
     {
+        $docs = $this->getXMLDocuments($searchEngine);
+
+        return array_values(array_map(static function (array $doc) {
+            return Str::lower((string) ($doc['url'] ?? ''));
+        }, $docs));
+    }
+
+    /**
+     * Документы выдачи с title/snippet.
+     * Google (xmlstock): doc.passages.passage; Яндекс (xmlstock): doc.headline;
+     * XmlRiver: doc.passages / doc.extendedpassage.
+     *
+     * @return list<array{url: string, title: ?string, snippet: ?string}>
+     */
+    public function getXMLDocuments(string $searchEngine = 'yandex'): array
+    {
         $providers = $this->providersForEngine($searchEngine);
         $providerIndex = 0;
 
@@ -102,15 +118,15 @@ class SimplifiedXmlFacade extends XmlFacade
                 }
 
                 if (isset($result['response']['results']['grouping']['group'])) {
-                    $urls = $this->parseResult($result['response']['results']['grouping']['group']);
+                    $docs = $this->parseDocuments($result['response']['results']['grouping']['group']);
                     $this->logDebug('info', 'xml.success', [
                         'engine' => $searchEngine,
                         'provider' => $provider,
-                        'urls' => count($urls),
+                        'urls' => count($docs),
                         'query' => $this->query,
                     ]);
 
-                    return $urls;
+                    return $docs;
                 }
             } catch (Throwable $e) {
                 $this->logDebug('error', 'xml.exception', [
@@ -130,6 +146,348 @@ class SimplifiedXmlFacade extends XmlFacade
         }
 
         return [];
+    }
+
+    /**
+     * Оценка числа найденных документов (Yandex/XML &lt;found priority="all"&gt;).
+     * Достаточно depth=1 — нужны только found, не список docs.
+     *
+     * @return int|null null при ошибке/недоступности провайдера
+     */
+    public function getFoundCount(string $searchEngine = 'yandex'): ?int
+    {
+        $providers = $this->providersForEngine($searchEngine);
+        $providerIndex = 0;
+
+        foreach ($providers as $provider) {
+            $providerIndex++;
+            $this->attempt = $providerIndex;
+            $this->notifyProgress($providerIndex, count($providers));
+
+            try {
+                $result = $this->fetchProviderResponse($searchEngine, $provider);
+                if ($result === null) {
+                    continue;
+                }
+
+                if (isset($result['response']['error'])) {
+                    $code = $this->extractApiErrorCode($result);
+                    // 15 — пустая выдача: found = 0
+                    if ($code === 15) {
+                        return 0;
+                    }
+                    continue;
+                }
+
+                $found = $this->extractFoundCount($result);
+                if ($found !== null) {
+                    $this->logDebug('info', 'xml.found_count', [
+                        'engine' => $searchEngine,
+                        'provider' => $provider,
+                        'found' => $found,
+                        'query' => $this->query,
+                    ]);
+
+                    return $found;
+                }
+
+                // нет found, но есть docs — fallback на число групп
+                if (isset($result['response']['results']['grouping']['group'])) {
+                    $docs = $this->parseDocuments($result['response']['results']['grouping']['group']);
+
+                    return count($docs);
+                }
+            } catch (Throwable $e) {
+                $this->logDebug('error', 'xml.found_exception', [
+                    'engine' => $searchEngine,
+                    'provider' => $provider,
+                    'message' => $e->getMessage(),
+                    'query' => $this->query,
+                ]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    protected function extractFoundCount(array $result): ?int
+    {
+        $candidates = [];
+        if (isset($result['response']['found'])) {
+            $candidates[] = $result['response']['found'];
+        }
+        if (isset($result['response']['results']['found'])) {
+            $candidates[] = $result['response']['results']['found'];
+        }
+
+        foreach ($candidates as $node) {
+            $parsed = $this->parseFoundNode($node);
+            if ($parsed !== null) {
+                return $parsed;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param mixed $node
+     */
+    protected function parseFoundNode($node): ?int
+    {
+        if ($node === null || $node === '') {
+            return null;
+        }
+        if (is_numeric($node)) {
+            return max(0, (int) $node);
+        }
+        if (is_string($node) && preg_match('/^\d+$/', trim($node))) {
+            return (int) trim($node);
+        }
+        if (! is_array($node)) {
+            return null;
+        }
+
+        // Один found с @attributes.priority
+        if (isset($node['@attributes']) || array_key_exists(0, $node) || array_key_exists('#text', $node)) {
+            $priority = isset($node['@attributes']['priority'])
+                ? Str::lower((string) $node['@attributes']['priority'])
+                : '';
+            $value = $this->foundNodeNumericValue($node);
+            if ($value !== null && ($priority === 'all' || $priority === '')) {
+                return $value;
+            }
+            if ($value !== null && $priority !== 'all') {
+                // запомним phrase как запасной — ниже
+            }
+        }
+
+        $all = null;
+        $any = null;
+        $list = isset($node[0]) || (isset($node['@attributes']) === false && $this->isListArray($node))
+            ? $node
+            : [$node];
+
+        foreach ($list as $item) {
+            if (! is_array($item) && is_numeric($item)) {
+                $any = max(0, (int) $item);
+                continue;
+            }
+            if (! is_array($item)) {
+                $flat = $this->foundNodeNumericValue($item);
+                if ($flat !== null) {
+                    $any = $flat;
+                }
+                continue;
+            }
+            $priority = isset($item['@attributes']['priority'])
+                ? Str::lower((string) $item['@attributes']['priority'])
+                : '';
+            $value = $this->foundNodeNumericValue($item);
+            if ($value === null) {
+                continue;
+            }
+            if ($priority === 'all') {
+                $all = $value;
+            } elseif ($any === null) {
+                $any = $value;
+            }
+        }
+
+        return $all !== null ? $all : $any;
+    }
+
+    /**
+     * @param mixed $node
+     */
+    protected function foundNodeNumericValue($node): ?int
+    {
+        if (is_numeric($node)) {
+            return max(0, (int) $node);
+        }
+        if (is_string($node)) {
+            $t = trim($node);
+            if ($t !== '' && preg_match('/^\d+$/', $t)) {
+                return (int) $t;
+            }
+
+            return null;
+        }
+        if (! is_array($node)) {
+            return null;
+        }
+        foreach (['#text', '0', '_'] as $key) {
+            if (isset($node[$key]) && is_numeric($node[$key])) {
+                return max(0, (int) $node[$key]);
+            }
+            if (isset($node[$key]) && is_string($node[$key]) && preg_match('/^\d+$/', trim($node[$key]))) {
+                return (int) trim($node[$key]);
+            }
+        }
+        // иногда значение лежит как единственный числовой leaf без ключа
+        foreach ($node as $key => $val) {
+            if ($key === '@attributes') {
+                continue;
+            }
+            if (is_numeric($val)) {
+                return max(0, (int) $val);
+            }
+            if (is_string($val) && preg_match('/^\d+$/', trim($val))) {
+                return (int) trim($val);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<mixed> $arr
+     */
+    protected function isListArray(array $arr): bool
+    {
+        if ($arr === []) {
+            return false;
+        }
+        $i = 0;
+        foreach ($arr as $k => $_) {
+            if ($k !== $i) {
+                return false;
+            }
+            $i++;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param mixed $xmlResult
+     * @return list<array{url: string, title: ?string, snippet: ?string}>
+     */
+    protected function parseDocuments($xmlResult): array
+    {
+        if (! is_array($xmlResult) || $xmlResult === []) {
+            return [];
+        }
+
+        if (isset($xmlResult['doc'])) {
+            $xmlResult = [$xmlResult];
+        }
+
+        $docs = [];
+        foreach ($xmlResult as $item) {
+            if (! is_array($item) || empty($item['doc']) || ! is_array($item['doc'])) {
+                continue;
+            }
+            $doc = $item['doc'];
+            $url = isset($doc['url']) ? (string) $doc['url'] : '';
+            if ($url === '') {
+                continue;
+            }
+
+            $title = $this->flattenXmlText($doc['title'] ?? null);
+            $snippet = $this->extractSnippet($doc);
+
+            $docs[] = [
+                'url' => $url,
+                'title' => $title !== '' ? $title : null,
+                'snippet' => $snippet !== '' ? $snippet : null,
+            ];
+        }
+
+        return $docs;
+    }
+
+    /**
+     * Сниппет из разных форматов XML-провайдеров.
+     *
+     * @param array<string, mixed> $doc
+     */
+    protected function extractSnippet(array $doc): string
+    {
+        $passages = $doc['passages'] ?? null;
+        if (is_array($passages) && array_key_exists('passage', $passages)) {
+            $fromPassages = $this->flattenXmlText($passages['passage']);
+            if ($fromPassages !== '') {
+                return $fromPassages;
+            }
+        }
+
+        // Яндекс через XmlStock: текст сниппета в headline, passages нет
+        foreach (['headline', 'extendedpassage'] as $key) {
+            if (! array_key_exists($key, $doc)) {
+                continue;
+            }
+            $flat = $this->flattenXmlText($doc[$key]);
+            if ($flat !== '') {
+                return $flat;
+            }
+        }
+
+        $extended = $doc['extendedpassages'] ?? null;
+        if (is_array($extended) && array_key_exists('passage', $extended)) {
+            $items = $extended['passage'];
+            if (! is_array($items)) {
+                return $this->flattenXmlText($items);
+            }
+            // Один passage или список: берём текстовые value / плоский текст
+            if (isset($items['value']) || isset($items['type'])) {
+                $items = [$items];
+            }
+            $parts = [];
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    $flat = $this->flattenXmlText($item);
+                    if ($flat !== '') {
+                        $parts[] = $flat;
+                    }
+                    continue;
+                }
+                $type = isset($item['type']) ? Str::lower((string) $item['type']) : '';
+                if ($type !== '' && ! in_array($type, ['text', 'description', 'snippet'], true)) {
+                    continue;
+                }
+                $flat = $this->flattenXmlText($item['value'] ?? $item);
+                if ($flat !== '') {
+                    $parts[] = $flat;
+                }
+            }
+
+            return trim(implode(' ', $parts));
+        }
+
+        return '';
+    }
+
+    /**
+     * @param mixed $value
+     */
+    protected function flattenXmlText($value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        if (is_string($value) || is_numeric($value)) {
+            return trim(html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        }
+        if (! is_array($value)) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ($value as $key => $item) {
+            if ($key === '@attributes') {
+                continue;
+            }
+            $flat = $this->flattenXmlText($item);
+            if ($flat !== '') {
+                $parts[] = $flat;
+            }
+        }
+
+        return trim(implode(' ', $parts));
     }
 
     /**

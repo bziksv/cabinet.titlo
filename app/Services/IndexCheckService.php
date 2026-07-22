@@ -48,34 +48,117 @@ class IndexCheckService
     }
 
     /**
-     * @return array{indexed: bool, results_count: int, matched_url: ?string, error: ?string}
+     * Оценка числа страниц в индексе ПС по site:{host} (XML found), без полного check().
+     * 1 запрос на движок (depth=1).
+     *
+     * @param list<string> $engines 'yandex'|'google'
+     * @return array<string, array{found: ?int, query: string, error: ?string}>
+     */
+    public static function siteIndexCount(string $hostOrUrl, array $engines = ['yandex', 'google']): array
+    {
+        $bare = self::bareHostFromInput($hostOrUrl);
+        if ($bare === '') {
+            return [];
+        }
+
+        $query = 'site:' . $bare;
+        $out = [];
+
+        foreach ($engines as $engine) {
+            $engine = Str::lower((string) $engine);
+            if (! in_array($engine, ['yandex', 'google'], true)) {
+                continue;
+            }
+            $lr = $engine === 'google'
+                ? (string) config('cabinet-index-check.default_google_lr', '213')
+                : (string) config('cabinet-index-check.default_yandex_lr', '213');
+
+            $hadError = false;
+            $found = self::fetchFoundCount($engine, $lr, $query, $hadError);
+            $out[$engine] = [
+                'found' => $found,
+                'query' => $query,
+                'error' => ($found === null && $hadError) ? 'Ошибка запроса к поисковой системе' : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    private static function bareHostFromInput(string $hostOrUrl): string
+    {
+        $raw = trim($hostOrUrl);
+        if ($raw === '') {
+            return '';
+        }
+        if (! preg_match('#^https?://#i', $raw)) {
+            $raw = 'https://' . $raw;
+        }
+        $parts = parse_url($raw);
+        if (! is_array($parts) || empty($parts['host'])) {
+            return '';
+        }
+        $host = Str::lower((string) $parts['host']);
+
+        return (string) (preg_replace('/^www\./i', '', $host) ?? $host);
+    }
+
+    private static function fetchFoundCount(string $engine, string $lr, string $query, bool &$hadError): ?int
+    {
+        try {
+            $xml = new SimplifiedXmlFacade($lr, 1);
+            $xml->setQuery($query);
+            $found = $xml->getFoundCount($engine);
+
+            if ($found === null) {
+                $hadError = true;
+            }
+
+            return $found;
+        } catch (\Throwable $e) {
+            $hadError = true;
+
+            return null;
+        }
+    }
+
+    /**
+     * @return array{indexed: bool, results_count: int, matched_url: ?string, title: ?string, snippet: ?string, error: ?string}
      */
     private static function probeEngine(string $url, string $engine, string $lr, bool $unifyWww): array
     {
         $defaultDepth = max(10, (int) config('cabinet-index-check.serp_depth', 100));
         $queries = self::siteQueriesForUrl($url, $unifyWww);
-        $urls = [];
+        $docs = [];
         $hadError = false;
 
         foreach ($queries as $query) {
-            $chunk = self::fetchSerpUrls($engine, $lr, $query, $defaultDepth, $hadError);
+            $chunk = self::fetchSerpDocuments($engine, $lr, $query, $defaultDepth, $hadError);
             if ($chunk !== []) {
-                $urls = array_merge($urls, $chunk);
+                $docs = array_merge($docs, $chunk);
             }
         }
 
-        $urls = array_values(array_unique($urls));
+        $docs = self::uniqueDocumentsByUrl($docs);
+        $urls = array_values(array_map(static function (array $doc) {
+            return (string) ($doc['url'] ?? '');
+        }, $docs));
         $matched = self::findMatchingUrl($url, $urls, $unifyWww);
+        $matchedDoc = $matched !== null ? self::findDocumentByUrl($docs, $matched) : null;
 
         if ($matched === null && self::isRootUrl($url)) {
             foreach (self::rootFallbackQueries($url) as $query) {
-                $chunk = self::fetchSerpUrls($engine, $lr, $query, 10, $hadError);
+                $chunk = self::fetchSerpDocuments($engine, $lr, $query, 10, $hadError);
                 if ($chunk === []) {
                     continue;
                 }
-                $urls = array_values(array_unique(array_merge($urls, $chunk)));
+                $docs = self::uniqueDocumentsByUrl(array_merge($docs, $chunk));
+                $urls = array_values(array_map(static function (array $doc) {
+                    return (string) ($doc['url'] ?? '');
+                }, $docs));
                 $matched = self::findMatchingUrl($url, $urls, $unifyWww);
                 if ($matched !== null) {
+                    $matchedDoc = self::findDocumentByUrl($docs, $matched);
                     break;
                 }
             }
@@ -86,27 +169,31 @@ class IndexCheckService
                 'indexed' => false,
                 'results_count' => 0,
                 'matched_url' => null,
+                'title' => null,
+                'snippet' => null,
                 'error' => 'Ошибка запроса к поисковой системе',
             ];
         }
 
         return [
             'indexed' => $matched !== null,
-            'results_count' => count($urls),
+            'results_count' => count($docs),
             'matched_url' => $matched,
+            'title' => $matchedDoc['title'] ?? null,
+            'snippet' => $matchedDoc['snippet'] ?? null,
             'error' => null,
         ];
     }
 
     /**
-     * @return array<int, string>
+     * @return list<array{url: string, title: ?string, snippet: ?string}>
      */
-    private static function fetchSerpUrls(string $engine, string $lr, string $query, int $depth, bool &$hadError): array
+    private static function fetchSerpDocuments(string $engine, string $lr, string $query, int $depth, bool &$hadError): array
     {
         try {
             $xml = new SimplifiedXmlFacade($lr, $depth);
             $xml->setQuery($query);
-            $chunk = $xml->getXMLResponse($engine);
+            $chunk = $xml->getXMLDocuments($engine);
 
             return is_array($chunk) ? $chunk : [];
         } catch (\Throwable $e) {
@@ -114,6 +201,61 @@ class IndexCheckService
 
             return [];
         }
+    }
+
+    /**
+     * @param list<array{url: string, title: ?string, snippet: ?string}> $docs
+     * @return list<array{url: string, title: ?string, snippet: ?string}>
+     */
+    private static function uniqueDocumentsByUrl(array $docs): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ($docs as $doc) {
+            if (! is_array($doc)) {
+                continue;
+            }
+            $url = (string) ($doc['url'] ?? '');
+            if ($url === '') {
+                continue;
+            }
+            $key = Str::lower($url);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = $doc;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array{url: string, title: ?string, snippet: ?string}> $docs
+     * @return array{url: string, title: ?string, snippet: ?string}|null
+     */
+    private static function findDocumentByUrl(array $docs, string $url): ?array
+    {
+        $needle = Str::lower($url);
+        foreach ($docs as $doc) {
+            if (Str::lower((string) ($doc['url'] ?? '')) === $needle) {
+                return $doc;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function fetchSerpUrls(string $engine, string $lr, string $query, int $depth, bool &$hadError): array
+    {
+        $docs = self::fetchSerpDocuments($engine, $lr, $query, $depth, $hadError);
+
+        return array_values(array_map(static function (array $doc) {
+            return (string) ($doc['url'] ?? '');
+        }, $docs));
     }
 
     /**

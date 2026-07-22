@@ -51,6 +51,8 @@
     $phraseCommerceHistoryName = null;
     $textAnalyzerMonthlyName = null;
     $textUniquenessHistoryName = null;
+    $indexCheckMonthlyName = null;
+    $indexCheckHistoryName = null;
     foreach ($plans as $plan) {
         if (isset($plan['settings']['SearchSuggestions']['name'])) {
             $suggestMonthlyName = $plan['settings']['SearchSuggestions']['name'];
@@ -82,10 +84,17 @@
         if (isset($plan['settings']['TextUniquenessHistory']['name'])) {
             $textUniquenessHistoryName = $plan['settings']['TextUniquenessHistory']['name'];
         }
+        if (isset($plan['settings']['IndexCheck']['name'])) {
+            $indexCheckMonthlyName = $plan['settings']['IndexCheck']['name'];
+        }
+        if (isset($plan['settings']['IndexCheckHistory']['name'])) {
+            $indexCheckHistoryName = $plan['settings']['IndexCheckHistory']['name'];
+        }
         if ($suggestMonthlyName && $suggestHistoryName && $siteTypesMonthlyName && $siteTypesHistoryName
             && $domainRecordsMonthlyName && $domainRecordsHistoryName
             && $phraseCommerceMonthlyName && $phraseCommerceHistoryName
-            && $textAnalyzerMonthlyName && $textUniquenessHistoryName) {
+            && $textAnalyzerMonthlyName && $textUniquenessHistoryName
+            && $indexCheckMonthlyName && $indexCheckHistoryName) {
             break;
         }
     }
@@ -97,6 +106,8 @@
         'PhraseCommerce' => 'PhraseCommerceHistory',
         // Сохранения проверок уникальности — в UI анализа текста
         'TextAnalyzer' => 'TextUniquenessHistory',
+        'IndexCheck' => 'IndexCheckHistory',
+        'SiteAudit' => 'SiteAuditCrawls',
     ];
 
     $featureRows = [];
@@ -122,6 +133,12 @@
             if ($code === 'TextUniquenessHistory' || ($textUniquenessHistoryName && $name === $textUniquenessHistoryName)) {
                 continue;
             }
+            if ($code === 'IndexCheckHistory' || ($indexCheckHistoryName && $name === $indexCheckHistoryName)) {
+                continue;
+            }
+            if ($code === 'SiteAuditCrawls') {
+                continue;
+            }
             $historyCode = $dualLimitCodes[$code] ?? null;
             if (!$historyCode) {
                 if ($suggestMonthlyName && $name === $suggestMonthlyName) {
@@ -134,6 +151,8 @@
                     $historyCode = 'PhraseCommerceHistory';
                 } elseif ($textAnalyzerMonthlyName && $name === $textAnalyzerMonthlyName) {
                     $historyCode = 'TextUniquenessHistory';
+                } elseif ($indexCheckMonthlyName && $name === $indexCheckMonthlyName) {
+                    $historyCode = 'IndexCheckHistory';
                 }
             }
             if (!isset($featureRows[$name])) {
@@ -236,6 +255,19 @@
             <div class="alert alert-info alert-dismissible fade show" role="alert">
                 <i class="bi bi-info-circle me-2"></i>{{ session('info') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
+            </div>
+        @endif
+        @if(!empty($staleRoleNotice))
+            <div class="alert alert-warning" role="alert">
+                <div class="fw-semibold mb-1">
+                    {{ __('Last subscription') }}: {{ $staleRoleNotice['name'] }}
+                </div>
+                <div class="small mb-0">
+                    {{ __('No active paid subscription') }}
+                    @if(!empty($staleRoleNotice['expired_at']))
+                        · {{ __('Subscription expired on :date', ['date' => $staleRoleNotice['expired_at']]) }}
+                    @endif
+                </div>
             </div>
         @endif
 

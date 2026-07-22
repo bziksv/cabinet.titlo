@@ -17,7 +17,8 @@ class SiteAuditButtons extends Buttons
         $temp->content = $this->wrapTag(__('Site audit'), 'p');
         $temp->icon = 'fas fa-tasks';
         $temp->bg = 'bg-info';
-        $temp->small = __('In developing');
+        $temp->small = __('Site audit');
+        $temp->href = route('pages.site-audit');
 
         return $temp;
     }

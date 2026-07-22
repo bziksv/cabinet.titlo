@@ -452,6 +452,24 @@ return [
             ],
         ],
         [
+            'slug' => 'site-audit',
+            'title' => 'Аудит сайта',
+            'route' => 'pages.site-audit',
+            'items' => [
+                [
+                    'id' => 'site-audit-crawl-done',
+                    'title' => 'Аудит сайта завершён',
+                    'trigger' => 'После успешного завершения краула аудита',
+                    'audience' => 'Владелец проекта аудита',
+                    'channels' => ['email_event'],
+                    'tariff' => 'Все тарифы',
+                    'cron' => null,
+                    'example_email' => 'Письмо со ссылкой на сводку краула и корзинами ошибок',
+                    'code_ref' => 'SiteAuditCrawlCompletedNotification',
+                ],
+            ],
+        ],
+        [
             'slug' => 'auth',
             'title' => 'Users notify module auth',
             'route' => 'login',

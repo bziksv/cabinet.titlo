@@ -1,0 +1,16 @@
+---
+description: После каждой завершённой задачи/этапа Site Audit — обновлять полный чеклист (волны + матрица Labrika)
+alwaysApply: true
+---
+
+# Site Audit — обновление чеклиста
+
+Когда работа касается **Site Audit** / краула / `site_audit` / proxy2 / HTML-снимков аудита:
+
+1. Источник правды:  
+   `titlo.ru/docs/cabinet-site-audit-implementation-checklist.md`  
+   (Часть «Этапность» + Часть I платформа + Часть II матрица ≈100+ отчётов).
+2. После каждой завершённой задачи: `[x]`, статус этапа/волны, Changelog.
+3. Отчёт ✅ только по DoD Части II.
+4. **proxy2 / remote — в самую последнюю очередь:** не трогать infra/HTML/remote DB, пока модуль обкатывается на local/cabinet. Волны 3–4 стартуют только по явному «пора remote».
+5. После cutover (когда дойдём): воркеры/HTML на proxy2; не LTE/3proxy; restart `site_audit` на proxy2.

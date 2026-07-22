@@ -126,14 +126,14 @@
                     </div>
                 </form>
 
-                <div class="social-auth-links text-center">
+                <div class="social-auth-links text-center mt-2">
                     @if (Route::has('password.request'))
                         <a href="{{ route('password.request') }}" target="_blank" class="btn btn-block btn-primary">
                             <i class="fas fa-key mr-2"></i> {{ __('Forgot Your Password?') }}
                         </a>
                     @endif
                     @if (Route::has('login'))
-                        <a href="{{ route('login') }}" class="btn btn-block btn-danger">
+                        <a href="{{ route('login') }}" class="btn btn-block btn-danger mt-2">
                             <i class="fas fa-user mr-2"></i> {{ __('Login membership') }}
                         </a>
                     @endif

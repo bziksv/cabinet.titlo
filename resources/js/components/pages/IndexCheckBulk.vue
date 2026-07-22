@@ -142,21 +142,50 @@
                 <table class="table table-striped table-hover mb-0 cabinet-ic-results-table">
                     <thead>
                         <tr>
-                            <th>{{ colUrl }}</th>
-                            <th class="text-center">{{ colYandex }}</th>
-                            <th class="text-center">{{ colGoogle }}</th>
+                            <th class="cabinet-ic-col-url">{{ colUrl }}</th>
+                            <th class="cabinet-ic-col-engine">{{ colYandex }}</th>
+                            <th class="cabinet-ic-col-engine">{{ colGoogle }}</th>
                         </tr>
                     </thead>
                     <tbody v-if="filteredItems.length">
                         <tr v-for="row in filteredItems" :key="row.id">
-                            <td class="font-monospace small text-break">{{ row.url }}</td>
-                            <td class="text-center" v-html="renderEngineCell(row.yandex)"></td>
-                            <td class="text-center" v-html="renderEngineCell(row.google)"></td>
+                            <td class="cabinet-ic-url-cell align-top" v-html="renderUrlCell(row.url)"></td>
+                            <td class="cabinet-ic-engine-cell align-top" v-html="renderEngineCell(row.yandex)"></td>
+                            <td class="cabinet-ic-engine-cell align-top" v-html="renderEngineCell(row.google)"></td>
                         </tr>
                     </tbody>
                     <tbody v-else>
                         <tr>
                             <td colspan="3" class="text-center text-secondary py-4">{{ searchEmpty }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section v-if="savedHistories.length" class="cabinet-ic-panel card border shadow-sm mt-3">
+            <div class="card-header py-3">
+                <h2 class="cabinet-ic-step-title h6 mb-0">
+                    <span class="cabinet-ic-step-badge">3</span>
+                    <span>{{ historyTitle }}</span>
+                </h2>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 cabinet-ic-results-table cabinet-ic-history-table">
+                    <thead>
+                        <tr>
+                            <th class="cabinet-ic-col-url">{{ colUrl }}</th>
+                            <th class="cabinet-ic-col-engine">{{ colYandex }}</th>
+                            <th class="cabinet-ic-col-engine">{{ colGoogle }}</th>
+                            <th class="cabinet-ic-col-date text-nowrap">Дата</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in savedHistories" :key="'h-' + row.id">
+                            <td class="cabinet-ic-url-cell align-top" v-html="renderUrlCell(row.url)"></td>
+                            <td class="cabinet-ic-engine-cell align-top" v-html="renderEngineCell(row.yandex)"></td>
+                            <td class="cabinet-ic-engine-cell align-top" v-html="renderEngineCell(row.google)"></td>
+                            <td class="small text-secondary text-nowrap align-top">{{ row.created_at }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -227,6 +256,10 @@ export default {
         colUrl: { type: String, required: true },
         colYandex: { type: String, required: true },
         colGoogle: { type: String, required: true },
+        titleLabel: { type: String, default: "Title" },
+        snippetLabel: { type: String, default: "Сниппет" },
+        historyTitle: { type: String, default: "Сохранённые проверки" },
+        historyEmpty: { type: String, default: "Пока нет сохранённых проверок" },
         yesLabel: { type: String, required: true },
         noLabel: { type: String, required: true },
         errLabel: { type: String, required: true },
@@ -251,6 +284,7 @@ export default {
         delayMs: { type: Number, default: 1200 },
         demoItemsJson: { type: String, default: "[]" },
         demoUrls: { type: String, default: "" },
+        historiesJson: { type: String, default: "[]" },
     },
     data() {
         return {
@@ -267,10 +301,12 @@ export default {
             localRemaining: this.remaining,
             pendingUrlList: [],
             urlSearch: "",
+            savedHistories: [],
         };
     },
     mounted() {
         this.applyDemoShowcase();
+        this.loadSavedHistories();
     },
     computed: {
         googleDomains() {
@@ -285,6 +321,14 @@ export default {
         },
         canSubmit() {
             return this.urlsTrimmed && (this.yandex || this.google);
+        },
+        hasDemoShowcase() {
+            try {
+                const items = JSON.parse(this.demoItemsJson || "[]");
+                return Array.isArray(items) && items.length > 0;
+            } catch (e) {
+                return false;
+            }
         },
         progressPercent() {
             if (!this.totalCount) return 0;
@@ -478,6 +522,20 @@ export default {
             }
             if (!list.length) return;
 
+            // Демо-кабинет: готовый снимок, без живых запросов к XmlRiver.
+            if (this.hasDemoShowcase) {
+                this.loading = true;
+                this.errorMessage = "";
+                this.totalCount = list.length;
+                this.doneCount = 0;
+                this.items = [];
+                window.setTimeout(() => {
+                    this.applyDemoShowcase();
+                    this.loading = false;
+                }, 280);
+                return;
+            }
+
             const needed = list.length * this.checkCost;
             if (this.limit !== null && this.localRemaining !== null && needed > this.localRemaining) {
                 this.errorMessage = this.formatTemplate(this.confirmInsufficient, {
@@ -521,6 +579,18 @@ export default {
                         yandex: result.yandex,
                         google: result.google,
                     });
+                    if (data.history && data.history.id) {
+                        this.savedHistories = [
+                            {
+                                id: data.history.id,
+                                url: data.history.url || result.url || url,
+                                created_at: data.history.created_at || "",
+                                yandex: result.yandex,
+                                google: result.google,
+                            },
+                            ...this.savedHistories,
+                        ].slice(0, 30);
+                    }
                 })
                 .catch((error) => {
                     const msg = error.response?.data?.message;
@@ -542,15 +612,51 @@ export default {
                 });
         },
 
+        renderUrlCell(url) {
+            const raw = String(url || "").trim();
+            if (!raw) {
+                return '<span class="text-muted">—</span>';
+            }
+            const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+            const soft = _.escape(raw).replace(/([:/?&=#_.-])/g, "$1<wbr>");
+            return (
+                `<a class="cabinet-ic-url-link" href="${_.escape(href)}" ` +
+                `target="_blank" rel="noopener noreferrer" title="${_.escape(raw)}">${soft}</a>`
+            );
+        },
+
         renderEngineCell(engine) {
             if (!engine) return '<span class="text-muted">—</span>';
             if (engine.error) {
                 return `<span class="badge text-bg-warning">${_.escape(engine.error)}</span>`;
             }
-            if (engine.indexed) {
-                return `<span class="badge text-bg-success">${_.escape(this.yesLabel)}</span>`;
+            let badge = engine.indexed
+                ? `<span class="badge text-bg-success">${_.escape(this.yesLabel)}</span>`
+                : `<span class="badge text-bg-secondary">${_.escape(this.noLabel)}</span>`;
+            if (!engine.indexed) {
+                return badge;
             }
-            return `<span class="badge text-bg-secondary">${_.escape(this.noLabel)}</span>`;
+            const parts = [badge];
+            if (engine.title) {
+                parts.push(
+                    `<div class="small fw-semibold mt-1">${_.escape(engine.title)}</div>`
+                );
+            }
+            if (engine.snippet) {
+                parts.push(
+                    `<div class="small text-secondary mt-1">${_.escape(engine.snippet)}</div>`
+                );
+            }
+            return parts.join("");
+        },
+
+        loadSavedHistories() {
+            try {
+                const rows = JSON.parse(this.historiesJson || "[]");
+                this.savedHistories = Array.isArray(rows) ? rows : [];
+            } catch (e) {
+                this.savedHistories = [];
+            }
         },
 
         clearResults() {
@@ -618,12 +724,24 @@ export default {
 
         exportCsv() {
             const rows = this.urlSearchTrimmed ? this.filteredItems : this.items;
-            const lines = [["URL", this.colYandex, this.colGoogle].join(";")];
+            const lines = [[
+                "URL",
+                this.colYandex,
+                this.titleLabel + " Yandex",
+                this.snippetLabel + " Yandex",
+                this.colGoogle,
+                this.titleLabel + " Google",
+                this.snippetLabel + " Google",
+            ].join(";")];
             rows.forEach((row) => {
                 lines.push([
                     row.url,
                     this.engineCsv(row.yandex),
+                    this.engineField(row.yandex, "title"),
+                    this.engineField(row.yandex, "snippet"),
                     this.engineCsv(row.google),
+                    this.engineField(row.google, "title"),
+                    this.engineField(row.google, "snippet"),
                 ].join(";"));
             });
             const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -637,6 +755,11 @@ export default {
             if (!engine) return "—";
             if (engine.error) return engine.error;
             return engine.indexed ? this.yesLabel : this.noLabel;
+        },
+
+        engineField(engine, key) {
+            if (!engine || !engine[key]) return "";
+            return String(engine[key]).replace(/;/g, ",");
         },
     },
 };

@@ -2,7 +2,7 @@
 
 /** Админ: /users */
 return [
-    'version' => '1.2.6s',
+    'version' => '1.2.8s',
 
     /** Неактивность владельца (дней) для отчёта «зависшие расписания мониторинга». */
     'stale_monitoring_inactive_days' => (int) env('CABINET_USERS_STALE_MONITORING_DAYS', 90),

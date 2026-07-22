@@ -216,6 +216,24 @@ class LimitsComposer
                     'position' => 4,
                 ];
 
+            case 'IndexCheckHistory':
+                return [
+                    'count' => \App\Support\IndexCheckLimits::savedCount($user),
+                    'position' => 5,
+                ];
+
+            case 'SiteAudit':
+                return [
+                    'count' => 0,
+                    'position' => 4,
+                ];
+
+            case 'SiteAuditCrawls':
+                return [
+                    'count' => \App\Support\SiteAuditLimits::crawlsUsedThisMonth($user),
+                    'position' => 5,
+                ];
+
             case 'EseninTextCheck':
                 return [
                     'count' => \App\Support\EseninTextCheckLimits::usedForUser($user),
@@ -342,6 +360,15 @@ class LimitsComposer
 
             case 'IndexCheck':
                 return 4;
+
+            case 'IndexCheckHistory':
+                return 5;
+
+            case 'SiteAudit':
+                return 4;
+
+            case 'SiteAuditCrawls':
+                return 5;
 
             case 'EseninTextCheck':
                 return 4;

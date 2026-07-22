@@ -27,6 +27,9 @@
         @endif
         @if($name)
             <div class="mb-2"><span class="badge text-bg-primary">{{ $name }}</span></div>
+            @if(!empty($tariffValidUntil))
+                <p class="text-secondary small mb-2">{{ $tariffValidUntil }}</p>
+            @endif
         @endif
         <ul class="list-group list-group-flush text-start small mt-2">
             <li class="list-group-item d-flex justify-content-between px-0">

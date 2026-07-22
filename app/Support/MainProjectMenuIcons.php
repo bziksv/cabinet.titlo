@@ -62,6 +62,8 @@ class MainProjectMenuIcons
         45 => '<i class="fas fa-map-marked-alt"></i>',
         // Уникальность текста (id после миграции может быть 46)
         46 => '<i class="fas fa-fingerprint"></i>',
+        // Аудит сайта
+        49 => '<i class="fas fa-tasks"></i>',
         // UTM-метки
         9 => '<i class="fas fa-tags"></i>',
         // Генератор паролей

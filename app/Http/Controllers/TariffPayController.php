@@ -30,8 +30,9 @@ class TariffPayController extends Controller
         $this->middleware(function ($request, $next) {
             $this->user = Auth::user();
 
-            if ($this->isSubscribe())
-                $this->active = $this->user->pay()->active()->first();
+            if ($this->isSubscribe()) {
+                $this->active = $this->user->activeTariffPay();
+            }
 
             return $next($request);
         });
@@ -52,13 +53,38 @@ class TariffPayController extends Controller
         if ($this->isSubscribe()) {
             $model = $this->active;
             $tariff = new $model->class_tariff;
-            $actual->put('info', [
+            $info = [
                 ['title' => __('Tariff'), 'value' => $tariff->name()],
-                ['title' => __('Days left'), 'value' => $model->active_to->diffInDays()],
-                ['title' => __('Active to'), 'value' => $model->active_to->toDayDateTimeString()]
-            ]);
-
+            ];
+            if ((int) $model->sum === 0) {
+                $info[] = ['title' => __('Granted manually'), 'value' => __('Yes')];
+                if ($model->active_to) {
+                    $info[] = ['title' => __('Valid until'), 'value' => $model->active_to->format('d.m.Y H:i')];
+                }
+            } else {
+                $info[] = ['title' => __('Days left'), 'value' => max(0, $model->active_to->diffInDays())];
+                $info[] = ['title' => __('Active to'), 'value' => $model->active_to->format('d.m.Y H:i')];
+            }
+            $actual->put('info', $info);
             $actual->put('data', $model);
+        }
+
+        $roleTariff = $this->user->tariff();
+        $staleRoleNotice = null;
+        if (! $this->isSubscribe()) {
+            // Залипшая платная роль без активной записи
+            if ($roleTariff && $roleTariff->code() !== 'Free') {
+                $lastPay = $this->user->pay()->orderByDesc('id')->first();
+                $staleRoleNotice = [
+                    'name' => $roleTariff->name(),
+                    'expired_at' => $lastPay && $lastPay->active_to
+                        ? $lastPay->active_to->format('d.m.Y')
+                        : null,
+                ];
+            } else {
+                // Обычный Free после окончания оплаты — показать когда закончилась
+                $staleRoleNotice = $this->user->lastExpiredSubscriptionNotice();
+            }
         }
 
         $total = $this->getTotal();
@@ -85,7 +111,7 @@ class TariffPayController extends Controller
             $tariffsArray[$tariffKey]['settings'] = collect($tariffsArray[$tariffKey]['settings'])->sortBy('position')->toArray();
         }
 
-        return view('tariff.index', compact('select', 'total', 'actual', 'tariffsArray'));
+        return view('tariff.index', compact('select', 'total', 'actual', 'tariffsArray', 'staleRoleNotice'));
     }
 
     public function total(Request $request)
@@ -164,7 +190,7 @@ class TariffPayController extends Controller
 
     public function isSubscribe()
     {
-        return $this->user->pay()->active()->count() ? true : false;
+        return $this->user->activeTariffPay() !== null;
     }
 
     /**

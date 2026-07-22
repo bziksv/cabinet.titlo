@@ -37,6 +37,10 @@
             col-url="{{ __('url') }}"
             col-yandex="{{ __('Yandex') }}"
             col-google="{{ __('Google') }}"
+            title-label="{{ __('Index check title label') }}"
+            snippet-label="{{ __('Index check snippet label') }}"
+            history-title="{{ __('Index check history title') }}"
+            history-empty="{{ __('Index check history empty') }}"
             yes-label="{{ __('Yes') }}"
             no-label="{{ __('No') }}"
             err-label="{{ __('Error') }}"
@@ -58,9 +62,21 @@
             :remaining="{{ $remaining !== null ? (int) $remaining : 'null' }}"
             :cost-per-engine="{{ (int) $costPerEngine }}"
             google-domains-json="{{ json_encode($googleDomains, JSON_UNESCAPED_UNICODE) }}"
-            @php $demoIndex = \App\Support\DemoCabinet::isCurrentUser() ? \App\Support\DemoCabinet::indexCheckShowcase() : null; @endphp
+            @php
+                $demoIndex = \App\Support\DemoCabinet::isCurrentUser() ? \App\Support\DemoCabinet::indexCheckShowcase() : null;
+                $historyPayload = collect($histories ?? [])->map(function ($row) {
+                    return [
+                        'id' => $row->id,
+                        'url' => $row->url,
+                        'created_at' => optional($row->created_at)->format('d.m.Y H:i'),
+                        'yandex' => is_array($row->result) ? ($row->result['yandex'] ?? null) : null,
+                        'google' => is_array($row->result) ? ($row->result['google'] ?? null) : null,
+                    ];
+                })->values();
+            @endphp
             demo-items-json='@json($demoIndex["items"] ?? [])'
             demo-urls="{{ $demoIndex['urls'] ?? '' }}"
+            histories-json='@json($historyPayload)'
         ></index-check-bulk>
     </div>
 @endcomponent

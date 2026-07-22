@@ -45,6 +45,12 @@ Route::get('public/share/html-editor/{token}', 'HtmlEditorPublicShareController@
 Route::get('public/share/site-monitoring/{token}', 'SiteMonitoringPublicShareController@show')->name('site.monitoring.public.share.view');
 Route::get('public/share/domain-information/{token}', 'DomainInformationPublicShareController@show')->name('domain.information.public.share.view');
 Route::get('public/share/monitoring-v2/{token}', 'MonitoringPublicShareController@show')->name('monitoring.public.share.view');
+Route::get('public/share/site-audit/{token}', 'SiteAuditPublicShareController@show')->name('site-audit.public.share.view');
+Route::get('public/share/site-audit/{token}/report/{code}', 'SiteAuditPublicShareController@showReport')->name('site-audit.public.share.report');
+Route::get('public/share/site-audit/{token}/report/{code}/csv', 'SiteAuditPublicShareController@exportCsv')->name('site-audit.public.share.csv');
+Route::get('public/share/site-audit/{token}/report/{code}/xlsx', 'SiteAuditPublicShareController@exportReportXlsx')->name('site-audit.public.share.report.xlsx');
+Route::get('public/share/site-audit/{token}/xlsx', 'SiteAuditPublicShareController@exportCrawlXlsx')->name('site-audit.public.share.xlsx');
+Route::get('public/share/site-audit/{token}/docx', 'SiteAuditPublicShareController@exportCrawlDocx')->name('site-audit.public.share.docx');
 Route::get('public/share/esenin-text-check/{token}', 'EseninTextCheckPublicShareController@show')->name('esenin.text.check.public.share.view');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/email/open/trigger/{token}.png', 'TriggerCampaignEmailOpenController@pixel')->name('email.trigger.open');
@@ -83,6 +89,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('monitoring/admin/stale-schedules/disable', 'MonitoringAdminController@disableStaleSchedules')->name('monitoring.admin.stale-schedules.disable');
     Route::post('users/storage-footprint/refresh', 'UsersController@refreshStorageFootprint')->name('users.storage-footprint.refresh');
     Route::get('users/{user}/storage-footprint', 'UsersController@userStorageFootprint')->name('users.storage-footprint.show');
+    Route::post('users/inactive-purge/preview', 'UsersController@inactivePurgePreview')->name('users.inactive-purge.preview');
+    Route::post('users/inactive-purge', 'UsersController@inactivePurge')->name('users.inactive-purge');
     Route::resource('users', 'UsersController');
 
     Route::post('/manage-access/assignPermission', 'ManageAccessController@assignPermission');
@@ -211,6 +219,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('http-headers/{url?}', "PagesController@httpHeaders")->name('pages.headers')->middleware('permission:Http headers');
 
     Route::get('index-check', 'IndexCheckController@index')->name('pages.index-check')->middleware('permission:Index check');
+
+    Route::get('site-audit', 'SiteAuditController@index')->name('pages.site-audit')->middleware('permission:Site audit');
+    Route::post('site-audit/start', 'SiteAuditController@start')->name('pages.site-audit.start')->middleware('permission:Site audit');
+    Route::delete('site-audit/project/{id}', 'SiteAuditController@destroyProject')->name('pages.site-audit.project.destroy')->middleware('permission:Site audit');
+    Route::post('site-audit/project/{id}/schedule', 'SiteAuditController@saveSchedule')->name('pages.site-audit.schedule')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}', 'SiteAuditController@showCrawl')->name('pages.site-audit.crawl.show')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/repeat', 'SiteAuditController@repeatCrawl')->name('pages.site-audit.crawl.repeat')->middleware('permission:Site audit');
+    Route::delete('site-audit/crawl/{id}', 'SiteAuditController@destroyCrawl')->name('pages.site-audit.crawl.destroy')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/share', 'SiteAuditController@createShare')->name('pages.site-audit.share.create')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/share/revoke', 'SiteAuditController@revokeShare')->name('pages.site-audit.share.revoke')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}/status', 'SiteAuditController@crawlStatus')->name('pages.site-audit.crawl.status')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}/report/{code}', 'SiteAuditController@showReport')->name('pages.site-audit.report.show')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}/report/{code}/csv', 'SiteAuditController@exportReportCsv')->name('pages.site-audit.report.csv')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}/report/{code}/xlsx', 'SiteAuditController@exportReportXlsx')->name('pages.site-audit.report.xlsx')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}/xlsx', 'SiteAuditController@exportCrawlXlsx')->name('pages.site-audit.crawl.xlsx')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}/docx', 'SiteAuditController@exportCrawlDocx')->name('pages.site-audit.crawl.docx')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}/diff', 'SiteAuditController@showDiff')->name('pages.site-audit.crawl.diff')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/ignore', 'SiteAuditController@ignoreFinding')->name('pages.site-audit.ignore')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/ignore/restore', 'SiteAuditController@restoreIgnore')->name('pages.site-audit.ignore.restore')->middleware('permission:Site audit');
 
     Route::get('search-suggestions', 'SearchSuggestionsController@index')->name('pages.search-suggestions')->middleware('permission:Search suggestions');
     Route::post('search-suggestions/collect', 'SearchSuggestionsController@collect')->name('pages.search-suggestions.collect')->middleware('permission:Search suggestions');

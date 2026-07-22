@@ -53,6 +53,7 @@ class ProfilesController extends Controller
         $user = $this->user;
         $tariff = $user->tariff();
         $name = ($tariff) ? $tariff->name() : null;
+        $tariffValidUntil = $user->tariffValidUntilLabel();
 
         $tariffProperties = [];
         $tariffSettings = $user->tariffSettings()
@@ -69,6 +70,7 @@ class ProfilesController extends Controller
             'user' => $user,
             'lang' => $lang,
             'name' => $name,
+            'tariffValidUntil' => $tariffValidUntil,
             'tariffProperties' => $tariffProperties,
             'telegramConnected' => $user->isTelegramConnected(),
             'notificationGroups' => app(UserNotificationPreferenceService::class)->profileGroupsForUser($user),

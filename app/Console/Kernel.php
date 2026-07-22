@@ -74,6 +74,7 @@ class Kernel extends ConsoleKernel
 
         $schedule->call(new QueueStatsSampler())->everyFiveMinutes();
         $schedule->call(new QueueDailyStatsRollup())->dailyAt('00:05');
+        $schedule->command('site-audit:run-schedules')->hourly();
 
         // Delete relevance histories (see relevance_analysis_config.cleaning_interval)
         $schedule->call(new RelevanceCleaningResults())->daily();

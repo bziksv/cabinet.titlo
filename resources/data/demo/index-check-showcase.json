@@ -7,12 +7,16 @@
                 "indexed": true,
                 "results_count": 12,
                 "matched_url": "https:\/\/titlo.ru\/",
+                "title": "Титло — SEO-кабинет для продвижения",
+                "snippet": "Сервисы Титло: релевантность, мониторинг позиций, кластеризация и проверка индексации страниц.",
                 "error": null
             },
             "google": {
                 "indexed": true,
                 "results_count": 8,
                 "matched_url": "https:\/\/titlo.ru\/",
+                "title": "Titlo — SEO tools",
+                "snippet": "Cabinet tools for SEO: relevance analysis, rank tracking, clustering and index checks.",
                 "error": null
             }
         },
@@ -22,12 +26,16 @@
                 "indexed": true,
                 "results_count": 3,
                 "matched_url": "https:\/\/titlo.ru\/modules\/",
+                "title": "Модули Титло",
+                "snippet": "Каталог модулей кабинета: анализ текста, конкуренты, мета-теги, индексация и сниппеты.",
                 "error": null
             },
             "google": {
                 "indexed": false,
                 "results_count": 0,
                 "matched_url": null,
+                "title": null,
+                "snippet": null,
                 "error": null
             }
         },
@@ -37,12 +45,16 @@
                 "indexed": false,
                 "results_count": 0,
                 "matched_url": null,
+                "title": null,
+                "snippet": null,
                 "error": null
             },
             "google": {
                 "indexed": true,
                 "results_count": 2,
                 "matched_url": "https:\/\/demo-shop.ru\/catalog\/divany\/",
+                "title": "Диваны — каталог demo-shop",
+                "snippet": "Купить диван недорого: каталог моделей с доставкой по Москве.",
                 "error": null
             }
         }

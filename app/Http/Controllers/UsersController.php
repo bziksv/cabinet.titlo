@@ -574,6 +574,21 @@ class UsersController extends Controller
                 $q->whereNull('last_online_at')
                     ->orWhere('last_online_at', '<', Carbon::now()->subDays(30));
             });
+        } elseif ($online === 'inactive180d') {
+            $query->where(function ($q) {
+                $q->whereNull('last_online_at')
+                    ->orWhere('last_online_at', '<', Carbon::now()->subDays(180));
+            });
+        } elseif ($online === 'inactive360d') {
+            $query->where(function ($q) {
+                $q->whereNull('last_online_at')
+                    ->orWhere('last_online_at', '<', Carbon::now()->subDays(360));
+            });
+        } elseif ($online === 'inactive2y') {
+            $query->where(function ($q) {
+                $q->whereNull('last_online_at')
+                    ->orWhere('last_online_at', '<', Carbon::now()->subYears(2));
+            });
         }
 
         $statistic = trim((string) $request->input('filter_statistic', ''));
@@ -988,14 +1003,59 @@ class UsersController extends Controller
      * @return Response
      * @throws Exception
      */
-    public function destroy(User $user)
+    public function destroy(User $user, \App\Support\InactiveUsersPurge $purge)
     {
         if ($user->id == Auth::id()) {
             flash()->overlay(__('You cannot delete yourself'), __('Error user'))->error();
-        } else {
-            $user->delete();
-            flash()->overlay(__('User deleted successfully'), __('Delete user'))->success();
+
+            return;
         }
+
+        try {
+            $purge->deleteUserCompletely($user);
+            flash()->overlay(__('User deleted successfully'), __('Delete user'))->success();
+        } catch (\Throwable $e) {
+            flash()->overlay($e->getMessage(), __('Error user'))->error();
+        }
+    }
+
+    /**
+     * Превью: сколько пользователей не заходили N лет (без админов / себя).
+     */
+    public function inactivePurgePreview(Request $request, \App\Support\InactiveUsersPurge $purge): JsonResponse
+    {
+        $years = (int) $request->input('years', 0);
+        if (! in_array($years, [2, 3], true)) {
+            return response()->json(['message' => __('Users inactive purge invalid years')], 422);
+        }
+
+        set_time_limit(120);
+
+        return response()->json($purge->preview($years));
+    }
+
+    /**
+     * Удалить пользователей и связанные данные (FK CASCADE), не заходивших N лет.
+     */
+    public function inactivePurge(Request $request, \App\Support\InactiveUsersPurge $purge): JsonResponse
+    {
+        $years = (int) $request->input('years', 0);
+        if (! in_array($years, [2, 3], true)) {
+            return response()->json(['message' => __('Users inactive purge invalid years')], 422);
+        }
+
+        $confirm = trim((string) $request->input('confirm', ''));
+        $expected = 'DELETE ' . $years . 'Y';
+        if ($confirm !== $expected) {
+            return response()->json([
+                'message' => __('Users inactive purge confirm mismatch', ['code' => $expected]),
+            ], 422);
+        }
+
+        set_time_limit(0);
+        $result = $purge->purge($years);
+
+        return response()->json($result);
     }
 
     /**

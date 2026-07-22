@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\IndexCheckHistory;
 use App\IndexCheckUsage;
 use App\Services\IndexCheckService;
 use App\User;
@@ -111,5 +112,66 @@ class IndexCheckLimits
     public static function estimateBatchCost(int $urlCount, bool $yandex, bool $google): int
     {
         return $urlCount * IndexCheckService::checkCost($yandex, $google);
+    }
+
+    /**
+     * Максимум сохранённых проверок со сниппетами (IndexCheckHistory).
+     */
+    public static function historyLimitForUser(?User $user = null): ?int
+    {
+        $user = $user ?? Auth::user();
+        if (! $user) {
+            return null;
+        }
+
+        $tariff = $user->tariff();
+        if (! $tariff) {
+            return null;
+        }
+
+        $settings = $tariff->getAsArray()['settings'] ?? [];
+        if (! array_key_exists('IndexCheckHistory', $settings)) {
+            return null;
+        }
+
+        return (int) $settings['IndexCheckHistory']['value'];
+    }
+
+    public static function savedCount(?User $user = null): int
+    {
+        $user = $user ?? Auth::user();
+        if (! $user) {
+            return 0;
+        }
+
+        return (int) IndexCheckHistory::query()->where('user_id', $user->id)->count();
+    }
+
+    public static function pruneHistory(?User $user = null): void
+    {
+        $user = $user ?? Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        $limit = self::historyLimitForUser($user);
+        if ($limit === null || $limit <= 0) {
+            return;
+        }
+
+        $keepIds = IndexCheckHistory::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->pluck('id');
+
+        if ($keepIds->isEmpty()) {
+            return;
+        }
+
+        IndexCheckHistory::query()
+            ->where('user_id', $user->id)
+            ->whereNotIn('id', $keepIds)
+            ->delete();
     }
 }

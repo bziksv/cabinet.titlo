@@ -354,6 +354,95 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(TariffPay::class);
     }
 
+    /**
+     * Действующая запись подписки: оплаченная с active_to в будущем,
+     * либо ручная из админки (sum = 0) — её middleware не сбрасывает.
+     */
+    public function activeTariffPay(): ?TariffPay
+    {
+        $now = Carbon::now();
+
+        return $this->pay()
+            ->active()
+            ->where(static function ($q) use ($now) {
+                $q->where('sum', 0)
+                    ->orWhere('active_to', '>', $now);
+            })
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * Подпись срока для профиля: действует до / назначен вручную / истекла.
+     */
+    public function tariffValidUntilLabel(): ?string
+    {
+        $pay = $this->activeTariffPay();
+        if ($pay && $pay->active_to) {
+            if ((int) $pay->sum === 0) {
+                return __('Granted manually') . ' · ' . __('Valid until') . ' ' . $pay->active_to->format('d.m.Y');
+            }
+
+            return __('Valid until') . ' ' . $pay->active_to->format('d.m.Y');
+        }
+
+        $expired = $this->lastExpiredPaidTariffPay();
+        if ($expired && $expired->active_to) {
+            $name = null;
+            if (is_string($expired->class_tariff) && class_exists($expired->class_tariff)) {
+                $name = (new $expired->class_tariff)->name();
+            }
+
+            $date = $expired->active_to->format('d.m.Y');
+            if ($name) {
+                return $name . ' · ' . __('Subscription expired on :date', ['date' => $date]);
+            }
+
+            return __('Subscription expired on :date', ['date' => $date]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Последняя оплаченная подписка, у которой уже вышел срок (для профиля / тарифов).
+     */
+    public function lastExpiredPaidTariffPay(): ?TariffPay
+    {
+        if ($this->activeTariffPay()) {
+            return null;
+        }
+
+        return $this->pay()
+            ->where('sum', '>', 0)
+            ->where('active_to', '<', Carbon::now())
+            ->where('class_tariff', '!=', \App\Classes\Tariffs\FreeTariff::class)
+            ->orderByDesc('active_to')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * @return array{name: string, expired_at: string}|null
+     */
+    public function lastExpiredSubscriptionNotice(): ?array
+    {
+        $pay = $this->lastExpiredPaidTariffPay();
+        if (! $pay || ! $pay->active_to) {
+            return null;
+        }
+
+        $name = __('Tariff');
+        if (is_string($pay->class_tariff) && class_exists($pay->class_tariff)) {
+            $name = (new $pay->class_tariff)->name();
+        }
+
+        return [
+            'name' => $name,
+            'expired_at' => $pay->active_to->format('d.m.Y'),
+        ];
+    }
+
     public function visitStatistics(): HasMany
     {
         return $this->hasMany(VisitStatistic::class);

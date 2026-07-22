@@ -158,6 +158,7 @@
 
     @include('users.modal.index', ['id' => 'exportModal', 'action' => route('filter.exports.users'), 'title' => __('User Upload Filter')])
     @include('users.modal.index', ['id' => 'assignTariffModal', 'action' => route('users.tariff'), 'title' => __('Assign tariff')])
+    @include('users.partials.inactive-purge-modal')
 @endsection
 
 @section('js')
@@ -219,6 +220,8 @@
                 edit: @json(url('/users/__ID__/edit')),
                 stats: @json(url('/visit-statistics/__ID__')),
                 destroy: @json(url('/users/__ID__')),
+                inactivePurgePreview: @json(route('users.inactive-purge.preview')),
+                inactivePurge: @json(route('users.inactive-purge')),
             };
 
             function userUrl(template, id) {
@@ -622,6 +625,140 @@
 
             return $('<div />').append(collapse)[0].outerHTML;
         }
+
+        function cabinetUsersPurgeInactive(years) {
+            var previewUrl = @json(route('users.inactive-purge.preview'));
+            var purgeUrl = @json(route('users.inactive-purge'));
+            var csrf = $('meta[name="csrf-token"]').attr('content');
+            var $btns = $('#cabinet-users-purge-2y, #cabinet-users-purge-3y');
+            var $modalEl = document.getElementById('cabinetUsersInactivePurgeModal');
+            if (!$modalEl || typeof bootstrap === 'undefined') {
+                alert(@json(__('Users admin action error')));
+                return;
+            }
+            var modal = bootstrap.Modal.getOrCreateInstance($modalEl);
+            var state = {years: years, code: 'DELETE ' + years + 'Y', count: 0};
+
+            $btns.prop('disabled', true);
+            $('#cabinet-users-purge-loading').removeClass('d-none');
+            $('#cabinet-users-purge-body, #cabinet-users-purge-error').addClass('d-none');
+            $('#cabinet-users-purge-confirm-btn').prop('disabled', true);
+            $('#cabinet-users-purge-confirm-input').val('');
+            modal.show();
+
+            $.ajax({
+                url: previewUrl,
+                method: 'POST',
+                data: {_token: csrf, years: years},
+                success: function (preview) {
+                    $('#cabinet-users-purge-loading').addClass('d-none');
+                    state.count = preview.count || 0;
+                    if (!state.count) {
+                        $('#cabinet-users-purge-error')
+                            .removeClass('d-none')
+                            .text(@json(__('Users inactive purge empty')));
+                        $btns.prop('disabled', false);
+                        return;
+                    }
+
+                    var storage = preview.storage || {};
+                    var summary = @json(__('Users inactive purge summary'))
+                        .replace(':count', String(state.count))
+                        .replace(':years', String(years));
+                    $('#cabinet-users-purge-summary').text(summary);
+                    $('#cabinet-users-purge-storage').html(
+                        '<strong>' + @json(__('Users inactive purge storage title')) + '</strong>: '
+                        + $('<div>').text(storage.est_label || '0').html()
+                        + '<div class="mt-1 text-secondary">' + $('<div>').text(storage.note || '').html() + '</div>'
+                    );
+
+                    var $mods = $('#cabinet-users-purge-modules').empty();
+                    (storage.modules || []).forEach(function (m) {
+                        $mods.append(
+                            $('<li/>').text(
+                                (m.label || '') + ': '
+                                + Number(m.rows || 0).toLocaleString('ru-RU')
+                                + ' · ~' + Number(m.est_mb || 0).toLocaleString('ru-RU') + ' MB'
+                            )
+                        );
+                    });
+                    if (!(storage.modules || []).length) {
+                        $mods.append($('<li/>').text('—'));
+                    }
+
+                    var sample = (preview.sample || []).map(function (u) {
+                        return u.email + (u.last_online_at ? ' (' + u.last_online_at + ')' : '');
+                    }).join('\n');
+                    $('#cabinet-users-purge-sample').text(sample || '—');
+                    $('#cabinet-users-purge-code').text(state.code);
+                    $('#cabinet-users-purge-body').removeClass('d-none');
+                    $('#cabinet-users-purge-confirm-input').trigger('focus');
+                },
+                error: function (xhr) {
+                    $('#cabinet-users-purge-loading').addClass('d-none');
+                    var m = (xhr.responseJSON && xhr.responseJSON.message)
+                        ? xhr.responseJSON.message
+                        : @json(__('Users admin action error'));
+                    $('#cabinet-users-purge-error').removeClass('d-none').text(m);
+                    $btns.prop('disabled', false);
+                },
+            });
+
+            $('#cabinet-users-purge-confirm-input').off('input.purge').on('input.purge', function () {
+                var ok = ($(this).val() || '') === state.code && state.count > 0;
+                $('#cabinet-users-purge-confirm-btn').prop('disabled', !ok);
+            });
+
+            $('#cabinet-users-purge-confirm-btn').off('click.purge').on('click.purge', function () {
+                if (($('#cabinet-users-purge-confirm-input').val() || '') !== state.code) {
+                    return;
+                }
+                var $btn = $(this).prop('disabled', true);
+                $('#cabinet-users-purge-loading').removeClass('d-none');
+                $('#cabinet-users-purge-body').addClass('d-none');
+                $.ajax({
+                    url: purgeUrl,
+                    method: 'POST',
+                    data: {_token: csrf, years: state.years, confirm: state.code},
+                    timeout: 0,
+                    success: function (res) {
+                        modal.hide();
+                        var done = @json(__('Users inactive purge done'))
+                            .replace(':deleted', String(res.deleted || 0))
+                            .replace(':failed', String(res.failed || 0));
+                        if (window.toastr) {
+                            toastr.success(done);
+                        } else {
+                            alert(done);
+                        }
+                        if (window.usersTable) {
+                            usersTable.ajax.reload(null, false);
+                        }
+                    },
+                    error: function (xhr) {
+                        $('#cabinet-users-purge-loading').addClass('d-none');
+                        $('#cabinet-users-purge-body').removeClass('d-none');
+                        var m = (xhr.responseJSON && xhr.responseJSON.message)
+                            ? xhr.responseJSON.message
+                            : @json(__('Users admin action error'));
+                        $('#cabinet-users-purge-error').removeClass('d-none').text(m);
+                        $btn.prop('disabled', false);
+                    },
+                    complete: function () {
+                        $btns.prop('disabled', false);
+                    },
+                });
+            });
+
+            $modalEl.addEventListener('hidden.bs.modal', function onHide() {
+                $btns.prop('disabled', false);
+                $modalEl.removeEventListener('hidden.bs.modal', onHide);
+            });
+        }
+
+        $(document).on('click', '#cabinet-users-purge-2y, #cabinet-users-purge-3y', function () {
+            cabinetUsersPurgeInactive(parseInt($(this).data('years'), 10) || 0);
+        });
     </script>
     <script>
         window.cabinetUsersAdminConfig = {

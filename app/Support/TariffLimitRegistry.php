@@ -141,7 +141,25 @@ class TariffLimitRegistry
             [
                 'code' => 'IndexCheck',
                 'module' => __('Index check'),
-                'hint' => __('Monthly index checks: 1 URL in one search engine = 1 unit.'),
+                'hint' => '1 URL × 1 ПС = 1 проверка/мес. Free 5 / Optimal 600 / Ultimate 1500 / Maximum 2400.',
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
+                'code' => 'IndexCheckHistory',
+                'module' => __('Index check history'),
+                'hint' => 'Сколько результатов с title/сниппетом хранить. Free 5 / Optimal 30 / Ultimate 50 / Maximum 100.',
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
+                'code' => 'SiteAudit',
+                'module' => 'Аудит сайта (страниц/краул)',
+                'hint' => 'Макс. URL за один краул. Free 500 / Optimal 5000 / Ultimate 20000 / Maximum 50000.',
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
+                'code' => 'SiteAuditCrawls',
+                'module' => 'Аудит сайта (краулов/мес)',
+                'hint' => 'Запусков аудита в месяц. Free 1 / Optimal 4 / Ultimate 8 / Maximum 12.',
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [

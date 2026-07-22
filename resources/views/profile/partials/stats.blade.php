@@ -20,7 +20,9 @@
                 <div class="info-box-content">
                     <span class="info-box-text">{{ __('Your tariff') }}</span>
                     <span class="info-box-number text-truncate cabinet-profile-stat-tariff">{{ $name }}</span>
-                    <span class="info-box-meta text-secondary">{{ __('Tariffs') }}</span>
+                    <span class="info-box-meta text-secondary">
+                        {{ $tariffValidUntil ?? __('Tariffs') }}
+                    </span>
                 </div>
             </a>
         </div>
