@@ -143,7 +143,7 @@
                             @if(!empty($row['fixed']))
                                 <div class="cabinet-sa-diff-urls mt-1">
                                     <span class="text-success">−</span>
-                                    @foreach(array_slice($row['fixed'], 0, 5) as $u>
+                                    @foreach(array_slice($row['fixed'], 0, 5) as $u)
                                         <div class="cabinet-sa-url" title="{{ $u }}">{{ \Illuminate\Support\Str::limit($u, 70) }}</div>
                                     @endforeach
                                     @if(count($row['fixed']) > 5)

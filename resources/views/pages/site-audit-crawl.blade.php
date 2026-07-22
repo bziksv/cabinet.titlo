@@ -130,7 +130,7 @@
                         @foreach($bucketLabels as $sev => $label)
                             <div class="cabinet-sa-tree__group" data-severity-group="{{ $sev }}">
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
-                                @foreach(($treeAll ?? [])[$sev] ?? [] as $item)
+                                @foreach(($treeAll[$sev] ?? []) as $item)
                                     <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
                                        href="{{ route('pages.site-audit.report.show', [$crawl->id, $item['code']]) }}"
                                        data-title="{{ $item['title'] }}"
@@ -172,7 +172,7 @@
                         @foreach($bucketLabels as $sev => $label)
                             <div class="cabinet-sa-tree__group" data-severity-group="{{ $sev }}">
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
-                                @foreach($tree[$sev] ?? [] as $item)
+                                @foreach(($tree[$sev] ?? []) as $item)
                                     <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
                                        href="{{ route('pages.site-audit.report.show', [$crawl->id, $item['code']]) }}"
                                        data-title="{{ $item['title'] }}"
@@ -210,7 +210,7 @@
                         @foreach($bucketLabels as $sev => $label)
                             <div class="cabinet-sa-tree__group" data-severity-group="{{ $sev }}">
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
-                                @foreach(($treeSeo ?? [])[$sev] ?? [] as $item)
+                                @foreach(($treeSeo[$sev] ?? []) as $item)
                                     <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
                                        href="{{ route('pages.site-audit.report.show', [$crawl->id, $item['code']]) }}"
                                        data-title="{{ $item['title'] }}"

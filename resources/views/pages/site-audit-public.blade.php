@@ -52,7 +52,7 @@
                             <div class="px-3 py-2 border-bottom fw-semibold small">Все замечания</div>
                             @foreach($bucketLabels as $sev => $label)
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
-                                @foreach(($treeAll ?? [])[$sev] ?? [] as $item)
+                                @foreach(($treeAll[$sev] ?? []) as $item)
                                     <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
                                        href="{{ route('site-audit.public.share.report', [$token, $item['code']]) }}">
                                         <span>
@@ -92,7 +92,7 @@
                             <div class="px-3 py-2 border-bottom fw-semibold small">Тех. аудит</div>
                             @foreach($bucketLabels as $sev => $label)
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
-                                @foreach($tree[$sev] ?? [] as $item)
+                                @foreach(($tree[$sev] ?? []) as $item)
                                     <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
                                        href="{{ route('site-audit.public.share.report', [$token, $item['code']]) }}">
                                         <span>{{ $item['title'] }}</span>
@@ -129,7 +129,7 @@
                             <div class="px-3 py-2 border-bottom fw-semibold small">SEO-аудит</div>
                             @foreach($bucketLabels as $sev => $label)
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
-                                @foreach($treeSeo[$sev] ?? [] as $item)
+                                @foreach(($treeSeo[$sev] ?? []) as $item)
                                     <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
                                        href="{{ route('site-audit.public.share.report', [$token, $item['code']]) }}">
                                         <span>{{ $item['title'] }}</span>
