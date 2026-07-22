@@ -21,7 +21,7 @@
                                 <th>Краул</th>
                                 <th>Дата</th>
                                 <th>Статус</th>
-                                <th>URL</th>
+                                <th>Страниц</th>
                                 @foreach($bucketLabels as $label)
                                     <th class="text-end">{{ $label }}</th>
                                 @endforeach
@@ -58,7 +58,8 @@
                                         <a class="btn btn-sm btn-outline-primary" href="{{ route('pages.site-audit.crawl.show', $a->id) }}">Сводка</a>
                                         @if(! $isCurrent && $crawl->status === 'done' && $a->status === 'done')
                                             <a class="btn btn-sm btn-outline-info"
-                                               href="{{ route('pages.site-audit.crawl.diff', ['id' => $crawl->id, 'with' => $a->id]) }}">Diff</a>
+                                               href="{{ route('pages.site-audit.crawl.diff', ['id' => $crawl->id, 'with' => $a->id]) }}"
+                                               title="Сравнить с текущим краулом">Сравнить</a>
                                         @endif
                                     </td>
                                 </tr>
