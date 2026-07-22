@@ -281,6 +281,15 @@ class SiteAuditPageProcessor
                     }
                 }
 
+                $headingIssues = $parsed['heading_issues'] ?? [];
+                if (is_array($headingIssues) && $headingIssues !== []) {
+                    $findings[] = $this->finding('heading_hierarchy', $url, $urlHash, [
+                        'issue_count' => count($headingIssues),
+                        'issues' => array_slice($headingIssues, 0, 5),
+                        'outline_sample' => array_slice($parsed['heading_outline'] ?? [], 0, 12),
+                    ]);
+                }
+
                 if (! $pageData['title']) {
                     $findings[] = $this->finding('empty_title', $url, $urlHash);
                 }

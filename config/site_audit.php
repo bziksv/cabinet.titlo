@@ -170,6 +170,7 @@ return [
         'title_equals_description',
         'description_equals_h1',
         'h1_equals_h2',
+        'heading_hierarchy',
         'too_many_strong',
         'duplicate_links',
         'external_links',
@@ -457,6 +458,13 @@ return [
             'severity' => 'warning',
             'title' => 'H1 = H2',
             'description' => 'Текст H1 совпадает с одним из H2.',
+        ],
+        'heading_hierarchy' => [
+            'phase' => 'B',
+            'severity' => 'warning',
+            'title' => 'Нарушена иерархия заголовков',
+            'description' => 'Заголовок до первого H1 или пропуск уровня (например H1→H3) в outline h1–h6.',
+            'group' => 'seo',
         ],
         'too_many_strong' => [
             'phase' => 'B',

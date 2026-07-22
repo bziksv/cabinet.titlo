@@ -90,6 +90,28 @@ class SiteAuditFindingPresenter
 
                 return $bits ? implode(' · ', $bits) : '—';
 
+            case 'heading_hierarchy':
+                $bits = [];
+                $n = (int) ($meta['issue_count'] ?? 0);
+                if ($n > 0) {
+                    $bits[] = 'проблем: ' . $n;
+                }
+                foreach (array_slice($meta['issues'] ?? [], 0, 2) as $issue) {
+                    if (! is_array($issue)) {
+                        continue;
+                    }
+                    $type = (string) ($issue['type'] ?? '');
+                    if ($type === 'before_h1') {
+                        $bits[] = 'до H1: H' . (int) ($issue['level'] ?? 0)
+                            . (! empty($issue['text']) ? (' «' . self::clip($issue['text'], 40) . '»') : '');
+                    } elseif ($type === 'skip') {
+                        $bits[] = 'H' . (int) ($issue['from'] ?? 0) . '→H' . (int) ($issue['to'] ?? 0)
+                            . (! empty($issue['text']) ? (' «' . self::clip($issue['text'], 40) . '»') : '');
+                    }
+                }
+
+                return $bits ? implode(' · ', $bits) : '—';
+
             case 'too_many_strong':
                 if (isset($meta['strong_count'])) {
                     $thr = isset($meta['threshold']) ? (' / порог ' . (int) $meta['threshold']) : '';

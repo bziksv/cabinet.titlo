@@ -57,6 +57,7 @@ class SiteAuditReportFilter
             'title_equals_description' => ['title', 'description'],
             'description_equals_h1' => ['description', 'h1'],
             'h1_equals_h2' => ['h1'],
+            'heading_hierarchy' => ['details'],
             'soft_404' => ['title'],
             'duplicate_description' => ['description'],
             'empty_description' => ['description'],

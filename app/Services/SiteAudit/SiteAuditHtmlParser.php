@@ -129,6 +129,8 @@ class SiteAuditHtmlParser
 
         $insecureForms = $isHttps ? $this->insecureFormActions($html) : [];
         $htmlErrors = $this->collectHtmlErrors($html);
+        $headingOutline = $this->headingOutline($html);
+        $headingIssues = $this->headingHierarchyIssues($headingOutline);
 
         return [
             'title' => $title !== '' ? $title : null,
@@ -140,6 +142,8 @@ class SiteAuditHtmlParser
             'h2' => $h2s[0] ?? null,
             'h2_count' => $h2Count,
             'h2s' => array_slice($h2s, 0, 20),
+            'heading_outline' => $headingOutline,
+            'heading_issues' => $headingIssues,
             'canonical' => $canonical,
             'canonical_count' => $canonicalCount,
             'robots_meta' => $robotsMeta,
@@ -324,6 +328,79 @@ class SiteAuditHtmlParser
         }
 
         return $samples;
+    }
+
+    /**
+     * Порядок заголовков h1–h6 на странице (cap).
+     *
+     * @return list<array{level:int, text:string}>
+     */
+    private function headingOutline(string $html): array
+    {
+        $out = [];
+        if (! preg_match_all('/<(h([1-6]))\b[^>]*>(.*?)<\/\1>/is', $html, $matches, PREG_SET_ORDER)) {
+            return $out;
+        }
+        foreach ($matches as $m) {
+            $text = trim(html_entity_decode(strip_tags($m[3]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $text = trim(preg_replace('/\s+/u', ' ', $text) ?: $text);
+            if ($text === '') {
+                continue;
+            }
+            $out[] = [
+                'level' => (int) $m[2],
+                'text' => mb_substr($text, 0, 120),
+            ];
+            if (count($out) >= 40) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Проблемы иерархии: заголовок до первого H1; пропуск уровня (H1→H3).
+     *
+     * @param  list<array{level:int, text:string}>  $outline
+     * @return list<array{type:string, level?:int, from?:int, to?:int, text:string}>
+     */
+    private function headingHierarchyIssues(array $outline): array
+    {
+        $issues = [];
+        $seenH1 = false;
+        $prev = null;
+        foreach ($outline as $h) {
+            $lvl = (int) ($h['level'] ?? 0);
+            $text = (string) ($h['text'] ?? '');
+            if ($lvl < 1 || $lvl > 6) {
+                continue;
+            }
+            if (! $seenH1 && $lvl > 1) {
+                $issues[] = [
+                    'type' => 'before_h1',
+                    'level' => $lvl,
+                    'text' => $text,
+                ];
+            }
+            if ($lvl === 1) {
+                $seenH1 = true;
+            }
+            if ($prev !== null && $lvl > $prev + 1) {
+                $issues[] = [
+                    'type' => 'skip',
+                    'from' => $prev,
+                    'to' => $lvl,
+                    'text' => $text,
+                ];
+            }
+            $prev = $lvl;
+            if (count($issues) >= 8) {
+                break;
+            }
+        }
+
+        return $issues;
     }
 
     private function visibleText(string $html): string
