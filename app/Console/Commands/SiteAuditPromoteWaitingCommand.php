@@ -9,13 +9,15 @@ class SiteAuditPromoteWaitingCommand extends Command
 {
     protected $signature = 'site-audit:promote-waiting';
 
-    protected $description = 'Запускает краулы из глобальной очереди queued_wait при свободном слоте';
+    protected $description = 'Снимает stale active-краулы и запускает queued_wait при свободном слоте';
 
     public function handle(): int
     {
+        $reclaimed = SiteAuditGlobalCap::reclaimStale();
         $n = SiteAuditGlobalCap::promoteWaiting();
         $this->info(sprintf(
-            'promoted=%d active=%d max=%d',
+            'reclaimed=%d promoted=%d active=%d max=%d',
+            $reclaimed,
             $n,
             SiteAuditGlobalCap::countActive(),
             SiteAuditGlobalCap::maxActive()

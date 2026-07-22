@@ -42,6 +42,36 @@ class SiteAuditGlobalCap
     }
 
     /**
+     * Зависшие active-краулы (нет updated_at дольше N мин) → failed, иначе слот вечный.
+     */
+    public static function reclaimStale(): int
+    {
+        $minutes = max(15, (int) config('site_audit.stale_active_minutes', 120));
+        $cutoff = now()->subMinutes($minutes);
+        $stale = SiteAuditCrawl::query()
+            ->whereIn('status', self::activeStatuses())
+            ->where('updated_at', '<', $cutoff)
+            ->orderBy('id')
+            ->limit(50)
+            ->get();
+
+        $n = 0;
+        foreach ($stale as $crawl) {
+            $crawl->status = SiteAuditCrawl::STATUS_FAILED;
+            $crawl->error = 'Прерван: нет прогресса более ' . $minutes . ' мин (освобождение слота)';
+            $crawl->finished_at = now();
+            $crawl->save();
+            $n++;
+            Log::warning('SiteAudit stale crawl reclaimed', [
+                'crawl_id' => $crawl->id,
+                'minutes' => $minutes,
+            ]);
+        }
+
+        return $n;
+    }
+
+    /**
      * @param callable $fn
      * @return mixed
      */
@@ -78,6 +108,8 @@ class SiteAuditGlobalCap
                     return false;
                 }
 
+                self::reclaimStale();
+
                 if (self::countActive((int) $crawl->id) >= self::maxActive()) {
                     if ($crawl->status !== SiteAuditCrawl::STATUS_QUEUED_WAIT) {
                         $crawl->status = SiteAuditCrawl::STATUS_QUEUED_WAIT;
@@ -113,6 +145,8 @@ class SiteAuditGlobalCap
     {
         try {
             return (int) self::withLock(function () {
+                self::reclaimStale();
+
                 $slots = self::maxActive() - self::countActive();
                 if ($slots <= 0) {
                     return 0;
