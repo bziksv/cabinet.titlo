@@ -81,7 +81,7 @@ return [
     // PSI (PageSpeed Insights v5). Дорого по времени — выкл. по умолчанию.
     'psi_enabled' => (bool) env('SITE_AUDIT_PSI', false),
     'psi_api_key' => env('SITE_AUDIT_PSI_API_KEY', ''),
-    'psi_max_urls' => (int) env('SITE_AUDIT_PSI_MAX_URLS', 3),
+    'psi_max_urls' => (int) env('SITE_AUDIT_PSI_MAX_URLS', 20),
     'psi_strategies' => ['mobile', 'desktop'],
     'psi_score_warn' => (float) env('SITE_AUDIT_PSI_SCORE_WARN', 0.5),
     'psi_timeout' => (int) env('SITE_AUDIT_PSI_TIMEOUT', 90),
