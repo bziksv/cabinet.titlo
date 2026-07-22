@@ -738,7 +738,7 @@
     "Database preview loading": "Загрузка…",
     "Database preview no columns": "Нет колонок для отображения.",
     "Database preview order": "Сортировка",
-    "Database preview search indices note": "Таблица ~17M строк: показаны последние записи по id (без url\/snippet). Сортировка по created_at на таких объёмах занимает минуты.",
+    "Database preview search indices note": "Показаны последние записи по id (все колонки). Сортировка по created_at на таких объёмах занимает минуты.",
     "Database preview table not found": "Таблица не найдена.",
     "Database table clear not allowed": "Очистка этой таблицы запрещена.",
     "Database table cleared": "Таблица :table очищена: удалено :count записей.",

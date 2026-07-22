@@ -93,27 +93,29 @@ class TableRowPreviewService
      */
     private function previewSearchIndices(int $limit): array
     {
+        $columns = [
+            'id', 'source', 'lr', 'url', 'position', 'title', 'snippet', 'query', 'created_at', 'updated_at',
+        ];
+
         $rows = DB::table('search_indices')
             ->orderByDesc('id')
             ->limit($limit)
-            ->get(['id', 'lr', 'query', 'position', 'created_at']);
+            ->get($columns);
 
         $out = [];
         foreach ($rows as $row) {
-            $out[] = [
-                'id' => $row->id,
-                'lr' => $row->lr,
-                'query' => $this->truncate((string) ($row->query ?? ''), 120),
-                'position' => $row->position,
-                'created_at' => (string) ($row->created_at ?? ''),
-            ];
+            $item = [];
+            foreach ($columns as $col) {
+                $item[$col] = $this->formatCellValue($row->{$col} ?? null);
+            }
+            $out[] = $item;
         }
 
         return [
             'table' => 'search_indices',
             'limit' => $limit,
             'order_column' => 'id DESC',
-            'columns' => ['id', 'lr', 'query', 'position', 'created_at'],
+            'columns' => $columns,
             'rows' => $out,
             'note' => __('Database preview search indices note'),
         ];

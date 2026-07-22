@@ -73,7 +73,6 @@ return [
         'sessions' => ['payload'],
         'jobs' => ['payload'],
         'failed_jobs' => [],
-        'search_indices' => ['url', 'title', 'snippet', 'source'],
     ],
 
     /** Кэш снимка (information_schema + маппинг), секунды */
