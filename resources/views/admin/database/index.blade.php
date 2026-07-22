@@ -357,7 +357,8 @@
                 running: @json(__('Database optimize status running')),
                 failed: @json(__('Database optimize status failed')),
                 reclaimable: @json(__('Database optimize reclaimable')),
-                optimizeError: @json(__('Database optimize status failed'))
+                optimizeError: @json(__('Database optimize status failed')),
+                optimizeDoneTpl: @json(__('Database optimize done', ['table' => ':table', 'freed' => ':freed', 'after' => ':after']))
             };
             var pollTimers = {};
 
@@ -477,7 +478,7 @@
                             if (!st || st === 'ok' || st === 'failed') {
                                 stopPoll(table);
                                 if (st === 'ok') {
-                                    showFlash('success', @json(__('Database optimize done', ['table' => ':table', 'freed' => ':freed', 'after' => ':after']))
+                                    showFlash('success', labels.optimizeDoneTpl
                                         .replace(':table', table)
                                         .replace(':freed', formatFreed((data.optimize && data.optimize.freed_mb) || 0))
                                         .replace(':after', formatMb(data.size_mb || 0)));
