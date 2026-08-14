@@ -907,12 +907,7 @@
                                         getSuccessMessage(response.message)
                                         $.each(response.object, function (key, value) {
                                             $('#history-state-' + value).html(
-                                                '<p>Обрабатывается..</p>' +
-                                                '<div class="text-center" id="preloaderBlock">' +
-                                                '        <div class="three col">' +
-                                                '            <div class="loader" id="loader-1"></div>' +
-                                                '        </div>' +
-                                                '</div>'
+                                                raHistoryProcessingHtml()
                                             )
                                         })
 
@@ -1054,12 +1049,7 @@
 
                                             } else if (val.state === 0) {
                                                 state =
-                                                    '<p>' + "{{ __('Processed..') }}" + '</p>' +
-                                                    '<div class="text-center" id="preloaderBlock">' +
-                                                    '        <div class="three col">' +
-                                                    '            <div class="loader" id="loader-1"></div>' +
-                                                    '        </div>' +
-                                                    '</div>'
+                                                    raHistoryProcessingHtml()
                                                 checkAnalyseProgress(val.id)
                                             } else if (val.state === -1) {
                                                 state = raHistoryActionsHtml(val.id, { detail: false, repeat: true, error: true })

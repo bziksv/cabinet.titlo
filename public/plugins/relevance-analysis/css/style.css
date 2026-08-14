@@ -1376,13 +1376,47 @@ th {
     margin: 0.5rem auto 0;
 }
 
+/* Статус «Обрабатывается» в колонке действий — по центру ячейки */
+#history_table_wrapper #history_table tbody td:last-child .ra-hist-processing,
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-processing,
+#history_table tbody td .ra-hist-processing {
+    display: inline-flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.4rem !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0.25rem 0 !important;
+    box-sizing: border-box;
+    white-space: normal !important;
+    text-align: center !important;
+    vertical-align: middle;
+}
+
+#history_table_wrapper #history_table tbody td:last-child .ra-hist-processing__text,
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-processing__text,
+#history_table tbody td .ra-hist-processing__text,
+#history_table_wrapper #history_table tbody td:last-child .ra-hist-processing p,
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-processing p {
+    display: block;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 1rem !important;
+    line-height: 1.25 !important;
+    color: #6c757d;
+    white-space: nowrap;
+}
+
 /* Колесо обработки в истории релевантности */
 .loader.relevance-history-spinner,
-#loader-1.loader {
+#loader-1.loader,
+.ra-hist-processing .loader {
     display: block;
     box-sizing: border-box;
-    width: 40px;
-    height: 40px;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin: 0 auto !important;
     border: 3px solid rgba(90, 98, 104, 0.25);
     border-top-color: #5a6268;
     border-radius: 50%;
@@ -1395,7 +1429,9 @@ th {
 .loader.relevance-history-spinner:before,
 .loader.relevance-history-spinner:after,
 #loader-1.loader:before,
-#loader-1.loader:after {
+#loader-1.loader:after,
+.ra-hist-processing .loader:before,
+.ra-hist-processing .loader:after {
     content: none;
     display: none;
 }
@@ -1425,7 +1461,8 @@ th {
 /* AdminLTE/BS: prefers-reduced-motion обнуляет animation — для статуса «Обрабатывается» оставляем вращение */
 @media (prefers-reduced-motion: reduce) {
     .loader.relevance-history-spinner,
-    #loader-1.loader {
+    #loader-1.loader,
+    .ra-hist-processing .loader {
         animation: relevance-history-spin 0.75s linear infinite !important;
         animation-duration: 0.75s !important;
         animation-iteration-count: infinite !important;
@@ -1871,8 +1908,8 @@ a.competitor-cloud:hover {
 
 /* Колонка действий — компактные кнопки в ряд */
 #history_table_wrapper #history_table thead th:last-child,
-#history_table_wrapper #history_table tbody td:last-child,
 #history_table_wrapper #history_table thead th.ra-hist-actions-th,
+#history_table_wrapper #history_table tbody td:last-child,
 #history_table_wrapper #history_table tbody td.ra-hist-actions-cell {
     width: 1% !important;
     min-width: 0 !important;
@@ -1880,6 +1917,14 @@ a.competitor-cloud:hover {
     white-space: nowrap !important;
     vertical-align: middle !important;
     text-align: right !important;
+}
+
+/* Пока идёт обработка — центрируем блок в ячейке */
+#history_table_wrapper #history_table tbody td:last-child:has(.ra-hist-processing),
+#history_table_wrapper #history_table tbody td.ra-hist-actions-cell:has(.ra-hist-processing),
+#history_table_wrapper #history_table [id^="history-state-"]:has(.ra-hist-processing) {
+    text-align: center !important;
+    white-space: normal !important;
 }
 
 #history_table_wrapper #history_table tbody td:last-child .ra-hist-actions,
@@ -1898,21 +1943,26 @@ a.competitor-cloud:hover {
 #history_table_wrapper #history_table [id^="history-state-"] .btn,
 #history_table_wrapper #history_table tbody td:last-child .ra-hist-act.btn,
 #history_table_wrapper #history_table [id^="history-state-"] .ra-hist-act.btn {
-    display: inline-block !important;
+    display: inline-flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
     width: auto !important;
     min-width: 0 !important;
     max-width: none !important;
     margin: 0 !important;
-    padding: 0.2rem 0.55rem !important;
+    padding: 0.375rem 0.75rem !important;
     box-sizing: border-box;
-    white-space: nowrap !important;
+    white-space: normal !important;
     word-break: keep-all !important;
     overflow-wrap: normal !important;
     text-align: center;
     writing-mode: horizontal-tb !important;
-    font-size: 0.78rem !important;
+    font-size: 1rem !important;
     line-height: 1.25 !important;
+    font-weight: 400 !important;
     vertical-align: middle;
+    height: auto !important;
 }
 
 #history_table_wrapper #history_table tbody td:last-child .btn + .btn,
@@ -2537,11 +2587,15 @@ table.dataTable thead th > .form-control.search-input + .form-control.search-inp
     width: auto;
     height: auto !important;
     min-height: 0;
-    padding: 0.2rem 0.55rem;
-    line-height: 1.25;
-    font-size: 0.78rem;
-    white-space: nowrap;
-    display: inline-block;
+    padding: 0.3rem 0.55rem;
+    line-height: 1.2;
+    font-size: 1rem;
+    white-space: normal;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
     vertical-align: middle;
 }
 

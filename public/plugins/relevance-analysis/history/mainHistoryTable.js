@@ -34,12 +34,9 @@ $('.repeat-scan-unique-sites').on('click', function () {
                 getSuccessMessage(response.message)
                 $.each(response.object, function (key, value) {
                     $('#history-state-' + value).html(
-                        '<p>Обрабатывается..</p>' +
-                        '<div class="text-center" id="preloaderBlock">' +
-                        '        <div class="three col">' +
-                        '            <div class="loader" id="loader-1"></div>' +
-                        '        </div>' +
-                        '</div>'
+                        typeof raHistoryProcessingHtml === 'function'
+                            ? raHistoryProcessingHtml()
+                            : '<div class="ra-hist-processing"><span class="ra-hist-processing__text">Обрабатывается..</span><span class="loader relevance-history-spinner" aria-hidden="true"></span></div>'
                     )
                 })
 

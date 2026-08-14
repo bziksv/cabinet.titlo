@@ -22,15 +22,15 @@ function raHistoryActionsHtml(id, opts) {
     var html = '<div class="ra-hist-actions">'
     if (showDetail) {
         html +=
-            '<a href="/show-history/' + id + '" target="_blank" rel="noopener" class="btn btn-sm btn-secondary ra-hist-act ra-hist-act--detail">' +
-            'Подробная' +
+            '<a href="/show-history/' + id + '" target="_blank" rel="noopener" class="btn btn-secondary ra-hist-act ra-hist-act--detail">' +
+            'Подробная<br>информация' +
             '</a>'
     }
     if (showRepeat) {
         html +=
-            '<button type="button" class="btn btn-sm btn-secondary ra-hist-act ra-hist-act--repeat get-history-info" data-order="' + id + '"' +
+            '<button type="button" class="btn btn-secondary ra-hist-act ra-hist-act--repeat get-history-info" data-order="' + id + '"' +
             ' data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
-            'Повторить' +
+            'Повторить<br>анализ' +
             '</button>'
     }
     if (showError) {
@@ -40,7 +40,18 @@ function raHistoryActionsHtml(id, opts) {
     return html
 }
 
+/** Статус «Обрабатывается» — компактный блок по центру ячейки (как кнопки). */
+function raHistoryProcessingHtml() {
+    return (
+        '<div class="ra-hist-processing">' +
+        '<span class="ra-hist-processing__text">Обрабатывается..</span>' +
+        '<span class="loader relevance-history-spinner" aria-hidden="true"></span>' +
+        '</div>'
+    )
+}
+
 window.raHistoryActionsHtml = raHistoryActionsHtml
+window.raHistoryProcessingHtml = raHistoryProcessingHtml
 
 function getHistoryInfo() {
     $('.get-history-info').unbind("click").click(function () {
@@ -182,13 +193,7 @@ function format(data) {
         if (value['state'] === 1) {
             state = raHistoryActionsHtml(value['id'])
         } else if (value['state'] === 0) {
-            state =
-                '<p>Обрабатывается..</p>' +
-                '<div class="text-center" id="preloaderBlock">' +
-                '        <div class="three col">' +
-                '            <div class="loader" id="loader-1"></div>' +
-                '        </div>' +
-                '</div>'
+            state = raHistoryProcessingHtml()
             checkAnalyseProgress(value['id'])
         } else if (value['state'] === -1) {
             state = raHistoryActionsHtml(value['id'], { detail: false, repeat: true, error: true })
@@ -375,12 +380,7 @@ function repeatScan() {
                 }
 
                 if (response.code === 200) {
-                    $('#history-state-' + id).html('<p>Обрабатывается..</p>' +
-                        '<div class="text-center" id="preloaderBlock">' +
-                        '        <div class="three col">' +
-                        '            <div class="loader" id="loader-1"></div>' +
-                        '        </div>' +
-                        '</div>')
+                    $('#history-state-' + id).html(raHistoryProcessingHtml())
                     checkAnalyseProgress(id)
                 }
 

@@ -115,14 +115,18 @@ final class RelevancePhraseNgrams
     }
 
     /**
-     * N-граммы (2–4 слова) по каждому сайту конкурентов, с лемматизацией токенов.
+     * N-граммы (2–4 слова): в ключе фразы — формы как в тексте (склонение),
+     * агрегация/дедуп — по леммам.
      *
      * @param array<string, array<string, mixed>> $sites
      * @return list<string>
      */
     public static function candidatePhrases(array $sites): array
     {
-        $aggregated = [];
+        /** @var array<string, int> $siteCoverage */
+        $siteCoverage = [];
+        /** @var array<string, array<string, int>> $surfaceFreq */
+        $surfaceFreq = [];
 
         foreach ($sites as $page) {
             if (!empty($page['ignored']) || !empty($page['mainPage'])) {
@@ -133,52 +137,83 @@ final class RelevancePhraseNgrams
                 $page['html'] ?? '',
                 $page['hiddenText'] ?? '',
             ]);
-            $tokens = self::tokenizeLemmas($text);
-            if (count($tokens) < self::MIN_N) {
+            $pairs = self::tokenizeSurfaceLemmaPairs($text);
+            if (count($pairs) < self::MIN_N) {
                 continue;
             }
 
-            foreach (array_count_values(self::extractNgrams($tokens)) as $phrase => $count) {
-                if ($count <= 0) {
-                    continue;
+            $seenOnSite = [];
+            foreach (self::extractSurfaceNgrams($pairs) as $item) {
+                $lemmaKey = $item['lemma_key'];
+                $surface = $item['surface'];
+                if (!isset($seenOnSite[$lemmaKey])) {
+                    $seenOnSite[$lemmaKey] = true;
+                    if (!isset($siteCoverage[$lemmaKey])) {
+                        $siteCoverage[$lemmaKey] = 0;
+                    }
+                    $siteCoverage[$lemmaKey]++;
                 }
-                if (!isset($aggregated[$phrase])) {
-                    $aggregated[$phrase] = 0;
+                if (!isset($surfaceFreq[$lemmaKey])) {
+                    $surfaceFreq[$lemmaKey] = [];
                 }
-                $aggregated[$phrase]++;
+                if (!isset($surfaceFreq[$lemmaKey][$surface])) {
+                    $surfaceFreq[$lemmaKey][$surface] = 0;
+                }
+                $surfaceFreq[$lemmaKey][$surface]++;
             }
         }
 
-        $phrases = [];
-        foreach ($aggregated as $phrase => $siteCoverage) {
-            if ($siteCoverage >= self::MIN_SITE_COVERAGE) {
-                $phrases[] = $phrase;
+        $candidates = [];
+        foreach ($siteCoverage as $lemmaKey => $coverage) {
+            $bestSurface = self::bestSurfaceForm($surfaceFreq[$lemmaKey] ?? []);
+            if ($bestSurface === '') {
+                continue;
             }
+            $tokens = self::phraseTokens($bestSurface);
+            $minCoverage = self::hasInternalStopWord($tokens) ? 1 : self::MIN_SITE_COVERAGE;
+            if ($coverage < $minCoverage) {
+                continue;
+            }
+            $candidates[$bestSurface] = $coverage;
         }
 
-        if (count($phrases) > self::MAX_CANDIDATE_PHRASES) {
-            arsort($aggregated);
-            $phrases = [];
-            foreach ($aggregated as $phrase => $siteCoverage) {
-                if ($siteCoverage < self::MIN_SITE_COVERAGE) {
-                    continue;
-                }
-                $phrases[] = $phrase;
-                if (count($phrases) >= self::MAX_CANDIDATE_PHRASES) {
-                    break;
-                }
-            }
+        if (count($candidates) > self::MAX_CANDIDATE_PHRASES) {
+            arsort($candidates);
+            $candidates = array_slice($candidates, 0, self::MAX_CANDIDATE_PHRASES, true);
         }
 
-        return $phrases;
+        return array_keys($candidates);
     }
 
-    public static function countLemmaPhraseOccurrences(string $lemmaPhrase, string $text): int
+    /**
+     * @param array<string, int> $freq
+     */
+    private static function bestSurfaceForm(array $freq): string
     {
-        $phraseTokens = preg_split('/\s+/u', trim($lemmaPhrase), -1, PREG_SPLIT_NO_EMPTY);
+        if ($freq === []) {
+            return '';
+        }
+        arsort($freq);
+        $best = (string) array_key_first($freq);
+
+        return $best;
+    }
+
+    public static function countLemmaPhraseOccurrences(string $phrase, string $text): int
+    {
+        $phraseTokens = preg_split('/\s+/u', trim($phrase), -1, PREG_SPLIT_NO_EMPTY);
         $n = is_array($phraseTokens) ? count($phraseTokens) : 0;
         if ($n < self::MIN_N) {
             return 0;
+        }
+
+        $phraseLemmas = [];
+        foreach ($phraseTokens as $token) {
+            $key = mb_strtolower(trim((string) $token), 'UTF-8');
+            if ($key === '') {
+                return 0;
+            }
+            $phraseLemmas[] = TextAnalyzerStopWords::isPhraseStopWord($key) ? $key : self::lemma($key);
         }
 
         $lemmas = self::lemmaTokensForText($text);
@@ -190,7 +225,7 @@ final class RelevancePhraseNgrams
         $count = 0;
         for ($i = 0; $i <= $tokenCount - $n; $i++) {
             $slice = array_slice($lemmas, $i, $n);
-            if ($slice === $phraseTokens) {
+            if ($slice === $phraseLemmas) {
                 $count++;
             }
         }
@@ -212,47 +247,60 @@ final class RelevancePhraseNgrams
             return self::$textLemmaTokensCache[$cacheKey];
         }
 
-        self::$textLemmaTokensCache[$cacheKey] = self::tokenizeLemmas($text);
+        self::$textLemmaTokensCache[$cacheKey] = array_column(self::tokenizeSurfaceLemmaPairs($text), 'lemma');
 
         return self::$textLemmaTokensCache[$cacheKey];
     }
 
     /**
+     * @return list<array{surface:string,lemma:string}>
+     */
+    private static function tokenizeSurfaceLemmaPairs(string $text): array
+    {
+        $tokens = self::tokenize($text);
+        $pairs = [];
+
+        foreach ($tokens as $token) {
+            $surface = mb_strtolower(trim((string) $token), 'UTF-8');
+            if ($surface === '') {
+                continue;
+            }
+
+            $isStop = TextAnalyzerStopWords::isPhraseStopWord($surface);
+            if (self::$unigramRoots !== []) {
+                if (isset(self::$lemmaMap[$surface])) {
+                    $lemma = self::$lemmaMap[$surface];
+                } elseif ($isStop) {
+                    $lemma = $surface;
+                } else {
+                    $lemma = self::lemma($surface);
+                    if (!isset(self::$unigramRoots[$lemma])) {
+                        continue;
+                    }
+                }
+            } else {
+                $lemma = $isStop ? $surface : self::lemma($surface);
+            }
+
+            $minLen = $isStop ? 1 : self::MIN_TOKEN_LENGTH;
+            if (mb_strlen($surface) >= $minLen) {
+                $pairs[] = [
+                    'surface' => $surface,
+                    'lemma' => $lemma !== '' ? $lemma : $surface,
+                ];
+            }
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * @deprecated kept for call sites that still expect lemma-only stream
      * @return list<string>
      */
     private static function tokenizeLemmas(string $text): array
     {
-        $tokens = self::tokenize($text);
-        $lemmas = [];
-
-        foreach ($tokens as $token) {
-            $token = mb_strtolower(trim($token), 'UTF-8');
-            if ($token === '') {
-                continue;
-            }
-
-            $isStop = TextAnalyzerStopWords::isPhraseStopWord($token);
-
-            if (self::$unigramRoots !== []) {
-                if (isset(self::$lemmaMap[$token])) {
-                    $lemma = self::$lemmaMap[$token];
-                } elseif ($isStop) {
-                    // Служебные слова оставляем в TLPs, даже если их вырезали из униграмм.
-                    $lemma = $token;
-                } else {
-                    continue;
-                }
-            } else {
-                $lemma = $isStop ? $token : self::lemma($token);
-            }
-
-            $minLen = $isStop ? 1 : self::MIN_TOKEN_LENGTH;
-            if (mb_strlen($lemma) >= $minLen) {
-                $lemmas[] = $lemma;
-            }
-        }
-
-        return $lemmas;
+        return array_column(self::tokenizeSurfaceLemmaPairs($text), 'lemma');
     }
 
     private static function lemma(string $token): string
@@ -301,6 +349,42 @@ final class RelevancePhraseNgrams
     }
 
     /**
+     * @param list<array{surface:string,lemma:string}> $pairs
+     * @return list<array{surface:string,lemma_key:string}>
+     */
+    private static function extractSurfaceNgrams(array $pairs): array
+    {
+        $ngrams = [];
+        $tokenCount = count($pairs);
+
+        for ($n = self::MIN_N; $n <= self::MAX_N; $n++) {
+            if ($tokenCount < $n) {
+                continue;
+            }
+
+            for ($i = 0; $i <= $tokenCount - $n; $i++) {
+                $slice = array_slice($pairs, $i, $n);
+                $surfaces = [];
+                $lemmas = [];
+                foreach ($slice as $pair) {
+                    $surfaces[] = $pair['surface'];
+                    $lemmas[] = $pair['lemma'];
+                }
+                // Края/служебные — по поверхностной форме («для»), не по лемме.
+                if (!self::isWellFormedPhraseTokens($surfaces)) {
+                    continue;
+                }
+                $ngrams[] = [
+                    'surface' => implode(' ', $surfaces),
+                    'lemma_key' => implode("\x1f", $lemmas),
+                ];
+            }
+        }
+
+        return $ngrams;
+    }
+
+    /**
      * @param list<string> $tokens
      * @return list<string>
      */
@@ -316,56 +400,79 @@ final class RelevancePhraseNgrams
 
             for ($i = 0; $i <= $tokenCount - $n; $i++) {
                 $slice = array_slice($tokens, $i, $n);
-                $valid = true;
-
-                foreach ($slice as $token) {
-                    $isStop = TextAnalyzerStopWords::isPhraseStopWord($token);
-                    $minLen = $isStop ? 1 : self::MIN_TOKEN_LENGTH;
-                    if (mb_strlen($token) < $minLen) {
-                        $valid = false;
-                        break;
-                    }
+                if (!self::isWellFormedPhraseTokens($slice)) {
+                    continue;
                 }
-
-                if ($valid) {
-                    $ngrams[] = implode(' ', $slice);
-                }
+                $ngrams[] = implode(' ', $slice);
             }
         }
 
         return $ngrams;
     }
 
-    public static function isValidUnigramPhrase(string $phrase): bool
+    /**
+     * Служебные слова можно только внутри фразы («увеличение для осмотра»),
+     * не на краях («увеличение для», «для увеличение»).
+     * Нужно ≥ 2 значимых слова — иначе это «слово + предлог», а не словосочетание.
+     *
+     * @param list<string> $tokens
+     */
+    public static function isWellFormedPhraseTokens(array $tokens): bool
     {
-        if (self::$unigramRoots === []) {
-            return true;
-        }
-
-        $tokens = preg_split('/\s+/u', trim($phrase), -1, PREG_SPLIT_NO_EMPTY);
-        if (!is_array($tokens) || count($tokens) < self::MIN_N) {
+        if (count($tokens) < self::MIN_N || count($tokens) > self::MAX_N) {
             return false;
         }
 
         $contentHits = 0;
-        foreach ($tokens as $token) {
+        foreach ($tokens as $i => $token) {
             $key = mb_strtolower(trim((string) $token), 'UTF-8');
             if ($key === '') {
                 return false;
             }
 
-            if (TextAnalyzerStopWords::isPhraseStopWord($key)) {
+            $isStop = TextAnalyzerStopWords::isPhraseStopWord($key);
+            $minLen = $isStop ? 1 : self::MIN_TOKEN_LENGTH;
+            if (mb_strlen($key) < $minLen) {
+                return false;
+            }
+
+            // Края фразы — только значимые слова.
+            if (($i === 0 || $i === count($tokens) - 1) && $isStop) {
+                return false;
+            }
+
+            if (!$isStop) {
+                $contentHits++;
+            }
+        }
+
+        return $contentHits >= 2;
+    }
+
+    public static function isValidUnigramPhrase(string $phrase): bool
+    {
+        $tokens = preg_split('/\s+/u', trim($phrase), -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($tokens) || !self::isWellFormedPhraseTokens($tokens)) {
+            return false;
+        }
+
+        if (self::$unigramRoots === []) {
+            return true;
+        }
+
+        foreach ($tokens as $token) {
+            $key = mb_strtolower(trim((string) $token), 'UTF-8');
+            if ($key === '' || TextAnalyzerStopWords::isPhraseStopWord($key)) {
                 continue;
             }
 
-            if (!isset(self::$unigramRoots[$key])) {
+            $lemma = isset(self::$lemmaMap[$key]) ? self::$lemmaMap[$key] : self::lemma($key);
+            if (!isset(self::$unigramRoots[$lemma]) && !isset(self::$unigramRoots[$key])) {
                 return false;
             }
-            $contentHits++;
         }
 
-        // Фраза только из служебных слов — мусор; нужен хотя бы один значимый токен из униграмм.
-        return $contentHits > 0;
+        return true;
     }
 
     /**
@@ -464,10 +571,13 @@ final class RelevancePhraseNgrams
             if ($key === '') {
                 continue;
             }
-            if (isset($seen[$key])) {
+            $lemma = TextAnalyzerStopWords::isPhraseStopWord($key)
+                ? $key
+                : (isset(self::$lemmaMap[$key]) ? self::$lemmaMap[$key] : self::lemma($key));
+            if (isset($seen[$lemma])) {
                 return true;
             }
-            $seen[$key] = true;
+            $seen[$lemma] = true;
         }
 
         return false;
@@ -479,7 +589,7 @@ final class RelevancePhraseNgrams
      */
     public static function isLowQualityPhrase(string $phrase, array $tokens, array $anchorLemmas): bool
     {
-        if ($tokens === [] || count($tokens) < self::MIN_N || count($tokens) > self::MAX_N) {
+        if ($tokens === [] || !self::isWellFormedPhraseTokens($tokens)) {
             return true;
         }
 
@@ -505,16 +615,25 @@ final class RelevancePhraseNgrams
             if ($key === '') {
                 continue;
             }
-            if (isset(self::$noiseLemmas[$key])) {
+            $lemma = TextAnalyzerStopWords::isPhraseStopWord($key)
+                ? $key
+                : (isset(self::$lemmaMap[$key]) ? self::$lemmaMap[$key] : self::lemma($key));
+            if (isset(self::$noiseLemmas[$lemma]) || isset(self::$noiseLemmas[$key])) {
                 $noiseCount++;
             }
-            if ($anchorLemmas !== [] && isset($anchorLemmas[$key])) {
+            if ($anchorLemmas !== [] && (isset($anchorLemmas[$lemma]) || isset($anchorLemmas[$key]))) {
                 $anchorCount++;
             }
         }
 
         if ($noiseCount === count($tokens)) {
             return true;
+        }
+
+        // Фразы со связкой («аппарат для диагностика») пропускаем без якоря —
+        // иначе почти все предлоги вычищаются quality-фильтром.
+        if (self::hasInternalStopWord($tokens)) {
+            return false;
         }
 
         if ($anchorLemmas !== [] && $anchorCount === 0) {
@@ -607,7 +726,15 @@ final class RelevancePhraseNgrams
                 continue;
             }
 
-            $sorted = $tokens;
+            $lemmaTokens = [];
+            foreach ($tokens as $token) {
+                $key = mb_strtolower(trim((string) $token), 'UTF-8');
+                $lemmaTokens[] = TextAnalyzerStopWords::isPhraseStopWord($key)
+                    ? $key
+                    : (isset(self::$lemmaMap[$key]) ? self::$lemmaMap[$key] : self::lemma($key));
+            }
+
+            $sorted = $lemmaTokens;
             sort($sorted, SORT_STRING);
             $signature = implode("\x1f", $sorted);
             if (!isset($groups[$signature])) {
@@ -654,9 +781,29 @@ final class RelevancePhraseNgrams
     /**
      * @param list<string> $tokens
      */
+    public static function hasInternalStopWord(array $tokens): bool
+    {
+        $count = count($tokens);
+        if ($count < 3) {
+            return false;
+        }
+        for ($i = 1; $i < $count - 1; $i++) {
+            if (TextAnalyzerStopWords::isPhraseStopWord((string) $tokens[$i])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function phraseLengthScore(array $tokens): int
     {
         $count = count($tokens);
+
+        // «увеличение для осмотра» важнее голой биграммы при равном TF-IDF.
+        if (self::hasInternalStopWord($tokens)) {
+            return 4;
+        }
         if ($count <= 2) {
             return 2;
         }
@@ -692,10 +839,19 @@ final class RelevancePhraseNgrams
                 continue;
             }
 
+            $lemmaTokens = [];
+            foreach ($tokens as $token) {
+                $key = mb_strtolower(trim((string) $token), 'UTF-8');
+                $lemmaTokens[] = TextAnalyzerStopWords::isPhraseStopWord($key)
+                    ? $key
+                    : (isset(self::$lemmaMap[$key]) ? self::$lemmaMap[$key] : self::lemma($key));
+            }
+
             $entries[] = [
                 'phrase' => $phrase,
                 'row' => $row,
                 'tokens' => $tokens,
+                'lemma_tokens' => $lemmaTokens,
             ];
         }
 
@@ -726,7 +882,7 @@ final class RelevancePhraseNgrams
             $isNestedDuplicate = false;
 
             foreach ($kept as $keptEntry) {
-                if (!self::isContiguousSubphrase($entry['tokens'], $keptEntry['tokens'])) {
+                if (!self::isContiguousSubphrase($entry['lemma_tokens'], $keptEntry['lemma_tokens'])) {
                     continue;
                 }
 

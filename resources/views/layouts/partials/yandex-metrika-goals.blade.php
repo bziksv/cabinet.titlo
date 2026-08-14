@@ -83,9 +83,11 @@
                 }
                 @if($ymRegistered)
                 reach('novaja_registracija_1231', 'registered');
+                (window._tmr = window._tmr || []).push({ type: 'reachGoal', id: 3787377, goal: 'registracija' });
                 @endif
                 @if($ymVerified)
                 reach('verifikacija_po_majlu_1628', 'verified');
+                (window._tmr = window._tmr || []).push({ type: 'reachGoal', id: 3787377, goal: 'verifikacija' });
                 if (window._tmr && typeof window._tmr.push === 'function') {
                     window._tmr.push({ type: 'reachGoal', id: 3340935, goal: 'Verifikacija170523' });
                 }

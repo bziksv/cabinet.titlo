@@ -533,6 +533,7 @@
                         if (typeof ym === 'function') {
                             ym(ymCounter, 'reachGoal', 'success_payment_1231');
                         }
+                        (window._tmr = window._tmr || []).push({ type: 'reachGoal', id: 3787377, goal: 'oplata' });
                     }
 
                     var url = new URL(window.location.href);

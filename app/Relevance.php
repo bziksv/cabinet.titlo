@@ -213,9 +213,10 @@ class Relevance
                 if (!is_array($page)) {
                     continue;
                 }
-                $sitesForTlps[$key]['html'] = $this->separateText($page['html'] ?? '');
-                $sitesForTlps[$key]['linkText'] = $this->separateText($page['linkText'] ?? '');
-                $sitesForTlps[$key]['hiddenText'] = $this->separateText($page['hiddenText'] ?? '');
+                // Для TLPs короткие предлоги/союзы не выкидываем (иначе «для/на/в» пропадают).
+                $sitesForTlps[$key]['html'] = $this->separateTextKeepStopWords($page['html'] ?? '');
+                $sitesForTlps[$key]['linkText'] = $this->separateTextKeepStopWords($page['linkText'] ?? '');
+                $sitesForTlps[$key]['hiddenText'] = $this->separateTextKeepStopWords($page['hiddenText'] ?? '');
             }
         }
 
@@ -2148,6 +2149,43 @@ class Relevance
         return implode(" ", $text);
     }
 
+    /**
+     * Как separateText, но служебные слова (предлоги/союзы) оставляем даже короткие —
+     * иначе при separator=3 пропадают «в/на/с/к/по», а при 4 ещё и «для».
+     */
+    public function separateTextKeepStopWords($text): string
+    {
+        return self::filterTextByMinLengthKeepStopWords((string) $text, (int) $this->maxWordLength);
+    }
+
+    public static function filterTextByMinLengthKeepStopWords(string $text, int $minLen): string
+    {
+        if ($text === '') {
+            return '';
+        }
+        if ($minLen < 1) {
+            $minLen = 1;
+        }
+
+        $parts = preg_split('/\s+/u', trim($text), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $kept = [];
+        foreach ($parts as $item) {
+            $item = trim((string) $item);
+            if ($item === '') {
+                continue;
+            }
+            if (TextAnalyzerStopWords::isPhraseStopWord($item)) {
+                $kept[] = $item;
+                continue;
+            }
+            if (Str::length($item) >= $minLen) {
+                $kept[] = $item;
+            }
+        }
+
+        return implode(' ', $kept);
+    }
+
     public function preparePhrasesTable(?array $sitesForTlps = null)
     {
         $sites = $sitesForTlps ?? $this->sites;
@@ -2217,7 +2255,13 @@ class Relevance
             }
 
             if ((int) ($row['numberOccurrences'] ?? 0) < 2) {
-                continue;
+                // Связки с предлогом допускаем с 1 сайта — иначе их почти нет в TLP.
+                $tokens = RelevancePhraseNgrams::phraseTokens($phrase);
+                if (!RelevancePhraseNgrams::hasInternalStopWord($tokens)
+                    || (int) ($row['numberOccurrences'] ?? 0) < 1
+                ) {
+                    continue;
+                }
             }
 
             HybridRelevanceMetrics::applyTableTfidfToWordStats($row, $corpusZones);
@@ -2230,10 +2274,17 @@ class Relevance
         $result = RelevancePhraseNgrams::deduplicateOverlappingPhrases($result);
 
         $collection = collect($result)->sortByDesc(static function (array $row, string $phrase) {
+            $tokens = RelevancePhraseNgrams::phraseTokens($phrase);
+            $tfidf = (float) ($row['tfidfTop'] ?? $row['score'] ?? 0);
+            // Связки с предлогом поднимаем в топ (×1.5), иначе их не видно за биграммами.
+            if (RelevancePhraseNgrams::hasInternalStopWord($tokens)) {
+                $tfidf *= 1.5;
+            }
+
             return [
-                (float) ($row['tfidfTop'] ?? $row['score'] ?? 0),
+                $tfidf,
                 (float) ($row['bm25Top'] ?? 0),
-                RelevancePhraseNgrams::phraseLengthScore(RelevancePhraseNgrams::phraseTokens($phrase)),
+                RelevancePhraseNgrams::phraseLengthScore($tokens),
                 (int) ($row['numberOccurrences'] ?? 0),
             ];
         });
@@ -2472,6 +2523,14 @@ class Relevance
             $html = TextAnalyzer::removeWords($listWords, $html);
             $linkText = TextAnalyzer::removeWords($listWords, $linkText);
             $hiddenText = TextAnalyzer::removeWords($listWords, $hiddenText);
+        }
+
+        // Мин. длина слова из настроек, но служебные слова для TLPs не режем.
+        $minLen = (int) ($request['separator'] ?? 0);
+        if ($minLen > 0) {
+            $html = self::filterTextByMinLengthKeepStopWords($html, $minLen);
+            $linkText = self::filterTextByMinLengthKeepStopWords($linkText, $minLen);
+            $hiddenText = self::filterTextByMinLengthKeepStopWords($hiddenText, $minLen);
         }
 
         return [
@@ -2962,9 +3021,14 @@ class Relevance
             self::filterStoredDetailsExcludedWords($data, $historyRequest);
         }
 
-        // Для пересборки TLPs со служебными словами нужны реальные sites (не stub).
+        // Для пересборки TLPs со служебными словами / краёв нужны реальные sites (не stub).
         if ($wantTables && $stubbedSites
-            && self::shouldRebuildPhrasesToKeepStopWords($data['phrases'] ?? null, $historyRequest)
+            && (
+                self::shouldRebuildPhrasesToKeepStopWords($data['phrases'] ?? null, $historyRequest)
+                || self::shouldRebuildPhrasesToFixStopWordEdges($data['phrases'] ?? null)
+                || self::shouldRebuildPhrasesMissingStopConnectors($data['phrases'] ?? null, $historyRequest)
+                || self::shouldRebuildPhrasesToSurfaceForms($data['phrases'] ?? null)
+            )
             && !empty($history['id'])
         ) {
             $sitesColumn = RelevanceHistoryResult::where('id', (int) $history['id'])->value('sites');
@@ -2979,7 +3043,10 @@ class Relevance
         if ($wantTables && !$stubbedSites && !empty($data['sites']) && is_array($data['sites'])) {
             $storedPhrases = $data['phrases'] ?? null;
             $shouldRebuildPhrases = self::shouldRebuildStoredPhrases($storedPhrases)
-                || self::shouldRebuildPhrasesToKeepStopWords($storedPhrases, $historyRequest);
+                || self::shouldRebuildPhrasesToKeepStopWords($storedPhrases, $historyRequest)
+                || self::shouldRebuildPhrasesToFixStopWordEdges($storedPhrases)
+                || self::shouldRebuildPhrasesMissingStopConnectors($storedPhrases, $historyRequest)
+                || self::shouldRebuildPhrasesToSurfaceForms($storedPhrases);
 
             if ($shouldRebuildPhrases) {
                 $sitesForPhrases = $data['sites'];
@@ -3214,6 +3281,134 @@ class Relevance
         }
 
         return $checked > 0;
+    }
+
+    /**
+     * TLPs со служебными словами на краях («увеличение для») — мусор, пересобрать.
+     *
+     * @param array<string, array<string, mixed>>|null $phrases
+     */
+    public static function shouldRebuildPhrasesToFixStopWordEdges(?array $phrases): bool
+    {
+        if (!is_array($phrases) || $phrases === []) {
+            return false;
+        }
+
+        $checked = 0;
+        foreach ($phrases as $phrase => $row) {
+            if (!is_string($phrase) || $phrase === '') {
+                continue;
+            }
+            $tokens = preg_split('/\s+/u', trim($phrase), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            if ($tokens === []) {
+                continue;
+            }
+            if (!RelevancePhraseNgrams::isWellFormedPhraseTokens($tokens)) {
+                return true;
+            }
+            $checked++;
+            if ($checked >= 60) {
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * В анализе вырезали союзы/предлоги, а в TLPs почти нет связок вида «X для Y» —
+     * пересобрать (часто после separateText коротких предлогов не осталось).
+     *
+     * @param array<string, array<string, mixed>>|null $phrases
+     * @param array<string, mixed>|null $historyRequest
+     */
+    public static function shouldRebuildPhrasesMissingStopConnectors(?array $phrases, ?array $historyRequest): bool
+    {
+        if (!is_array($phrases) || $phrases === []) {
+            return false;
+        }
+
+        $excludedStops = is_array($historyRequest)
+            && (
+                ($historyRequest['conjunctionsPrepositionsPronouns'] ?? '') === 'false'
+                || ($historyRequest['conjunctionsPrepositionsPronouns'] ?? '') === false
+                || ($historyRequest['conjunctionsPrepositionsPronouns'] ?? '') === '0'
+                || ($historyRequest['conjunctionsPrepositionsPronouns'] ?? '') === 0
+            );
+        if (!$excludedStops) {
+            return false;
+        }
+
+        $checked = 0;
+        $withInternalStop = 0;
+        foreach ($phrases as $phrase => $row) {
+            if (!is_string($phrase) || $phrase === '') {
+                continue;
+            }
+            $tokens = preg_split('/\s+/u', trim($phrase), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            if (!RelevancePhraseNgrams::isWellFormedPhraseTokens($tokens)) {
+                $checked++;
+                continue;
+            }
+            $n = count($tokens);
+            for ($i = 1; $i < $n - 1; $i++) {
+                if (TextAnalyzerStopWords::isPhraseStopWord((string) $tokens[$i])) {
+                    $withInternalStop++;
+                    break;
+                }
+            }
+            $checked++;
+            if ($checked >= 80) {
+                break;
+            }
+        }
+
+        // Меньше ~5% нормальных фраз со связкой — похоже на «предлоги вырезаны».
+        return $checked >= 20 && $withInternalStop < max(2, (int) floor($checked * 0.05));
+    }
+
+    /**
+     * Старые TLPs полностью лемматизированы («для диагностика» вместо «для диагностики») —
+     * пересобрать с сохранением словоформ.
+     *
+     * @param array<string, array<string, mixed>>|null $phrases
+     */
+    public static function shouldRebuildPhrasesToSurfaceForms(?array $phrases): bool
+    {
+        if (!is_array($phrases) || $phrases === []) {
+            return false;
+        }
+
+        $afterPrep = 0;
+        $looksLemmatized = 0;
+        $looksInflected = 0;
+
+        foreach ($phrases as $phrase => $row) {
+            if (!is_string($phrase) || $phrase === '') {
+                continue;
+            }
+            if (!preg_match_all('/\b(для|без|от|из|около|вместо)\s+([а-яё]+)/u', mb_strtolower($phrase, 'UTF-8'), $matches, PREG_SET_ORDER)) {
+                continue;
+            }
+            foreach ($matches as $m) {
+                $word = $m[2];
+                if (TextAnalyzerStopWords::isPhraseStopWord($word)) {
+                    continue;
+                }
+                $afterPrep++;
+                // Род.п. после «для/без/от/из» часто на -и/-ы; лемма чаще именительный -а/-я/-о/-е или голый корень.
+                if (preg_match('/[иы]$/u', $word)) {
+                    $looksInflected++;
+                } elseif (preg_match('/[аяоеь]$/u', $word) || !preg_match('/[аеёиоуыэюя]$/u', $word)) {
+                    $looksLemmatized++;
+                }
+            }
+            if ($afterPrep >= 12) {
+                break;
+            }
+        }
+
+        return $afterPrep >= 3 && $looksInflected === 0 && $looksLemmatized >= 2;
     }
 
     /**
