@@ -316,7 +316,7 @@
                                                 <span class="cabinet-sc-feed__task-go">{{ __('Open in project') }}</span>
                                             </a>
                                         @endif
-                                        <div class="cabinet-sc-feed__note">{{ $note->body }}</div>
+                                        <div class="cabinet-sc-feed__note">{!! \App\Support\TextAutoLinker::format((string) $note->body) !!}</div>
                                         <div class="cabinet-sc-feed__actions">
                                             <form method="post" action="{{ route('pages.seo-checklist.chronicle.read') }}" data-sc-mark-read data-note-id="{{ $note->id }}">
                                                 @csrf
@@ -566,7 +566,7 @@
                                                     {!! $statusPill($meta['to'] ?? null) !!}
                                                 </div>
                                             @elseif($isNote)
-                                                <div class="cabinet-sc-feed__note">{{ \Illuminate\Support\Str::limit($meta['body'] ?? '', 220) }}</div>
+                                                <div class="cabinet-sc-feed__note">{!! \App\Support\TextAutoLinker::format((string) ($meta['body'] ?? ''), 220) !!}</div>
                                             @else
                                                 <div class="cabinet-sc-feed__note text-secondary">{{ $log->type }}</div>
                                             @endif

@@ -441,6 +441,9 @@ class SeoChecklistService
             ->whereIn('status', SeoChecklistItem::OPEN_STATUSES)
             ->with([
                 'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
+                'notes' => function ($q) {
+                    $q->orderByDesc('id')->with('user');
+                },
                 'children' => function ($q) use ($userId) {
                     $q->orderBy('sort')->orderBy('id')
                         ->with([
@@ -2195,6 +2198,9 @@ class SeoChecklistService
             ->where('status', 'review')
             ->with([
                 'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
+                'notes' => function ($q) {
+                    $q->orderByDesc('id')->with('user');
+                },
                 'children' => function ($q) use ($userId) {
                     $q->orderBy('sort')->orderBy('id')
                         ->with([

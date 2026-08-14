@@ -75,22 +75,34 @@ class MonitoringProjectSnapshotService
     }
 
     /**
-     * Проекты без снимка или со устаревшим снимком (по updated_at строки кэша).
+     * Проекты без снимка, со устаревшим снимком, или с позициями новее снимка.
      */
     public function refreshStale(?int $olderThanHours = 24, int $chunkSize = 25): int
     {
         $threshold = now()->subHours($olderThanHours ?? 24);
+        $cutover = \Carbon\Carbon::parse('2026-08-14 11:00:00');
         $updated = 0;
 
         MonitoringProject::query()
             ->orderBy('id')
-            ->chunk($chunkSize, function ($chunk) use ($threshold, &$updated) {
-                foreach ($chunk as $project) {
-                    $cached = MonitoringDataTableColumnsProject::query()
-                        ->where('monitoring_project_id', $project->id)
-                        ->first();
+            ->chunk($chunkSize, function ($chunk) use ($threshold, $cutover, &$updated) {
+                $ids = $chunk->pluck('id')->all();
+                $cachedById = MonitoringDataTableColumnsProject::query()
+                    ->whereIn('monitoring_project_id', $ids)
+                    ->get()
+                    ->keyBy('monitoring_project_id');
+                $latestByProject = MonitoringLatestPositions::maxCreatedAtByProjectIds($ids);
 
-                    if ($cached && $cached->updated_at && $cached->updated_at->gte($threshold)) {
+                foreach ($chunk as $project) {
+                    $cached = $cachedById->get($project->id);
+                    $latestAt = $latestByProject->get($project->id);
+                    $needs = $cached === null
+                        || !$cached->updated_at
+                        || $cached->updated_at->lt($threshold)
+                        || $cached->updated_at->lt($cutover)
+                        || ($latestAt && \Carbon\Carbon::parse($latestAt)->gt($cached->updated_at));
+
+                    if (!$needs) {
                         continue;
                     }
 

@@ -41,9 +41,12 @@
             <a href="{{ route('monitoring.v2') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>{{ __('Monitoring show back to list') }}
             </a>
-            <a href="{{ url('/monitoring/' . $project->id . '/export/edit') }}" class="btn btn-outline-secondary btn-sm">
+            <button type="button"
+                    class="btn btn-outline-secondary btn-sm"
+                    data-mon-export-open
+                    data-id="{{ $project->id }}">
                 <i class="bi bi-download me-1" aria-hidden="true"></i>{{ __('Monitoring show export') }}
-            </a>
+            </button>
             @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-monitoring'])
         </div>
     </div>

@@ -3,50 +3,50 @@
     <th class="phrases-ranges-label font-weight-normal text-muted">{{ __('Ranges for filtering the table') }}</th>
     <th class="phrases-filter-cell">
         <div class="phrases-filter-box">
-            <input class="w-100" type="number" id="phrasesMinTfidfTop" placeholder="min">
-            <input class="w-100" type="number" id="phrasesMaxTfidfTop" placeholder="max">
+            <input class="w-100" type="number" id="phrasesMinTfidfTop" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" id="phrasesMaxTfidfTop" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="phrases-filter-cell">
         <div class="phrases-filter-box">
-            <input class="w-100" type="number" id="phrasesMinTfidfSite" placeholder="min">
-            <input class="w-100" type="number" id="phrasesMaxTfidfSite" placeholder="max">
+            <input class="w-100" type="number" id="phrasesMinTfidfSite" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" id="phrasesMaxTfidfSite" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="phrases-filter-cell">
         <div class="phrases-filter-box">
-            <input class="w-100" type="number" id="phrasesMinBm25Top" placeholder="min">
-            <input class="w-100" type="number" id="phrasesMaxBm25Top" placeholder="max">
+            <input class="w-100" type="number" id="phrasesMinBm25Top" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" id="phrasesMaxBm25Top" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="phrases-filter-cell">
         <div class="phrases-filter-box">
-            <input class="w-100" type="number" id="phrasesMinBm25Site" placeholder="min">
-            <input class="w-100" type="number" id="phrasesMaxBm25Site" placeholder="max">
+            <input class="w-100" type="number" id="phrasesMinBm25Site" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" id="phrasesMaxBm25Site" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="phrases-filter-cell">
         <div class="phrases-filter-box">
-            <input class="w-100" type="number" id="phrasesMinSites" placeholder="min">
-            <input class="w-100" type="number" id="phrasesMaxSites" placeholder="max">
+            <input class="w-100" type="number" id="phrasesMinSites" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" id="phrasesMaxSites" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="phrases-filter-cell">
         <div class="phrases-filter-box">
-            <input class="w-100" type="number" id="phrasesMinMedian" placeholder="min">
-            <input class="w-100" type="number" id="phrasesMaxMedian" placeholder="max">
+            <input class="w-100" type="number" id="phrasesMinMedian" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" id="phrasesMaxMedian" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="phrases-filter-cell">
         <div class="phrases-filter-box">
-            <input class="w-100" type="number" id="phrasesMinAvg" placeholder="min">
-            <input class="w-100" type="number" id="phrasesMaxAvg" placeholder="max">
+            <input class="w-100" type="number" id="phrasesMinAvg" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" id="phrasesMaxAvg" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="phrases-filter-cell">
         <div class="phrases-filter-box">
-            <input class="w-100" type="number" id="phrasesMinOurSite" placeholder="min">
-            <input class="w-100" type="number" id="phrasesMaxOurSite" placeholder="max">
+            <input class="w-100" type="number" id="phrasesMinOurSite" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" id="phrasesMaxOurSite" placeholder="{{ __('max') }}">
         </div>
     </th>
 </tr>

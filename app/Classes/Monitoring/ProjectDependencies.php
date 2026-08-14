@@ -1,16 +1,11 @@
 <?php
 
-
 namespace App\Classes\Monitoring;
 
 use App\MonitoringProject;
 
 class ProjectDependencies
 {
-    const POSITION_PREFIX = 'engine';
-    const POSITION_POSTFIX = 'latest';
-    const POSITION_SEPARATOR = '_';
-
     protected $project;
     protected $queries;
     protected $engines;
@@ -26,9 +21,9 @@ class ProjectDependencies
 
         $this->engines = $project['searchengines'];
 
-        $this->queries = $project->keywords()
-            ->addLastPositions(self::POSITION_SEPARATOR, self::POSITION_PREFIX, self::POSITION_POSTFIX, $this->engines->pluck('id'))
-            ->get();
+        // Без addLastPositions: N коррелированных подзапросов на тяжёлых проектах
+        // тормозили/срывали снимок, и в колонке ТОП оставался старый «архивный» срез.
+        $this->queries = $project->keywords()->get(['id', 'monitoring_project_id', 'query']);
     }
 
     public function getQueries()
@@ -43,33 +38,14 @@ class ProjectDependencies
 
     public function getLatestPositionCollect()
     {
-        $latestPositions = collect([]);
+        $engineIds = $this->engines->pluck('id')->map(static function ($id) {
+            return (int) $id;
+        })->all();
 
-        $engines = $this->getEngines();
+        $keywordIds = $this->queries->pluck('id')->map(static function ($id) {
+            return (int) $id;
+        })->all();
 
-        foreach ($engines as $engine)
-        {
-            $positions = $this->queries->map(function ($item) use ($engine) {
-                return collect([
-                    'query_id' => $item['id'],
-                    'engine_id' => $engine['id'],
-                    'position' => $item[$this->generateLatestKeyPosition($engine['id'])],
-                ]);
-            });
-
-            $latestPositions = $latestPositions->merge($positions);
-        }
-
-        $latestPositions = $latestPositions->filter(function ($value) {
-            return $value['position'] !== null;
-        });
-
-        return $latestPositions;
+        return MonitoringLatestPositions::collectForProjectData($engineIds, $keywordIds);
     }
-
-    private function generateLatestKeyPosition($engine_id)
-    {
-        return implode(self::POSITION_SEPARATOR, [self::POSITION_PREFIX, $engine_id, self::POSITION_POSTFIX]);
-    }
-
 }

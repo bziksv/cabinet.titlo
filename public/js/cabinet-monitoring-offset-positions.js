@@ -45,6 +45,18 @@
             format: 'L',
             locale: 'ru',
         });
+
+        var $groups = $content.find('#cabinetMonExportGroups');
+        if ($groups.length && $.fn.select2) {
+            $groups.select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                dropdownParent: $modal,
+                placeholder: $groups.data('placeholder') || '',
+                allowClear: true,
+                closeOnSelect: false,
+            });
+        }
     }
 
     function appendOffsetFields($form) {

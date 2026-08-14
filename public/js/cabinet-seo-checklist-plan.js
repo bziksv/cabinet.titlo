@@ -4,6 +4,7 @@
 
     var csrf = root.getAttribute('data-csrf') || '';
     var statusTpl = root.getAttribute('data-status-url-template') || '';
+    var noteTpl = root.getAttribute('data-note-url-template') || '';
     var timerStartTpl = root.getAttribute('data-timer-start-url-template') || '';
     var timerStopTpl = root.getAttribute('data-timer-stop-url-template') || '';
     var labelStart = root.getAttribute('data-i18n-timer-start') || 'Start timer';
@@ -322,13 +323,78 @@
         });
     }
 
+    function bumpNotesCount(itemEl) {
+        if (!itemEl) return;
+        var btn = itemEl.querySelector('[data-sc-toggle-notes]');
+        if (!btn) return;
+        var countEl = btn.querySelector('[data-sc-notes-count]');
+        var n = countEl ? (parseInt(countEl.textContent || '0', 10) || 0) + 1 : 1;
+        if (!countEl) {
+            countEl = document.createElement('span');
+            countEl.className = 'cabinet-sc-plan__notes-count';
+            countEl.setAttribute('data-sc-notes-count', '');
+            btn.appendChild(countEl);
+        }
+        countEl.textContent = String(n);
+    }
+
     root.addEventListener('click', function (e) {
         var timerBtn = e.target.closest('[data-sc-timer]');
         if (timerBtn) {
             e.preventDefault();
             var item = timerBtn.closest('[data-sc-plan-sub], [data-sc-plan-item]');
             if (item && !item.classList.contains('is-busy')) toggleTimer(item);
+            return;
         }
+
+        var toggleNotes = e.target.closest('[data-sc-toggle-notes]');
+        if (toggleNotes) {
+            e.preventDefault();
+            var notesItem = toggleNotes.closest('[data-sc-plan-item]');
+            if (!notesItem) return;
+            var notesBox = notesItem.querySelector('[data-sc-notes]');
+            if (notesBox) notesBox.classList.toggle('d-none');
+            return;
+        }
+
+        var saveNote = e.target.closest('[data-sc-note-save]');
+        if (!saveNote || !noteTpl) return;
+        e.preventDefault();
+        var noteItem = saveNote.closest('[data-sc-plan-item]');
+        if (!noteItem || noteItem.classList.contains('is-busy')) return;
+        var noteBody = noteItem.querySelector('[data-sc-note-body]');
+        var notesList = noteItem.querySelector('[data-sc-notes-list]');
+        if (!noteBody || !notesList) return;
+        var body = String(noteBody.value || '').trim();
+        if (!body) return;
+        var projectId = noteItem.getAttribute('data-project-id');
+        var itemId = noteItem.getAttribute('data-id');
+        if (!projectId || !itemId) return;
+        saveNote.disabled = true;
+        postJson(urlFor(noteTpl, projectId, itemId), { body: body })
+            .then(function (result) {
+                saveNote.disabled = false;
+                if (!result.ok) {
+                    alert((result.data && result.data.message) || 'Error');
+                    return;
+                }
+                var li = document.createElement('li');
+                var author = String((result.data.note && result.data.note.author) || '').replace(/</g, '&lt;');
+                var created = String((result.data.note && result.data.note.created_at) || '');
+                var bodyHtml = (result.data.note && result.data.note.body_html)
+                    ? String(result.data.note.body_html)
+                    : String((result.data.note && result.data.note.body) || '').replace(/</g, '&lt;');
+                li.innerHTML = '<div class="cabinet-sc-notes-list__meta">' +
+                    (author ? '<strong class="cabinet-sc-notes-list__author">' + author + '</strong> ' : '') +
+                    '<span class="text-secondary small">' + created + '</span></div>' +
+                    '<div class="cabinet-sc-notes-list__body">' + bodyHtml + '</div>';
+                notesList.insertBefore(li, notesList.firstChild);
+                noteBody.value = '';
+                bumpNotesCount(noteItem);
+            })
+            .catch(function () {
+                saveNote.disabled = false;
+            });
     });
 
     root.addEventListener('change', function (e) {

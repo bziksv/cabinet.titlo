@@ -1,0 +1,49 @@
+.cabinet-mon-export-page {
+    max-width: 52rem;
+}
+
+.cabinet-mon-export-page__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.cabinet-mon-export-form__section {
+    margin-top: 0.5rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.5rem;
+    background: #f8f9fb;
+}
+
+.cabinet-mon-export-form__section-title {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #212529;
+}
+
+.cabinet-mon-export-form .custom-control {
+    margin-bottom: 0.45rem;
+}
+
+.cabinet-mon-export-form .custom-control-label {
+    color: #212529;
+}
+
+.cabinet-mon-export-form__finance {
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.5rem;
+    background: #fff8f1;
+}
+
+.cabinet-mon-export-form .select2-container--bootstrap4 .select2-selection--multiple {
+    min-height: 2.35rem;
+}

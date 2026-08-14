@@ -7,6 +7,7 @@ use App\MonitoringProject;
 use App\MonitoringPublicShare;
 use App\MonitoringUserStatus;
 use App\User;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -18,7 +19,13 @@ class MonitoringProjectListSerializer
     private const CACHE_TTL_SECONDS = 120;
 
     /** Смена схемы ответа — сброс старого кэша с пустыми снимками. */
-    private const CACHE_KEY_SUFFIX = 's19';
+    private const CACHE_KEY_SUFFIX = 's21';
+
+    /**
+     * Снимки до этого момента могли быть посчитаны через addLastPositions
+     * и «залипнуть» на архивном срезе — принудительный пересчёт через MAX(id).
+     */
+    private const METRICS_CALC_CUTOVER = '2026-08-14 11:00:00';
 
     /** Фоновая догрузка метрик — отдельный endpoint, не в list. */
     /** Один проект за HTTP — иначе таймаут 90 с на тяжёлых ProjectData. */
@@ -59,33 +66,65 @@ class MonitoringProjectListSerializer
     /**
      * Порционный пересчёт снимков (отдельный HTTP, не блокирует list).
      *
-     * @return array{rebuilt: int, pending: int, updates: array<int, array<string, mixed>>}
+     * @return array{
+     *   rebuilt: int,
+     *   pending: int,
+     *   updates: array<int, array<string, mixed>>,
+     *   timed_out?: bool,
+     *   wall_ms?: int,
+     *   can_continue?: bool,
+     *   without_positions?: array<int, array{id: int, name: string}>
+     * }
      */
     public function fillMissingSnapshots(User $user, int $limit, bool $force = false): array
     {
         $limit = max(1, min($force ? self::FILL_SNAPSHOT_FORCE_BATCH : self::FILL_SNAPSHOT_BATCH, $limit));
 
         $projects = $user->monitoringProjectsDataTable()
-            ->select('monitoring_projects.id')
+            ->select('monitoring_projects.id', 'monitoring_projects.name')
             ->orderBy('monitoring_projects.name')
             ->get();
 
         if ($projects->isEmpty()) {
-            return ['rebuilt' => 0, 'pending' => 0, 'updates' => []];
+            return [
+                'rebuilt' => 0,
+                'pending' => 0,
+                'updates' => [],
+                'can_continue' => false,
+                'without_positions' => [],
+            ];
         }
 
-        $snapshots = $this->loadSnapshots($projects->pluck('id')->all());
+        $projectIds = $projects->pluck('id')->all();
+        $snapshots = $this->loadSnapshots($projectIds);
+        $latestByProject = MonitoringLatestPositions::maxCreatedAtByProjectIds($projectIds);
+        if ($force) {
+            Cache::forget('monitoring_v2_snap_skip:' . (int) $user->id);
+        }
+        $skipIds = $this->snapshotFillSkipIds((int) $user->id);
         $toRefresh = [];
 
         foreach ($projects as $project) {
+            $pid = (int) $project->id;
+            if (!$force && isset($skipIds[$pid])) {
+                continue;
+            }
             $snap = $snapshots->get($project->id);
-            if ($force || $this->snapshotNeedsRefresh($snap)) {
+            if ($force || $this->snapshotNeedsRefresh($snap, $latestByProject->get($project->id))) {
                 $toRefresh[] = $project;
             }
         }
 
+        $withoutPositions = $this->projectsWithoutPositionsList($projects, $latestByProject);
+
         if ($toRefresh === []) {
-            return ['rebuilt' => 0, 'pending' => 0, 'updates' => []];
+            return [
+                'rebuilt' => 0,
+                'pending' => 0,
+                'updates' => [],
+                'can_continue' => false,
+                'without_positions' => $withoutPositions,
+            ];
         }
 
         set_time_limit(max(60, (int) ini_get('max_execution_time')));
@@ -101,6 +140,7 @@ class MonitoringProjectListSerializer
                 $timedOut = true;
                 break;
             }
+            $full = null;
             try {
                 $projectStart = microtime(true);
                 $full = MonitoringProject::query()->find($project->id);
@@ -119,6 +159,23 @@ class MonitoringProjectListSerializer
                 }
             } catch (\Throwable $e) {
                 report($e);
+                $pid = (int) $project->id;
+                $hasPositions = $latestByProject->get($project->id) !== null
+                    && $latestByProject->get($project->id) !== '';
+
+                if (!$hasPositions) {
+                    // Нет ни одной позиции в БД — пишем пустой снимок, чтобы не крутить forever.
+                    if ($full === null) {
+                        $full = MonitoringProject::query()->find($project->id);
+                    }
+                    if ($full) {
+                        $snap = $this->storeEmptySnapshot($full);
+                        $updates[] = $this->metricsFromSnapshot($pid, $snap);
+                        $rebuilt++;
+                    }
+                } else {
+                    $this->rememberSnapshotFillSkip((int) $user->id, $pid);
+                }
             }
         }
 
@@ -126,8 +183,20 @@ class MonitoringProjectListSerializer
             self::forgetCacheForUser((int) $user->id);
         }
 
-        $snapshots = $this->loadSnapshots($projects->pluck('id')->all());
-        $pending = $this->countPendingSnapshots($projects, $snapshots);
+        $snapshots = $this->loadSnapshots($projectIds);
+        $latestByProject = MonitoringLatestPositions::maxCreatedAtByProjectIds($projectIds);
+        $pending = $this->countPendingSnapshots($projects, $snapshots, $latestByProject);
+        $skipIds = $this->snapshotFillSkipIds((int) $user->id);
+        $refreshable = 0;
+        foreach ($projects as $project) {
+            $pid = (int) $project->id;
+            if (isset($skipIds[$pid])) {
+                continue;
+            }
+            if ($this->snapshotNeedsRefresh($snapshots->get($project->id), $latestByProject->get($project->id))) {
+                $refreshable++;
+            }
+        }
 
         return [
             'rebuilt' => $rebuilt,
@@ -135,7 +204,85 @@ class MonitoringProjectListSerializer
             'updates' => $updates,
             'timed_out' => $timedOut,
             'wall_ms' => (int) round((microtime(true) - $wallStart) * 1000),
+            'can_continue' => $refreshable > 0,
+            'without_positions' => $this->projectsWithoutPositionsList($projects, $latestByProject),
         ];
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, MonitoringProject> $projects
+     * @param \Illuminate\Support\Collection<int, mixed> $latestByProject
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function projectsWithoutPositionsList($projects, $latestByProject): array
+    {
+        $out = [];
+        foreach ($projects as $project) {
+            $latest = $latestByProject->get($project->id);
+            if ($latest !== null && $latest !== '') {
+                continue;
+            }
+            $name = trim((string) ($project->name ?? ''));
+            if ($name === '') {
+                $name = '#' . $project->id;
+            }
+            $out[] = [
+                'id' => (int) $project->id,
+                'name' => $name,
+            ];
+        }
+
+        return $out;
+    }
+
+    private function storeEmptySnapshot(MonitoringProject $project): MonitoringDataTableColumnsProject
+    {
+        $words = (int) $project->keywords()->count();
+
+        return MonitoringDataTableColumnsProject::updateOrCreate(
+            ['monitoring_project_id' => $project->id],
+            [
+                'words' => $words,
+                'middle' => 0,
+                'top1' => 0,
+                'top3' => 0,
+                'top5' => 0,
+                'top10' => 0,
+                'top30' => 0,
+                'top100' => 0,
+                'mastered' => 0,
+                'mastered_percent' => null,
+            ]
+        );
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    private function snapshotFillSkipIds(int $userId): array
+    {
+        $raw = Cache::get('monitoring_v2_snap_skip:' . $userId, []);
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $id) {
+            $out[(int) $id] = true;
+        }
+
+        return $out;
+    }
+
+    private function rememberSnapshotFillSkip(int $userId, int $projectId): void
+    {
+        $key = 'monitoring_v2_snap_skip:' . $userId;
+        $raw = Cache::get($key, []);
+        if (!is_array($raw)) {
+            $raw = [];
+        }
+        $raw[] = $projectId;
+        $raw = array_values(array_unique(array_map('intval', $raw)));
+        Cache::put($key, $raw, 600);
     }
 
     public static function forgetCacheForUser(int $userId): void
@@ -219,9 +366,11 @@ class MonitoringProjectListSerializer
         }
 
         $snapshots = $this->loadSnapshots($projects->pluck('id')->all());
+        $latestByProject = MonitoringLatestPositions::maxCreatedAtByProjectIds($projects->pluck('id')->all());
         $snapshotsRebuilt = $this->ensureSnapshots($projects, $snapshots, $rebuildSnapshots);
         if ($snapshotsRebuilt > 0) {
             $snapshots = $this->loadSnapshots($projects->pluck('id')->all());
+            $latestByProject = MonitoringLatestPositions::maxCreatedAtByProjectIds($projects->pluck('id')->all());
         }
 
         $items = [];
@@ -236,7 +385,7 @@ class MonitoringProjectListSerializer
             );
         }
 
-        $pending = $this->countPendingSnapshots($projects, $snapshots);
+        $pending = $this->countPendingSnapshots($projects, $snapshots, $latestByProject);
 
         return [
             'total' => count($items),
@@ -244,6 +393,7 @@ class MonitoringProjectListSerializer
             'cached_at' => now()->toIso8601String(),
             'snapshots_rebuilt' => $snapshotsRebuilt,
             'snapshots_pending' => $pending,
+            'without_positions' => $this->projectsWithoutPositionsList($projects, $latestByProject),
         ];
     }
 
@@ -340,7 +490,7 @@ class MonitoringProjectListSerializer
             && $snap->middle === null;
     }
 
-    private function snapshotNeedsRefresh(?MonitoringDataTableColumnsProject $snap): bool
+    private function snapshotNeedsRefresh(?MonitoringDataTableColumnsProject $snap, $latestPositionAt = null): bool
     {
         if ($this->snapshotIsEmpty($snap)) {
             return true;
@@ -350,18 +500,34 @@ class MonitoringProjectListSerializer
             return true;
         }
 
+        if ($snap->updated_at->lt(Carbon::parse(self::METRICS_CALC_CUTOVER))) {
+            return true;
+        }
+
+        if ($latestPositionAt !== null && $latestPositionAt !== '') {
+            try {
+                if (Carbon::parse($latestPositionAt)->gt($snap->updated_at)) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                // ignore parse errors — fallback to age check
+            }
+        }
+
         return $snap->updated_at->lt(now()->subHours(24));
     }
 
     /**
      * @param \Illuminate\Support\Collection<int, MonitoringProject> $projects
      * @param \Illuminate\Support\Collection<int, MonitoringDataTableColumnsProject> $snapshots
+     * @param \Illuminate\Support\Collection<int, mixed>|null $latestByProject
      */
-    private function countPendingSnapshots($projects, $snapshots): int
+    private function countPendingSnapshots($projects, $snapshots, $latestByProject = null): int
     {
         $pending = 0;
         foreach ($projects as $project) {
-            if ($this->snapshotNeedsRefresh($snapshots->get($project->id))) {
+            $latestAt = $latestByProject ? $latestByProject->get($project->id) : null;
+            if ($this->snapshotNeedsRefresh($snapshots->get($project->id), $latestAt)) {
                 $pending++;
             }
         }

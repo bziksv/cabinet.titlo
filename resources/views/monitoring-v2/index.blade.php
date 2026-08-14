@@ -101,6 +101,7 @@
                     listLoadError: @json(__('Monitoring v2 list load error')),
                     snapshotsLoading: @json(__('Monitoring v2 snapshots loading')),
                     snapshotsPartial: @json(__('Monitoring v2 snapshots partial')),
+                    snapshotsPartialMore: @json(__('Monitoring v2 snapshots partial more')),
                     snapshotsFillTimeout: @json(__('Monitoring v2 snapshots fill timeout')),
                     faviconRefreshClick: @json(__('Monitoring v2 favicon refresh click')),
                     faviconRefreshed: @json(__('Monitoring v2 favicon refreshed')),

@@ -21,7 +21,7 @@ class MenuComposer
         }
 
         if (cabinet_skip_heavy_web()) {
-            $stamp = MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full') . ':beta1';
+            $stamp = MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full') . ':sa-alpha';
             $cached = session('cabinet_menu_modules_v10');
             $cachedStamp = session('cabinet_menu_modules_v10_stamp');
             if (is_array($cached) && $cachedStamp === $stamp && $this->cachedMenuHasItems($cached)) {
@@ -80,7 +80,7 @@ class MenuComposer
         if (cabinet_skip_heavy_web()) {
             session([
                 'cabinet_menu_modules_v10' => $modules,
-                'cabinet_menu_modules_v10_stamp' => MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full') . ':beta1',
+                'cabinet_menu_modules_v10_stamp' => MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full') . ':sa-alpha',
             ]);
         }
 

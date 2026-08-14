@@ -135,16 +135,16 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         )
 
         $('#unigram > thead > tr:nth-child(1) > th:nth-child(14)').after(
-            "<th class='passages-elem'>" +
-            "    <div>" +
-            "        <input class='w-100' type='number' name='minAVGPassages' id='minAVGPassages' placeholder='min'>" +
-            "        <input class='w-100' type='number' name='maxAVGPassages' id='maxAVGPassages' placeholder='max'>" +
+            "<th class='passages-elem unigram-filter-cell'>" +
+            "    <div class='unigram-filter-box'>" +
+            "        <input class='w-100' type='number' name='minAVGPassages' id='minAVGPassages' placeholder='мин'>" +
+            "        <input class='w-100' type='number' name='maxAVGPassages' id='maxAVGPassages' placeholder='макс'>" +
             "    </div>" +
             "</th>" +
-            "<th class='passages-elem'>" +
-            "    <div>" +
-            "        <input class='w-100' type='number' name='minPassages' id='minPassages' placeholder='min'>" +
-            "        <input class='w-100' type='number' name='maxPassages' id='maxPassages' placeholder='max'>" +
+            "<th class='passages-elem unigram-filter-cell'>" +
+            "    <div class='unigram-filter-box'>" +
+            "        <input class='w-100' type='number' name='minPassages' id='minPassages' placeholder='мин'>" +
+            "        <input class='w-100' type='number' name='maxPassages' id='maxPassages' placeholder='макс'>" +
             "    </div>" +
             "</th>"
         )

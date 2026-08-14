@@ -1596,6 +1596,7 @@ class SeoChecklistController extends Controller
             'note' => [
                 'id' => $note->id,
                 'body' => $note->body,
+                'body_html' => \App\Support\TextAutoLinker::format((string) $note->body),
                 'author' => $note->authorLabel(),
                 'created_at' => $note->created_at->format('d.m.Y H:i'),
             ],

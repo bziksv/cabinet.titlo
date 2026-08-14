@@ -55,7 +55,8 @@ class ProjectData
 
     private function masteredCalc()
     {
-        $mastered = new Mastered($this->positions);
+        $priceByKeyword = $this->preloadPrices();
+        $mastered = new Mastered($this->positions, $priceByKeyword);
 
         $this->result['mastered'] = $mastered->total();
         $this->result['mastered_percent'] = $mastered->percentOf($this->project['budget']);
@@ -69,6 +70,40 @@ class ProjectData
             'top100' => $mastered->top100(),
             'total' => $mastered->total(),
         ]);
+    }
+
+    /**
+     * Цены одним запросом — иначе Mastered бьёт БД на каждый ключ×топ.
+     */
+    private function preloadPrices()
+    {
+        $keywordIds = $this->positions->map(static function ($row) {
+            if (is_array($row)) {
+                return (int) ($row['query_id'] ?? $row['monitoring_keyword_id'] ?? 0);
+            }
+
+            return (int) ($row['query_id'] ?? $row->query_id ?? $row->monitoring_keyword_id ?? 0);
+        })->filter()->unique()->values()->all();
+
+        if ($keywordIds === []) {
+            return collect();
+        }
+
+        $engineIds = $this->positions->map(static function ($row) {
+            if (is_array($row)) {
+                return (int) ($row['engine_id'] ?? $row['monitoring_searchengine_id'] ?? 0);
+            }
+
+            return (int) ($row['engine_id'] ?? $row->engine_id ?? $row->monitoring_searchengine_id ?? 0);
+        })->filter()->unique()->values()->all();
+
+        $query = \App\MonitoringKeywordPrice::query()->whereIn('monitoring_keyword_id', $keywordIds);
+        if ($engineIds !== []) {
+            $query->whereIn('monitoring_searchengine_id', $engineIds);
+        }
+
+        // Mastered::getPrice ищет по keyword_id в коллекции — одна цена на ключ (как child-rows).
+        return $query->get()->keyBy('monitoring_keyword_id');
     }
 
     private function percentCalc()

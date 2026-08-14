@@ -8,55 +8,55 @@
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="text"
-               name="projectComment" id="projectComment" placeholder="comment">
+               name="projectComment" id="projectComment" placeholder="{{ __('comment') }}">
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="text"
-               name="phraseSearch" id="phraseSearch" placeholder="phrase">
+               name="phraseSearch" id="phraseSearch" placeholder="{{ __('phrase') }}">
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="text"
-               name="regionSearch" id="regionSearch" placeholder="region">
+               name="regionSearch" id="regionSearch" placeholder="{{ __('region') }}">
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="text"
-               name="mainPageSearch" id="mainPageSearch" placeholder="link">
+               name="mainPageSearch" id="mainPageSearch" placeholder="{{ __('link') }}">
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="number"
-               name="minPosition" id="minPosition" placeholder="min">
+               name="minPosition" id="minPosition" placeholder="{{ __('min') }}">
         <input class="w-100 form form-control search-input" type="number"
-               name="maxPosition" id="maxPosition" placeholder="max">
+               name="maxPosition" id="maxPosition" placeholder="{{ __('max') }}">
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="number"
-               name="minPoints" id="minPoints" placeholder="min">
+               name="minPoints" id="minPoints" placeholder="{{ __('min') }}">
         <input class="w-100 form form-control search-input" type="number"
-               name="maxPoints" id="maxPoints" placeholder="max">
+               name="maxPoints" id="maxPoints" placeholder="{{ __('max') }}">
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="number"
-               name="minCoverage" id="minCoverage" placeholder="min">
+               name="minCoverage" id="minCoverage" placeholder="{{ __('min') }}">
         <input class="w-100 form form-control search-input" type="number"
-               name="maxCoverage" id="maxCoverage" placeholder="max">
+               name="maxCoverage" id="maxCoverage" placeholder="{{ __('max') }}">
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="number"
-               name="minCoverageTf" id="minCoverageTf" placeholder="min">
+               name="minCoverageTf" id="minCoverageTf" placeholder="{{ __('min') }}">
         <input class="w-100 form form-control search-input" type="number"
-               name="maxCoverageTf" id="maxCoverageTf" placeholder="max">
+               name="maxCoverageTf" id="maxCoverageTf" placeholder="{{ __('max') }}">
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="number" name="minWidth"
-               id="minWidth" placeholder="min">
+               id="minWidth" placeholder="{{ __('min') }}">
         <input class="w-100 form form-control search-input" type="number"
-               name="maxWidth" id="maxWidth" placeholder="max">
+               name="maxWidth" id="maxWidth" placeholder="{{ __('max') }}">
     </th>
     <th>
         <input class="w-100 form form-control search-input" type="number"
-               name="minDensity" id="minDensity" placeholder="min">
+               name="minDensity" id="minDensity" placeholder="{{ __('min') }}">
         <input class="w-100 form form-control search-input" type="number"
-               name="maxDensity" id="maxDensity" placeholder="max">
+               name="maxDensity" id="maxDensity" placeholder="{{ __('max') }}">
     </th>
     <th>
         <div>
@@ -78,37 +78,37 @@
 </tr>
 <tr>
     <th class="table-header">{{ __('Date of last check') }}</th>
-    <th class="table-header" style="min-width: 200px">
+    <th class="table-header">
         {{ __('Comment') }}
     </th>
-    <th class="table-header" style="min-width: 160px; height: 83px">
+    <th class="table-header">
         {{ __('Phrase') }}
     </th>
-    <th class="table-header" style="min-width: 160px; height: 83px">
+    <th class="table-header">
         {{ __('Region') }}
     </th>
-    <th class="table-header" style="min-width: 160px; max-width:160px; height: 83px">
+    <th class="table-header">
         {{ __('Landing page') }}
     </th>
-    <th class="table-header" style="height: 83px; min-width: 69px">
+    <th class="table-header">
         {{ __('Position in the top') }}
     </th>
-    <th class="table-header" style="height: 83px; min-width: 69px">
+    <th class="table-header">
         {{ __('Scores') }}
     </th>
-    <th class="table-header" style="height: 83px; min-width: 69px">
+    <th class="table-header">
         {{ __('Coverage of important words') }}
     </th>
-    <th class="table-header" style="height: 83px; min-width: 69px">
+    <th class="table-header">
         {{ __('TF coverage') }}
     </th>
-    <th class="table-header" style="height: 83px; min-width: 69px">
+    <th class="table-header">
         {{ __('Width') }}
     </th>
-    <th class="table-header" style="height: 83px; min-width: 69px">
+    <th class="table-header">
         {{ __('Density') }}
     </th>
-    <th class="table-header" style="height: 83px; min-width: 69px">
+    <th class="table-header">
         {{ __('Take into account when calculating the total score') }}
     </th>
     <th class="table-header"></th>

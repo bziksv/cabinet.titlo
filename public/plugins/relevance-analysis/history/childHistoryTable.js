@@ -4,6 +4,11 @@ hash = hash.split('').sort(function () {
     return 0.5 - Math.random()
 }).join('');
 
+function raPh(key, fallback) {
+    var map = window.raFilterPh || {}
+    return map[key] || fallback
+}
+
 function getHistoryInfo() {
     $('.get-history-info').unbind("click").click(function () {
         let id = $(this).attr('data-order')
@@ -169,7 +174,7 @@ function format(data) {
         child +=
             '<tr>' +
             '   <td>' + value['created_at'] + '</td>' +
-            '   <td> <textarea style="width: 150px; height: 160px;" data-target="' + value['id'] + '" class="history-comment form form-control">' + value['comment'] + '</textarea></td>' +
+            '   <td> <textarea rows="3" data-target="' + value['id'] + '" class="history-comment form form-control">' + value['comment'] + '</textarea></td>' +
             '   <td style="width: 150px;">' + value['phrase'] + '</td>' +
             '   <td style="width: 150px;">' + (value['region_name'] || (value['region_name'] || getRegionName(value['region']))) + '</td>' +
             '   <td style="width: 150px;">' + value['main_link'] + '</td>' +
@@ -226,55 +231,55 @@ function format(data) {
         '     </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="text"' +
-        '               name="projectComment' + tableId + '" id="projectComment' + tableId + '" placeholder="comment">' +
+        '               name="projectComment' + tableId + '" id="projectComment' + tableId + '" placeholder="' + raPh('comment', 'комментарий') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="text"' +
-        '               name="phraseSearch' + tableId + '" id="phraseSearch' + tableId + '" placeholder="phrase">' +
+        '               name="phraseSearch' + tableId + '" id="phraseSearch' + tableId + '" placeholder="' + raPh('phrase', 'фраза') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="text"' +
-        '               name="regionSearch' + tableId + '" id="regionSearch' + tableId + '" placeholder="region">' +
+        '               name="regionSearch' + tableId + '" id="regionSearch' + tableId + '" placeholder="' + raPh('region', 'регион') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="text"' +
-        '               name="mainPageSearch' + tableId + '" id="mainPageSearch' + tableId + '" placeholder="link">' +
+        '               name="mainPageSearch' + tableId + '" id="mainPageSearch' + tableId + '" placeholder="' + raPh('link', 'ссылка') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="minPosition' + tableId + '" id="minPosition' + tableId + '" placeholder="min">' +
+        '               name="minPosition' + tableId + '" id="minPosition' + tableId + '" placeholder="' + raPh('min', 'мин') + '">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="maxPosition' + tableId + '" id="maxPosition' + tableId + '" placeholder="max">' +
+        '               name="maxPosition' + tableId + '" id="maxPosition' + tableId + '" placeholder="' + raPh('max', 'макс') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="minPoints' + tableId + '" id="minPoints' + tableId + '" placeholder="min">' +
+        '               name="minPoints' + tableId + '" id="minPoints' + tableId + '" placeholder="' + raPh('min', 'мин') + '">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="maxPoints' + tableId + '" id="maxPoints' + tableId + '" placeholder="max">' +
+        '               name="maxPoints' + tableId + '" id="maxPoints' + tableId + '" placeholder="' + raPh('max', 'макс') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="minCoverage' + tableId + '" id="minCoverage' + tableId + '" placeholder="min">' +
+        '               name="minCoverage' + tableId + '" id="minCoverage' + tableId + '" placeholder="' + raPh('min', 'мин') + '">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="maxCoverage' + tableId + '" id="maxCoverage' + tableId + '" placeholder="max">' +
+        '               name="maxCoverage' + tableId + '" id="maxCoverage' + tableId + '" placeholder="' + raPh('max', 'макс') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="minCoverageTf' + tableId + '" id="minCoverageTf' + tableId + '" placeholder="min">' +
+        '               name="minCoverageTf' + tableId + '" id="minCoverageTf' + tableId + '" placeholder="' + raPh('min', 'мин') + '">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="maxCoverageTf' + tableId + '" id="maxCoverageTf' + tableId + '" placeholder="max">' +
+        '               name="maxCoverageTf' + tableId + '" id="maxCoverageTf' + tableId + '" placeholder="' + raPh('max', 'макс') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="number" name="minWidth"' + tableId +
-        '               id="minWidth' + tableId + '" placeholder="min">' +
+        '               id="minWidth' + tableId + '" placeholder="' + raPh('min', 'мин') + '">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="maxWidth' + tableId + '" id="maxWidth' + tableId + '" placeholder="max">' +
+        '               name="maxWidth' + tableId + '" id="maxWidth' + tableId + '" placeholder="' + raPh('max', 'макс') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="minDensity' + tableId + '" id="minDensity' + tableId + '" placeholder="min">' +
+        '               name="minDensity' + tableId + '" id="minDensity' + tableId + '" placeholder="' + raPh('min', 'мин') + '">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
-        '               name="maxDensity' + tableId + '" id="maxDensity' + tableId + '" placeholder="max">' +
+        '               name="maxDensity' + tableId + '" id="maxDensity' + tableId + '" placeholder="' + raPh('max', 'макс') + '">' +
         '    </th>' +
         '   <th style="position: inherit" class="table-header">' +
         '       <div>' +
@@ -453,7 +458,7 @@ function checkAnalyseProgress(id) {
                 let $tr = $('<tr class="render"></tr>')
                 $tr.append('<td>' + (newObject.last_check || '') + '</td>')
                 $tr.append(
-                    '<td><textarea style="height: 160px;" data-target="' + newObject.id +
+                    '<td><textarea rows="3" data-target="' + newObject.id +
                     '" class="history-comment form form-control">' + (newObject.comment || '') +
                     '</textarea></td>'
                 )

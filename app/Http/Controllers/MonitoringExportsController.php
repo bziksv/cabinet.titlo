@@ -129,7 +129,14 @@ class MonitoringExportsController extends MonitoringKeywordsController
 
     public function edit($id)
     {
-        $project = MonitoringProject::findOrFail($id);
-        return view('monitoring.export.edit', compact('project'));
+        $project = MonitoringProject::query()
+            ->with(['searchengines.location', 'groups'])
+            ->findOrFail($id);
+
+        if (request()->ajax()) {
+            return view('monitoring.export.edit', compact('project'));
+        }
+
+        return view('monitoring.export.page', compact('project'));
     }
 }

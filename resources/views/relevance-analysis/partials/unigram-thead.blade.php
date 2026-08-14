@@ -4,74 +4,74 @@
     <th class="unigram-ranges-label font-weight-normal text-muted">{{ __('Ranges for filtering the table') }}</th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minTfidfTop" id="minTfidfTop" placeholder="min">
-            <input class="w-100" type="number" name="maxTfidfTop" id="maxTfidfTop" placeholder="max">
+            <input class="w-100" type="number" name="minTfidfTop" id="minTfidfTop" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxTfidfTop" id="maxTfidfTop" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minTfidfSite" id="minTfidfSite" placeholder="min">
-            <input class="w-100" type="number" name="maxTfidfSite" id="maxTfidfSite" placeholder="max">
+            <input class="w-100" type="number" name="minTfidfSite" id="minTfidfSite" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxTfidfSite" id="maxTfidfSite" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minBm25Top" id="minBm25Top" placeholder="min">
-            <input class="w-100" type="number" name="maxBm25Top" id="maxBm25Top" placeholder="max">
+            <input class="w-100" type="number" name="minBm25Top" id="minBm25Top" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxBm25Top" id="maxBm25Top" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minBm25Site" id="minBm25Site" placeholder="min">
-            <input class="w-100" type="number" name="maxBm25Site" id="maxBm25Site" placeholder="max">
+            <input class="w-100" type="number" name="minBm25Site" id="minBm25Site" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxBm25Site" id="maxBm25Site" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minInter" id="minInter" placeholder="min">
-            <input class="w-100" type="number" name="maxInter" id="maxInter" placeholder="max">
+            <input class="w-100" type="number" name="minInter" id="minInter" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxInter" id="maxInter" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minReSpam" id="minReSpam" placeholder="min">
-            <input class="w-100" type="number" name="maxReSpam" id="maxReSpam" placeholder="max">
+            <input class="w-100" type="number" name="minReSpam" id="minReSpam" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxReSpam" id="maxReSpam" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minAVG" id="minAVG" placeholder="min">
-            <input class="w-100" type="number" name="maxAVG" id="maxAVG" placeholder="max">
+            <input class="w-100" type="number" name="minAVG" id="minAVG" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxAVG" id="maxAVG" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minAVGText" id="minAVGText" placeholder="min">
-            <input class="w-100" type="number" name="maxAVGText" id="maxAVGText" placeholder="max">
+            <input class="w-100" type="number" name="minAVGText" id="minAVGText" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxAVGText" id="maxAVGText" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minInYourPage" id="minInYourPage" placeholder="min">
-            <input class="w-100" type="number" name="maxInYourPage" id="maxInYourPage" placeholder="max">
+            <input class="w-100" type="number" name="minInYourPage" id="minInYourPage" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxInYourPage" id="maxInYourPage" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minTextIYP" id="minTextIYP" placeholder="min">
-            <input class="w-100" type="number" name="maxTextIYP" id="maxTextIYP" placeholder="max">
+            <input class="w-100" type="number" name="minTextIYP" id="minTextIYP" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxTextIYP" id="maxTextIYP" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minAVGLink" id="minAVGLink" placeholder="min">
-            <input class="w-100" type="number" name="maxAVGLink" id="maxAVGLink" placeholder="max">
+            <input class="w-100" type="number" name="minAVGLink" id="minAVGLink" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxAVGLink" id="maxAVGLink" placeholder="{{ __('max') }}">
         </div>
     </th>
     <th class="unigram-filter-cell">
         <div class="unigram-filter-box">
-            <input class="w-100" type="number" name="minLinkIYP" id="minLinkIYP" placeholder="min">
-            <input class="w-100" type="number" name="maxLinkIYP" id="maxLinkIYP" placeholder="max">
+            <input class="w-100" type="number" name="minLinkIYP" id="minLinkIYP" placeholder="{{ __('min') }}">
+            <input class="w-100" type="number" name="maxLinkIYP" id="maxLinkIYP" placeholder="{{ __('max') }}">
         </div>
     </th>
 </tr>

@@ -91,6 +91,19 @@
                     @endforeach
                 </select>
             @endif
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary cabinet-sc-plan__notes-btn"
+                    data-sc-toggle-notes
+                    data-tip="{{ __('Notes') }}"
+                    aria-label="{{ __('Notes') }}">
+                <i class="bi bi-chat-left-text" aria-hidden="true"></i>
+                @php
+                    $notesCount = $item->relationLoaded('notes') ? $item->notes->count() : 0;
+                @endphp
+                @if($notesCount > 0)
+                    <span class="cabinet-sc-plan__notes-count" data-sc-notes-count>{{ $notesCount }}</span>
+                @endif
+            </button>
             <a href="{{ $projectUrl }}"
                class="btn btn-sm cabinet-sc-plan__open"
                data-tip="{{ __('Open in project') }}">
@@ -98,6 +111,25 @@
                 {{ __('To project') }}
             </a>
         </div>
+    </div>
+    <div class="cabinet-sc-task__notes cabinet-sc-plan__notes d-none" data-sc-notes>
+        <ul class="cabinet-sc-notes-list" data-sc-notes-list>
+            @foreach(($item->relationLoaded('notes') ? $item->notes : collect()) as $note)
+                <li>
+                    <div class="cabinet-sc-notes-list__meta">
+                        <strong class="cabinet-sc-notes-list__author">{{ $note->authorLabel() }}</strong>
+                        <span class="text-secondary small">{{ $note->created_at->format('d.m.Y H:i') }}</span>
+                    </div>
+                    <div class="cabinet-sc-notes-list__body">{!! \App\Support\TextAutoLinker::format((string) $note->body) !!}</div>
+                </li>
+            @endforeach
+        </ul>
+        @if(!$projectArchived)
+            <div class="cabinet-sc-notes-form">
+                <textarea class="form-control form-control-sm" rows="2" data-sc-note-body placeholder="{{ __('Add a note') }}…"></textarea>
+                <button type="button" class="btn btn-sm btn-primary" data-sc-note-save>{{ __('Save') }}</button>
+            </div>
+        @endif
     </div>
     @php
         $children = $item->relationLoaded('children') ? $item->children : collect();

@@ -1860,20 +1860,18 @@
                 });
                 mergeSnapshotUpdates(res && res.updates ? res.updates : [], false);
                 const pending = res && res.pending ? res.pending : 0;
-                if (pending > 0 && snapshotFillActive && (rebuilt > 0 || (res && res.timed_out))) {
+                const canContinue = !!(res && res.can_continue);
+                if (
+                    pending > 0 &&
+                    snapshotFillActive &&
+                    (rebuilt > 0 || (res && res.timed_out) || canContinue)
+                ) {
                     updateSnapshotProgress(pending, allRows.length);
                     runSnapshotFillStep(false);
                     return;
                 }
                 stopSnapshotFill();
-                if (dataTable && pending > 0 && rebuilt === 0) {
-                    if (typeof toastr !== 'undefined') {
-                        toastr.info(
-                            cfg.i18n.snapshotsPartial ||
-                                'Часть проектов без снятых позиций — метрики недоступны'
-                        );
-                    }
-                }
+                showWithoutPositionsToast(res && res.without_positions ? res.without_positions : []);
             })
             .fail(function (xhr) {
                 const status = xhr && xhr.status;
@@ -1903,6 +1901,34 @@
                 }
                 stopSnapshotFill();
             });
+    }
+
+    function showWithoutPositionsToast(list) {
+        if (!list || !list.length || typeof toastr === 'undefined') {
+            return;
+        }
+        const maxShow = 12;
+        const names = list.map(function (item) {
+            return item && item.name ? String(item.name) : '#' + (item && item.id ? item.id : '?');
+        });
+        const shown = names.slice(0, maxShow);
+        let body = shown.join(', ');
+        if (names.length > maxShow) {
+            const moreTpl =
+                cfg.i18n.snapshotsPartialMore || 'и ещё :n';
+            body +=
+                '; ' +
+                String(moreTpl).replace(':n', String(names.length - maxShow));
+        }
+        const titleTpl =
+            cfg.i18n.snapshotsPartial ||
+            'Нет снятых позиций у :count проектов — в таблице прочерки';
+        const title = String(titleTpl).replace(':count', String(names.length));
+        toastr.info(title + '<br><small>' + escHtml(body) + '</small>', '', {
+            timeOut: 12000,
+            extendedTimeOut: 4000,
+            escapeHtml: false,
+        });
     }
 
     function startSnapshotFill(force, pendingHint) {
@@ -2000,14 +2026,19 @@
 
                 if (pending > 0) {
                     startSnapshotFill(forceRefresh, pending);
-                } else if (forceRefresh && missingFavicons > 0) {
-                    updateFaviconProgress(missingFavicons, allRows.length);
-                    startFaviconFill();
-                } else if (missingFavicons > 0) {
-                    $progress.addClass('d-none');
-                    scheduleFaviconFillAfterSnapshots();
                 } else {
-                    $progress.addClass('d-none');
+                    showWithoutPositionsToast(
+                        payload && payload.without_positions ? payload.without_positions : []
+                    );
+                    if (forceRefresh && missingFavicons > 0) {
+                        updateFaviconProgress(missingFavicons, allRows.length);
+                        startFaviconFill();
+                    } else if (missingFavicons > 0) {
+                        $progress.addClass('d-none');
+                        scheduleFaviconFillAfterSnapshots();
+                    } else {
+                        $progress.addClass('d-none');
+                    }
                 }
 
                 monV2DebugLine('info', 'ajax.list.done', {

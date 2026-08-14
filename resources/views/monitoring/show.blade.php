@@ -7,9 +7,11 @@
         @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc47' }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-export.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-export.css')) ?: time() }}">
     @endslot
 
     <div class="cabinet-mon-project-page" id="cabinet-mon-project-root" data-view="keywords">
@@ -181,6 +183,8 @@
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
         <!-- InputMask -->
         <script src="{{ asset('plugins/moment/moment.min.js') }}"></script>
+        <script src="{{ asset('plugins/moment/locale/ru.js') }}"></script>
+        <script src="{{ asset('plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js') }}"></script>
         <script src="{{ asset('plugins/inputmask/jquery.inputmask.min.js') }}"></script>
         <!-- date-range-picker -->
         <script src="{{ asset('plugins/daterangepicker/daterangepicker.js') }}"></script>
@@ -221,6 +225,66 @@
             const MAIN_COLUMNS_COUNT = 7;
             const MON_KEYWORD_COUNT = {{ (int) ($kpiSummary['words'] ?? 0) }};
             const MON_REGIONS = @json($monRegions);
+
+            function initMonitoringExportModal($modal) {
+                $modal.find('select[name="mode"]').off('change.monExport').on('change.monExport', function () {
+                    if ($(this).val() === 'finance') {
+                        $modal.find('#finance').removeClass('d-none');
+                    } else {
+                        $modal.find('#finance').addClass('d-none');
+                    }
+                });
+
+                if ($.fn.datetimepicker) {
+                    $modal.find('#startDatePicker, #endDatePicker').datetimepicker({
+                        format: 'L',
+                        locale: 'ru',
+                    });
+                }
+
+                var $groups = $modal.find('#cabinetMonExportGroups');
+                if ($groups.length && $.fn.select2) {
+                    if ($groups.hasClass('select2-hidden-accessible')) {
+                        $groups.select2('destroy');
+                    }
+                    $groups.select2({
+                        theme: 'bootstrap4',
+                        width: '100%',
+                        dropdownParent: $modal,
+                        placeholder: $groups.data('placeholder') || '',
+                        allowClear: true,
+                        closeOnSelect: false
+                    });
+                }
+            }
+
+            function openMonitoringExportModal() {
+                var $modal = $('#cabinetMonKeywordsModal');
+                if (!$modal.length) {
+                    return;
+                }
+                $modal.find('.modal-content').html(
+                    '<div class="modal-body text-center py-5 text-muted">{{ __('Loading records') }}</div>'
+                );
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance($modal[0]).show();
+                } else {
+                    $modal.modal('show');
+                }
+                axios.get('/monitoring/' + PROJECT_ID + '/export/edit').then(function (response) {
+                    $modal.find('.modal-content').html(response.data);
+                    initMonitoringExportModal($modal);
+                }).catch(function () {
+                    $modal.find('.modal-content').html(
+                        '<div class="modal-body"><div class="alert alert-danger mb-0">{{ __('Something is going wrong') }}</div></div>'
+                    );
+                });
+            }
+
+            $(document).on('click', '[data-mon-export-open]', function (e) {
+                e.preventDefault();
+                openMonitoringExportModal();
+            });
 
             function monModalSetBusy($modal, busy, busyLabel) {
                 const $btn = $modal.find('.modal-footer .btn-success');
@@ -1926,6 +1990,12 @@
                             });
 
                             break;
+                        case "export-edit":
+                            request = axios.get(`/monitoring/${PROJECT_ID}/export/edit`).then(function (response) {
+                                modal.find('.modal-content').html(response.data);
+                                initMonitoringExportModal(modal);
+                            });
+                            break;
                     }
 
                     if (request) {
@@ -1964,11 +2034,19 @@
                                 });
                             }
 
-                            modal.find('.save-modal').click(function (e) {
+                            modal.find('.save-modal').off('click.monExport').on('click.monExport', function (e) {
                                 let self = $(this);
                                 let form = self.closest('.modal-content').find('form');
-                                let action = form.attr('action');
-                                let method = form.attr('method');
+                                let action = form.attr('action') || '';
+                                let method = (form.attr('method') || 'POST').toUpperCase();
+
+                                // Экспорт — обычный GET/скачивание файла, не axios
+                                if (action.indexOf('/export') !== -1) {
+                                    return;
+                                }
+
+                                e.preventDefault();
+
                                 let data = {};
 
                                 $.each(form.serializeArray(), function (inc, item) {
@@ -1976,7 +2054,6 @@
                                 });
 
                                 if (data.hasOwnProperty('query') && data.query.length < 1) {
-                                    e.preventDefault();
                                     form.find('.invalid-feedback.query').fadeIn().delay(3000).fadeOut();
                                     return false;
                                 }

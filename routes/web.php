@@ -814,6 +814,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/show-though/{though}', 'RelevanceThoughController@show')->name('show-though');
     Route::post('/start-through-analyse', 'RelevanceThoughController@startThroughAnalyse')->name('start.through.analyse');
     Route::post('/get-slice-result', 'RelevanceThoughController@getSliceResult')->name('get.slice.result');
+    Route::post('/get-though-word-group', 'RelevanceThoughController@getWordGroup')->name('get.though.word.group');
 
     Route::post('/set-cluster-cleaning-interval', 'ClusterController@setCleaningInterval')->name('set.cluster.cleaning.interval');
     Route::get('/cluster', 'ClusterController@index')->name('cluster');

@@ -822,7 +822,7 @@
 
                     <div style="display:none;" class="history">
                         <h3>{{ __("Recent checks") }}</h3>
-                        <table id="history_table" class="table table-bordered table-hover dataTable dtr-inline w-100">
+                        <table id="history_table" class="table table-bordered table-hover dataTable dtr-inline">
                             <thead>
                             @include('relevance-analysis.layouts.table-rows')
                             </thead>
@@ -846,51 +846,51 @@
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="text"
-                                       name="phraseSearchList" id="phraseSearchList" placeholder="phrase">
+                                       name="phraseSearchList" id="phraseSearchList" placeholder="{{ __('phrase') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="text"
-                                       name="regionSearchList" id="regionSearchList" placeholder="region">
+                                       name="regionSearchList" id="regionSearchList" placeholder="{{ __('region') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="text"
-                                       name="mainPageSearchList" id="mainPageSearchList" placeholder="link">
+                                       name="mainPageSearchList" id="mainPageSearchList" placeholder="{{ __('link') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minPositionList" id="minPositionList" placeholder="min">
+                                       name="minPositionList" id="minPositionList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxPositionList" id="maxPositionList" placeholder="max">
+                                       name="maxPositionList" id="maxPositionList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minPointsList" id="minPointsList" placeholder="min">
+                                       name="minPointsList" id="minPointsList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxPointsList" id="maxPointsList" placeholder="max">
+                                       name="maxPointsList" id="maxPointsList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minCoverageList" id="minCoverageList" placeholder="min">
+                                       name="minCoverageList" id="minCoverageList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxCoverageList" id="maxCoverageList" placeholder="max">
+                                       name="maxCoverageList" id="maxCoverageList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minCoverageTfList" id="minCoverageTfList" placeholder="min">
+                                       name="minCoverageTfList" id="minCoverageTfList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxCoverageTfList" id="maxCoverageTfList" placeholder="max">
+                                       name="maxCoverageTfList" id="maxCoverageTfList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number" name="minWidthList"
-                                       id="minWidthList" placeholder="min">
+                                       id="minWidthList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxWidthList" id="maxWidthList" placeholder="max">
+                                       name="maxWidthList" id="maxWidthList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minDensityList" id="minDensityList" placeholder="min">
+                                       name="minDensityList" id="minDensityList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxDensityList" id="maxDensityList" placeholder="max">
+                                       name="maxDensityList" id="maxDensityList" placeholder="{{ __('max') }}">
                             </th>
                         </tr>
                         <tr>
@@ -987,6 +987,15 @@
                 to: "{{ __('to') }}",
                 of: "{{ __('of') }}",
                 entries: "{{ __('entries') }}"
+            };
+
+            window.raFilterPh = {
+                min: @json(__('min')),
+                max: @json(__('max')),
+                phrase: @json(__('phrase')),
+                region: @json(__('region')),
+                link: @json(__('link')),
+                comment: @json(__('comment'))
             };
 
             let columns = [
@@ -1203,7 +1212,7 @@
                                                 '   Повторить анализ' +
                                                 '</button>'
                                                 +
-                                                "<a href='/show-history/" + val.id + "' target='_blank' class='btn btn-secondary get-history-info mt-3'> Подробная информация</a>"
+                                                "<a href='/show-history/" + val.id + "' target='_blank' class='btn btn-secondary get-history-info'>Подробная информация</a>"
 
                                         } else if (val.state === 0) {
                                             state =
@@ -1239,7 +1248,7 @@
                                         let newRow = "<tr class='render'>" +
                                             "   <td>" + val.last_check + "</td>" +
                                             "   <td>" +
-                                            "      <textarea style='height: 160px;' data-target='" + val.id + "' class='history-comment form form-control' >" + val.comment + "</textarea>" +
+                                            "      <textarea rows='3' data-target='" + val.id + "' class='history-comment form form-control'>" + (val.comment || '') + "</textarea>" +
                                             "   </td>" +
                                             "   <td>" + phrase + "</td>" +
                                             "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
@@ -1300,6 +1309,8 @@
                                             "order": [[0, "desc"]],
                                             "pageLength": 25,
                                             "searching": true,
+                                            "autoWidth": false,
+                                            "scrollX": false,
                                             language: {
                                                 paginate: {
                                                     "first": "«",
@@ -1312,6 +1323,10 @@
                                                 {
                                                     type: "num",
                                                     targets: [5, 6, 7, 8, 9, 10]
+                                                },
+                                                {
+                                                    orderable: false,
+                                                    targets: [1, 11, 12]
                                                 },
                                             ],
                                             "oLanguage": {
@@ -1364,12 +1379,15 @@
                                         });
 
                                         $('#history_table_length').before(
-                                            "<span>" +
-                                            "<a href='/get-file/" + storyId + "/csv' class='btn btn-secondary ml-1'>CSV</a>" +
-                                            "<a href='/get-file/" + storyId + "/xls' class='btn btn-secondary ml-1'>Excel</a>" +
+                                            "<span class=\"cabinet-ra-export-btns\">" +
+                                            "<a href='/get-file/" + storyId + "/csv' class='btn btn-secondary'>CSV</a>" +
+                                            "<a href='/get-file/" + storyId + "/xls' class='btn btn-secondary'>Excel</a>" +
                                             "</span>"
                                         )
-                                        $('#history_table').wrap('<div style="width:100%; overflow: auto"></div>')
+
+                                        if (!$('#history_table').parent().hasClass('history-table-scroll')) {
+                                            $('#history_table').wrap('<div class="history-table-scroll"></div>');
+                                        }
 
                                         $(".dt-button").addClass('btn btn-secondary')
 
@@ -1488,6 +1506,14 @@
                                                 "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
                                             }
                                         });
+
+                                        if (!$('#list-history').parent().hasClass('list-history-table-scroll')) {
+                                            $('#list-history').wrap('<div class="list-history-table-scroll"></div>');
+                                        }
+                                        var listScroll = document.querySelector('#list-history_wrapper .list-history-table-scroll');
+                                        if (listScroll) {
+                                            listScroll.scrollLeft = 0;
+                                        }
 
                                         scrollTo('#history-list-subject')
 

@@ -6,7 +6,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/jqcloud/css/jqcloud.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/common/css/datatable.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/css/style.css')) ?: time() }}">
 
         <style>
             .fa {
@@ -68,10 +68,22 @@
             .dataTables_length > label > select{
                 margin: 0 5px !important;
             }
+
+            .nav-link {
+                padding: .5rem .8rem !important;
+            }
         </style>
     @endslot
 
-    @if(count(json_decode($though->cleaning_projects)) > 0 && $though->cleaning_state == 0)
+    <div class="card mb-0">
+        @include('relevance-analysis.partials.module-top-nav', [
+            'active' => 'though',
+            'admin' => $admin ?? false,
+            'project' => $project ?? null,
+        ])
+
+        <div class="card-body">
+    @if(count(json_decode($though->cleaning_projects ?? '[]') ?: []) > 0 && $though->cleaning_state == 0)
         <div id="toast-container" class="toast-top-right success-message" style="display:none;">
             <div class="toast toast-success" aria-live="polite">
                 <div class="toast-message"
@@ -198,6 +210,8 @@
             </tbody>
         </table>
     </div>
+        </div>{{-- /.card-body --}}
+    </div>{{-- /.card --}}
 
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
@@ -208,13 +222,12 @@
         <script src="{{ asset('plugins/datatables/buttons/html5.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
         <script>
-            let totalResults = "{{ json_encode($allElems) }}";
-            totalResults = totalResults.replace(/&quot;/g, '"')
-            totalResults = JSON.parse(totalResults)
             let count = {{ $count }};
             let allCount = {{ $allCount }};
-            let iterator = count
+            let iterator = count;
             let recordId = "{{ $though->id }}";
+            let wordGroupUrl = @json(route('get.though.word.group'));
+            let wordGroupCache = {};
 
             $(document).ready(function () {
                 if (typeof window.initRelevanceActionTips === 'function') {
@@ -226,26 +239,32 @@
                     "searching": true,
                     dom: 'lBfrtip',
                     buttons: [
-                        'copy', 'csv', 'excel'
+                        { extend: 'copy', text: @json(__('Copy button')) },
+                        { extend: 'csv', text: 'CSV' },
+                        { extend: 'excel', text: 'Excel' }
                     ],
                     language: {
-                        search: "{{ __('Search') }}",
-                        show: "{{ __('show') }}",
-                        records: "{{ __('records') }}",
-                        noRecords: "{{ __('No records') }}",
-                        showing: "{{ __('Showing') }}",
-                        from: "{{ __('from') }}",
-                        to: "{{ __('to') }}",
-                        of: "{{ __('of') }}",
-                        entries: "{{ __('entries') }}",
-                        ignoredDomain: "{{ __('ignored domain') }}",
-                        notGetData: "{{ __('Could not get data from the page') }}",
-                        successAnalyse: "{{ __('The page has been successfully analyzed') }}",
-                        notTop: "{{ __('the site did not get into the top') }}",
-                        hideDomains: "{{ __('hide ignored domains') }}",
-                        copyLinks: "{{ __('Copy site links') }}",
-                        success: "{{ __('Successfully') }}",
-                        recommendations: "{{ __('Recommendations for your page') }}",
+                        processing: @json(__('Loading records')),
+                        search: @json(__('Search') . ':'),
+                        lengthMenu: @json(__('show') . ' _MENU_ ' . __('records')),
+                        emptyTable: @json(__('No records')),
+                        zeroRecords: @json(__('No records')),
+                        info: @json(__('Showing') . ' ' . __('from') . ' _START_ ' . __('to') . ' _END_ ' . __('of') . ' _TOTAL_ ' . __('entries')),
+                        infoEmpty: @json(__('Showing') . ' ' . __('from') . ' 0 ' . __('to') . ' 0 ' . __('of') . ' 0 ' . __('entries')),
+                        infoFiltered: @json(__('DataTables info filtered')),
+                        paginate: {
+                            first: '«',
+                            last: '»',
+                            next: '»',
+                            previous: '«'
+                        },
+                        buttons: {
+                            copyTitle: @json(__('Copy button')),
+                            copySuccess: {
+                                _: @json(__('DataTables copy success many')),
+                                1: @json(__('DataTables copy success one'))
+                            }
+                        }
                     }
                 });
                 $('.dt-button').addClass('btn btn-secondary')
@@ -280,7 +299,7 @@
 
                             let ChildTable = '<td> ' +
                                 '<a data-bs-toggle="collapse" href="#collapseExample' + key + '" role="button" aria-expanded="false" aria-controls="collapseExample' + key + '">' +
-                                'Посмотреть таблицу </a> ' +
+                                'Показать</a> ' +
                                 '<div class="collapse" id="collapseExample' + key + '"> ' +
                                 '<table class="child-table"> ' +
                                 '   <thead> ' +
@@ -336,63 +355,90 @@
                 });
             }
 
+            function loadWordGroup(word, done) {
+                if (wordGroupCache[word]) {
+                    done(wordGroupCache[word]);
+                    return;
+                }
+                $.ajax({
+                    type: 'POST',
+                    dataType: 'json',
+                    url: wordGroupUrl,
+                    data: { id: recordId, word: word },
+                    success: function (response) {
+                        var group = (response && response.group) ? response.group : {};
+                        wordGroupCache[word] = group;
+                        done(group);
+                    },
+                    error: function () {
+                        done({});
+                    }
+                });
+            }
+
+            function renderWordChildren(tr, target, group) {
+                $("tr[data-target='" + target + "']").remove();
+                $.each(group, function (key, value) {
+                    if (key !== target) {
+                        let childRows = ''
+
+                        $.each(value['throughLinks'] || {}, function (key2, value2) {
+                            childRows +=
+                                '<tr>' +
+                                '   <td>' + key2 + '</td>' +
+                                '   <td>' + value2 + '</td>' +
+                                '</tr>'
+                        })
+
+                        let childTable =
+                            '<table class="child-table">' +
+                            '   <thead>' +
+                            '       <tr>' +
+                            '           <th class="col-9">Ссылка</th>' +
+                            '           <th class="col-3">Кол-во вхождений</th>' +
+                            '       </tr>' +
+                            '   </thead>' +
+                            '   <tbody>' +
+                            childRows +
+                            '   </tbody>' +
+                            '</table>'
+                        tr.after(
+                            '<tr class="render-child" data-target="' + target + '">' +
+                            '   <td class="remove-child" data-target="' + target + '"' +
+                            (typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr(@json(__('Relevance though collapse tip'))) : '') +
+                            '> <i class="fa fa-minus" ></i></td>' +
+                            '   <td>' + key + '</td>' +
+                            '   <td>' +
+                            '       <a data-bs-toggle="collapse" href="#childTable' + key + '" role="button" aria-expanded="false" aria-controls="childTable' + key + '">' +
+                            '           {{ __('show') }}</a>' +
+                            '       <div class="collapse" id="childTable' + key + '">' +
+                            childTable +
+                            '       </div>' +
+                            '   </td>' +
+                            '   <td>' + (Number(value['tf'] || 0)).toFixed(6) + '</td>' +
+                            '   <td>' + (Number(value['idf'] || 0)).toFixed(6) + '</td>' +
+                            '   <td>' + value['repeatInText'] + '</td>' +
+                            '   <td>' + value['repeatInTextMainPage'] + '</td>' +
+                            '   <td>' + value['repeatInLink'] + '</td>' +
+                            '   <td>' + value['repeatInLinkMainPage'] + '</td>' +
+                            '   <td>' + value['throughCount'] + '</td>' +
+                            '</tr>'
+                        )
+                    }
+                })
+                removeElems()
+                if (typeof window.initRelevanceActionTips === 'function') {
+                    window.initRelevanceActionTips(document);
+                }
+            }
+
             setInterval(() => {
                 $('.show-more').unbind().on('click', function () {
                     let tr = $(this).parent().parent()
                     let target = $(this).attr('data-target')
-                    $("tr[data-target='" + target + "']").remove();
-                    $.each(totalResults[target], function (key, value) {
-                        if (key !== target) {
-                            let childRows = ''
-
-                            $.each(value['throughLinks'], function (key2, value2) {
-                                childRows +=
-                                    '<tr>' +
-                                    '   <td>' + key2 + '</td>' +
-                                    '   <td>' + value2 + '</td>' +
-                                    '</tr>'
-                            })
-
-                            let childTable =
-                                '<table class="child-table">' +
-                                '   <thead>' +
-                                '       <tr>' +
-                                '           <th class="col-9">Ссылка</th>' +
-                                '           <th class="col-3">Кол-во вхождений</th>' +
-                                '       </tr>' +
-                                '   </thead>' +
-                                '   <tbody>' +
-                                childRows +
-                                '   </tbody>' +
-                                '</table>'
-                            tr.after(
-                                '<tr class="render-child" data-target="' + target + '">' +
-                                '   <td class="remove-child" data-target="' + target + '"' +
-                                (typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr(@json(__('Relevance though collapse tip'))) : '') +
-                                '> <i class="fa fa-minus" ></i></td>' +
-                                '   <td>' + key + '</td>' +
-                                '   <td>' +
-                                '       <a data-bs-toggle="collapse" href="#childTable' + key + '" role="button" aria-expanded="false" aria-controls="childTable' + key + '">' +
-                                '           Посмотреть таблицу </a>' +
-                                '       <div class="collapse" id="childTable' + key + '">' +
-                                childTable +
-                                '       </div>' +
-                                '   </td>' +
-                                '   <td>' + (value['tf']).toFixed(6) + '</td>' +
-                                '   <td>' + (value['idf']).toFixed(6) + '</td>' +
-                                '   <td>' + value['repeatInText'] + '</td>' +
-                                '   <td>' + value['repeatInTextMainPage'] + '</td>' +
-                                '   <td>' + value['repeatInLink'] + '</td>' +
-                                '   <td>' + value['repeatInLinkMainPage'] + '</td>' +
-                                '   <td>' + value['throughCount'] + '</td>' +
-                                '</tr>'
-                            )
-                        }
-                    })
-                    removeElems()
-                    if (typeof window.initRelevanceActionTips === 'function') {
-                        window.initRelevanceActionTips(document);
-                    }
+                    loadWordGroup(target, function (group) {
+                        renderWordChildren(tr, target, group);
+                    });
                 })
             }, 100)
 

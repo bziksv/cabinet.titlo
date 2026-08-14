@@ -11,6 +11,7 @@
          data-sc-hub="review"
          data-csrf="{{ csrf_token() }}"
          data-status-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/status') }}"
+         data-note-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/notes') }}"
          data-timer-start-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/timer/start') }}"
          data-timer-stop-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/timer/stop') }}"
          data-timer-stop-active-url="{{ route('pages.seo-checklist.timer.stop-active') }}"

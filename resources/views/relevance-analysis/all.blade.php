@@ -96,43 +96,43 @@
                                     <tbody>
                                     <tr>
                                         <th scope="row">{{ __('Number of checks for the current day') }}</th>
-                                        <td>{{ $statistics['toDay']['count_checks'] ?? 0 }}</td>
+                                        <td>{{ number_format((int) ($statistics['toDay']['count_checks'] ?? 0), 0, '', ' ') }}</td>
                                     </tr>
                                     <tr>
                                         <th scope="row">{{ __('Number of checks for the current month') }}</th>
-                                        <td>{{ $statistics['month'] }}</td>
+                                        <td>{{ number_format((int) $statistics['month'], 0, '', ' ') }}</td>
                                     </tr>
                                     <tr>
                                         <th scope="row">{{ __('Number of errors for the current day') }}</th>
-                                        <td>{{ $statistics['toDay']['count_fails'] ?? 0 }}</td>
+                                        <td>{{ number_format((int) ($statistics['toDay']['count_fails'] ?? 0), 0, '', ' ') }}</td>
                                     </tr>
                                     <tr>
                                         <th scope="row">{{ __('Number of projects') }}</th>
-                                        <td>{{ $statistics['countProjects'] }}</td>
+                                        <td>{{ number_format((int) $statistics['countProjects'], 0, '', ' ') }}</td>
                                     </tr>
                                     <tr>
                                         <th scope="row">{{ __('Number of saved scan results') }}</th>
-                                        <td>{{ $statistics['countSavedResults'] }}</td>
+                                        <td>{{ number_format((int) $statistics['countSavedResults'], 0, '', ' ') }}</td>
                                     </tr>
                                     <tr>
                                         <th scope="row">{{ __('Number of unique landing pages') }}</th>
-                                        <td>{{ $statistics['pages'] }}</td>
+                                        <td>{{ number_format((int) $statistics['pages'], 0, '', ' ') }}</td>
                                     </tr>
                                     <tr>
                                         <th scope="row">{{ __('Number of unique landing domains') }}</th>
-                                        <td>{{ $statistics['domains'] }}</td>
+                                        <td>{{ number_format((int) $statistics['domains'], 0, '', ' ') }}</td>
                                     </tr>
                                     <tr>
                                         <th scope="row">{{ __('Total number of unique analyzed domains') }}</th>
-                                        <td>{{ $statistics['allDomains'] }}</td>
+                                        <td>{{ number_format((int) $statistics['allDomains'], 0, '', ' ') }}</td>
                                     </tr>
                                     <tr>
                                         <th scope="row">{{ __('Total number of unique analyzed sites') }}</th>
-                                        <td>{{ $statistics['allPages'] }}</td>
+                                        <td>{{ number_format((int) $statistics['allPages'], 0, '', ' ') }}</td>
                                     </tr>
-                                    <tr>
+                                    <tr class="cabinet-ra-stats-metrics__queue">
                                         <th scope="row">{{ __('Number of tasks in the queue') }}</th>
-                                        <td id="countJobs">{{ $statistics['countJobs'] }}</td>
+                                        <td id="countJobs">{{ number_format((int) $statistics['countJobs'], 0, '', ' ') }}</td>
                                     </tr>
                                     </tbody>
                                 </table>
@@ -142,13 +142,17 @@
                     <div class="col-12 col-xl-7">
                         <section class="cabinet-ra-stats-panel h-100">
                             <header class="cabinet-ra-stats-panel__head">
-                                <h2 class="cabinet-ra-stats-panel__title">{{ __('Users and their tasks') }}</h2>
+                                <h2 class="cabinet-ra-stats-panel__title">
+                                    {{ __('Users and their tasks') }}
+                                    <span class="cabinet-ra-stats-panel__count">{{ number_format($usersJobs->count(), 0, '', ' ') }}</span>
+                                </h2>
                                 <div class="cabinet-ra-stats-jobs-toolbar">
                                     <select class="form-select form-select-sm user-job-group" aria-label="{{ __('Group by name') }}">
                                         <option value="0">{{ __('Group by name') }}</option>
                                         <option value="1">{{ __('Group by email') }}</option>
-                                        <option value="2">{{ __('Group by queue') }}</option>
-                                        <option value="3">{{ __('Group by job') }}</option>
+                                        <option value="2">{{ __('Group by project') }}</option>
+                                        <option value="5">{{ __('Group by queue') }}</option>
+                                        <option value="6">{{ __('Group by job') }}</option>
                                     </select>
                                     <select class="form-select form-select-sm user-job-view" aria-label="{{ __('Detail view') }}">
                                         <option value="1">{{ __('Detail view') }}</option>
@@ -157,26 +161,57 @@
                                 </div>
                             </header>
                             <div class="cabinet-ra-stats-panel__body">
-                                <table id="user_jobs_table" class="table table-bordered table-hover table-sm dataTable dtr-inline mb-0" style="width: 100%">
-                                    <thead>
-                                    <tr>
-                                        <th>{{ __('User') }}</th>
-                                        <th>{{ __('Email') }}</th>
-                                        <th>{{ __('Queue') }}</th>
-                                        <th>{{ __('Job') }}</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody id="user_jobs_table_body">
-                                    @foreach($usersJobs as $job)
-                                        <tr class="job-row">
-                                            <td>{{ $job['user'] }}</td>
-                                            <td>{{ $job['email'] }}</td>
-                                            <td>{{ $job['queue'] }}</td>
-                                            <td>{{ $job['job'] }}</td>
+                                <div class="cabinet-ra-stats-jobs-scroll">
+                                    <table id="user_jobs_table" class="table table-bordered table-hover table-sm dataTable dtr-inline mb-0" style="width: 100%">
+                                        <thead>
+                                        <tr>
+                                            <th>{{ __('User') }}</th>
+                                            <th>{{ __('Email') }}</th>
+                                            <th>{{ __('Project name') }}</th>
+                                            <th>{{ __('Phrase') }}</th>
+                                            <th>{{ __('Landing page') }}</th>
+                                            <th>{{ __('Queue') }}</th>
+                                            <th>{{ __('Task') }}</th>
                                         </tr>
-                                    @endforeach
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody id="user_jobs_table_body">
+                                        @foreach($usersJobs as $job)
+                                            <tr class="job-row">
+                                                <td>{{ $job['user'] }}</td>
+                                                <td>{{ $job['email'] }}</td>
+                                                <td>
+                                                    @if($job['project'] !== '')
+                                                        <span class="cabinet-ra-job-project">{{ $job['project'] }}</span>
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if($job['phrase'] !== '')
+                                                        <span class="cabinet-ra-job-phrase">{{ $job['phrase'] }}</span>
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if($job['link'] !== '')
+                                                        <a class="cabinet-ra-job-link" href="{{ $job['link'] }}" target="_blank" rel="noopener noreferrer">{{ $job['link'] }}</a>
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <span class="cabinet-ra-job-queue" data-queue="{{ $job['queue'] }}">{{ $job['queue_label'] }}</span>
+                                                </td>
+                                                <td>
+                                                    <span class="cabinet-ra-job-type">{{ $job['job_label'] }}</span>
+                                                    <span class="cabinet-ra-job-class text-muted">{{ $job['job'] }}</span>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </section>
                     </div>
@@ -419,7 +454,7 @@
                             </div>
                         </div>
                         <h3>{{ __("Recent checks") }}</h3>
-                        <table id="history_table" class="table table-bordered table-hover dataTable dtr-inline w-100">
+                        <table id="history_table" class="table table-bordered table-hover dataTable dtr-inline">
                             <thead>
                             @include('relevance-analysis.layouts.table-rows')
                             </thead>
@@ -442,51 +477,51 @@
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="text"
-                                       name="phraseSearchList" id="phraseSearchList" placeholder="phrase">
+                                       name="phraseSearchList" id="phraseSearchList" placeholder="{{ __('phrase') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="text"
-                                       name="regionSearchList" id="regionSearchList" placeholder="region">
+                                       name="regionSearchList" id="regionSearchList" placeholder="{{ __('region') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="text"
-                                       name="mainPageSearchList" id="mainPageSearchList" placeholder="link">
+                                       name="mainPageSearchList" id="mainPageSearchList" placeholder="{{ __('link') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minPositionList" id="minPositionList" placeholder="min">
+                                       name="minPositionList" id="minPositionList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxPositionList" id="maxPositionList" placeholder="max">
+                                       name="maxPositionList" id="maxPositionList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minPointsList" id="minPointsList" placeholder="min">
+                                       name="minPointsList" id="minPointsList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxPointsList" id="maxPointsList" placeholder="max">
+                                       name="maxPointsList" id="maxPointsList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minCoverageList" id="minCoverageList" placeholder="min">
+                                       name="minCoverageList" id="minCoverageList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxCoverageList" id="maxCoverageList" placeholder="max">
+                                       name="maxCoverageList" id="maxCoverageList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minCoverageTfList" id="minCoverageTfList" placeholder="min">
+                                       name="minCoverageTfList" id="minCoverageTfList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxCoverageTfList" id="maxCoverageTfList" placeholder="max">
+                                       name="maxCoverageTfList" id="maxCoverageTfList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number" name="minWidthList"
-                                       id="minWidthList" placeholder="min">
+                                       id="minWidthList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxWidthList" id="maxWidthList" placeholder="max">
+                                       name="maxWidthList" id="maxWidthList" placeholder="{{ __('max') }}">
                             </th>
                             <th style="position: inherit;">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="minDensityList" id="minDensityList" placeholder="min">
+                                       name="minDensityList" id="minDensityList" placeholder="{{ __('min') }}">
                                 <input class="w-100 form form-control search-input" type="number"
-                                       name="maxDensityList" id="maxDensityList" placeholder="max">
+                                       name="maxDensityList" id="maxDensityList" placeholder="{{ __('max') }}">
                             </th>
                         </tr>
                         <tr>
@@ -558,6 +593,15 @@
                 entries: "{{ __('entries') }}"
             };
 
+            window.raFilterPh = {
+                min: @json(__('min')),
+                max: @json(__('max')),
+                phrase: @json(__('phrase')),
+                region: @json(__('region')),
+                link: @json(__('link')),
+                comment: @json(__('comment'))
+            };
+
             $(document).ready(function () {
 
                 $('input#switchMyListWords').click(function () {
@@ -569,16 +613,22 @@
                 });
 
                 let userJobsTable = $('#user_jobs_table').DataTable({
-                    order: [[0, 'desc']],
+                    order: [[0, 'asc']],
                     paging: false,
                     searching: true,
                     autoWidth: false,
+                    scrollX: true,
+                    columnDefs: [
+                        { targets: [3, 4], width: '18%' },
+                        { targets: [2], width: '12%' },
+                        { targets: [5, 6], width: '10%' },
+                    ],
                     dom: "<'row'<'col-12'f>>" +
                         "<'row'<'col-12'tr>>" +
                         "<'row'<'col-12'i>>",
                     language: {
                         search: words.search + ':',
-                        emptyTable: words.noRecords,
+                        emptyTable: @json(__('Relevance queue empty')),
                         zeroRecords: words.noRecords,
                         info: words.showing + ' ' + words.from + ' _START_ ' + words.to + ' _END_ ' + words.of + ' _TOTAL_ ' + words.entries,
                         infoEmpty: words.showing + ' ' + words.from + ' 0 ' + words.to + ' 0 ' + words.of + ' 0 ' + words.entries,
@@ -1042,7 +1092,7 @@
                                                 newRow = "<tr class='render'>" +
                                                     "   <td>" + val.last_check + "</td>" +
                                                     "   <td>" +
-                                                    "      <textarea style='height: 160px;' data-target='" + val.id + "' class='history-comment form form-control' >" + val.comment + "</textarea>" +
+                                                    "      <textarea rows='3' data-target='" + val.id + "' class='history-comment form form-control'>" + val.comment + "</textarea>" +
                                                     "   </td>" +
                                                     "   <td>" + phrase + "</td>" +
                                                     "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
@@ -1071,7 +1121,7 @@
                                                 newRow = "<tr class='render'>" +
                                                     "   <td>" + val.last_check + "</td>" +
                                                     "   <td>" +
-                                                    "      <textarea style='height: 160px;' data-target='" + val.id + "' class='history-comment form form-control' >" + val.comment + "</textarea>" +
+                                                    "      <textarea rows='3' data-target='" + val.id + "' class='history-comment form form-control'>" + val.comment + "</textarea>" +
                                                     "   </td>" +
                                                     "   <td>" + phrase + "</td>" +
                                                     "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
@@ -1110,6 +1160,7 @@
                                                 "order": [[0, "desc"]],
                                                 "pageLength": 25,
                                                 "searching": true,
+                                                "autoWidth": false,
                                                 language: {
                                                     paginate: {
                                                         "first": "«",
@@ -1148,12 +1199,14 @@
                                                 }
                                             });
 
-                                            $('#history_table').wrap("<div style='width: 100%; overflow-x: scroll;'></div>")
+                                            if (!$('#history_table').parent().hasClass('history-table-scroll')) {
+                                                $('#history_table').wrap('<div class="history-table-scroll"></div>');
+                                            }
 
                                             $('#history_table_length').before(
-                                                "<span>" +
-                                                "<a href='/get-file/" + storyId + "/csv' class='btn btn-secondary ml-1'>CSV</a>" +
-                                                "<a href='/get-file/" + storyId + "/xls' class='btn btn-secondary ml-1'>Excel</a>" +
+                                                "<span class=\"cabinet-ra-export-btns\">" +
+                                                "<a href='/get-file/" + storyId + "/csv' class='btn btn-secondary'>CSV</a>" +
+                                                "<a href='/get-file/" + storyId + "/xls' class='btn btn-secondary'>Excel</a>" +
                                                 "</span>"
                                             )
 
@@ -1274,7 +1327,9 @@
                                             scrollTo('#history-list-subject')
 
                                             customFiltersWithoutComment('list-history', listTable, 'List', 1)
-                                            $('#list-history').wrap("<div style='width: 100%; overflow-x: scroll;'></div>")
+                                            if (!$('#list-history').parent().hasClass('list-history-table-scroll')) {
+                                                $('#list-history').wrap('<div class="list-history-table-scroll"></div>');
+                                            }
 
                                             $('#list-history').unbind().on('click', 'td.dt-control', function () {
                                                 let tr = $(this).closest('tr');

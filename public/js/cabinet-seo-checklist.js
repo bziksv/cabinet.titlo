@@ -1158,11 +1158,13 @@
                             var li = document.createElement('li');
                             var author = String((result.data.note && result.data.note.author) || '').replace(/</g, '&lt;');
                             var created = String((result.data.note && result.data.note.created_at) || '');
-                            var body = String((result.data.note && result.data.note.body) || '').replace(/</g, '&lt;');
+                            var bodyHtml = (result.data.note && result.data.note.body_html)
+                                ? String(result.data.note.body_html)
+                                : String((result.data.note && result.data.note.body) || '').replace(/</g, '&lt;');
                             li.innerHTML = '<div class="cabinet-sc-notes-list__meta">' +
                                 (author ? '<strong class="cabinet-sc-notes-list__author">' + author + '</strong> ' : '') +
                                 '<span class="text-secondary small">' + created + '</span></div>' +
-                                '<div class="cabinet-sc-notes-list__body">' + body + '</div>';
+                                '<div class="cabinet-sc-notes-list__body">' + bodyHtml + '</div>';
                             notesList.insertBefore(li, notesList.firstChild);
                             noteBody.value = '';
                         })

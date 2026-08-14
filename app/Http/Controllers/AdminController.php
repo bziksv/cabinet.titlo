@@ -62,27 +62,138 @@ class AdminController extends Controller
         $queues = new RelevanceQueues();
         $jobs = $queues->all();
 
-        foreach($jobs as $job)
-        {
+        $userIds = [];
+        $historyIds = [];
+        $projectIds = [];
+
+        foreach ($jobs as $job) {
+            if (property_exists($job, 'userId') && $job->userId) {
+                $userIds[] = (int) $job->userId;
+            }
+            if (property_exists($job, 'historyId') && $job->historyId) {
+                $historyIds[] = (int) $job->historyId;
+            }
+            if (property_exists($job, 'mainId') && $job->mainId) {
+                $projectIds[] = (int) $job->mainId;
+            }
+        }
+
+        $users = User::query()
+            ->whereIn('id', array_values(array_unique($userIds)))
+            ->get()
+            ->keyBy('id');
+
+        $histories = RelevanceHistory::query()
+            ->with('mainHistory:id,name')
+            ->whereIn('id', array_values(array_unique($historyIds)))
+            ->get(['id', 'phrase', 'main_link', 'project_relevance_history_id'])
+            ->keyBy('id');
+
+        $projects = ProjectRelevanceHistory::query()
+            ->whereIn('id', array_values(array_unique($projectIds)))
+            ->get(['id', 'name'])
+            ->keyBy('id');
+
+        foreach ($jobs as $job) {
+            $request = (property_exists($job, 'request') && is_array($job->request))
+                ? $job->request
+                : [];
+
+            $phrase = (string) ($request['phrase'] ?? '');
+            $link = (string) ($request['link'] ?? $request['main_link'] ?? '');
+            $project = '';
+            $historyId = property_exists($job, 'historyId') ? (int) $job->historyId : 0;
+
+            if ($historyId > 0 && isset($histories[$historyId])) {
+                $history = $histories[$historyId];
+                if ($phrase === '') {
+                    $phrase = (string) $history->phrase;
+                }
+                if ($link === '') {
+                    $link = (string) $history->main_link;
+                }
+                $project = (string) optional($history->mainHistory)->name;
+            }
+
+            if ($project === '' && property_exists($job, 'mainId') && isset($projects[(int) $job->mainId])) {
+                $project = (string) $projects[(int) $job->mainId]->name;
+            }
+
+            if ($project === '' && $link !== '') {
+                $host = parse_url($link, PHP_URL_HOST);
+                $project = is_string($host) ? $host : '';
+            }
+
+            $jobClass = class_basename($job);
+            $jobType = property_exists($job, 'type') ? (string) $job->type : '';
+            $jobLabel = $this->relevanceJobLabel($jobClass, $jobType);
+            $queue = (string) ($job->queue ?? '');
+
             $row = [
                 'user' => 'System',
                 'email' => '',
-                'queue' => $job->queue,
-                'job' => class_basename($job),
+                'project' => $project,
+                'phrase' => $phrase,
+                'link' => $link,
+                'queue' => $queue,
+                'queue_label' => $this->relevanceQueueLabel($queue),
+                'job' => $jobClass,
+                'job_label' => $jobLabel,
             ];
 
-            if(property_exists($job, 'userId'))
-            {
-                $user = User::find($job->userId);
-
+            if (property_exists($job, 'userId') && isset($users[(int) $job->userId])) {
+                $user = $users[(int) $job->userId];
                 $row['user'] = $user->fullName;
-                $row['email'] = $user->email;
+                $row['email'] = (string) $user->email;
             }
 
             $rows->push($row);
         }
 
         return $rows;
+    }
+
+    protected function relevanceQueueLabel(string $queue): string
+    {
+        $map = [
+            'relevance_high_priority' => __('Relevance queue high'),
+            'relevance_medium_priority' => __('Relevance queue medium'),
+            'relevance_normal_priority' => __('Relevance queue normal'),
+        ];
+
+        return $map[$queue] ?? $queue;
+    }
+
+    protected function relevanceJobLabel(string $jobClass, string $type = ''): string
+    {
+        if ($jobClass === 'RelevanceThoughAnalysisQueue') {
+            return __('Relevance job through analysis');
+        }
+
+        if ($jobClass === 'RelevanceAnalyseQueue') {
+            return __('Relevance job new analysis');
+        }
+
+        if ($jobClass === 'RelevanceHistoryQueue') {
+            if ($type === 'mainPage') {
+                return __('Relevance job refresh landing');
+            }
+            if ($type === 'competitors') {
+                return __('Relevance job refresh competitors');
+            }
+
+            return __('Relevance job history check');
+        }
+
+        if ($jobClass === 'RunRelevanceAnalyseQueue') {
+            return __('Relevance job finish analysis');
+        }
+
+        if ($jobClass === 'RemoveRelevanceProgress') {
+            return __('Relevance job cleanup');
+        }
+
+        return $jobClass;
     }
 
     /**

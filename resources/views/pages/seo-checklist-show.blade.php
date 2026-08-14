@@ -690,7 +690,7 @@
                                                     <strong class="cabinet-sc-notes-list__author">{{ $note->authorLabel() }}</strong>
                                                     <span class="text-secondary small">{{ $note->created_at->format('d.m.Y H:i') }}</span>
                                                 </div>
-                                                <div class="cabinet-sc-notes-list__body">{{ $note->body }}</div>
+                                                <div class="cabinet-sc-notes-list__body">{!! \App\Support\TextAutoLinker::format((string) $note->body) !!}</div>
                                             </li>
                                         @endforeach
                                     </ul>

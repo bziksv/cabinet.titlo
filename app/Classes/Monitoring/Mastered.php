@@ -246,6 +246,10 @@ class Mastered
             return (int) ($position['query_id'] ?? $position['monitoring_keyword_id'] ?? 0);
         }
 
+        if ($position instanceof \Illuminate\Support\Collection) {
+            return (int) ($position->get('query_id') ?? $position->get('monitoring_keyword_id') ?? 0);
+        }
+
         return (int) ($position->query_id ?? $position->monitoring_keyword_id ?? 0);
     }
 
@@ -253,6 +257,10 @@ class Mastered
     {
         if (is_array($position)) {
             return (int) ($position['engine_id'] ?? $position['monitoring_searchengine_id'] ?? 0);
+        }
+
+        if ($position instanceof \Illuminate\Support\Collection) {
+            return (int) ($position->get('engine_id') ?? $position->get('monitoring_searchengine_id') ?? 0);
         }
 
         return (int) ($position->engine_id ?? $position->monitoring_searchengine_id ?? 0);

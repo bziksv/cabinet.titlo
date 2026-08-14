@@ -22,62 +22,62 @@
                 <th class="font-weight-normal text-muted">{{ __('Ranges for filtering the table') }}</th>
                 <th>
                     <div style="width: 90px">
-                        <input class="w-100" type="number" name="minTF" id="minTF" placeholder="min">
-                        <input class="w-100" type="number" name="maxTF" id="maxTF" placeholder="max">
+                        <input class="w-100" type="number" name="minTF" id="minTF" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxTF" id="maxTF" placeholder="{{ __('max') }}">
                     </div>
                 </th>
                 <th>
                     <div style="width: 90px">
-                        <input class="w-100" type="number" name="minIdf" id="minIdf" placeholder="min">
-                        <input class="w-100" type="number" name="maxIdf" id="maxIdf" placeholder="max">
+                        <input class="w-100" type="number" name="minIdf" id="minIdf" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxIdf" id="maxIdf" placeholder="{{ __('max') }}">
                     </div>
                 </th>
                 <th>
                     <div>
-                        <input class="w-100" type="number" name="minInter" id="minInter" placeholder="min">
-                        <input class="w-100" type="number" name="maxInter" id="maxInter" placeholder="max">
+                        <input class="w-100" type="number" name="minInter" id="minInter" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxInter" id="maxInter" placeholder="{{ __('max') }}">
                     </div>
                 </th>
                 <th>
                     <div>
-                        <input class="w-100" type="number" name="minReSpam" id="minReSpam" placeholder="min">
-                        <input class="w-100" type="number" name="maxReSpam" id="maxReSpam" placeholder="max">
+                        <input class="w-100" type="number" name="minReSpam" id="minReSpam" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxReSpam" id="maxReSpam" placeholder="{{ __('max') }}">
                     </div>
                 </th>
                 <th>
                     <div>
-                        <input class="w-100" type="number" name="minAVG" id="minAVG" placeholder="min">
-                        <input class="w-100" type="number" name="maxAVG" id="maxAVG" placeholder="max">
+                        <input class="w-100" type="number" name="minAVG" id="minAVG" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxAVG" id="maxAVG" placeholder="{{ __('max') }}">
                     </div>
                 </th>
                 <th>
                     <div>
-                        <input class="w-100" type="number" name="minAVGText" id="minAVGText" placeholder="min">
-                        <input class="w-100" type="number" name="maxAVGText" id="maxAVGText" placeholder="max">
+                        <input class="w-100" type="number" name="minAVGText" id="minAVGText" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxAVGText" id="maxAVGText" placeholder="{{ __('max') }}">
                     </div>
                 </th>
                 <th>
                     <div>
-                        <input class="w-100" type="number" name="minInYourPage" id="minInYourPage" placeholder="min">
-                        <input class="w-100" type="number" name="maxInYourPage" id="maxInYourPage" placeholder="max">
+                        <input class="w-100" type="number" name="minInYourPage" id="minInYourPage" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxInYourPage" id="maxInYourPage" placeholder="{{ __('max') }}">
                     </div>
                 </th>
                 <th>
                     <div>
-                        <input class="w-100" type="number" name="minTextIYP" id="minTextIYP" placeholder="min">
-                        <input class="w-100" type="number" name="maxTextIYP" id="maxTextIYP" placeholder="max">
+                        <input class="w-100" type="number" name="minTextIYP" id="minTextIYP" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxTextIYP" id="maxTextIYP" placeholder="{{ __('max') }}">
                     </div>
                 </th>
                 <th>
                     <div>
-                        <input class="w-100" type="number" name="minAVGLink" id="minAVGLink" placeholder="min">
-                        <input class="w-100" type="number" name="maxAVGLink" id="maxAVGLink" placeholder="max">
+                        <input class="w-100" type="number" name="minAVGLink" id="minAVGLink" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxAVGLink" id="maxAVGLink" placeholder="{{ __('max') }}">
                     </div>
                 </th>
                 <th>
                     <div>
-                        <input class="w-100" type="number" name="minLinkIYP" id="minLinkIYP" placeholder="min">
-                        <input class="w-100" type="number" name="maxLinkIYP" id="maxLinkIYP" placeholder="max">
+                        <input class="w-100" type="number" name="minLinkIYP" id="minLinkIYP" placeholder="{{ __('min') }}">
+                        <input class="w-100" type="number" name="maxLinkIYP" id="maxLinkIYP" placeholder="{{ __('max') }}">
                     </div>
                 </th>
             </tr>

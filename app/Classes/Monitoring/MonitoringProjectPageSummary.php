@@ -9,7 +9,6 @@ use App\MonitoringSearchengine;
 use App\Support\MonitoringProjectPublicStats;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * KPI на /monitoring/{id}: актуальные цифры (не застрявший кэш 2024 при графиках 2026).
@@ -27,9 +26,12 @@ class MonitoringProjectPageSummary
             if ($regionId !== null && $regionId > 0) {
                 $summary = self::liveForRegion($project, $regionId);
             } else {
-                $snapshot = MonitoringProjectPublicStats::summaryFromSnapshot($project);
+                $snap = MonitoringDataTableColumnsProject::query()
+                    ->where('monitoring_project_id', $project->id)
+                    ->first();
+                $snapshot = MonitoringProjectPublicStats::summaryFromSnapshot($project, $snap);
 
-                if (self::summaryNeedsLiveFallback($snapshot)) {
+                if (self::summaryNeedsLiveFallback($snapshot, $project, $snap)) {
                     $summary = self::liveForAllRegions($project, $snapshot);
                 } else {
                     $summary = $snapshot;
@@ -46,11 +48,15 @@ class MonitoringProjectPageSummary
 
     /**
      * Снимок без полного набора ТОП-% (часто top1 есть, остальное null) — нужен live-расчёт.
+     * Также если в БД есть позиции новее снимка — считаем по последним результатам поиска.
      *
      * @param array<string, mixed> $summary
      */
-    private static function summaryNeedsLiveFallback(array $summary): bool
-    {
+    private static function summaryNeedsLiveFallback(
+        array $summary,
+        MonitoringProject $project,
+        ?MonitoringDataTableColumnsProject $snap
+    ): bool {
         if (((int) ($summary['words'] ?? 0)) === 0 && empty($summary['has_data'])) {
             return false;
         }
@@ -61,7 +67,23 @@ class MonitoringProjectPageSummary
             }
         }
 
-        return false;
+        if ($snap === null || !$snap->updated_at) {
+            return true;
+        }
+
+        // Снимки, посчитанные старым addLastPositions, могли показывать архивный срез.
+        if ($snap->updated_at->lt(Carbon::parse('2026-08-14 11:00:00'))) {
+            return true;
+        }
+
+        $latestAt = MonitoringLatestPositions::maxCreatedAtByProjectIds([(int) $project->id])
+            ->get($project->id);
+
+        if ($latestAt === null || $latestAt === '') {
+            return false;
+        }
+
+        return Carbon::parse($latestAt)->gt($snap->updated_at);
     }
 
     private static function scopeLabel(MonitoringProject $project, ?int $regionId): ?string
@@ -186,34 +208,6 @@ class MonitoringProjectPageSummary
      */
     private static function latestPositionValues(MonitoringProject $project, array $engineIds = null): Collection
     {
-        if ($engineIds === null) {
-            $engineIds = $project->searchengines()->pluck('id')->all();
-        }
-
-        if ($engineIds === []) {
-            return collect();
-        }
-
-        $keywordIds = $project->keywords()->pluck('id')->all();
-        if ($keywordIds === []) {
-            return collect();
-        }
-
-        return MonitoringPosition::query()
-            ->select('position')
-            ->whereIn('monitoring_searchengine_id', $engineIds)
-            ->whereIn('monitoring_keyword_id', $keywordIds)
-            ->whereIn('id', function ($query) use ($engineIds, $keywordIds) {
-                $query->select(DB::raw('MAX(id)'))
-                    ->from('monitoring_positions')
-                    ->whereIn('monitoring_searchengine_id', $engineIds)
-                    ->whereIn('monitoring_keyword_id', $keywordIds)
-                    ->groupBy('monitoring_keyword_id', 'monitoring_searchengine_id');
-            })
-            ->pluck('position')
-            ->filter(function ($pos) {
-                return $pos !== null && $pos !== '';
-            })
-            ->values();
+        return MonitoringLatestPositions::valuesForProject($project, $engineIds);
     }
 }
