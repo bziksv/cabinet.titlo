@@ -1050,12 +1050,7 @@
                                             let state
 
                                             if (val.state === 1) {
-                                                state =
-                                                    '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
-                                                    "{{ __('Repeat the analysis') }}" +
-                                                    '</button>'
-                                                    +
-                                                    "<a href='/show-history/" + val.id + "' target='_blank' class='btn btn-secondary mt-3'>" + '{{ __("Detailed information") }}' + "</a>"
+                                                state = raHistoryActionsHtml(val.id)
 
                                             } else if (val.state === 0) {
                                                 state =
@@ -1067,11 +1062,7 @@
                                                     '</div>'
                                                 checkAnalyseProgress(val.id)
                                             } else if (val.state === -1) {
-                                                state =
-                                                    '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
-                                                    '{{ __("Processed..") }}' +
-                                                    '</button>' +
-                                                    "<span class='text-muted'>" + '{{ __("An error has occurred, try again or contact the administrator") }}' + "</span>"
+                                                state = raHistoryActionsHtml(val.id, { detail: false, repeat: true, error: true })
                                             }
 
                                             let position = val.position
@@ -1113,7 +1104,7 @@
                                                     "          </div>" +
                                                     "      </div>" +
                                                     "   </td>" +
-                                                    "   <td id='history-state-" + val.id + "'>" +
+                                                    "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
                                                     state +
                                                     "   </td>" +
                                                     "</tr>"
@@ -1142,7 +1133,7 @@
                                                     "          </div>" +
                                                     "      </div>" +
                                                     "   </td>" +
-                                                    "   <td id='history-state-" + val.id + "'>" +
+                                                    "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
                                                     state +
                                                     "   </td>" +
                                                     "</tr>"

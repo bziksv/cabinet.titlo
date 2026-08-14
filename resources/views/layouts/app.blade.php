@@ -33,6 +33,7 @@
 {{-- Счётчик и цели в начале body: после verify flash на тяжёлой главной не отваливается --}}
 @include('layouts.partials.yandex-metrika')
 @include('layouts.partials.yandex-metrika-goals')
+@include('layouts.partials.top-mail-ru')
 <div class="app-wrapper">
     @include('layouts.partials.app-header')
     @include('layouts.partials.app-sidebar')

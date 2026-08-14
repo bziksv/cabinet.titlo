@@ -126,7 +126,23 @@
     </div>
 
     <div id="params" style="display:none;">
-        <div class="d-flex w-100 justify-content-between" style="margin-top: 40px;">
+        @php
+            $req = is_array($object->request ?? null) ? $object->request : [];
+            $scanEngineKey = strtolower((string) ($req['searchEngine'] ?? 'yandex')) === 'google' ? 'google' : 'yandex';
+            $scanEngineLabel = $scanEngineKey === 'google' ? 'Google' : 'Яндекс';
+            $scanRegionLabel = '';
+            if (!empty($defaultRegion) && is_array($defaultRegion)) {
+                $scanRegionLabel = (string) ($defaultRegion['text'] ?? $defaultRegion['name'] ?? '');
+            }
+            if ($scanRegionLabel === '') {
+                $scanRegionLabel = \App\Common::getRegionName((string) ($object->region ?? $req['region'] ?? ''));
+            }
+            $scanTop = isset($req['count']) && $req['count'] !== '' && $req['count'] !== null
+                ? (int) $req['count']
+                : null;
+            $scanType = (string) ($req['type'] ?? 'phrase');
+        @endphp
+        <div class="d-flex w-100 flex-wrap justify-content-between cabinet-ra-show-params" style="margin-top: 40px; gap: 0.65rem 1rem;">
             <div style="cursor:pointer;" class="pl-1 pr-1">
                 {{ __('Date') }}:
                 <span class="project-info">
@@ -149,6 +165,20 @@
                     <i class="fa fa-copy"></i>
                 </span>
             </div>
+            <div class="pl-1 pr-1">
+                {{ __('Search engine') }}:
+                <span class="project-info">{{ $scanEngineLabel }}</span>
+            </div>
+            <div class="pl-1 pr-1">
+                {{ __('Region') }}:
+                <span class="project-info">{{ $scanRegionLabel !== '' ? $scanRegionLabel : '—' }}</span>
+            </div>
+            @if($scanType === 'phrase' && $scanTop)
+                <div class="pl-1 pr-1">
+                    {{ __('Top') }}:
+                    <span class="project-info">ТОП-{{ $scanTop }}</span>
+                </div>
+            @endif
         </div>
     </div>
 

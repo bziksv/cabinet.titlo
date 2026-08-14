@@ -1869,35 +1869,58 @@ a.competitor-cloud:hover {
     text-align: center;
 }
 
-/* Колонка действий — кнопки не сплющивать в столбик букв */
+/* Колонка действий — компактные кнопки в ряд */
 #history_table_wrapper #history_table thead th:last-child,
-#history_table_wrapper #history_table tbody td:last-child {
-    min-width: 13.5rem !important;
-    width: 13.5rem !important;
-    max-width: 15rem;
-    white-space: normal;
-    vertical-align: middle;
+#history_table_wrapper #history_table tbody td:last-child,
+#history_table_wrapper #history_table thead th.ra-hist-actions-th,
+#history_table_wrapper #history_table tbody td.ra-hist-actions-cell {
+    width: 1% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+    text-align: right !important;
+}
+
+#history_table_wrapper #history_table tbody td:last-child .ra-hist-actions,
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-actions {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 0.35rem !important;
+    width: auto !important;
+    max-width: none !important;
 }
 
 #history_table_wrapper #history_table tbody td:last-child .btn,
-#history_table_wrapper #history_table [id^="history-state-"] .btn {
-    display: block !important;
-    width: 100% !important;
-    min-width: 12rem !important;
-    max-width: 14rem;
+#history_table_wrapper #history_table [id^="history-state-"] .btn,
+#history_table_wrapper #history_table tbody td:last-child .ra-hist-act.btn,
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-act.btn {
+    display: inline-block !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0.2rem 0.55rem !important;
     box-sizing: border-box;
     white-space: nowrap !important;
     word-break: keep-all !important;
     overflow-wrap: normal !important;
     text-align: center;
     writing-mode: horizontal-tb !important;
+    font-size: 0.78rem !important;
+    line-height: 1.25 !important;
+    vertical-align: middle;
 }
 
 #history_table_wrapper #history_table tbody td:last-child .btn + .btn,
 #history_table_wrapper #history_table tbody td:last-child .btn + a.btn,
 #history_table_wrapper #history_table [id^="history-state-"] .btn + .btn,
 #history_table_wrapper #history_table [id^="history-state-"] .btn + a.btn {
-    margin-top: 0.5rem !important;
+    margin-top: 0 !important;
+    margin-left: 0 !important;
 }
 
 /* Комментарий — компактный, без гигантского textarea */
@@ -2476,4 +2499,57 @@ table.dataTable thead th > .form-control.search-input + .form-control.search-inp
 .cabinet-relevance-limit-cost .js-relevance-limit-cost {
     color: var(--bs-body-color, #212529);
     font-weight: 600;
+}
+
+/* Действия в истории: Подробная | Повторить — компактно, в ряд */
+.ra-hist-actions-cell {
+    width: 1%;
+    min-width: 11rem;
+    vertical-align: middle !important;
+    text-align: right;
+    white-space: nowrap;
+    overflow: visible;
+}
+
+.ra-hist-actions-th {
+    width: 1%;
+    min-width: 11rem;
+    text-align: right;
+    white-space: nowrap;
+    font-size: 0.78rem;
+}
+
+.ra-hist-actions {
+    display: inline-flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    height: auto;
+    max-height: none;
+}
+
+.ra-hist-actions .ra-hist-act.btn {
+    margin: 0;
+    flex: 0 0 auto;
+    align-self: center;
+    width: auto;
+    height: auto !important;
+    min-height: 0;
+    padding: 0.2rem 0.55rem;
+    line-height: 1.25;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.ra-hist-actions__err {
+    display: block;
+    max-width: 12rem;
+    font-size: 0.7rem;
+    line-height: 1.25;
+    text-align: right;
+    white-space: normal;
 }

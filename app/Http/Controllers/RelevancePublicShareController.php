@@ -56,6 +56,13 @@ class RelevancePublicShareController extends Controller
         }
 
         $object->request = json_decode($object->request, true);
+        $req = is_array($object->request) ? $object->request : [];
+        $defaultEngine = strtolower((string) ($req['searchEngine'] ?? 'yandex')) === 'google' ? 'google' : 'yandex';
+        $regionId = (string) ($req['region'] ?? '');
+        $defaultRegion = $regionId !== ''
+            ? (\App\Support\CompetitorSearchRegions::find($defaultEngine, $regionId)
+                ?? \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine))
+            : \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine);
         $viewOnlyAccess = (object) ['access' => 1];
 
         return view('relevance-analysis.show-history', [
@@ -63,6 +70,8 @@ class RelevancePublicShareController extends Controller
             'id' => $id,
             'object' => $object,
             'access' => $viewOnlyAccess,
+            'defaultSearchEngine' => $defaultEngine,
+            'defaultRegion' => $defaultRegion,
             'publicShareToken' => $token,
             'publicShareExpires' => $share->isUnlimited()
                 ? (string) __('Relevance share ttl unlimited')

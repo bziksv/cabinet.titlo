@@ -1282,12 +1282,7 @@
                                         let state
 
                                         if (val.state === 1) {
-                                            state =
-                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
-                                                '   Повторить анализ' +
-                                                '</button>'
-                                                +
-                                                "<a href='/show-history/" + val.id + "' target='_blank' class='btn btn-secondary mt-3'> Подробная информация</a>"
+                                            state = raHistoryActionsHtml(val.id)
 
                                         } else if (val.state === 0) {
                                             state =
@@ -1299,11 +1294,7 @@
                                                 '</div>'
                                             checkAnalyseProgress(val.id)
                                         } else if (val.state === -1) {
-                                            state =
-                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
-                                                '   Повторить анализ' +
-                                                '</button>' +
-                                                "<span class='text-muted'>Произошла ошибка, повторите попытку или обратитесь к администратору</span>"
+                                            state = raHistoryActionsHtml(val.id, { detail: false, repeat: true, error: true })
                                         }
 
                                         let position = val.position
@@ -1345,7 +1336,7 @@
                                                 "          </div>" +
                                                 "      </div>" +
                                                 "   </td>" +
-                                                "   <td id='history-state-" + val.id + "'>" +
+                                                "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
                                                 state +
                                                 "   </td>" +
                                                 "</tr>"
@@ -1374,7 +1365,7 @@
                                                 "          </div>" +
                                                 "      </div>" +
                                                 "   </td>" +
-                                                "   <td id='history-state-" + val.id + "'>" +
+                                                "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
                                                 state +
                                                 "   </td>" +
                                                 "</tr>"

@@ -9,6 +9,39 @@ function raPh(key, fallback) {
     return map[key] || fallback
 }
 
+/**
+ * Кнопки действий в истории: Подробная | Повторить (в ряд, текст, стиль кабинета).
+ * @param {number|string} id
+ * @param {{detail?: boolean, repeat?: boolean, error?: boolean}} opts
+ */
+function raHistoryActionsHtml(id, opts) {
+    opts = opts || {}
+    var showDetail = opts.detail !== false
+    var showRepeat = opts.repeat !== false
+    var showError = !!opts.error
+    var html = '<div class="ra-hist-actions">'
+    if (showDetail) {
+        html +=
+            '<a href="/show-history/' + id + '" target="_blank" rel="noopener" class="btn btn-sm btn-secondary ra-hist-act ra-hist-act--detail">' +
+            'Подробная' +
+            '</a>'
+    }
+    if (showRepeat) {
+        html +=
+            '<button type="button" class="btn btn-sm btn-secondary ra-hist-act ra-hist-act--repeat get-history-info" data-order="' + id + '"' +
+            ' data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
+            'Повторить' +
+            '</button>'
+    }
+    if (showError) {
+        html += '<span class="ra-hist-actions__err text-muted">Ошибка — повторите или напишите в поддержку</span>'
+    }
+    html += '</div>'
+    return html
+}
+
+window.raHistoryActionsHtml = raHistoryActionsHtml
+
 function getHistoryInfo() {
     $('.get-history-info').unbind("click").click(function () {
         let id = $(this).attr('data-order')
@@ -147,12 +180,7 @@ function format(data) {
     $.each(array[data], function (key, value) {
         let state
         if (value['state'] === 1) {
-            state =
-                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + value['id'] + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
-                '   Повторить анализ' +
-                '</button>' +
-                "<a href='/show-history/" + value['id'] + "' target='_blank' class='btn btn-secondary mt-3'> Подробная информация</a>"
-
+            state = raHistoryActionsHtml(value['id'])
         } else if (value['state'] === 0) {
             state =
                 '<p>Обрабатывается..</p>' +
@@ -163,11 +191,7 @@ function format(data) {
                 '</div>'
             checkAnalyseProgress(value['id'])
         } else if (value['state'] === -1) {
-            state =
-                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + value['id'] + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
-                '   Повторить анализ' +
-                '</button>' +
-                "<span class='text-muted'>Произошла ошибка, повторите попытку или обратитесь к администратору</span>"
+            state = raHistoryActionsHtml(value['id'], { detail: false, repeat: true, error: true })
         }
 
         let checked = value['calculate'] ? 'checked' : ''
@@ -194,7 +218,7 @@ function format(data) {
             "       </div>" +
             "   </div>" +
             '   </td>' +
-            '   <td id="history-state-' + value['id'] + '" class="d-flex flex-column">' +
+            '   <td id="history-state-' + value['id'] + '" class="ra-hist-actions-cell">' +
             state +
             '   </td>' +
             '</tr>'
@@ -294,7 +318,7 @@ function format(data) {
         '          </div>' +
         '       </div>' +
         '   </th>' +
-        '   <th></th>' +
+        '   <th class="ra-hist-actions-th"></th>' +
         '   </tr>' +
         '      <tr>' +
         '         <th class="table-header">Дата сканирования</th>' +
@@ -309,7 +333,7 @@ function format(data) {
         '         <th class="table-header">Ширина</th>' +
         '         <th class="table-header">Плотность</th>' +
         '         <th class="table-header">Учитывать в расчёте общего балла</th>' +
-        '         <th class="table-header"></th>' +
+        '         <th class="table-header ra-hist-actions-th">Действия</th>' +
         '   </tr>' +
         '</thead>' +
         child +
@@ -387,20 +411,12 @@ function checkAnalyseProgress(id) {
                 }, 10000)
             } else if (response.message === 'error') {
                 $('#history-state-' + id).html(
-                    '<button type="button" class="btn btn-secondary get-history-info" data-order="' + id + '"' +
-                    '        data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ' +
-                    '</button>' +
-                    '<span class="text-muted">Произошла ошибка, повторите попытку или обратитесь к администратору</span>'
+                    raHistoryActionsHtml(id, { detail: false, repeat: true, error: true })
                 );
             } else if (response.message === 'success') {
                 let newObject = response.newObject
                 if (!newObject || !newObject.id) {
-                    $('#history-state-' + id).html(
-                        '<button type="button" class="btn btn-secondary get-history-info" data-order="' + id + '"' +
-                        '   data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ' +
-                        '</button>' +
-                        '<a href="/show-history/' + id + '" target="_blank" class="btn btn-secondary mt-3"> Подробная информация</a>'
-                    )
+                    $('#history-state-' + id).html(raHistoryActionsHtml(id))
                     getHistoryInfo()
                     return
                 }
@@ -414,12 +430,7 @@ function checkAnalyseProgress(id) {
                     return
                 }
 
-                $('#history-state-' + id).html(
-                    '<button type="button" class="btn btn-secondary get-history-info" data-order="' + id + '"' +
-                    '   data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ' +
-                    '</button>' +
-                    '<a href="/show-history/' + id + '" target="_blank" class="btn btn-secondary mt-3"> Подробная информация</a>'
-                )
+                $('#history-state-' + id).html(raHistoryActionsHtml(id))
 
                 // Та же запись (обновили in-place) — новую строку не добавляем.
                 if (String(newObject.id) === String(id)) {
@@ -481,10 +492,8 @@ function checkAnalyseProgress(id) {
                     '</div></td>'
                 )
                 $tr.append(
-                    '<td id="history-state-' + newObject.id + '">' +
-                    '  <button type="button" class="btn btn-secondary get-history-info" data-order="' + newObject.id +
-                    '" data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ </button>' +
-                    '  <a href="/show-history/' + newObject.id + '" target="_blank" class="btn btn-secondary mt-3"> Подробная информация</a>' +
+                    '<td id="history-state-' + newObject.id + '" class="ra-hist-actions-cell">' +
+                    raHistoryActionsHtml(newObject.id) +
                     '</td>'
                 )
 

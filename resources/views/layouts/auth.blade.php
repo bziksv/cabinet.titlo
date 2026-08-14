@@ -19,6 +19,7 @@
 {{-- Счётчик и цели сразу: после register/verify flash не должен ждать конец страницы --}}
 @include('layouts.partials.yandex-metrika')
 @include('layouts.partials.yandex-metrika-goals')
+@include('layouts.partials.top-mail-ru')
 @yield('content')
 
 @if(config('app.env') !== 'local')

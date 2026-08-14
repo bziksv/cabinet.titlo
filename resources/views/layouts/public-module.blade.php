@@ -102,6 +102,7 @@
 @if(!$isWhiteLabel)
     @include('layouts.partials.yandex-metrika')
     @include('layouts.partials.yandex-metrika-goals')
+    @include('layouts.partials.top-mail-ru')
 @endif
 </body>
 </html>

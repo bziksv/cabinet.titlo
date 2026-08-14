@@ -231,16 +231,23 @@ final class RelevancePhraseNgrams
                 continue;
             }
 
+            $isStop = TextAnalyzerStopWords::isPhraseStopWord($token);
+
             if (self::$unigramRoots !== []) {
-                if (!isset(self::$lemmaMap[$token])) {
+                if (isset(self::$lemmaMap[$token])) {
+                    $lemma = self::$lemmaMap[$token];
+                } elseif ($isStop) {
+                    // Служебные слова оставляем в TLPs, даже если их вырезали из униграмм.
+                    $lemma = $token;
+                } else {
                     continue;
                 }
-                $lemma = self::$lemmaMap[$token];
             } else {
-                $lemma = self::lemma($token);
+                $lemma = $isStop ? $token : self::lemma($token);
             }
 
-            if (mb_strlen($lemma) >= self::MIN_TOKEN_LENGTH) {
+            $minLen = $isStop ? 1 : self::MIN_TOKEN_LENGTH;
+            if (mb_strlen($lemma) >= $minLen) {
                 $lemmas[] = $lemma;
             }
         }
@@ -312,7 +319,9 @@ final class RelevancePhraseNgrams
                 $valid = true;
 
                 foreach ($slice as $token) {
-                    if (mb_strlen($token) < self::MIN_TOKEN_LENGTH) {
+                    $isStop = TextAnalyzerStopWords::isPhraseStopWord($token);
+                    $minLen = $isStop ? 1 : self::MIN_TOKEN_LENGTH;
+                    if (mb_strlen($token) < $minLen) {
                         $valid = false;
                         break;
                     }
@@ -338,14 +347,25 @@ final class RelevancePhraseNgrams
             return false;
         }
 
+        $contentHits = 0;
         foreach ($tokens as $token) {
             $key = mb_strtolower(trim((string) $token), 'UTF-8');
-            if ($key === '' || !isset(self::$unigramRoots[$key])) {
+            if ($key === '') {
                 return false;
             }
+
+            if (TextAnalyzerStopWords::isPhraseStopWord($key)) {
+                continue;
+            }
+
+            if (!isset(self::$unigramRoots[$key])) {
+                return false;
+            }
+            $contentHits++;
         }
 
-        return true;
+        // Фраза только из служебных слов — мусор; нужен хотя бы один значимый токен из униграмм.
+        return $contentHits > 0;
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Classes\Xml\SimplifiedXmlFacade;
 use App\Jobs\Relevance\RemoveRelevanceProgress;
 use App\Support\HybridRelevanceMetrics;
 use App\Support\RelevancePhraseNgrams;
+use App\Support\TextAnalyzerStopWords;
 use App\Support\TfidfMetrics;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -182,10 +183,42 @@ class Relevance
         $this->removeNoIndex();
         $this->getHiddenData();
         $this->separateLinksFromText();
+
+        // TLPs: служебные слова оставляем в словосочетаниях, даже если вырезаем их из униграмм.
+        $sitesForTlps = null;
+        if (($this->request['conjunctionsPrepositionsPronouns'] ?? '') == 'false') {
+            $sitesForTlps = self::copySitesTextZones($this->sites);
+        }
+
         $this->removePartsOfSpeech();
         $this->removeListWords();
+
+        if ($sitesForTlps !== null && self::shouldApplyExcludedWordsList($this->request)) {
+            $listWords = (string) $this->request['listWords'];
+            foreach ($sitesForTlps as $key => $page) {
+                if (!is_array($page)) {
+                    continue;
+                }
+                foreach (['html', 'linkText', 'hiddenText'] as $zone) {
+                    $sitesForTlps[$key][$zone] = TextAnalyzer::removeWords($listWords, $sitesForTlps[$key][$zone] ?? '');
+                }
+            }
+        }
+
         $this->getTextFromCompetitors();
         $this->separateAllText();
+
+        if ($sitesForTlps !== null) {
+            foreach ($sitesForTlps as $key => $page) {
+                if (!is_array($page)) {
+                    continue;
+                }
+                $sitesForTlps[$key]['html'] = $this->separateText($page['html'] ?? '');
+                $sitesForTlps[$key]['linkText'] = $this->separateText($page['linkText'] ?? '');
+                $sitesForTlps[$key]['hiddenText'] = $this->separateText($page['hiddenText'] ?? '');
+            }
+        }
+
         $this->searchWordForms();
         $this->processingOfGeneralInformation();
         RelevanceProgress::editProgress(82, $this->request);
@@ -193,7 +226,7 @@ class Relevance
         $this->prepareAnalysedSitesTable();
         RelevanceProgress::editProgress(85, $this->request);
         $this->analyseRecommendations();
-        $this->preparePhrasesTable();
+        $this->preparePhrasesTable($sitesForTlps);
         RelevanceProgress::editProgress(88, $this->request);
         $this->prepareClouds();
         $this->applyTableTfidfToUnigramTable();
@@ -206,6 +239,32 @@ class Relevance
         RemoveRelevanceProgress::dispatch($this->scanHash)
             ->onQueue('default')
             ->delay(now()->addSeconds(100));
+    }
+
+    /**
+     * Копия текстовых зон сайтов (для TLPs со служебными словами).
+     *
+     * @param array<string, array<string, mixed>> $sites
+     * @return array<string, array<string, mixed>>
+     */
+    private static function copySitesTextZones(array $sites): array
+    {
+        $copy = [];
+        foreach ($sites as $key => $site) {
+            if (!is_array($site)) {
+                $copy[$key] = $site;
+                continue;
+            }
+            $row = $site;
+            foreach (['html', 'linkText', 'hiddenText', 'passages', 'defaultHtml'] as $zone) {
+                if (array_key_exists($zone, $site)) {
+                    $row[$zone] = $site[$zone];
+                }
+            }
+            $copy[$key] = $row;
+        }
+
+        return $copy;
     }
 
     /**
@@ -2089,11 +2148,17 @@ class Relevance
         return implode(" ", $text);
     }
 
-    public function preparePhrasesTable()
+    public function preparePhrasesTable(?array $sitesForTlps = null)
     {
+        $sites = $sitesForTlps ?? $this->sites;
+        $mainPage = self::mainPageFromSites($sites);
+        if ($mainPage === []) {
+            $mainPage = $this->mainPage;
+        }
+
         $this->phrases = self::buildPhrasesTableFromSites(
-            $this->sites,
-            $this->mainPage,
+            $sites,
+            $mainPage,
             $this->hybridCorpusZoneStats(),
             $this->wordForms ?: null
         );
@@ -2871,6 +2936,7 @@ class Relevance
 
         // Для tables без sites: stub-сайты по avg_coverage, чтобы BM25/IDF не считались от documentCount=1
         $stubbedSites = false;
+        $sitesLoadedForPhraseRebuild = false;
         if ($wantTables && empty($data['sites']) && !empty($data['avg_coverage_percent']) && is_array($data['avg_coverage_percent'])) {
             $n = count($data['avg_coverage_percent']);
             if ($n > 0) {
@@ -2896,9 +2962,24 @@ class Relevance
             self::filterStoredDetailsExcludedWords($data, $historyRequest);
         }
 
+        // Для пересборки TLPs со служебными словами нужны реальные sites (не stub).
+        if ($wantTables && $stubbedSites
+            && self::shouldRebuildPhrasesToKeepStopWords($data['phrases'] ?? null, $historyRequest)
+            && !empty($history['id'])
+        ) {
+            $sitesColumn = RelevanceHistoryResult::where('id', (int) $history['id'])->value('sites');
+            $realSites = self::decodeGzJsonField($sitesColumn);
+            if (is_array($realSites) && $realSites !== []) {
+                $data['sites'] = $realSites;
+                $stubbedSites = false;
+                $sitesLoadedForPhraseRebuild = true;
+            }
+        }
+
         if ($wantTables && !$stubbedSites && !empty($data['sites']) && is_array($data['sites'])) {
             $storedPhrases = $data['phrases'] ?? null;
-            $shouldRebuildPhrases = self::shouldRebuildStoredPhrases($storedPhrases);
+            $shouldRebuildPhrases = self::shouldRebuildStoredPhrases($storedPhrases)
+                || self::shouldRebuildPhrasesToKeepStopWords($storedPhrases, $historyRequest);
 
             if ($shouldRebuildPhrases) {
                 $sitesForPhrases = $data['sites'];
@@ -2906,11 +2987,10 @@ class Relevance
                 if ($historyRow && !empty($historyRow->html_main_page)) {
                     $mainPageRawHtml = self::decodeStoredSiteHtml((string) $historyRow->html_main_page);
                 }
-                if (is_array($historyRequest)) {
-                    self::hydrateStoredSitesTextZones($sitesForPhrases, $historyRequest, $mainPageRawHtml);
-                } else {
-                    self::hydrateStoredSitesTextZones($sitesForPhrases, [], $mainPageRawHtml);
-                }
+                // TLPs всегда со служебными словами (предлоги/союзы), даже если в анализе их вырезали.
+                $requestForPhrases = is_array($historyRequest) ? $historyRequest : [];
+                $requestForPhrases['conjunctionsPrepositionsPronouns'] = 'true';
+                self::hydrateStoredSitesTextZones($sitesForPhrases, $requestForPhrases, $mainPageRawHtml);
 
                 $mainPageSite = self::mainPageFromSites($sitesForPhrases);
                 $corpusZones = HybridRelevanceMetrics::corpusZoneStatsFromData($data);
@@ -2925,6 +3005,20 @@ class Relevance
                         $data['phrases'],
                         (string) ($historyRequest['listWords'] ?? '')
                     );
+                }
+
+                if (!empty($history['project_id']) && is_array($data['phrases'])) {
+                    try {
+                        RelevanceHistoryResult::where('project_id', (int) $history['project_id'])
+                            ->update([
+                                'phrases' => base64_encode(gzcompress(json_encode($data['phrases']), 9)),
+                            ]);
+                    } catch (\Throwable $e) {
+                        Log::warning('relevance.phrases.persist_rebuild_failed', [
+                            'project_id' => (int) $history['project_id'],
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             } else {
                 self::enrichPhrasesHybridMetrics($data);
@@ -2947,7 +3041,7 @@ class Relevance
             }
         }
 
-        if ($stubbedSites) {
+        if ($stubbedSites || $sitesLoadedForPhraseRebuild) {
             unset($data['sites']);
         }
 
@@ -3078,6 +3172,48 @@ class Relevance
         // Нет tfidfTop у старых снимков — дообогащаем enrichPhrasesHybridMetrics (~мс),
         // а не полной пересборкой через hydrate HTML/morphy (~десятки секунд).
         return false;
+    }
+
+    /**
+     * Старые TLPs собраны после вырезания предлогов — пересобрать со служебными словами.
+     *
+     * @param array<string, array<string, mixed>>|null $phrases
+     * @param array<string, mixed>|null $historyRequest
+     */
+    public static function shouldRebuildPhrasesToKeepStopWords(?array $phrases, ?array $historyRequest): bool
+    {
+        if (!is_array($phrases) || $phrases === []) {
+            return false;
+        }
+
+        // Если в анализе служебные слова уже учитывались — пересобирать не нужно.
+        if (is_array($historyRequest)
+            && ($historyRequest['conjunctionsPrepositionsPronouns'] ?? '') !== 'false'
+            && ($historyRequest['conjunctionsPrepositionsPronouns'] ?? '') !== false
+            && ($historyRequest['conjunctionsPrepositionsPronouns'] ?? '') !== '0'
+            && ($historyRequest['conjunctionsPrepositionsPronouns'] ?? '') !== 0
+        ) {
+            return false;
+        }
+
+        $checked = 0;
+        foreach ($phrases as $phrase => $row) {
+            if (!is_string($phrase) || $phrase === '') {
+                continue;
+            }
+            $tokens = preg_split('/\s+/u', trim($phrase), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            foreach ($tokens as $token) {
+                if (TextAnalyzerStopWords::isPhraseStopWord((string) $token)) {
+                    return false;
+                }
+            }
+            $checked++;
+            if ($checked >= 40) {
+                break;
+            }
+        }
+
+        return $checked > 0;
     }
 
     /**
