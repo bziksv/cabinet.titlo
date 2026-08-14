@@ -371,7 +371,10 @@
                         <div class="mb-2">
                             <label class="form-label">{{ __('Email') }}</label>
                             <input type="email" class="form-control form-control-sm" name="agency_email"
-                                   value="{{ old('agency_email', $template->agency_email) }}">
+                                   value="{{ old('agency_email', $template->agency_email) }}"
+                                   data-sr-email-latin
+                                   autocomplete="email"
+                                   inputmode="email">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">{{ __('Phone') }}</label>
@@ -426,7 +429,10 @@
                         <div class="mb-2">
                             <label class="form-label">{{ __('Email') }}</label>
                             <input type="email" class="form-control form-control-sm" name="manager_email"
-                                   value="{{ old('manager_email', $template->manager_email) }}">
+                                   value="{{ old('manager_email', $template->manager_email) }}"
+                                   data-sr-email-latin
+                                   autocomplete="email"
+                                   inputmode="email">
                         </div>
                         <div class="mb-0">
                             <label class="form-label">{{ __('Avatar') }}</label>
@@ -494,6 +500,29 @@
                         new bootstrap.Tooltip(el);
                     });
                 }
+
+                (function bindLatinEmailHints() {
+                    var msgLatin = @json(__('Email: Latin characters only'));
+                    var msgFormat = @json(__('Enter a valid email'));
+                    document.querySelectorAll('[data-sr-email-latin]').forEach(function (input) {
+                        function refreshValidity() {
+                            input.setCustomValidity('');
+                            if (!input.value) {
+                                return;
+                            }
+                            if (/[^\x00-\x7F]/.test(input.value)) {
+                                input.setCustomValidity(msgLatin);
+                                return;
+                            }
+                            if (input.validity.typeMismatch) {
+                                input.setCustomValidity(msgFormat);
+                            }
+                        }
+                        input.addEventListener('input', refreshValidity);
+                        input.addEventListener('invalid', refreshValidity);
+                        refreshValidity();
+                    });
+                })();
 
                 var periodBox = document.querySelector('[data-sr-period-settings]');
                 if (periodBox) {

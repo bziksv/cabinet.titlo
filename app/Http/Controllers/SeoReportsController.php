@@ -193,6 +193,9 @@ class SeoReportsController extends Controller
             'teamProjectIds' => $teamProjects->pluck('id')->all(),
             'presetCards' => SeoReportSectionRegistry::presetCards(),
             'reportTemplates' => $reportTemplates,
+            'metrikaBindings' => SeoReportBindings::metrikaBindingsForUser($userId),
+            'metrikaConfigured' => $this->metrika->isConfigured(),
+            'metrikaConnected' => $this->metrika->isConnected($userId),
         ]);
     }
 
@@ -531,6 +534,8 @@ class SeoReportsController extends Controller
             'templates' => $templateList,
             'attachedTemplate' => $project->resolvedTemplate(),
             'metrikaBindings' => SeoReportBindings::metrikaBindingsForUser($userId),
+            'metrikaConfigured' => $this->metrika->isConfigured(),
+            'metrikaConnected' => $this->metrika->isConnected($userId),
             'webmasterBindings' => SeoReportBindings::webmasterBindingsForUser($userId),
             'webmasterConfigured' => $this->webmaster->isConfigured(),
             'webmasterConnected' => $this->webmaster->isConnected($userId),

@@ -110,8 +110,8 @@
                     </div>
                 </div>
                 <div class="col-12">
-                    <div class="border border-danger-subtle rounded-2 p-2 bg-danger-subtle">
-                        <div class="small text-secondary mb-2">
+                    <div class="border border-danger-subtle rounded-2 px-2 py-2 bg-danger-subtle">
+                        <div class="small text-secondary mb-1">
                             <i class="bi bi-exclamation-triangle me-1 text-danger"></i>
                             {{ __('Users inactive purge help') }}
                         </div>

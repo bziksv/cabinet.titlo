@@ -31,9 +31,9 @@
             </div>
         </div>
 
-        <div class="row g-2 g-md-3 mb-3 cabinet-users-stat">
-            <div class="col-6 col-lg-3 d-flex">
-                <div class="info-box mb-0 flex-fill">
+        <div class="row g-2 mb-3 cabinet-users-stat">
+            <div class="col-6 col-lg-3">
+                <div class="info-box mb-0">
                     <span class="info-box-icon text-bg-primary shadow-sm"><i class="bi bi-people"></i></span>
                     <div class="info-box-content">
                         <span class="info-box-text">{{ __('Total users') }}</span>
@@ -41,8 +41,8 @@
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-lg-3 d-flex">
-                <div class="info-box mb-0 flex-fill">
+            <div class="col-6 col-lg-3">
+                <div class="info-box mb-0">
                     <span class="info-box-icon text-bg-success shadow-sm"><i class="bi bi-patch-check"></i></span>
                     <div class="info-box-content">
                         <span class="info-box-text">{{ __('Verified') }}</span>
@@ -50,20 +50,22 @@
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-lg-3 d-flex">
-                <a href="{{ route('users.index', ['telegram' => '1']) }}" class="info-box mb-0 flex-fill text-body text-decoration-none cabinet-users-stat-link">
+            <div class="col-6 col-lg-3">
+                <a href="{{ route('users.index', ['telegram' => '1']) }}" class="info-box mb-0 text-body text-decoration-none cabinet-users-stat-link">
                     <span class="info-box-icon text-bg-info shadow-sm"><i class="bi bi-telegram"></i></span>
                     <div class="info-box-content">
                         <span class="info-box-text">{{ __('Telegram connected') }}</span>
-                        <span class="info-box-number">{{ number_format($stats['telegram'], 0, ',', ' ') }}</span>
-                        @if($stats['total'] > 0)
-                            <span class="info-box-text small">{{ round($stats['telegram'] / $stats['total'] * 100, 1) }}%</span>
-                        @endif
+                        <span class="info-box-number">
+                            {{ number_format($stats['telegram'], 0, ',', ' ') }}
+                            @if($stats['total'] > 0)
+                                <span class="cabinet-users-stat-pct">{{ round($stats['telegram'] / $stats['total'] * 100, 1) }}%</span>
+                            @endif
+                        </span>
                     </div>
                 </a>
             </div>
-            <div class="col-6 col-lg-3 d-flex">
-                <div class="info-box mb-0 flex-fill">
+            <div class="col-6 col-lg-3">
+                <div class="info-box mb-0">
                     <span class="info-box-icon text-bg-warning shadow-sm"><i class="bi bi-tag"></i></span>
                     <div class="info-box-content">
                         <span class="info-box-text">{{ __('With active tariff') }}</span>
@@ -124,28 +126,38 @@
                 </div>
             </div>
             <div class="card-body border-bottom py-3 cabinet-users-search-bar">
-                <label class="form-label small fw-semibold mb-1" for="cabinet-users-q">
-                    <i class="bi bi-search me-1"></i>{{ __('Smart search') }}
-                </label>
-                <div class="input-group">
-                    <span class="input-group-text text-secondary"><i class="bi bi-person-lines-fill" aria-hidden="true"></i></span>
-                    <input type="search"
-                           class="form-control"
-                           id="cabinet-users-q"
-                           name="filter_q"
-                           autocomplete="off"
-                           spellcheck="false"
-                           placeholder="{{ __('Name, surname, email or user ID') }}"
-                           aria-describedby="cabinet-users-q-hint">
-                    <button type="button"
-                            class="btn btn-outline-secondary d-none"
-                            id="cabinet-users-q-clear"
-                            title="{{ __('Clear search') }}">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
+                <div class="cabinet-users-search-bar__main">
+                    <label class="form-label small fw-semibold mb-1" for="cabinet-users-q">
+                        <i class="bi bi-search me-1"></i>{{ __('Smart search') }}
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text text-secondary"><i class="bi bi-person-lines-fill" aria-hidden="true"></i></span>
+                        <input type="search"
+                               class="form-control"
+                               id="cabinet-users-q"
+                               name="filter_q"
+                               autocomplete="off"
+                               spellcheck="false"
+                               placeholder="{{ __('Name, surname, email or user ID') }}"
+                               aria-describedby="cabinet-users-q-hint">
+                        <button type="button"
+                                class="btn btn-outline-secondary d-none"
+                                id="cabinet-users-q-clear"
+                                aria-label="{{ __('Clear search') }}">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <div id="cabinet-users-q-hint" class="form-text">
+                        {{ __('Examples: Ivanov, ivan@mail.ru, Ivan Petrov. Several words — all must match.') }}
+                    </div>
                 </div>
-                <div id="cabinet-users-q-hint" class="form-text">
-                    {{ __('Examples: Ivanov, ivan@mail.ru, Ivan Petrov. Several words — all must match.') }}
+                <div class="cabinet-users-length-host" id="cabinet-users-length-host">
+                    <select id="cabinet-users-page-length" class="form-select form-select-sm">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
                 </div>
             </div>
             <div class="card-body p-0 cabinet-users-table-wrap">
@@ -288,14 +300,13 @@
             }
 
             var usersTable = $('#service-users').DataTable({
-                dom: '<"row align-items-center justify-content-end g-2 cabinet-users-dt-top"<"col-sm-auto"l>>rt<"row align-items-center g-2"<"col-sm-auto"i><"col-sm"p>>',
+                dom: 'rt<"row align-items-center g-2 px-3 pb-2"<"col-sm-auto"i><"col-sm"p>>',
                 autoWidth: false,
-                lengthMenu: [10, 25, 50, 100],
+                lengthChange: false,
                 pageLength: 50,
                 pagingType: 'simple_numbers',
                 searching: false,
                 language: {
-                    lengthMenu: '_MENU_',
                     paginate: {
                         first: '«',
                         last: '»',
@@ -491,6 +502,11 @@
                         window.cabinetUsersEnsureVisibleFootprints(this.api());
                     }
                 },
+            });
+
+            $('#cabinet-users-page-length').on('change', function () {
+                var n = parseInt($(this).val(), 10) || 50;
+                usersTable.page.len(n).draw(false);
             });
 
             (function applyStaleFilterFromQuery() {

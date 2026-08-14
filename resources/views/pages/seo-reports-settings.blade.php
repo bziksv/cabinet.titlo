@@ -168,18 +168,46 @@
                     <span class="cabinet-sr-step__status is-{{ $stepKinds[3] }}">{{ $stepLabels[$stepKinds[3]] }}</span>
                 </summary>
                 <div class="cabinet-sr-step__body">
-                    <div class="mb-2">
+                    <div class="mb-2"
+                         data-sr-metrika
+                         data-domain="{{ $project->domain }}"
+                         data-metrika-configured="{{ !empty($metrikaConfigured) ? '1' : '0' }}"
+                         data-metrika-connected="{{ !empty($metrikaConnected) ? '1' : '0' }}"
+                         data-metrika-connect-url="{{ route('yandex-metrika.connect') }}"
+                         data-metrika-binding-url="{{ route('yandex-metrika.binding') }}"
+                         data-metrika-counters-url="{{ route('yandex-metrika.counters') }}"
+                         data-metrika-bind-url="{{ route('yandex-metrika.bind') }}"
+                         data-metrika-unbind-url="{{ route('yandex-metrika.unbind') }}"
+                         data-metrika-return="{{ route('pages.seo-reports.settings', ['id' => $project->id, 'step' => 3]) }}">
                         <label class="form-label">{{ __('Yandex Metrika') }}</label>
-                        <select class="form-select form-select-sm" name="metrika_counter_id" data-sr-select2>
-                            <option value="">{{ __('Not connected') }}</option>
-                            @foreach($metrikaBindings as $binding)
-                                <option value="{{ $binding->counter_id }}"
-                                    @if((int) $project->metrika_counter_id === (int) $binding->counter_id) selected @endif>
-                                    @if($binding->counter_name){{ $binding->counter_name }} · @endif{{ $binding->domain }}
-                                    · #{{ $binding->counter_id }}
-                                </option>
-                            @endforeach
-                        </select>
+                        @php
+                            $selectedMetrika = (int) old('metrika_counter_id', $project->metrika_counter_id ?? 0);
+                            $metrikaList = $metrikaBindings ?? collect();
+                            $selectedMetrikaInList = $metrikaList->contains(static function ($b) use ($selectedMetrika) {
+                                return (int) $b->counter_id === $selectedMetrika;
+                            });
+                        @endphp
+                        <div class="d-flex flex-wrap gap-2 align-items-start mb-1">
+                            <div class="flex-grow-1" style="min-width: 12rem;">
+                                <select class="form-select form-select-sm" name="metrika_counter_id" data-sr-select2 data-sr-metrika-select>
+                                    <option value="">{{ __('Not connected') }}</option>
+                                    @if($selectedMetrika > 0 && !$selectedMetrikaInList)
+                                        <option value="{{ $selectedMetrika }}" selected>#{{ $selectedMetrika }}</option>
+                                    @endif
+                                    @foreach($metrikaList as $binding)
+                                        <option value="{{ $binding->counter_id }}"
+                                            @if($selectedMetrika === (int) $binding->counter_id) selected @endif>
+                                            @if($binding->counter_name){{ $binding->counter_name }} · @endif{{ $binding->domain }}
+                                            · #{{ $binding->counter_id }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-sr-metrika-open>
+                                {{ __('Connect or change Metrika') }}
+                            </button>
+                        </div>
+                        <div class="form-text">{{ __('Metrika connect from settings hint') }}</div>
                     </div>
                     <div class="mb-2">
                         <label class="form-label">{{ __('Position monitoring') }}</label>
@@ -339,7 +367,7 @@
                         <label class="form-label">{{ __('Email recipients') }}</label>
                         <input type="text" class="form-control form-control-sm" name="auto_email_to"
                                value="{{ old('auto_email_to', $settings['auto_email_to'] ?? '') }}"
-                               placeholder="client@example.com">
+                               placeholder="client@firma.ru, seo@firma.ru">
                     </div>
                     <div class="mb-2">
                         <label class="form-label">{{ __('Email message') }}</label>
@@ -360,6 +388,8 @@
             </div>
         </form>
     </div>
+
+    @include('pages.partials.seo-reports-metrika-modal')
 
     <div class="modal fade" id="cabinet-sr-webmaster-modal" tabindex="-1" aria-labelledby="cabinet-sr-webmaster-modal-title" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -452,6 +482,273 @@
                     e.preventDefault();
                     openStep(btn.getAttribute('data-sr-step-next'));
                 });
+
+                (function initMetrikaPicker() {
+                    var box = document.querySelector('[data-sr-metrika]');
+                    var modalEl = document.getElementById('cabinet-sr-metrika-modal');
+                    if (!box || !modalEl) return;
+
+                    var csrfEl = document.querySelector('meta[name="csrf-token"]');
+                    var csrfToken = csrfEl ? csrfEl.getAttribute('content') : '';
+                    var currentDomain = box.getAttribute('data-domain') || '';
+                    var allCounters = [];
+                    var selectedCounterId = 0;
+                    var listEl = modalEl.querySelector('[data-metrika-list]');
+                    var loadingEl = modalEl.querySelector('[data-metrika-loading]');
+                    var errorEl = modalEl.querySelector('[data-metrika-error]');
+                    var authEl = modalEl.querySelector('[data-metrika-auth]');
+                    var authLink = modalEl.querySelector('[data-metrika-auth-link]');
+                    var domainLabel = modalEl.querySelector('[data-metrika-domain-label]');
+                    var currentEl = modalEl.querySelector('[data-metrika-current]');
+                    var unbindBtn = modalEl.querySelector('[data-metrika-unbind]');
+                    var searchWrap = modalEl.querySelector('[data-metrika-search-wrap]');
+                    var searchInput = modalEl.querySelector('[data-metrika-search]');
+
+                    function showModal() {
+                        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                            return;
+                        }
+                        if (typeof $ !== 'undefined' && $.fn.modal) {
+                            $(modalEl).modal('show');
+                        }
+                    }
+
+                    function connectUrl(domain) {
+                        var base = box.getAttribute('data-metrika-connect-url') || '';
+                        var ret = box.getAttribute('data-metrika-return') || location.href;
+                        return base + (base.indexOf('?') === -1 ? '?' : '&') +
+                            'domain=' + encodeURIComponent(domain || '') +
+                            '&return=' + encodeURIComponent(ret);
+                    }
+
+                    function setError(msg) {
+                        if (!errorEl) return;
+                        errorEl.textContent = msg || '';
+                        errorEl.classList.toggle('d-none', !msg);
+                    }
+
+                    function setLoading(on) {
+                        if (loadingEl) loadingEl.classList.toggle('d-none', !on);
+                    }
+
+                    function setSearchVisible(on) {
+                        if (searchWrap) searchWrap.classList.toggle('d-none', !on);
+                        if (!on && searchInput) searchInput.value = '';
+                    }
+
+                    function filterCounters(counters, query) {
+                        var q = String(query || '').trim().toLowerCase();
+                        if (!q) return counters.slice();
+                        return counters.filter(function (c) {
+                            var name = String(c.name || '').toLowerCase();
+                            var site = String(c.site || '').toLowerCase();
+                            var id = String(c.id || '');
+                            return name.indexOf(q) !== -1 || site.indexOf(q) !== -1 || id.indexOf(q) !== -1;
+                        });
+                    }
+
+                    function renderCounters(counters, selectedId) {
+                        if (!listEl) return;
+                        listEl.innerHTML = '';
+                        if (!counters.length) {
+                            listEl.innerHTML = '<div class="list-group-item text-secondary small">' +
+                                (allCounters.length
+                                    ? @json(__('No counters match the search'))
+                                    : @json(__('No Metrika counters found'))) + '</div>';
+                            return;
+                        }
+                        counters.forEach(function (c) {
+                            var btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2';
+                            btn.setAttribute('data-metrika-counter-id', String(c.id));
+                            if (selectedId && Number(selectedId) === Number(c.id)) {
+                                btn.classList.add('active');
+                            }
+                            btn.innerHTML =
+                                '<span class="text-start">' +
+                                '<strong>' + String(c.name || ('#' + c.id)).replace(/</g, '&lt;') + '</strong>' +
+                                '<br><span class="small opacity-75">' + String(c.site || '').replace(/</g, '&lt;') +
+                                ' · ID ' + c.id + '</span></span>' +
+                                '<span class="flex-shrink-0 align-self-center">' +
+                                (selectedId && Number(selectedId) === Number(c.id)
+                                    ? '<span class="badge text-bg-light text-dark border">' + @json(__('Selected')) + '</span>'
+                                    : '') +
+                                '</span>';
+                            btn.addEventListener('click', function () {
+                                bindCounter(c.id);
+                            });
+                            listEl.appendChild(btn);
+                        });
+                    }
+
+                    function applyCounterFilter() {
+                        renderCounters(
+                            filterCounters(allCounters, searchInput ? searchInput.value : ''),
+                            selectedCounterId
+                        );
+                    }
+
+                    function openForDomain(domain) {
+                        currentDomain = domain || box.getAttribute('data-domain') || '';
+                        allCounters = [];
+                        selectedCounterId = 0;
+                        if (domainLabel) domainLabel.textContent = currentDomain || '—';
+                        if (authEl) authEl.classList.add('d-none');
+                        if (listEl) listEl.innerHTML = '';
+                        setSearchVisible(false);
+                        if (currentEl) {
+                            currentEl.classList.add('d-none');
+                            currentEl.textContent = '';
+                        }
+                        if (unbindBtn) unbindBtn.classList.add('d-none');
+                        setError('');
+                        setLoading(true);
+                        if (authLink) authLink.href = connectUrl(currentDomain);
+                        openStep(3);
+                        showModal();
+
+                        if (box.getAttribute('data-metrika-configured') !== '1') {
+                            setLoading(false);
+                            setError(@json(__('Yandex Metrika is not configured')));
+                            return;
+                        }
+
+                        var bindingUrl = box.getAttribute('data-metrika-binding-url') +
+                            '?domain=' + encodeURIComponent(currentDomain);
+                        fetch(bindingUrl, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                            .then(function (r) { return r.json(); })
+                            .then(function (info) {
+                                if (!info || !info.ok) {
+                                    throw new Error('binding');
+                                }
+                                if (!info.configured) {
+                                    setLoading(false);
+                                    setError(@json(__('Yandex Metrika is not configured')));
+                                    return null;
+                                }
+                                if (!info.connected) {
+                                    setLoading(false);
+                                    if (authEl) authEl.classList.remove('d-none');
+                                    return null;
+                                }
+                                if (info.binding && currentEl) {
+                                    currentEl.textContent = @json(__('Current counter')) + ': ' +
+                                        (info.binding.counter_name || ('#' + info.binding.counter_id)) +
+                                        (info.binding.counter_site ? ' (' + info.binding.counter_site + ')' : '');
+                                    currentEl.classList.remove('d-none');
+                                    if (unbindBtn) unbindBtn.classList.remove('d-none');
+                                }
+                                return fetch(box.getAttribute('data-metrika-counters-url'), {
+                                    headers: { 'Accept': 'application/json' },
+                                    credentials: 'same-origin',
+                                }).then(function (r) {
+                                    return r.json().then(function (data) {
+                                        return { status: r.status, data: data, selected: info.binding && info.binding.counter_id };
+                                    });
+                                });
+                            })
+                            .then(function (result) {
+                                setLoading(false);
+                                if (!result) return;
+                                if (result.status === 401 || (result.data && result.data.need_auth)) {
+                                    if (authEl) authEl.classList.remove('d-none');
+                                    return;
+                                }
+                                if (!result.data || !result.data.ok) {
+                                    setError((result.data && result.data.message) || @json(__('Could not load Metrika counters')));
+                                    return;
+                                }
+                                allCounters = result.data.counters || [];
+                                selectedCounterId = result.selected || 0;
+                                setSearchVisible(allCounters.length > 0);
+                                applyCounterFilter();
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not load Metrika counters')));
+                            });
+                    }
+
+                    function bindCounter(counterId) {
+                        setError('');
+                        setLoading(true);
+                        fetch(box.getAttribute('data-metrika-bind-url'), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ domain: currentDomain, counter_id: counterId }),
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (data) {
+                                if (!data || !data.ok) {
+                                    throw new Error((data && data.message) || 'bind');
+                                }
+                                window.location.href = box.getAttribute('data-metrika-return') || location.pathname;
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not bind Metrika counter')));
+                            });
+                    }
+
+                    if (unbindBtn) {
+                        unbindBtn.addEventListener('click', function () {
+                            if (!currentDomain) return;
+                            setLoading(true);
+                            fetch(box.getAttribute('data-metrika-unbind-url'), {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                credentials: 'same-origin',
+                                body: JSON.stringify({ domain: currentDomain }),
+                            })
+                                .then(function (r) { return r.json(); })
+                                .then(function (data) {
+                                    if (!data || !data.ok) throw new Error('unbind');
+                                    window.location.href = box.getAttribute('data-metrika-return') || location.pathname;
+                                })
+                                .catch(function () {
+                                    setLoading(false);
+                                    setError(@json(__('Could not unbind Metrika counter')));
+                                });
+                        });
+                    }
+
+                    if (searchInput) {
+                        searchInput.addEventListener('input', applyCounterFilter);
+                    }
+
+                    var openBtn = box.querySelector('[data-sr-metrika-open]');
+                    if (openBtn) {
+                        openBtn.addEventListener('click', function () {
+                            openForDomain(box.getAttribute('data-domain') || '');
+                        });
+                    }
+
+                    try {
+                        var params = new URLSearchParams(window.location.search);
+                        if (params.get('metrika_picker') === '1') {
+                            openForDomain(params.get('metrika_domain') || box.getAttribute('data-domain') || '');
+                            if (window.history && window.history.replaceState) {
+                                params.delete('metrika_picker');
+                                params.delete('metrika_domain');
+                                var q = params.toString();
+                                window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
+                            }
+                        }
+                    } catch (e) {}
+                })();
 
                 (function initWebmasterPicker() {
                     var box = document.querySelector('[data-sr-webmaster]');
