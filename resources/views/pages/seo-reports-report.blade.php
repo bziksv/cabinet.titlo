@@ -1,5 +1,6 @@
 @component('component.card', [
     'title' => __('Report') . ' · ' . $project->domain,
+    'titleHtml' => e(__('Report') . ' · ' . $project->domain) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-seo-reports'])->render(),
     'documentTitle' => __('Report') . ' · ' . $project->domain,
 ])
     @slot('css')

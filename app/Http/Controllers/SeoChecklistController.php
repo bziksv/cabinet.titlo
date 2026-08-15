@@ -933,6 +933,7 @@ class SeoChecklistController extends Controller
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($this->service->chronicleForUser($userId, null, null, true, 1)['unread_count'] ?? 0),
             'usageCount' => SeoChecklistProject::query()->where('template_id', $template->id)->count(),
+            'isAdmin' => \App\User::isUserAdmin(),
         ]);
     }
 
@@ -947,7 +948,7 @@ class SeoChecklistController extends Controller
             $template,
             (string) $request->input('title', ''),
             $request->input('description'),
-            (bool) $request->boolean('skip_weekends')
+            $request->boolean('skip_weekends')
         );
 
         return redirect()
@@ -969,11 +970,38 @@ class SeoChecklistController extends Controller
             ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('SEO checklist template deleted') : ($result['message'] ?? __('Error')));
     }
 
-    public function updateTemplateTask(Request $request, int $templateId, int $taskId): RedirectResponse
+    public function updateTemplateTask(Request $request, int $templateId, int $taskId)
     {
         $template = $this->findOwnedCustomTemplate($templateId);
         if (!$template) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['ok' => false, 'message' => __('Template not found')], 404);
+            }
+
             return redirect()->route('pages.seo-checklist.templates')->with('error', __('Template not found'));
+        }
+
+        // Быстрый toggle «В отчёты» для пунктов шаблона (без полной формы).
+        if (($request->ajax() || $request->wantsJson())
+            && $request->exists('include_in_report')
+            && !$request->exists('title')
+        ) {
+            /** @var \App\SeoChecklist\SeoChecklistTemplateTask|null $task */
+            $task = $template->tasks()->where('id', $taskId)->first();
+            if (!$task) {
+                return response()->json(['ok' => false, 'message' => __('Task not found')], 404);
+            }
+            if ($template->is_system && !\App\User::isUserAdmin()) {
+                return response()->json(['ok' => false, 'message' => __('System template is read-only')], 403);
+            }
+            $task->forceFill([
+                'include_in_report' => (bool) $request->input('include_in_report'),
+            ])->save();
+
+            return response()->json([
+                'ok' => true,
+                'include_in_report' => (bool) $task->include_in_report,
+            ]);
         }
 
         $result = $this->service->updateTemplateTask($template, $taskId, [
@@ -981,6 +1009,7 @@ class SeoChecklistController extends Controller
             'help' => $request->input('help'),
             'role' => $request->input('role'),
             'is_important' => $request->has('is_important'),
+            'include_in_report' => $request->has('include_in_report'),
             'repeat_rule' => $request->input('repeat_rule'),
             'due_days_from_start' => $request->input('due_days_from_start'),
         ]);
@@ -1025,7 +1054,8 @@ class SeoChecklistController extends Controller
         $result = $this->service->addTemplateSubtask(
             $template,
             $taskId,
-            (string) $request->input('title', '')
+            (string) $request->input('title', ''),
+            ['include_in_report' => $request->boolean('include_in_report')]
         );
 
         if (empty($result['ok']) || empty($result['task'])) {
@@ -1040,6 +1070,11 @@ class SeoChecklistController extends Controller
                 'id' => $child->id,
                 'title' => $child->title,
                 'parent_id' => $child->parent_id,
+                'include_in_report' => (bool) $child->include_in_report,
+                'update_url' => route('pages.seo-checklist.templates.task.update', [
+                    'templateId' => $template->id,
+                    'taskId' => $child->id,
+                ]),
                 'delete_url' => route('pages.seo-checklist.templates.task.delete', [
                     'templateId' => $template->id,
                     'taskId' => $child->id,
@@ -1059,11 +1094,22 @@ class SeoChecklistController extends Controller
             return redirect()->route('pages.seo-checklist.templates')->with('error', __('Template not found'));
         }
 
-        $result = $this->service->moveTemplateTask(
-            $template,
-            $taskId,
-            (string) $request->input('direction', '')
-        );
+        $orderedIds = $request->input('ordered_ids');
+        if (is_array($orderedIds)) {
+            $result = $this->service->reorderTemplateTasksByIds($template, $taskId, $orderedIds);
+        } elseif ($request->exists('before_id')) {
+            $beforeRaw = $request->input('before_id');
+            $beforeId = ($beforeRaw === null || $beforeRaw === '' || $beforeRaw === 'null')
+                ? null
+                : (int) $beforeRaw;
+            $result = $this->service->reorderTemplateTask($template, $taskId, $beforeId);
+        } else {
+            $result = $this->service->moveTemplateTask(
+                $template,
+                $taskId,
+                (string) $request->input('direction', '')
+            );
+        }
 
         if ($request->ajax() || $request->wantsJson()) {
             if (empty($result['ok'])) {
@@ -1074,6 +1120,8 @@ class SeoChecklistController extends Controller
                 'ok' => true,
                 'task_id' => $taskId,
                 'direction' => (string) $request->input('direction', ''),
+                'before_id' => $request->exists('before_id') ? $request->input('before_id') : null,
+                'ordered_ids' => is_array($orderedIds) ? array_values(array_map('intval', $orderedIds)) : null,
             ]);
         }
 
@@ -1082,10 +1130,14 @@ class SeoChecklistController extends Controller
             ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('Order updated') : ($result['message'] ?? __('Error')));
     }
 
-    public function storeTemplateTask(Request $request, int $templateId): RedirectResponse
+    public function storeTemplateTask(Request $request, int $templateId)
     {
         $template = $this->findOwnedCustomTemplate($templateId);
         if (!$template) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['ok' => false, 'message' => __('Template not found')], 404);
+            }
+
             return redirect()->route('pages.seo-checklist.templates')->with('error', __('Template not found'));
         }
 
@@ -1094,11 +1146,57 @@ class SeoChecklistController extends Controller
             'help' => $request->input('help'),
             'stage_key' => $request->input('stage_key'),
             'role' => $request->input('role'),
-            'is_important' => $request->has('is_important'),
+            'is_important' => $request->boolean('is_important') || $request->has('is_important'),
+            'include_in_report' => $request->boolean('include_in_report') || $request->has('include_in_report'),
             'allows_subtasks' => $request->has('allows_subtasks'),
             'repeat_rule' => $request->input('repeat_rule'),
             'due_days_from_start' => $request->input('due_days_from_start'),
         ]);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            if (empty($result['ok']) || empty($result['task'])) {
+                return response()->json(['ok' => false, 'message' => $result['message'] ?? __('Error')], 422);
+            }
+
+            /** @var \App\SeoChecklist\SeoChecklistTemplateTask $task */
+            $task = $result['task'];
+            $task->setRelation('children', collect());
+
+            $stageKey = (string) $task->stage_key;
+            $siblings = $template->tasks()
+                ->where('stage_key', $stageKey)
+                ->whereNull('parent_id')
+                ->orderBy('sort')
+                ->orderBy('id')
+                ->get(['id']);
+            $ids = $siblings->pluck('id')->map(static function ($id) {
+                return (int) $id;
+            })->values()->all();
+            $taskIndex = array_search((int) $task->id, $ids, true);
+            if ($taskIndex === false) {
+                $taskIndex = max(0, count($ids) - 1);
+            }
+
+            $html = view('pages.partials.seo-checklist-template-task-row', [
+                'template' => $template,
+                'task' => $task,
+                'taskIndex' => (int) $taskIndex,
+                'isFirstInStage' => (int) $taskIndex === 0,
+                'isLastInStage' => (int) $taskIndex === count($ids) - 1,
+                'roleLabels' => $this->roleLabels(),
+                'stageSearch' => '',
+                'readOnly' => false,
+            ])->render();
+
+            return response()->json([
+                'ok' => true,
+                'message' => __('Task added'),
+                'task_id' => (int) $task->id,
+                'stage_key' => $stageKey,
+                'stage_task_count' => count($ids),
+                'html' => $html,
+            ]);
+        }
 
         return redirect()
             ->route('pages.seo-checklist.templates.edit', ['templateId' => $template->id])
@@ -1236,8 +1334,13 @@ class SeoChecklistController extends Controller
         $this->service->syncAutoStatuses($project, $authId);
         $project->refresh();
         $project->load(['ownerUser', 'pmUser', 'team.members.user']);
-        $items = $project->items()->whereNull('parent_id')->with([
-            'notes.user',
+        $noteWith = ['notes.user'];
+        if (\App\SeoChecklist\SeoChecklistNoteRead::tableReady()) {
+            $noteWith['notes.reads'] = function ($q) use ($authId) {
+                $q->where('user_id', $authId);
+            };
+        }
+        $items = $project->items()->whereNull('parent_id')->with(array_merge($noteWith, [
             'createdByUser',
             'doneByUser',
             'children.createdByUser',
@@ -1248,7 +1351,8 @@ class SeoChecklistController extends Controller
             'timeLogs' => function ($q) use ($authId) {
                 $q->where('user_id', $authId)->whereNull('ended_at')->orderByDesc('id');
             },
-        ])->get();
+        ]))->get();
+        $this->service->attachStatusAuditLabels($items);
         $project->loadMissing('template');
         $stagesMeta = $this->service->resolveTemplateStages($project->template);
         $grouped = [];
@@ -1258,6 +1362,7 @@ class SeoChecklistController extends Controller
             'shared' => ['done' => 0, 'total' => 0],
             'any' => ['done' => 0, 'total' => 0],
         ];
+        $projectReviewCount = 0;
         foreach ($items as $item) {
             $key = $item->stage_key === 'connect' ? 'access' : $item->stage_key;
             if (!isset($grouped[$key])) {
@@ -1275,6 +1380,9 @@ class SeoChecklistController extends Controller
             $grouped[$key]['total']++;
             if (in_array($item->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true)) {
                 $grouped[$key]['done']++;
+            }
+            if ($item->status === 'review') {
+                $projectReviewCount++;
             }
 
             $role = in_array($item->role, ['owner', 'pm', 'shared', 'any'], true) ? $item->role : 'any';
@@ -1325,6 +1433,7 @@ class SeoChecklistController extends Controller
             'templatesCount' => $this->service->templatesForUser($authId)->count(),
             'myTasksCount' => (int) ($plan['count'] ?? 0),
             'reviewCount' => $this->service->reviewQueueForUser($authId)->count(),
+            'projectReviewCount' => $projectReviewCount,
             'showReviewTab' => $this->service->canSeeReviewQueue($authId),
             'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),
         ]);
@@ -1486,6 +1595,9 @@ class SeoChecklistController extends Controller
         if ($request->exists('is_important')) {
             $payload['is_important'] = (bool) $request->input('is_important');
         }
+        if ($request->exists('include_in_report')) {
+            $payload['include_in_report'] = (bool) $request->input('include_in_report');
+        }
         if ($request->exists('allows_subtasks')) {
             $payload['allows_subtasks'] = (bool) $request->input('allows_subtasks');
         }
@@ -1508,6 +1620,7 @@ class SeoChecklistController extends Controller
                 'help' => $item->help,
                 'role' => $item->role,
                 'is_important' => (bool) $item->is_important,
+                'include_in_report' => (bool) $item->include_in_report,
                 'allows_subtasks' => (bool) $item->allows_subtasks,
                 'repeat_rule' => $item->repeat_rule,
             ],
@@ -1640,6 +1753,7 @@ class SeoChecklistController extends Controller
             'help' => null,
             'role' => $parent->role,
             'is_important' => false,
+            'include_in_report' => $request->boolean('include_in_report'),
             'allows_subtasks' => false,
             'status' => 'todo',
             'links_json' => [],
@@ -1662,9 +1776,33 @@ class SeoChecklistController extends Controller
                 'title' => $child->title,
                 'status' => $child->status,
                 'parent_id' => $parent->id,
+                'include_in_report' => (bool) $child->include_in_report,
                 'created_by' => (int) $child->created_by,
                 'audit' => $this->itemAuditPayload($child),
             ],
+        ]);
+    }
+
+    public function reorderSubtasks(Request $request, int $id, int $itemId): JsonResponse
+    {
+        $project = $this->findAccessibleProject($id);
+        if (!$project) {
+            return response()->json(['ok' => false, 'message' => __('Project not found')], 404);
+        }
+
+        $orderedIds = $request->input('ordered_ids');
+        if (!is_array($orderedIds)) {
+            return response()->json(['ok' => false, 'message' => __('Error')], 422);
+        }
+
+        $result = $this->service->reorderSubtasksByIds($project, $itemId, $orderedIds);
+        if (empty($result['ok'])) {
+            return response()->json(['ok' => false, 'message' => $result['message'] ?? __('Error')], 422);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'ordered_ids' => array_values(array_map('intval', $orderedIds)),
         ]);
     }
 
@@ -1735,6 +1873,7 @@ class SeoChecklistController extends Controller
             'stage_key' => $request->input('stage_key'),
             'role' => $request->input('role'),
             'is_important' => $request->has('is_important') || (bool) $request->input('is_important'),
+            'include_in_report' => $request->has('include_in_report') || (bool) $request->input('include_in_report'),
             'allows_subtasks' => $request->has('allows_subtasks') || (bool) $request->input('allows_subtasks'),
             'repeat_rule' => $request->input('repeat_rule'),
         ]);
@@ -1993,7 +2132,7 @@ class SeoChecklistController extends Controller
     }
 
     /**
-     * @return array{created_label:?string,done_label:?string}
+     * @return array{created_label:?string,done_label:?string,status_label:?string}
      */
     private function itemAuditPayload(SeoChecklistItem $item): array
     {
@@ -2001,10 +2140,14 @@ class SeoChecklistController extends Controller
         $createdAt = $this->formatAuditAt($item->created_at);
         $createdLabel = null;
         if ($createdBy || $createdAt) {
-            $createdLabel = __('Created by :name on :date', [
-                'name' => $createdBy ?: '—',
-                'date' => $createdAt ?: '—',
-            ]);
+            $createdLabel = $createdBy
+                ? __('Created by :name on :date', [
+                    'name' => $createdBy,
+                    'date' => $createdAt ?: '—',
+                ])
+                : __('Created on :date', [
+                    'date' => $createdAt ?: '—',
+                ]);
         }
 
         $doneLabel = null;
@@ -2016,9 +2159,12 @@ class SeoChecklistController extends Controller
             ]);
         }
 
+        $statusLabels = $this->service->lastStatusChangeLabelsByItemIds([(int) $item->id]);
+
         return [
             'created_label' => $createdLabel,
             'done_label' => $doneLabel,
+            'status_label' => $statusLabels[(int) $item->id] ?? null,
         ];
     }
 

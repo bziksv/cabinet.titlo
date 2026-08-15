@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\DomainMonitoring;
 use App\Jobs\GenerateSeoReportJob;
 use App\Mail\SeoReportProjectShareMail;
 use App\Mail\SeoReportShareMail;
+use App\ProjectRelevanceHistory;
+use App\SeoChecklist\SeoChecklistProject;
 use App\SeoReports\SeoReport;
 use App\SeoReports\SeoReportBindings;
 use App\SeoReports\SeoReportBrandColor;
@@ -14,6 +17,7 @@ use App\SeoReports\SeoReportPhraseLibrary;
 use App\SeoReports\SeoReportProject;
 use App\SeoReports\SeoReportSectionRegistry;
 use App\SeoReports\SeoReportTemplate;
+use App\SiteAuditProject;
 use App\User;
 use Illuminate\Support\Str;
 use App\Services\SeoChecklist\SeoChecklistService;
@@ -1692,6 +1696,9 @@ class SeoReportsController extends Controller
                 ? SeoReportSectionRegistry::SOURCE_STATUS_OK
                 : SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED;
         }
+        if (in_array($source, ['seo_checklist', 'site_audit', 'relevance', 'site_monitoring'], true)) {
+            return $this->guessTitloModuleStatus($project, $source);
+        }
         if ($source === 'gsc' || $source === 'webmaster') {
             $settings = method_exists($project, 'reportSettings') ? $project->reportSettings() : (is_array($project->settings_json) ? $project->settings_json : []);
             $import = $settings[$source . '_import'] ?? null;
@@ -1728,6 +1735,83 @@ class SeoReportsController extends Controller
             ) {
                 return SeoReportSectionRegistry::SOURCE_STATUS_OK;
             }
+        }
+
+        return SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED;
+    }
+
+    /**
+     * Статус модулей Titlo на карточке проекта: есть ли проект по тому же домену.
+     */
+    private function guessTitloModuleStatus(SeoReportProject $project, string $source): string
+    {
+        $userId = (int) $project->user_id;
+        $domain = HomeUserSites::normalizeDomain((string) $project->domain);
+        if ($userId < 1 || $domain === '') {
+            return SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED;
+        }
+
+        try {
+            if ($source === 'seo_checklist') {
+                $exists = SeoChecklistProject::query()
+                    ->where('user_id', $userId)
+                    ->where('domain', $domain)
+                    ->exists();
+
+                return $exists
+                    ? SeoReportSectionRegistry::SOURCE_STATUS_OK
+                    : SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED;
+            }
+
+            if ($source === 'site_audit') {
+                $audit = SiteAuditProject::query()
+                    ->where('user_id', $userId)
+                    ->where('domain', $domain)
+                    ->orderByDesc('id')
+                    ->first();
+                if (!$audit) {
+                    return SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED;
+                }
+                $hasDoneCrawl = $audit->crawls()
+                    ->where('status', 'done')
+                    ->exists();
+
+                return $hasDoneCrawl
+                    ? SeoReportSectionRegistry::SOURCE_STATUS_OK
+                    : SeoReportSectionRegistry::SOURCE_STATUS_EMPTY;
+            }
+
+            if ($source === 'relevance') {
+                $rel = ProjectRelevanceHistory::query()
+                    ->where('user_id', $userId)
+                    ->where('name', $domain)
+                    ->orderByDesc('id')
+                    ->first();
+                if (!$rel) {
+                    return SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED;
+                }
+
+                return ((int) ($rel->count_checks ?? 0) >= 1)
+                    ? SeoReportSectionRegistry::SOURCE_STATUS_OK
+                    : SeoReportSectionRegistry::SOURCE_STATUS_EMPTY;
+            }
+
+            if ($source === 'site_monitoring') {
+                $monitors = DomainMonitoring::query()
+                    ->where('user_id', $userId)
+                    ->orderByDesc('id')
+                    ->limit(200)
+                    ->get(['id', 'link']);
+                foreach ($monitors as $row) {
+                    if (HomeUserSites::normalizeDomain((string) $row->link) === $domain) {
+                        return SeoReportSectionRegistry::SOURCE_STATUS_OK;
+                    }
+                }
+
+                return SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED;
+            }
+        } catch (\Throwable $e) {
+            return SeoReportSectionRegistry::SOURCE_STATUS_ERROR;
         }
 
         return SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED;

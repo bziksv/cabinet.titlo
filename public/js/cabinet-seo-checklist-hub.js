@@ -506,6 +506,127 @@
         apply();
     })();
 
+    // —— Template editor: добавление задачи без перезагрузки ——
+    (function initTemplateTaskAdd() {
+        var page = document.querySelector('[data-sc-hub="templates"]');
+        if (!page) return;
+        var csrf = page.getAttribute('data-csrf') ||
+            (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+
+        function refreshStageCounts(stage, count) {
+            if (!stage) return;
+            var meta = stage.querySelector('[data-sc-tpl-stage-meta]');
+            if (meta) {
+                meta.setAttribute('data-total', String(count));
+                meta.textContent = String(count);
+            }
+            var key = stage.getAttribute('data-stage-key') || '';
+            if (!key) return;
+            var railCount = page.querySelector('[data-sc-tpl-rail-link="' + key.replace(/"/g, '\\"') + '"] .cabinet-sc-tpl-rail__count');
+            if (railCount) railCount.textContent = String(count);
+        }
+
+        function refreshMoveButtons(stage) {
+            var ul = stage.querySelector('.cabinet-sc-tasks');
+            if (!ul) return;
+            var items = Array.prototype.filter.call(ul.children, function (el) {
+                return el.hasAttribute('data-sc-tpl-task');
+            });
+            items.forEach(function (li, idx) {
+                var up = li.querySelector('[data-sc-tpl-move="up"]');
+                var down = li.querySelector('[data-sc-tpl-move="down"]');
+                if (up) up.disabled = idx === 0;
+                if (down) down.disabled = idx === items.length - 1;
+                var indexEl = li.querySelector('.cabinet-sc-tpl-compact__index');
+                if (indexEl) indexEl.textContent = String(idx + 1);
+            });
+        }
+
+        function showInlineFlash(message, isError) {
+            var existing = page.querySelector('[data-sc-tpl-inline-flash]');
+            if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+            var el = document.createElement('div');
+            el.setAttribute('data-sc-tpl-inline-flash', '');
+            el.className = 'alert py-2 px-3 small mb-3 ' + (isError ? 'alert-danger' : 'alert-success');
+            el.textContent = message || '';
+            var anchor = page.querySelector('.cabinet-sc-tpl-layout') || page.querySelector('[data-sc-tpl-stages]') || page;
+            if (anchor.parentNode) {
+                anchor.parentNode.insertBefore(el, anchor);
+            } else {
+                page.insertBefore(el, page.firstChild);
+            }
+            window.setTimeout(function () {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            }, 3200);
+        }
+
+        page.addEventListener('submit', function (e) {
+            var form = e.target.closest('[data-sc-tpl-add-form]');
+            if (!form || !page.contains(form)) return;
+            e.preventDefault();
+
+            var stage = form.closest('[data-sc-tpl-stage]');
+            var list = stage ? stage.querySelector('.cabinet-sc-tasks') : null;
+            var addRow = form.closest('[data-sc-tpl-add]');
+            var titleInput = form.querySelector('input[name="title"]');
+            var title = titleInput ? String(titleInput.value || '').trim() : '';
+            if (!title || !list) return;
+
+            var submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+            form.classList.add('is-busy');
+
+            var body = new FormData(form);
+            fetch(form.getAttribute('action'), {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: body,
+            })
+                .then(function (r) {
+                    return r.json().then(function (data) {
+                        return { ok: r.ok && data && data.ok, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (submitBtn) submitBtn.disabled = false;
+                    form.classList.remove('is-busy');
+                    if (!result.ok) {
+                        showInlineFlash((result.data && result.data.message) || 'Error', true);
+                        return;
+                    }
+                    var wrap = document.createElement('div');
+                    wrap.innerHTML = String(result.data.html || '').trim();
+                    var li = wrap.firstElementChild;
+                    if (li) {
+                        if (addRow) list.insertBefore(li, addRow);
+                        else list.appendChild(li);
+                    }
+                    form.reset();
+                    var includeCb = form.querySelector('input[name="include_in_report"]');
+                    if (includeCb) includeCb.checked = true;
+                    var roleSelect = form.querySelector('select[name="role"]');
+                    if (roleSelect) {
+                        var ownerOpt = roleSelect.querySelector('option[value="owner"]');
+                        if (ownerOpt) roleSelect.value = 'owner';
+                    }
+                    refreshMoveButtons(stage);
+                    refreshStageCounts(stage, parseInt(result.data.stage_task_count, 10) || 0);
+                    showInlineFlash(result.data.message || '', false);
+                    if (titleInput) titleInput.focus();
+                })
+                .catch(function () {
+                    if (submitBtn) submitBtn.disabled = false;
+                    form.classList.remove('is-busy');
+                    showInlineFlash('Error', true);
+                });
+        });
+    })();
+
     // —— Template editor: подзадачи без перезагрузки ——
     (function initTemplateSubtasks() {
         var page = document.querySelector('[data-sc-hub="templates"]');
@@ -541,9 +662,13 @@
                 var list = wrap ? wrap.querySelector('[data-sc-tpl-subtasks-list]') : null;
                 var title = input ? String(input.value || '').trim() : '';
                 var url = addBtn.getAttribute('data-url');
+                var includeCb = wrap ? wrap.querySelector('[data-sc-tpl-subtask-include-report]') : null;
                 if (!url || !title) return;
                 addBtn.disabled = true;
-                postJson(url, { title: title })
+                postJson(url, {
+                    title: title,
+                    include_in_report: includeCb && includeCb.checked ? 1 : 0,
+                })
                     .then(function (result) {
                         addBtn.disabled = false;
                         if (!result.ok) {
@@ -554,11 +679,24 @@
                         var li = document.createElement('li');
                         li.setAttribute('data-sc-tpl-subtask', '');
                         li.setAttribute('data-id', String(task.id));
-                        li.innerHTML = '<span class="cabinet-sc-tpl-subtasks__dot" aria-hidden="true"></span><span class="cabinet-sc-tpl-subtasks__title"></span><button type="button" class="cabinet-sc-tpl-subtasks__remove" data-sc-tpl-subtask-delete title="×" aria-label="×">×</button>';
+                        if (task.update_url) {
+                            li.setAttribute('data-update-url', task.update_url);
+                        }
+                        var reportLabel = page.getAttribute('data-i18n-include-report') || 'In reports';
+                        var reportHint = page.getAttribute('data-i18n-include-report-hint') || reportLabel;
+                        li.innerHTML =
+                            '<span class="cabinet-sc-tpl-subtasks__title"></span>' +
+                            '<label class="cabinet-sc-tpl-subtasks__report small mb-0" data-tip="' +
+                            String(reportHint).replace(/"/g, '&quot;') + '">' +
+                            '<input type="checkbox" data-sc-tpl-include-report value="1"' +
+                            (task.include_in_report ? ' checked' : '') + '>' +
+                            '<span>' + String(reportLabel).replace(/</g, '&lt;') + '</span></label>' +
+                            '<button type="button" class="cabinet-sc-tpl-subtasks__remove" data-sc-tpl-subtask-delete aria-label="×">×</button>';
                         li.querySelector('.cabinet-sc-tpl-subtasks__title').textContent = task.title;
                         li.querySelector('[data-sc-tpl-subtask-delete]').setAttribute('data-url', task.delete_url);
                         list.appendChild(li);
                         input.value = '';
+                        if (includeCb) includeCb.checked = true;
                         input.focus();
                     })
                     .catch(function () {
@@ -588,6 +726,27 @@
                         delBtn.disabled = false;
                     });
             }
+        });
+
+        page.addEventListener('change', function (e) {
+            var includeToggle = e.target.closest('[data-sc-tpl-include-report]');
+            if (!includeToggle || !includeToggle.matches('input[type="checkbox"]')) return;
+            var li = includeToggle.closest('[data-sc-tpl-subtask]');
+            var updateUrl = li ? li.getAttribute('data-update-url') : '';
+            if (!li || !updateUrl) return;
+            includeToggle.disabled = true;
+            postJson(updateUrl, { include_in_report: includeToggle.checked ? 1 : 0 })
+                .then(function (result) {
+                    includeToggle.disabled = false;
+                    if (!result.ok) {
+                        includeToggle.checked = !includeToggle.checked;
+                        alert((result.data && result.data.message) || 'Error');
+                    }
+                })
+                .catch(function () {
+                    includeToggle.disabled = false;
+                    includeToggle.checked = !includeToggle.checked;
+                });
         });
 
         page.addEventListener('keydown', function (e) {
@@ -816,7 +975,7 @@
         refreshStageMoveButtons();
     })();
 
-    // —— Template editor: ↑↓ без перезагрузки ——
+    // —— Template editor: ↑↓ и drag-and-drop без перезагрузки ——
     (function initTemplateTaskMove() {
         var page = document.querySelector('[data-sc-hub="templates"]');
         if (!page) return;
@@ -824,6 +983,12 @@
         var csrf = page.getAttribute('data-csrf') ||
             (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
         if (!moveTpl) return;
+
+        var dragLi = null;
+        var dragOriginParent = null;
+        var dragOriginNext = null;
+        var dragOriginIds = [];
+        var dragSaving = false;
 
         function taskLis(stage) {
             var ul = stage.querySelector('.cabinet-sc-tasks');
@@ -833,6 +998,14 @@
             });
         }
 
+        function taskIdFromLi(li) {
+            return String(li && li.id || '').replace('tpl-task-', '');
+        }
+
+        function idsOf(stage) {
+            return taskLis(stage).map(taskIdFromLi).filter(Boolean);
+        }
+
         function refreshMoveButtons(stage) {
             var items = taskLis(stage);
             items.forEach(function (li, idx) {
@@ -840,10 +1013,16 @@
                 var down = li.querySelector('[data-sc-tpl-move="down"]');
                 if (up) up.disabled = idx === 0;
                 if (down) down.disabled = idx === items.length - 1;
+                var indexEl = li.querySelector('.cabinet-sc-tpl-compact__index');
+                if (indexEl) indexEl.textContent = String(idx + 1);
             });
         }
 
-        function postMove(url, direction) {
+        function refreshAllStages() {
+            page.querySelectorAll('[data-sc-tpl-stage]').forEach(refreshMoveButtons);
+        }
+
+        function postMove(url, body) {
             return fetch(url, {
                 method: 'POST',
                 headers: {
@@ -853,12 +1032,59 @@
                     'X-Requested-With': 'XMLHttpRequest',
                 },
                 credentials: 'same-origin',
-                body: JSON.stringify({ direction: direction }),
+                body: JSON.stringify(body || {}),
             }).then(function (r) {
                 return r.json().then(function (data) {
-                    return { ok: r.ok && data && data.ok, data: data };
+                    return { ok: r.ok && data && data.ok, data: data, status: r.status };
+                }).catch(function () {
+                    return { ok: false, data: { message: 'Error ' + r.status }, status: r.status };
                 });
             });
+        }
+
+        function restoreDrag(li, originParent, originNext) {
+            if (!li || !originParent) return;
+            if (originNext && originNext.parentNode === originParent) {
+                originParent.insertBefore(li, originNext);
+            } else {
+                originParent.appendChild(li);
+            }
+        }
+
+        function saveDragOrder(li, originParent, originNext, originIds) {
+            var stage = li ? li.closest('[data-sc-tpl-stage]') : null;
+            if (!li || !stage) return;
+            var id = taskIdFromLi(li);
+            var ids = idsOf(stage);
+            if (!id || ids.length < 1) return;
+            if (ids.join(',') === (originIds || []).join(',')) {
+                li.classList.remove('is-dragging');
+                refreshMoveButtons(stage);
+                return;
+            }
+
+            dragSaving = true;
+            li.classList.add('is-busy');
+            var url = moveTpl.replace('__ID__', id);
+            postMove(url, { ordered_ids: ids.map(function (x) { return parseInt(x, 10); }) })
+                .then(function (result) {
+                    li.classList.remove('is-busy', 'is-dragging');
+                    dragSaving = false;
+                    if (!result.ok) {
+                        restoreDrag(li, originParent, originNext);
+                        refreshMoveButtons(stage);
+                        alert((result.data && result.data.message) || 'Error');
+                        return;
+                    }
+                    refreshMoveButtons(stage);
+                })
+                .catch(function () {
+                    li.classList.remove('is-busy', 'is-dragging');
+                    dragSaving = false;
+                    restoreDrag(li, originParent, originNext);
+                    refreshMoveButtons(stage);
+                    alert('Error');
+                });
         }
 
         page.addEventListener('click', function (e) {
@@ -869,7 +1095,7 @@
             if (!li || !stage) return;
 
             var direction = btn.getAttribute('data-sc-tpl-move');
-            var id = String(li.id || '').replace('tpl-task-', '');
+            var id = taskIdFromLi(li);
             if (!id) return;
 
             var items = taskLis(stage);
@@ -881,7 +1107,7 @@
             btn.disabled = true;
             li.classList.add('is-busy');
 
-            postMove(url, direction)
+            postMove(url, { direction: direction })
                 .then(function (result) {
                     li.classList.remove('is-busy');
                     if (!result.ok) {
@@ -905,6 +1131,82 @@
                     li.classList.remove('is-busy');
                     refreshMoveButtons(stage);
                 });
+        });
+
+        page.addEventListener('dragstart', function (e) {
+            var handle = e.target.closest('[data-sc-tpl-drag]');
+            if (!handle || !page.contains(handle)) return;
+            var li = handle.closest('[data-sc-tpl-task]');
+            if (!li) return;
+            var stage = li.closest('[data-sc-tpl-stage]');
+            dragLi = li;
+            dragOriginParent = li.parentNode;
+            dragOriginNext = li.nextSibling;
+            dragOriginIds = stage ? idsOf(stage) : [];
+            li.classList.add('is-dragging');
+            try {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', taskIdFromLi(li));
+            } catch (err) { /* ignore */ }
+        });
+
+        page.addEventListener('dragover', function (e) {
+            if (!dragLi) return;
+            var stage = dragLi.closest('[data-sc-tpl-stage]');
+            var overTask = e.target.closest('[data-sc-tpl-task]');
+            var overList = e.target.closest('.cabinet-sc-tasks');
+            if (!stage) return;
+            if (overTask && overTask.closest('[data-sc-tpl-stage]') !== stage) return;
+            if (!overTask && (!overList || overList.closest('[data-sc-tpl-stage]') !== stage)) return;
+
+            e.preventDefault();
+            try { e.dataTransfer.dropEffect = 'move'; } catch (err) { /* ignore */ }
+
+            if (!overTask || overTask === dragLi) return;
+
+            page.querySelectorAll('.is-drag-over').forEach(function (el) {
+                if (el !== overTask) el.classList.remove('is-drag-over');
+            });
+            overTask.classList.add('is-drag-over');
+
+            var rect = overTask.getBoundingClientRect();
+            var before = (e.clientY - rect.top) < rect.height / 2;
+            var list = overTask.parentNode;
+            if (before) {
+                if (dragLi.nextSibling !== overTask) {
+                    list.insertBefore(dragLi, overTask);
+                }
+            } else if (overTask.nextSibling !== dragLi) {
+                list.insertBefore(dragLi, overTask.nextSibling);
+            }
+        });
+
+        page.addEventListener('drop', function (e) {
+            if (!dragLi) return;
+            e.preventDefault();
+        });
+
+        page.addEventListener('dragend', function () {
+            page.querySelectorAll('.is-drag-over').forEach(function (el) {
+                el.classList.remove('is-drag-over');
+            });
+            var li = dragLi;
+            var originParent = dragOriginParent;
+            var originNext = dragOriginNext;
+            var originIds = dragOriginIds.slice();
+            dragLi = null;
+            dragOriginParent = null;
+            dragOriginNext = null;
+            dragOriginIds = [];
+            if (!li || dragSaving) return;
+            var stage = li.closest('[data-sc-tpl-stage]');
+            var currentIds = stage ? idsOf(stage) : [];
+            if (currentIds.join(',') === originIds.join(',')) {
+                li.classList.remove('is-dragging');
+                refreshAllStages();
+                return;
+            }
+            saveDragOrder(li, originParent, originNext, originIds);
         });
     })();
 
@@ -1157,5 +1459,134 @@
                 submitBtn.disabled = true;
             }
         });
+    })();
+
+    // —— Template editor V2: плавающий блок «Этапы» ——
+    // В layout-fixed .app-main часто НЕ скроллит (растёт с контентом), скролл идёт у window.
+    // overflow:auto на .app-main при этом ломает CSS sticky → pin через position:fixed.
+    (function initTemplateRailPin() {
+        var root = document.getElementById('cabinetScTplEditor');
+        if (!root) return;
+        var slot = root.querySelector('[data-sc-tpl-rail-slot]');
+        var rail = root.querySelector('[data-sc-tpl-rail]');
+        var layout = root.querySelector('.cabinet-sc-tpl-layout');
+        if (!slot || !rail || !layout) return;
+
+        var topGap = 12;
+        var bottomGap = 16;
+        var ticking = false;
+        var mobileMq = window.matchMedia('(max-width: 900px)');
+        var mainEl = document.querySelector('.app-main');
+
+        function unpin() {
+            rail.classList.remove('is-pinned');
+            rail.style.top = '';
+            rail.style.left = '';
+            rail.style.width = '';
+            rail.style.height = '';
+            rail.style.maxHeight = '';
+            slot.style.height = '';
+            slot.style.maxHeight = '';
+        }
+
+        function viewportMetrics() {
+            var mainScrolls = !!(mainEl && mainEl.scrollHeight > mainEl.clientHeight + 5);
+            if (mainScrolls) {
+                var mr = mainEl.getBoundingClientRect();
+                return {
+                    stickLine: mr.top + topGap,
+                    viewH: mainEl.clientHeight || mr.height,
+                    minTop: mr.top + 8
+                };
+            }
+            return {
+                stickLine: topGap,
+                viewH: window.innerHeight || document.documentElement.clientHeight || 800,
+                minTop: 8
+            };
+        }
+
+        function contentHeight(maxH) {
+            var head = rail.querySelector('.cabinet-sc-tpl-rail__head');
+            var list = rail.querySelector('.cabinet-sc-tpl-rail__list');
+            var h = 20;
+            if (head) h += head.offsetHeight || 0;
+            if (list) h += list.scrollHeight || list.offsetHeight || 0;
+            return Math.min(Math.max(h, 120), maxH);
+        }
+
+        function sync() {
+            if (root.getAttribute('data-tpl-visual') !== 'v2' || mobileMq.matches) {
+                unpin();
+                return;
+            }
+
+            var metrics = viewportMetrics();
+            var maxH = Math.max(160, Math.floor(metrics.viewH - topGap - bottomGap));
+            var layoutRect = layout.getBoundingClientRect();
+            var slotRect = slot.getBoundingClientRect();
+            var stickLine = metrics.stickLine;
+
+            slot.style.maxHeight = maxH + 'px';
+
+            if (layoutRect.bottom <= stickLine + 40) {
+                unpin();
+                slot.style.maxHeight = maxH + 'px';
+                return;
+            }
+
+            // Пока слот ниже линии прилипания — обычный поток (и сброс pin при скролле вверх)
+            if (slotRect.top > stickLine + 1) {
+                if (rail.classList.contains('is-pinned')) {
+                    unpin();
+                    slot.style.maxHeight = maxH + 'px';
+                }
+                rail.style.maxHeight = maxH + 'px';
+                return;
+            }
+
+            var naturalH = contentHeight(maxH);
+            var pinTop = stickLine;
+            var maxTop = layoutRect.bottom - bottomGap - naturalH;
+            if (maxTop < pinTop) {
+                pinTop = Math.max(metrics.minTop, maxTop);
+            }
+
+            slot.style.height = naturalH + 'px';
+            slotRect = slot.getBoundingClientRect();
+
+            rail.classList.add('is-pinned');
+            rail.style.left = Math.round(slotRect.left) + 'px';
+            rail.style.width = Math.round(slotRect.width) + 'px';
+            rail.style.top = Math.round(pinTop) + 'px';
+            rail.style.height = Math.round(naturalH) + 'px';
+            rail.style.maxHeight = Math.round(naturalH) + 'px';
+        }
+
+        function requestSync() {
+            if (ticking) return;
+            ticking = true;
+            window.requestAnimationFrame(function () {
+                ticking = false;
+                sync();
+            });
+        }
+
+        // Оба корня: на части экранов скроллит window, на части — .app-main
+        if (mainEl) {
+            mainEl.addEventListener('scroll', requestSync, { passive: true });
+        }
+        window.addEventListener('scroll', requestSync, { passive: true, capture: true });
+        window.addEventListener('resize', requestSync);
+        window.addEventListener('cabinet-sc-tpl-visual', requestSync);
+        if (mobileMq.addEventListener) {
+            mobileMq.addEventListener('change', requestSync);
+        } else if (mobileMq.addListener) {
+            mobileMq.addListener(requestSync);
+        }
+
+        requestSync();
+        window.setTimeout(requestSync, 50);
+        window.setTimeout(requestSync, 300);
     })();
 })();

@@ -19,12 +19,13 @@ class SeoChecklistItem extends Model
 
     protected $fillable = [
         'project_id', 'parent_id', 'code', 'stage_key', 'stage_sort', 'sort',
-        'title', 'help', 'role', 'is_important', 'allows_subtasks', 'repeat_rule', 'due_days_from_start', 'due_at', 'links_json',
+        'title', 'help', 'role', 'is_important', 'include_in_report', 'allows_subtasks', 'repeat_rule', 'due_days_from_start', 'due_at', 'links_json',
         'status', 'assignee_user_id', 'done_at', 'done_by', 'created_by', 'time_spent_seconds',
     ];
 
     protected $casts = [
         'is_important' => 'boolean',
+        'include_in_report' => 'boolean',
         'allows_subtasks' => 'boolean',
         'links_json' => 'array',
         'done_at' => 'datetime',

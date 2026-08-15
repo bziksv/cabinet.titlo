@@ -405,6 +405,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('checklist/{id}/items/{itemId}/timer/stop', 'SeoChecklistController@stopItemTimer')->name('pages.seo-checklist.item.timer.stop')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
     Route::get('checklist/{id}/items/{itemId}/time', 'SeoChecklistController@itemTimeBreakdown')->name('pages.seo-checklist.item.time')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
     Route::post('checklist/{id}/items/{itemId}/subtasks', 'SeoChecklistController@addSubtask')->name('pages.seo-checklist.item.subtasks')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::post('checklist/{id}/items/{itemId}/subtasks/reorder', 'SeoChecklistController@reorderSubtasks')->name('pages.seo-checklist.item.subtasks.reorder')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
 
     Route::get('search-suggestions', 'SearchSuggestionsController@index')->name('pages.search-suggestions')->middleware('permission:Search suggestions');
     Route::post('search-suggestions/collect', 'SearchSuggestionsController@collect')->name('pages.search-suggestions.collect')->middleware('permission:Search suggestions');

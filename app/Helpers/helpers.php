@@ -220,6 +220,22 @@ if (! function_exists('cabinet_sc_document_title')) {
     }
 }
 
+if (! function_exists('cabinet_sc_module_title_html')) {
+    /**
+     * Заголовок карточки модуля с бейджем версии (как у аудита сайта).
+     */
+    function cabinet_sc_module_title_html(?int $userId = null): string
+    {
+        $title = e(\App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(
+            $userId ?? (auth()->check() ? (int) auth()->id() : null)
+        ));
+
+        return $title . view('partials.cabinet-module-version-badge', [
+            'configKey' => 'cabinet-seo-checklist',
+        ])->render();
+    }
+}
+
 if (! function_exists('db_admin_date_column_label')) {
     /**
      * Человекочитаемая подпись колонки даты на /admin/database.

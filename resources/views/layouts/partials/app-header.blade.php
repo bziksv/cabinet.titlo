@@ -54,6 +54,7 @@
                 @php
                     $scDueCount = (int) ($seoChecklistDueCount ?? 0);
                     $scOverdueCount = (int) ($seoChecklistOverdueCount ?? 0);
+                    $scReviewCount = (int) ($seoChecklistReviewCount ?? 0);
                     $scUnreadNotes = (int) ($seoChecklistUnreadNotesCount ?? 0);
                     $scDueTip = $scOverdueCount > 0
                         ? __('SEO checklist header due tip overdue', [
@@ -61,6 +62,7 @@
                             'total' => $scDueCount,
                         ])
                         : __('SEO checklist header due tip soon', ['total' => $scDueCount]);
+                    $scReviewTip = __('SEO checklist header review tip', ['total' => $scReviewCount]);
                     $scUnreadTip = __('SEO checklist header unread tip');
                 @endphp
                 <li class="nav-item d-none d-md-block">
@@ -79,6 +81,14 @@
                                 {{ $scDueCount > 99 ? '99+' : $scDueCount }}
                             </a>
                         @endif
+                        <a href="{{ route('pages.seo-checklist.review') }}"
+                           class="navbar-badge badge text-bg-primary text-decoration-none cabinet-header-tip cabinet-header-sc-review"
+                           data-sc-review-header-count
+                           data-tip="{{ $scReviewTip }}"
+                           aria-label="{{ $scReviewTip }}"
+                           @if($scReviewCount < 1) hidden @endif>
+                            {{ $scReviewCount > 99 ? '99+' : $scReviewCount }}
+                        </a>
                         <a href="{{ route('pages.seo-checklist.chronicle', ['view' => 'unread']) }}"
                            class="navbar-badge badge text-bg-warning text-decoration-none cabinet-header-tip"
                            data-sc-unread-header-count

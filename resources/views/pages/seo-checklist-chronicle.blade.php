@@ -1,5 +1,5 @@
 @component('component.card', [
-    'title' => \App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(auth()->id()),
+    'titleHtml' => cabinet_sc_module_title_html(),
     'documentTitle' => cabinet_sc_document_title(__('Chronicle')),
 ])
     @slot('css')

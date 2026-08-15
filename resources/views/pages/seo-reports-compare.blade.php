@@ -1,5 +1,6 @@
 @component('component.card', [
     'title' => __('Compare reports') . ' · ' . $project->domain,
+    'titleHtml' => e(__('Compare reports') . ' · ' . $project->domain) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-seo-reports'])->render(),
     'documentTitle' => __('Compare reports') . ' · ' . $project->domain,
 ])
     @slot('css')

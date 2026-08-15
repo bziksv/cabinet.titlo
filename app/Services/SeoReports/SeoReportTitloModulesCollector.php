@@ -198,7 +198,7 @@ class SeoReportTitloModulesCollector
     private function workListsForChecklistProject(SeoChecklistProject $project, ?Carbon $from, ?Carbon $to): array
     {
         $closedQuery = $project->items()
-            ->whereNull('parent_id')
+            ->where('include_in_report', true)
             ->whereIn('status', SeoChecklistItem::CLOSED_STATUSES)
             ->whereNotNull('done_at');
         if ($from) {
@@ -210,7 +210,7 @@ class SeoReportTitloModulesCollector
         $closed = $closedQuery
             ->orderByDesc('done_at')
             ->limit(40)
-            ->get(['id', 'title', 'status', 'done_at'])
+            ->get(['id', 'title', 'status', 'done_at', 'parent_id'])
             ->map(static function (SeoChecklistItem $item) {
                 return [
                     'id' => (int) $item->id,
@@ -225,7 +225,7 @@ class SeoReportTitloModulesCollector
         $horizonEnd = ($to ? $to->copy() : Carbon::now())->addDays(21)->endOfDay();
         $now = Carbon::now();
         $plan = $project->items()
-            ->whereNull('parent_id')
+            ->where('include_in_report', true)
             ->whereIn('status', SeoChecklistItem::OPEN_STATUSES)
             ->where(function ($q) use ($horizonEnd) {
                 $q->where(function ($q2) use ($horizonEnd) {
@@ -236,7 +236,7 @@ class SeoReportTitloModulesCollector
             ->orderBy('due_at')
             ->orderBy('id')
             ->limit(30)
-            ->get(['id', 'title', 'status', 'due_at'])
+            ->get(['id', 'title', 'status', 'due_at', 'parent_id'])
             ->map(static function (SeoChecklistItem $item) use ($now) {
                 $due = $item->due_at;
                 return [

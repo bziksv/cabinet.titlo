@@ -10,11 +10,12 @@ class SeoChecklistTemplate extends Model
     protected $table = 'seo_checklist_templates';
 
     protected $fillable = [
-        'user_id', 'code', 'title', 'description', 'stages_json', 'is_system', 'skip_weekends',
+        'user_id', 'code', 'title', 'description', 'stages_json', 'is_system', 'admin_only', 'skip_weekends',
     ];
 
     protected $casts = [
         'is_system' => 'boolean',
+        'admin_only' => 'boolean',
         'skip_weekends' => 'boolean',
         'stages_json' => 'array',
     ];

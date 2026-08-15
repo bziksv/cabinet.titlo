@@ -57,6 +57,9 @@ class SeoChecklistService
                         'help' => $task['help'],
                         'role' => $task['role'],
                         'is_important' => !empty($task['is_important']),
+                        'include_in_report' => array_key_exists('include_in_report', $task)
+                            ? !empty($task['include_in_report'])
+                            : true,
                         'allows_subtasks' => !empty($task['allows_subtasks']),
                         'repeat_rule' => $task['repeat_rule'] ?? null,
                         'due_days_from_start' => $task['due_days_from_start'] ?? null,
@@ -126,6 +129,9 @@ class SeoChecklistService
                         'help' => $task['help'],
                         'role' => $task['role'],
                         'is_important' => !empty($task['is_important']),
+                        'include_in_report' => array_key_exists('include_in_report', $task)
+                            ? !empty($task['include_in_report'])
+                            : true,
                         'allows_subtasks' => !empty($task['allows_subtasks']),
                         'repeat_rule' => $task['repeat_rule'] ?? null,
                         'due_days_from_start' => $task['due_days_from_start'] ?? null,
@@ -412,6 +418,7 @@ class SeoChecklistService
             'overdue' => 0,
             'doing' => 0,
             'groups' => $emptyGroups,
+            'stages' => [],
         ];
 
         if (!SeoChecklistProject::tableReady()) {
@@ -441,8 +448,17 @@ class SeoChecklistService
             ->whereIn('status', SeoChecklistItem::OPEN_STATUSES)
             ->with([
                 'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
-                'notes' => function ($q) {
+                'createdByUser',
+                'doneByUser',
+                'notes' => function ($q) use ($userId) {
                     $q->orderByDesc('id')->with('user');
+                    if (SeoChecklistNoteRead::tableReady()) {
+                        $q->with([
+                            'reads' => function ($rq) use ($userId) {
+                                $rq->where('user_id', $userId);
+                            },
+                        ]);
+                    }
                 },
                 'children' => function ($q) use ($userId) {
                     $q->orderBy('sort')->orderBy('id')
@@ -487,6 +503,8 @@ class SeoChecklistService
                 $rolesByProject[(int) $item->project_id] ?? []
             );
         })->values();
+
+        $doneItems = $this->recentDoneWorkPlanItems($projectIds, $rolesByProject, $userId, 120);
 
         $groups = $emptyGroups;
         $overdue = 0;
@@ -536,6 +554,10 @@ class SeoChecklistService
             }
         }
 
+        foreach ($doneItems as $item) {
+            $groups['done']['items']->push($item);
+        }
+
         $count = 0;
         foreach ($groups as $key => $group) {
             $groups[$key]['items'] = $group['items']->take($limit)->values();
@@ -544,12 +566,160 @@ class SeoChecklistService
             }
         }
 
+        $allForAudit = $mine->concat($doneItems)->unique('id')->values();
+        $stages = $this->buildWorkPlanStages($groups);
+        $this->attachStatusAuditLabels($allForAudit);
+
         return [
             'count' => $count,
             'overdue' => $overdue,
             'doing' => $doing,
             'groups' => $groups,
+            'stages' => $stages,
         ];
+    }
+
+    /**
+     * Группы плана по этапам (для рейла V2) + счётчики статусов внутри этапа.
+     *
+     * @param  array<string, array{key:string,title:string,items:\Illuminate\Support\Collection}>  $groups
+     * @return list<array{
+     *   key:string,
+     *   title:string,
+     *   sort:int,
+     *   count:int,
+     *   items:\Illuminate\Support\Collection,
+     *   chips:list<array{key:string,title:string,icon:string,count:int}>
+     * }>
+     */
+    private function buildWorkPlanStages(array $groups): array
+    {
+        $byId = [];
+        foreach ($groups as $group) {
+            foreach ($group['items'] ?? [] as $item) {
+                if (!$item instanceof SeoChecklistItem) {
+                    continue;
+                }
+                $byId[(int) $item->id] = $item;
+            }
+        }
+
+        if ($byId === []) {
+            return [];
+        }
+
+        $defaults = SeoChecklistDefaultTemplate::skeletonStagesMap();
+        $buckets = [];
+
+        foreach ($byId as $item) {
+            $rawKey = (string) ($item->stage_key ?: 'other');
+            $key = $rawKey === 'connect' ? 'access' : $rawKey;
+            if (!isset($buckets[$key])) {
+                $meta = $defaults[$key] ?? null;
+                $buckets[$key] = [
+                    'key' => $key,
+                    'title' => $meta['title'] ?? SeoChecklistDefaultTemplate::stageTitle($key),
+                    'sort' => (int) ($meta['sort'] ?? ($item->stage_sort ?: 999)),
+                    'items' => collect(),
+                ];
+            }
+            $buckets[$key]['items']->push($item);
+            $sort = (int) ($item->stage_sort ?: 0);
+            if ($sort > 0 && $sort < $buckets[$key]['sort']) {
+                $buckets[$key]['sort'] = $sort;
+            }
+        }
+
+        uasort($buckets, function ($a, $b) {
+            if ($a['sort'] === $b['sort']) {
+                return strcmp($a['title'], $b['title']);
+            }
+
+            return $a['sort'] <=> $b['sort'];
+        });
+
+        $chipDefs = [
+            'doing' => ['title' => __('In progress'), 'icon' => 'bi-play-circle-fill'],
+            'rework' => ['title' => __('Status rework'), 'icon' => 'bi-arrow-repeat'],
+            'clarify' => ['title' => __('Status clarify'), 'icon' => 'bi-question-circle'],
+            'review' => ['title' => __('Status review'), 'icon' => 'bi-eye'],
+            'done' => ['title' => __('Completed tasks'), 'icon' => 'bi-check-circle-fill'],
+            'overdue' => ['title' => __('Overdue'), 'icon' => 'bi-exclamation-triangle-fill'],
+            'due_soon' => ['title' => __('Due soon'), 'icon' => 'bi-calendar-event'],
+            'later' => ['title' => __('Later'), 'icon' => 'bi-clock'],
+        ];
+
+        $result = [];
+        foreach ($buckets as $bucket) {
+            /** @var \Illuminate\Support\Collection $items */
+            $items = $bucket['items']->sortBy(function (SeoChecklistItem $item) {
+                $due = $item->due_at ? $item->due_at->timestamp : PHP_INT_MAX;
+                $statusRank = [
+                    'doing' => 1,
+                    'rework' => 2,
+                    'clarify' => 3,
+                    'review' => 4,
+                    'todo' => 5,
+                    'done' => 8,
+                    'skip' => 9,
+                ][$item->status === 'blocked' ? 'clarify' : $item->status] ?? 7;
+
+                // выполненные — свежие сверху
+                if (in_array($item->status, SeoChecklistItem::CLOSED_STATUSES, true)) {
+                    $doneTs = $item->done_at ? (PHP_INT_MAX - $item->done_at->timestamp) : PHP_INT_MAX;
+
+                    return sprintf('%d-%d-%d', $statusRank, $doneTs, (int) $item->id);
+                }
+
+                return sprintf('%d-%d-%d', $statusRank, $due, (int) $item->id);
+            })->values();
+
+            $chipCounts = array_fill_keys(array_keys($chipDefs), 0);
+            foreach ($items as $item) {
+                $status = $item->status === 'blocked' ? 'clarify' : (string) $item->status;
+                if ($status === 'skip') {
+                    $status = 'done';
+                }
+                if (isset($chipCounts[$status])) {
+                    $chipCounts[$status]++;
+                }
+                if (in_array($item->status, SeoChecklistItem::CLOSED_STATUSES, true)) {
+                    continue;
+                }
+                if (method_exists($item, 'isOverdue') && $item->isOverdue()) {
+                    $chipCounts['overdue']++;
+                } elseif (method_exists($item, 'isDueSoon') && $item->isDueSoon()) {
+                    $chipCounts['due_soon']++;
+                } elseif ($item->due_at && $item->due_at->gt(now()->addDays(7)->endOfDay())) {
+                    $chipCounts['later']++;
+                }
+            }
+
+            $chips = [];
+            foreach ($chipDefs as $chipKey => $meta) {
+                $n = (int) ($chipCounts[$chipKey] ?? 0);
+                if ($n < 1) {
+                    continue;
+                }
+                $chips[] = [
+                    'key' => $chipKey,
+                    'title' => $meta['title'],
+                    'icon' => $meta['icon'],
+                    'count' => $n,
+                ];
+            }
+
+            $result[] = [
+                'key' => $bucket['key'],
+                'title' => $bucket['title'],
+                'sort' => $bucket['sort'],
+                'count' => $items->count(),
+                'items' => $items,
+                'chips' => $chips,
+            ];
+        }
+
+        return $result;
     }
 
     /**
@@ -562,6 +732,7 @@ class SeoChecklistService
             'rework' => ['key' => 'rework', 'title' => __('Status rework'), 'items' => collect()],
             'clarify' => ['key' => 'clarify', 'title' => __('Status clarify'), 'items' => collect()],
             'review' => ['key' => 'review', 'title' => __('Status review'), 'items' => collect()],
+            'done' => ['key' => 'done', 'title' => __('Completed tasks'), 'items' => collect()],
             'overdue' => ['key' => 'overdue', 'title' => __('Overdue'), 'items' => collect()],
             'today' => ['key' => 'today', 'title' => __('Today'), 'items' => collect()],
             'tomorrow' => ['key' => 'tomorrow', 'title' => __('Tomorrow'), 'items' => collect()],
@@ -569,6 +740,68 @@ class SeoChecklistService
             'later' => ['key' => 'later', 'title' => __('Later'), 'items' => collect()],
             'no_due' => ['key' => 'no_due', 'title' => __('Important without due date'), 'items' => collect()],
         ];
+    }
+
+    /**
+     * Недавно закрытые задачи «моих» ролей — для фильтра «Выполненные».
+     *
+     * @param  array<int, int>  $projectIds
+     * @param  array<int, string[]>  $rolesByProject
+     * @return \Illuminate\Support\Collection<int, SeoChecklistItem>
+     */
+    private function recentDoneWorkPlanItems(
+        array $projectIds,
+        array $rolesByProject,
+        int $userId,
+        int $limit = 120
+    ) {
+        if ($projectIds === []) {
+            return collect();
+        }
+
+        $query = SeoChecklistItem::query()
+            ->whereIn('project_id', $projectIds)
+            ->whereNull('parent_id')
+            ->whereIn('status', SeoChecklistItem::CLOSED_STATUSES)
+            ->whereNotNull('done_at')
+            ->where('done_at', '>=', now()->subDays(120)->startOfDay())
+            ->with([
+                'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
+                'createdByUser',
+                'doneByUser',
+                'notes' => function ($q) use ($userId) {
+                    $q->orderByDesc('id')->with('user');
+                    if (SeoChecklistNoteRead::tableReady()) {
+                        $q->with([
+                            'reads' => function ($rq) use ($userId) {
+                                $rq->where('user_id', $userId);
+                            },
+                        ]);
+                    }
+                },
+                'children' => function ($q) use ($userId) {
+                    $q->orderBy('sort')->orderBy('id')
+                        ->with([
+                            'createdByUser',
+                            'doneByUser',
+                            'timeLogs' => function ($tq) use ($userId) {
+                                $tq->where('user_id', $userId)->whereNull('ended_at')->orderByDesc('id');
+                            },
+                        ]);
+                },
+                'timeLogs' => function ($q) use ($userId) {
+                    $q->where('user_id', $userId)->whereNull('ended_at')->orderByDesc('id');
+                },
+            ])
+            ->orderByDesc('done_at')
+            ->limit(max(20, $limit * 2));
+
+        return $query->get()->filter(function (SeoChecklistItem $item) use ($rolesByProject) {
+            return $this->itemMatchesMyRoles(
+                (string) $item->role,
+                $rolesByProject[(int) $item->project_id] ?? []
+            );
+        })->take($limit)->values();
     }
 
     /**
@@ -1158,6 +1391,7 @@ class SeoChecklistService
                         'help' => $task->help,
                         'role' => $task->role,
                         'is_important' => $task->is_important,
+                        'include_in_report' => (bool) $task->include_in_report,
                         'allows_subtasks' => $task->allows_subtasks,
                         'repeat_rule' => $task->repeat_rule,
                         'due_days_from_start' => $task->due_days_from_start,
@@ -1176,6 +1410,7 @@ class SeoChecklistService
                             'help' => $child->help,
                             'role' => $child->role,
                             'is_important' => false,
+                            'include_in_report' => (bool) $child->include_in_report,
                             'allows_subtasks' => false,
                             'repeat_rule' => null,
                             'due_days_from_start' => null,
@@ -1214,7 +1449,13 @@ class SeoChecklistService
     /**
      * @return array{ok:bool,message?:string}
      */
-    public function updateTemplate(SeoChecklistTemplate $template, string $title, ?string $description, ?bool $skipWeekends = null): array
+    public function updateTemplate(
+        SeoChecklistTemplate $template,
+        string $title,
+        ?string $description,
+        ?bool $skipWeekends = null,
+        ?bool $adminOnly = null
+    ): array
     {
         if ($template->is_system && !User::isUserAdmin()) {
             return ['ok' => false, 'message' => __('System template is read-only')];
@@ -1231,6 +1472,12 @@ class SeoChecklistService
         ];
         if ($skipWeekends !== null && Schema::hasColumn('seo_checklist_templates', 'skip_weekends')) {
             $fill['skip_weekends'] = (bool) $skipWeekends;
+        }
+        if ($adminOnly !== null
+            && Schema::hasColumn('seo_checklist_templates', 'admin_only')
+            && User::isUserAdmin()
+        ) {
+            $fill['admin_only'] = (bool) $adminOnly;
         }
         $template->forceFill($fill)->save();
 
@@ -1322,6 +1569,9 @@ class SeoChecklistService
             'is_important' => array_key_exists('is_important', $payload)
                 ? (bool) $payload['is_important']
                 : $task->is_important,
+            'include_in_report' => array_key_exists('include_in_report', $payload)
+                ? (bool) $payload['include_in_report']
+                : $task->include_in_report,
             'allows_subtasks' => array_key_exists('allows_subtasks', $payload)
                 ? (bool) $payload['allows_subtasks']
                 : $task->allows_subtasks,
@@ -1391,6 +1641,131 @@ class SeoChecklistService
         $ordered[$index] = $ordered[$swapWith];
         $ordered[$swapWith] = $tmp;
 
+        foreach ($ordered as $i => $row) {
+            $newSort = ($i + 1) * 10;
+            if ((int) $row->sort !== $newSort) {
+                $row->forceFill(['sort' => $newSort])->save();
+            }
+        }
+
+        return ['ok' => true];
+    }
+
+    /**
+     * Переставить задачу внутри этапа: перед beforeId, либо в конец если beforeId = null.
+     *
+     * @return array{ok:bool,message?:string}
+     */
+    public function reorderTemplateTask(SeoChecklistTemplate $template, int $taskId, ?int $beforeId): array
+    {
+        if ($template->is_system && !User::isUserAdmin()) {
+            return ['ok' => false, 'message' => __('System template is read-only')];
+        }
+
+        /** @var SeoChecklistTemplateTask|null $task */
+        $task = $template->tasks()->where('id', $taskId)->whereNull('parent_id')->first();
+        if (!$task) {
+            return ['ok' => false, 'message' => __('Task not found')];
+        }
+
+        $siblings = $template->tasks()
+            ->where('stage_key', $task->stage_key)
+            ->whereNull('parent_id')
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get()
+            ->values();
+
+        $ordered = [];
+        foreach ($siblings as $row) {
+            if ((int) $row->id === $taskId) {
+                continue;
+            }
+            $ordered[] = $row;
+        }
+
+        $insertAt = count($ordered);
+        if ($beforeId !== null && $beforeId > 0) {
+            if ($beforeId === $taskId) {
+                return ['ok' => true];
+            }
+            $found = false;
+            foreach ($ordered as $i => $row) {
+                if ((int) $row->id === $beforeId) {
+                    $insertAt = $i;
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
+                return ['ok' => false, 'message' => __('Task not found')];
+            }
+        }
+
+        array_splice($ordered, $insertAt, 0, [$task]);
+
+        return $this->persistTemplateTaskOrder($ordered);
+    }
+
+    /**
+     * Полный порядок задач этапа (drag-and-drop).
+     *
+     * @param list<int|string> $orderedIds
+     * @return array{ok:bool,message?:string}
+     */
+    public function reorderTemplateTasksByIds(SeoChecklistTemplate $template, int $taskId, array $orderedIds): array
+    {
+        if ($template->is_system && !User::isUserAdmin()) {
+            return ['ok' => false, 'message' => __('System template is read-only')];
+        }
+
+        /** @var SeoChecklistTemplateTask|null $task */
+        $task = $template->tasks()->where('id', $taskId)->whereNull('parent_id')->first();
+        if (!$task) {
+            return ['ok' => false, 'message' => __('Task not found')];
+        }
+
+        $ids = [];
+        foreach ($orderedIds as $raw) {
+            $id = (int) $raw;
+            if ($id > 0 && !in_array($id, $ids, true)) {
+                $ids[] = $id;
+            }
+        }
+        if ($ids === []) {
+            return ['ok' => false, 'message' => __('Error')];
+        }
+
+        $siblings = $template->tasks()
+            ->where('stage_key', $task->stage_key)
+            ->whereNull('parent_id')
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get()
+            ->keyBy('id');
+
+        if ($siblings->count() !== count($ids)) {
+            return ['ok' => false, 'message' => __('Error')];
+        }
+
+        $ordered = [];
+        foreach ($ids as $id) {
+            $row = $siblings->get($id) ?: $siblings->get((string) $id);
+            if (!$row) {
+                return ['ok' => false, 'message' => __('Task not found')];
+            }
+            $ordered[] = $row;
+        }
+
+        return $this->persistTemplateTaskOrder($ordered);
+    }
+
+    /**
+     * @param list<SeoChecklistTemplateTask> $ordered
+     * @return array{ok:bool}
+     */
+    private function persistTemplateTaskOrder(array $ordered): array
+    {
         foreach ($ordered as $i => $row) {
             $newSort = ($i + 1) * 10;
             if ((int) $row->sort !== $newSort) {
@@ -1472,9 +1847,10 @@ class SeoChecklistService
     }
 
     /**
+     * @param array{include_in_report?:bool} $payload
      * @return array{ok:bool,message?:string,task?:SeoChecklistTemplateTask}
      */
-    public function addTemplateSubtask(SeoChecklistTemplate $template, int $parentTaskId, string $title): array
+    public function addTemplateSubtask(SeoChecklistTemplate $template, int $parentTaskId, string $title, array $payload = []): array
     {
         if ($template->is_system && !User::isUserAdmin()) {
             return ['ok' => false, 'message' => __('System template is read-only')];
@@ -1507,6 +1883,7 @@ class SeoChecklistService
             'help' => null,
             'role' => $parent->role,
             'is_important' => false,
+            'include_in_report' => !empty($payload['include_in_report']),
             'allows_subtasks' => false,
             'repeat_rule' => null,
             'due_days_from_start' => null,
@@ -1557,6 +1934,7 @@ class SeoChecklistService
             'help' => trim((string) ($payload['help'] ?? '')) ?: null,
             'role' => $role,
             'is_important' => !empty($payload['is_important']),
+            'include_in_report' => !empty($payload['include_in_report']),
             'allows_subtasks' => true,
             'repeat_rule' => $repeat,
             'due_days_from_start' => $this->normalizeDueDays($payload['due_days_from_start'] ?? null),
@@ -1784,6 +2162,7 @@ class SeoChecklistService
             'help' => trim((string) ($payload['help'] ?? '')) ?: null,
             'role' => $role,
             'is_important' => !empty($payload['is_important']),
+            'include_in_report' => !empty($payload['include_in_report']),
             'allows_subtasks' => true,
             'repeat_rule' => $repeat,
             'due_days_from_start' => $dueDays,
@@ -1834,6 +2213,9 @@ class SeoChecklistService
         }
         if (array_key_exists('is_important', $payload)) {
             $fill['is_important'] = (bool) $payload['is_important'];
+        }
+        if (array_key_exists('include_in_report', $payload)) {
+            $fill['include_in_report'] = (bool) $payload['include_in_report'];
         }
         if (array_key_exists('allows_subtasks', $payload)) {
             $fill['allows_subtasks'] = (bool) $payload['allows_subtasks'];
@@ -1998,6 +2380,7 @@ class SeoChecklistService
                         'help' => $task->help,
                         'role' => $task->role,
                         'is_important' => $task->is_important,
+                        'include_in_report' => (bool) $task->include_in_report,
                         'allows_subtasks' => true,
                         'repeat_rule' => $task->repeat_rule,
                         'due_days_from_start' => $task->due_days_from_start,
@@ -2008,6 +2391,7 @@ class SeoChecklistService
                         ),
                         'links_json' => $task->links_json ?: [],
                         'status' => 'todo',
+                        'created_by' => $userId,
                     ]);
 
                     foreach ($task->children as $child) {
@@ -2022,12 +2406,14 @@ class SeoChecklistService
                             'help' => $child->help,
                             'role' => $child->role ?: $task->role,
                             'is_important' => false,
+                            'include_in_report' => (bool) $child->include_in_report,
                             'allows_subtasks' => false,
                             'repeat_rule' => null,
                             'due_days_from_start' => null,
                             'due_at' => null,
                             'links_json' => [],
                             'status' => 'todo',
+                            'created_by' => $userId,
                         ]);
                     }
                 }
@@ -2090,6 +2476,16 @@ class SeoChecklistService
                 if (!$this->canApproveReview($project, $userId)) {
                     return ['ok' => false, 'message' => __('Only PM or auditor can approve')];
                 }
+                $openChildren = SeoChecklistItem::query()
+                    ->where('parent_id', (int) $item->id)
+                    ->whereNotIn('status', SeoChecklistItem::CLOSED_STATUSES)
+                    ->count();
+                if ($openChildren > 0) {
+                    return [
+                        'ok' => false,
+                        'message' => __('Close open checklist items first', ['count' => $openChildren]),
+                    ];
+                }
             }
         }
 
@@ -2114,6 +2510,62 @@ class SeoChecklistService
         ], $this->itemActivitySnapshot($item)));
 
         return ['ok' => true, 'item' => $item];
+    }
+
+    /**
+     * Порядок пунктов чеклиста (подзадач) внутри родительской задачи — drag-and-drop.
+     *
+     * @param list<int|string> $orderedIds
+     * @return array{ok:bool,message?:string}
+     */
+    public function reorderSubtasksByIds(SeoChecklistProject $project, int $parentId, array $orderedIds): array
+    {
+        if ($project->status === 'archived') {
+            return ['ok' => false, 'message' => __('Project not found')];
+        }
+
+        /** @var SeoChecklistItem|null $parent */
+        $parent = $project->items()->where('id', $parentId)->whereNull('parent_id')->first();
+        if (!$parent) {
+            return ['ok' => false, 'message' => __('Task not found')];
+        }
+
+        $ids = [];
+        foreach ($orderedIds as $raw) {
+            $id = (int) $raw;
+            if ($id > 0 && !in_array($id, $ids, true)) {
+                $ids[] = $id;
+            }
+        }
+        if ($ids === []) {
+            return ['ok' => false, 'message' => __('Error')];
+        }
+
+        $siblings = $project->items()
+            ->where('parent_id', $parent->id)
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get()
+            ->keyBy('id');
+
+        if ($siblings->count() !== count($ids)) {
+            return ['ok' => false, 'message' => __('Error')];
+        }
+
+        foreach ($ids as $i => $id) {
+            $row = $siblings->get($id) ?: $siblings->get((string) $id);
+            if (!$row) {
+                return ['ok' => false, 'message' => __('Task not found')];
+            }
+            $newSort = ($i + 1) * 10;
+            if ((int) $row->sort !== $newSort) {
+                $row->forceFill(['sort' => $newSort])->save();
+            }
+        }
+
+        $project->forceFill(['last_activity_at' => now()])->save();
+
+        return ['ok' => true];
     }
 
     /**
@@ -2172,6 +2624,32 @@ class SeoChecklistService
     }
 
     /**
+     * Число задач «На проверку» для шапки / бейджа (без загрузки самих задач).
+     */
+    public function reviewQueueCountForUser(int $userId): int
+    {
+        $projects = $this->accessibleProjectsQuery($userId)
+            ->where('status', 'active')
+            ->get(['id', 'user_id', 'owner_user_id', 'pm_user_id', 'team_id']);
+
+        $allowedIds = [];
+        foreach ($projects as $project) {
+            if ($this->canApproveReview($project, $userId)) {
+                $allowedIds[] = (int) $project->id;
+            }
+        }
+        if ($allowedIds === []) {
+            return 0;
+        }
+
+        return (int) SeoChecklistItem::query()
+            ->whereIn('project_id', $allowedIds)
+            ->whereNull('parent_id')
+            ->where('status', 'review')
+            ->count();
+    }
+
+    /**
      * Очередь «На проверку» для PM/аудиторов.
      *
      * @return \Illuminate\Support\Collection<int, SeoChecklistItem>
@@ -2192,14 +2670,23 @@ class SeoChecklistService
             return collect();
         }
 
-        return SeoChecklistItem::query()
+        $items = SeoChecklistItem::query()
             ->whereIn('project_id', $allowedIds)
             ->whereNull('parent_id')
             ->where('status', 'review')
             ->with([
                 'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
-                'notes' => function ($q) {
+                'createdByUser',
+                'doneByUser',
+                'notes' => function ($q) use ($userId) {
                     $q->orderByDesc('id')->with('user');
+                    if (SeoChecklistNoteRead::tableReady()) {
+                        $q->with([
+                            'reads' => function ($rq) use ($userId) {
+                                $rq->where('user_id', $userId);
+                            },
+                        ]);
+                    }
                 },
                 'children' => function ($q) use ($userId) {
                     $q->orderBy('sort')->orderBy('id')
@@ -2219,6 +2706,10 @@ class SeoChecklistService
             ->orderBy('id')
             ->limit($limit)
             ->get();
+
+        $this->attachStatusAuditLabels($items);
+
+        return $items;
     }
 
     public function logActivity(
@@ -2238,6 +2729,113 @@ class SeoChecklistService
             'type' => $type,
             'meta_json' => $meta,
         ]);
+    }
+
+    /**
+     * Подписи последней смены статуса по item_id (для блока «i» / audit).
+     *
+     * @param  array<int, int|string>  $itemIds
+     * @return array<int, string>
+     */
+    public function lastStatusChangeLabelsByItemIds(array $itemIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $itemIds))));
+        if ($ids === [] || !SeoChecklistActivityLog::tableReady()) {
+            return [];
+        }
+
+        $latestIds = SeoChecklistActivityLog::query()
+            ->selectRaw('MAX(id) as id')
+            ->where('type', 'status_change')
+            ->whereIn('item_id', $ids)
+            ->groupBy('item_id')
+            ->pluck('id')
+            ->all();
+        if ($latestIds === []) {
+            return [];
+        }
+
+        $logs = SeoChecklistActivityLog::query()
+            ->whereIn('id', $latestIds)
+            ->with('user:id,name,last_name,email')
+            ->get();
+
+        $out = [];
+        foreach ($logs as $log) {
+            $label = $this->formatStatusChangeAuditLabel($log);
+            if ($label !== null && $log->item_id) {
+                $out[(int) $log->item_id] = $label;
+            }
+        }
+
+        return $out;
+    }
+
+    public function formatStatusChangeAuditLabel(SeoChecklistActivityLog $log): ?string
+    {
+        $meta = is_array($log->meta_json) ? $log->meta_json : [];
+        $to = (string) ($meta['to'] ?? '');
+        if ($to === '') {
+            return null;
+        }
+
+        $name = $this->userDisplayName($log->user);
+        $at = $log->created_at
+            ? $log->created_at->format('d.m.Y') . "\xc2\xa0" . $log->created_at->format('H:i')
+            : '—';
+
+        return __('Status changed to :status by :name on :date', [
+            'status' => $this->statusLabel($to),
+            'name' => $name ?: '—',
+            'date' => $at,
+        ]);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, SeoChecklistItem>|array<int, SeoChecklistItem>  $items
+     */
+    public function attachStatusAuditLabels($items): void
+    {
+        $list = collect($items)->filter();
+        if ($list->isEmpty()) {
+            return;
+        }
+
+        $ids = [];
+        foreach ($list as $item) {
+            $ids[] = (int) $item->id;
+            if ($item->relationLoaded('children')) {
+                foreach ($item->children as $child) {
+                    $ids[] = (int) $child->id;
+                }
+            }
+        }
+
+        $labels = $this->lastStatusChangeLabelsByItemIds($ids);
+        foreach ($list as $item) {
+            $item->setAttribute('status_audit_label', $labels[(int) $item->id] ?? null);
+            if ($item->relationLoaded('children')) {
+                foreach ($item->children as $child) {
+                    $child->setAttribute('status_audit_label', $labels[(int) $child->id] ?? null);
+                }
+            }
+        }
+    }
+
+    public function statusLabel(string $status): string
+    {
+        $map = [
+            'todo' => __('Status new'),
+            'doing' => __('Status doing'),
+            'rework' => __('Status rework'),
+            'clarify' => __('Status clarify'),
+            'review' => __('Status review'),
+            'done' => __('Status done'),
+            'skip' => __('Status skip'),
+            'blocked' => __('Status blocked'),
+        ];
+
+        return $map[$status] ?? $status;
     }
 
     /**

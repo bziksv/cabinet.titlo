@@ -152,6 +152,11 @@
     margin-left: 0.35rem;
 }
 
+#header-nav-bar.cabinet-header .cabinet-header-sc-review {
+    background: #2563eb !important;
+    color: #fff !important;
+}
+
 /* Подсказки бейджей чеклиста в шапке — без native title */
 #header-nav-bar.cabinet-header .cabinet-header-tip {
     position: relative;

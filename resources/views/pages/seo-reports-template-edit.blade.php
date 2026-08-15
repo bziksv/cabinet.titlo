@@ -1,5 +1,6 @@
 @component('component.card', [
     'title' => __('Edit template') . ' · ' . $template->title,
+    'titleHtml' => e(__('Edit template') . ' · ' . $template->title) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-seo-reports'])->render(),
     'documentTitle' => __('Edit template') . ' · ' . $template->title,
 ])
     @slot('css')

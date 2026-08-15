@@ -1,5 +1,5 @@
 @component('component.card', [
-    'title' => \App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(auth()->id()),
+    'titleHtml' => cabinet_sc_module_title_html(),
     'documentTitle' => cabinet_sc_document_title(__('For review')),
 ])
     @slot('css')
@@ -12,6 +12,9 @@
          data-csrf="{{ csrf_token() }}"
          data-status-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/status') }}"
          data-note-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/notes') }}"
+         data-subtask-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/subtasks') }}"
+         data-mark-read-url="{{ route('pages.seo-checklist.chronicle.read') }}"
+         data-mark-unread-url="{{ route('pages.seo-checklist.chronicle.unread') }}"
          data-timer-start-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/timer/start') }}"
          data-timer-stop-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/timer/stop') }}"
          data-timer-stop-active-url="{{ route('pages.seo-checklist.timer.stop-active') }}"
@@ -21,7 +24,14 @@
          data-i18n-timer-start="{{ e(__('Start timer')) }}"
          data-i18n-timer-stop="{{ e(__('Stop timer')) }}"
          data-i18n-timer-start-short="{{ e(__('Timer start')) }}"
-         data-i18n-timer-stop-short="{{ e(__('Timer stop')) }}">
+         data-i18n-timer-stop-short="{{ e(__('Timer stop')) }}"
+         data-i18n-waiting-review="{{ e(__('Waiting for review')) }}"
+         data-i18n-mark-read="{{ e(__('Mark as read')) }}"
+         data-i18n-mark-unread="{{ e(__('Mark note unread')) }}"
+         data-i18n-mark-unread-short="{{ e(__('Mark unread short')) }}"
+         data-i18n-unread="{{ e(__('Unread')) }}"
+         data-i18n-send-review-first="{{ e(__('Send to review first')) }}"
+         data-i18n-close-subs-first="{{ e(__('Close open checklist items first')) }}">
         @include('pages.partials.seo-checklist-nav', [
             'scTab' => 'review',
             'scMyTasksCount' => $myTasksCount ?? null,

@@ -12,11 +12,12 @@ class SeoChecklistTemplateTask extends Model
 
     protected $fillable = [
         'template_id', 'parent_id', 'code', 'stage_key', 'stage_sort', 'sort',
-        'title', 'help', 'role', 'is_important', 'allows_subtasks', 'repeat_rule', 'due_days_from_start', 'links_json',
+        'title', 'help', 'role', 'is_important', 'include_in_report', 'allows_subtasks', 'repeat_rule', 'due_days_from_start', 'links_json',
     ];
 
     protected $casts = [
         'is_important' => 'boolean',
+        'include_in_report' => 'boolean',
         'allows_subtasks' => 'boolean',
         'links_json' => 'array',
     ];

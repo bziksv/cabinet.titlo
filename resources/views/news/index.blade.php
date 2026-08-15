@@ -21,11 +21,11 @@
         <div class="cabinet-news-feed position-relative">
             <nav class="cabinet-news-scroll-nav" aria-label="Прокрутка страницы">
                 <button type="button" class="cabinet-news-scroll-nav__btn" data-news-scroll="up"
-                        title="Прокрутить страницу вверх" aria-label="Прокрутить страницу вверх">
+                        aria-label="Прокрутить страницу вверх">
                     <i class="fas fa-chevron-up" aria-hidden="true"></i>
                 </button>
                 <button type="button" class="cabinet-news-scroll-nav__btn" data-news-scroll="down"
-                        title="Прокрутить страницу вниз" aria-label="Прокрутить страницу вниз">
+                        aria-label="Прокрутить страницу вниз">
                     <i class="fas fa-chevron-down" aria-hidden="true"></i>
                 </button>
             </nav>
