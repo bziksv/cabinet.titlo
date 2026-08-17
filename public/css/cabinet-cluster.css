@@ -193,13 +193,32 @@
     opacity: 1;
 }
 
+
+
 .cabinet-cluster-projects-page .cabinet-cluster-projects-card > .card-header {
     background-color: var(--bs-body-bg);
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-body {
+    padding: 1rem 1rem 0.75rem;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-table {
+    width: 100% !important;
+    margin: 0 !important;
 }
 
 .cabinet-cluster-projects-page .cabinet-cluster-projects-table thead th {
     font-size: 0.8125rem;
     white-space: nowrap;
+    vertical-align: middle !important;
+    position: relative;
 }
 
 .cabinet-cluster-projects-page .cabinet-cluster-projects-table .project-domain,
@@ -214,24 +233,171 @@
     white-space: nowrap;
 }
 
-.cabinet-cluster-projects-page .cabinet-cluster-projects-actions-col {
-    width: 10rem;
+.cabinet-cluster-projects-page .cabinet-cluster-projects-actions-col,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.cabinet-cluster-projects-actions-col,
+.cabinet-cluster-projects-page #my-cluster-projects tbody td:last-child {
+    width: 11.75rem;
+    min-width: 11.75rem;
+    max-width: 12.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-project-actions {
+    width: 100%;
+    min-width: 0;
 }
 
 .cabinet-cluster-projects-page .cabinet-cluster-project-actions .btn-group-sm .btn {
     flex: 1 1 auto;
 }
 
-.cabinet-cluster-projects-page .cabinet-cluster-projects-table .dataTables_wrapper {
-    padding: 0.75rem 1rem 1rem;
+.cabinet-cluster-projects-page .cabinet-cluster-project-actions > .btn-primary {
+    white-space: normal;
+    line-height: 1.25;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
 }
 
-.cabinet-cluster-projects-page .cabinet-cluster-projects-table .dataTables_filter label,
-.cabinet-cluster-projects-page .cabinet-cluster-projects-table .dataTables_length label {
-    display: flex;
+/* Toolbar: поиск и «25» на одной линии, одинаковая высота */
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper {
+    padding: 0;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .cabinet-cluster-dt-toolbar {
+    display: flex !important;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.35rem;
-    margin-bottom: 0;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    width: 100%;
+    margin: 0 0 1rem !important;
+    float: none !important;
+    clear: both;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .cabinet-cluster-dt-search,
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .cabinet-cluster-dt-length {
+    float: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .cabinet-cluster-dt-length {
+    margin-left: auto !important;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_filter,
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_length {
+    float: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: left;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_filter label,
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_length label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.4rem;
+    margin: 0 !important;
+    height: 34px;
+    font-weight: 400;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_filter input,
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_length select {
+    box-sizing: border-box !important;
+    height: 34px !important;
+    margin: 0 !important;
+    padding: 0.375rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    line-height: 1.25 !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 0.25rem !important;
+    background-color: #fff !important;
+    vertical-align: middle;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_filter input {
+    min-width: 16rem;
+    width: 16rem;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_length select {
+    min-width: 4.5rem;
+    width: auto;
+    padding-right: 1.75rem !important;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_info,
+.cabinet-cluster-projects-page #my-cluster-projects_wrapper .dataTables_paginate {
+    padding: 0.85rem 0 0.25rem;
+}
+
+/* Sort: без PNG, стрелки справа и по вертикали по центру */
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc_disabled,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc_disabled {
+    background-image: none !important;
+    padding-right: 1.6rem !important;
+    cursor: pointer;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting:after,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc:after,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc:after,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc_disabled:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc_disabled:after,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc_disabled:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc_disabled:after {
+    position: absolute !important;
+    top: 50% !important;
+    bottom: auto !important;
+    left: auto !important;
+    display: block !important;
+    margin: 0 !important;
+    opacity: 0.35;
+    font-size: 0.7rem;
+    line-height: 1;
+    transform: translateY(-50%);
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc_disabled:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc_disabled:before {
+    right: 0.45em !important;
+    content: "↑";
+    transform: translateY(calc(-50% - 0.4em));
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting:after,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc:after,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc:after,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc_disabled:after,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc_disabled:after {
+    right: 0.45em !important;
+    content: "↓";
+    transform: translateY(calc(-50% + 0.4em));
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_asc:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_desc:after {
+    opacity: 1;
+    color: #0d6efd;
+}
+
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_disabled:before,
+.cabinet-cluster-projects-page #my-cluster-projects thead th.sorting_disabled:after {
+    display: none !important;
+    content: none !important;
 }
 
 .cabinet-cluster-config-page .cabinet-cluster-settings-card.card-outline {

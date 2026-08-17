@@ -86,6 +86,7 @@
     var sessionVersions = [];
     var activeVersionId = null;
     var resultsStale = false;
+    var highlightSuppressTimer = null;
     var autosaveTimer = null;
     var autosaveInFlight = false;
     var suppressAutosave = false;
@@ -314,7 +315,28 @@
         providersBarEl.innerHTML = parts.join(' · ');
     }
 
+    function beginHighlightProgrammaticUpdate() {
+        suppressHighlightSync = true;
+        if (highlightSuppressTimer) {
+            clearTimeout(highlightSuppressTimer);
+            highlightSuppressTimer = null;
+        }
+    }
+
+    function endHighlightProgrammaticUpdate(delayMs) {
+        if (highlightSuppressTimer) {
+            clearTimeout(highlightSuppressTimer);
+        }
+        highlightSuppressTimer = window.setTimeout(function () {
+            suppressHighlightSync = false;
+            highlightSuppressTimer = null;
+        }, typeof delayMs === 'number' ? delayMs : 400);
+    }
+
     function markResultsStale() {
+        if (suppressHighlightSync) {
+            return;
+        }
         if (!lastResult || resultsStale) {
             updateStaleBanner();
             return;
@@ -1031,6 +1053,15 @@
     }
 
     function tryResumeSessionFromUrl() {
+        var historyMatch = window.location.search.match(/(?:\?|&)history=(\d+)/);
+        if (historyMatch) {
+            var historyId = parseInt(historyMatch[1], 10);
+            if (historyId) {
+                loadSavedHistoryById(historyId);
+                return;
+            }
+        }
+
         var match = window.location.search.match(/(?:\?|&)session=(\d+)/);
         if (!match) {
             return;
@@ -1040,6 +1071,29 @@
         if (id) {
             loadSession(id, true);
         }
+    }
+
+    function loadSavedHistoryById(id) {
+        var card = document.querySelector('[data-cabinet-saved-checks]');
+        var base = (card && card.getAttribute('data-history-url'))
+            || ((config.urls && config.urls.history) || '/esenin-text-check/history');
+        setAutosaveStatus('Загрузка…', 'muted');
+        getJson(base + '/' + id).then(function (data) {
+            if (data && data.ok && data.item) {
+                openSavedCheck(data.item);
+                try {
+                    var url = new URL(window.location.href);
+                    url.searchParams.delete('history');
+                    window.history.replaceState({}, '', url.pathname + (url.search || '') + url.hash);
+                } catch (e) { /* ignore */ }
+            } else {
+                setAutosaveStatus('Не удалось открыть сохранение', 'danger');
+                showError((data && data.message) || 'Не удалось открыть сохранение');
+            }
+        }).catch(function () {
+            setAutosaveStatus('Не удалось открыть сохранение', 'danger');
+            showError('Не удалось открыть сохранение');
+        });
     }
 
     function formatNumber(value) {
@@ -2019,7 +2073,12 @@
 
         if (shareCreateEl) {
             shareCreateEl.addEventListener('click', function () {
-                if (!lastResult || resultsStale) {
+                if (!lastResult) {
+                    showError('Сначала выполните проверку');
+                    return;
+                }
+                if (resultsStale) {
+                    showError('Текст изменён после проверки. Нажмите «Перепроверить», затем создайте ссылку.');
                     return;
                 }
                 shareCreateEl.disabled = true;
@@ -2222,6 +2281,9 @@
         }
 
         highlightInlineEditor.on('change', function () {
+            if (suppressHighlightSync) {
+                return;
+            }
             syncFromHighlightEdit();
             setTimeout(repositionHighlightFloatToolbar, 0);
         });
@@ -2353,12 +2415,12 @@
 
         if (highlightEl) {
             destroyHighlightInlineEditor();
-            suppressHighlightSync = true;
+            beginHighlightProgrammaticUpdate();
             highlightEl.innerHTML = (lastResult.highlights && lastResult.highlights[block]) || lastResult.highlighted_html || '';
             highlightEl.setAttribute('contenteditable', 'true');
-            suppressHighlightSync = false;
             hardenHighlightMarkIcons(highlightEl);
             initMarkTooltips(highlightEl);
+            endHighlightProgrammaticUpdate(800);
         }
 
         if (panelTitleEl) {
@@ -2452,6 +2514,12 @@
         updateSharePanel(share || { available: publicShareAvailable, stale: false });
         relocateEditor(true);
         updateCkeditorFloatVisibility();
+        // После переноса редактора / CK снова включаем кнопку ссылки (ложный stale от input).
+        window.setTimeout(function () {
+            if (!resultsStale) {
+                updateSharePanel(share || { available: publicShareAvailable, stale: false });
+            }
+        }, 850);
     }
 
     function runCheck() {
@@ -2462,6 +2530,11 @@
             session_id: sessionId,
             name: taskNameValue()
         };
+
+        var saveHistoryEl = root.querySelector('[data-esenin-save-history]');
+        if (saveHistoryEl) {
+            payload.save_history = saveHistoryEl.checked ? 1 : 0;
+        }
 
         if (activeSource === 'url') {
             payload.url = urlEl ? urlEl.value.trim() : '';
@@ -2505,6 +2578,11 @@
             if (data.session) {
                 applySessionPayload(data.session, false);
                 setAutosaveStatus('Сохранено', 'success');
+            }
+            if (data.history_warning) {
+                setAutosaveStatus(data.history_warning, 'warning');
+            } else if (data.history_id) {
+                prependSavedCheckFromResult(data, data.result || {});
             }
         }
 
@@ -2630,8 +2708,269 @@
         }, true);
     }
 
+    function pad2(n) {
+        return n < 10 ? '0' + n : String(n);
+    }
+
+    function formatNowLabel() {
+        var d = new Date();
+        return pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear()
+            + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    }
+
+    function updateSavedChecksCount(savedCount, limit) {
+        var countEl = document.querySelector('[data-cabinet-saved-checks-count]');
+        if (!countEl) {
+            return;
+        }
+        if (limit == null) {
+            var parts = (countEl.textContent || '').split('/');
+            if (parts.length > 1) {
+                limit = parseInt(parts[1], 10) || 0;
+            }
+        }
+        if (limit) {
+            countEl.textContent = String(savedCount) + ' / ' + String(limit);
+        } else {
+            countEl.textContent = String(savedCount);
+        }
+    }
+
+    function prependSavedCheckFromResult(data, result) {
+        var body = document.querySelector('[data-cabinet-saved-checks-body]');
+        if (!body || !data.history_id) {
+            return;
+        }
+        var empty = body.querySelector('[data-cabinet-saved-checks-empty]');
+        if (empty) {
+            empty.remove();
+        }
+        var stats = (result && result.stats) || {};
+        var risk = result && result.risk != null ? result.risk : '—';
+        var level = result && result.level ? ' <span class="text-muted small">' + escapeHtml(result.level) + '</span>' : '';
+        var title = taskNameValue() || (activeSource === 'url' && urlEl ? urlEl.value.trim() : 'Проверка Есенина');
+        if (title.length > 80) {
+            title = title.slice(0, 80) + '…';
+        }
+        var chars = stats.chars != null ? formatNumber(stats.chars) : '—';
+        var words = stats.words != null ? formatNumber(stats.words) : '—';
+        var tr = document.createElement('tr');
+        tr.setAttribute('data-id', String(data.history_id));
+        tr.setAttribute('data-source', 'esenin-text-check');
+        tr.innerHTML =
+            '<td class="text-nowrap">' + escapeHtml(formatNowLabel()) + '</td>' +
+            '<td>' + escapeHtml(title) + '</td>' +
+            '<td class="text-nowrap">—</td>' +
+            '<td class="text-nowrap">' + escapeHtml(String(risk)) + level + '</td>' +
+            '<td class="text-nowrap">' + escapeHtml(String(chars)) + '</td>' +
+            '<td class="text-nowrap">' + escapeHtml(String(words)) + '</td>' +
+            '<td class="text-nowrap">' +
+                '<button type="button" class="btn btn-xs btn-outline-primary cabinet-ta-uniq-history-open">Открыть</button> ' +
+                '<button type="button" class="btn btn-xs btn-outline-danger cabinet-ta-uniq-history-del">Удалить</button>' +
+            '</td>';
+        body.insertBefore(tr, body.firstChild);
+        if (data.history_saved_count != null) {
+            updateSavedChecksCount(data.history_saved_count, data.history_limit);
+        }
+    }
+
+    function renderHistoryUniquenessPanel(u) {
+        var panel = document.getElementById('cabinet-ta-uniq-history-panel')
+            || document.querySelector('[data-cabinet-saved-checks-panel]');
+        if (!panel || !u) {
+            return;
+        }
+        panel.classList.remove('d-none');
+        var pct = u.uniqueness_pct != null ? u.uniqueness_pct + '%' : '—';
+        if (u.no_significant_matches) {
+            pct = 'н/д';
+        }
+        var html = '<div class="card shadow-sm mb-3"><div class="card-header py-2"><h3 class="card-title h6 mb-0">Уникальность: '
+            + escapeHtml(String(pct))
+            + '</h3></div><div class="card-body">';
+        if (u.error) {
+            html += '<div class="alert alert-warning mb-0">' + escapeHtml(u.message || 'Ошибка') + '</div>';
+        } else {
+            html += '<div class="row g-3"><div class="col-lg-8">';
+            html += '<div class="small text-secondary mb-2">Цветом отмечены неуникальные фрагменты.</div>';
+            html += '<div class="cabinet-esenin-text-view__content cabinet-esenin-text-view__content--readonly border rounded p-3">';
+            if (u.highlighted_html) {
+                html += u.highlighted_html;
+            } else if (u.text) {
+                html += escapeHtml(u.text).replace(/\n/g, '<br>');
+            } else {
+                html += '<span class="text-muted">Текст проверки не сохранён в этой записи.</span>';
+            }
+            html += '</div></div><div class="col-lg-4"><h6 class="fw-semibold mb-2">Источники</h6><ul class="list-unstyled mb-0">';
+            (u.sources || []).forEach(function (s) {
+                html += '<li class="mb-2 pb-2 border-bottom"><div class="small fw-semibold">'
+                    + escapeHtml(String(s.overlap_pct != null ? s.overlap_pct : 0)) + '%</div>';
+                if (s.url) {
+                    html += '<a class="small text-break" href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener">'
+                        + escapeHtml(s.url) + '</a>';
+                }
+                html += '</li>';
+            });
+            html += '</ul></div></div>';
+        }
+        html += '</div></div>';
+        panel.innerHTML = html;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function openSavedCheck(item) {
+        var params = item.params || {};
+        var results = item.results || {};
+
+        // Полный снимок анализа текста — открываем в модуле анализатора.
+        if (params.had_analysis || (results.analysis && typeof results.analysis === 'object')) {
+            var hid = item.id;
+            if (hid) {
+                window.location.href = '/text-analyzer/uniqueness-history/' + encodeURIComponent(hid) + '/open';
+                return;
+            }
+        }
+
+        var esenin = results.esenin;
+        var uniq = results.uniqueness;
+
+        if (esenin && (esenin.details || esenin.highlights || esenin.highlighted_html
+            || esenin.stats || esenin.risk != null || esenin.metrics)) {
+            var text = params.plain || params.text || '';
+            if (!text && uniq && (uniq.text || uniq.plain)) {
+                text = uniq.text || uniq.plain || '';
+            }
+            if (taskNameEl && (params.task_name || item.title)) {
+                taskNameEl.value = params.task_name || item.title || '';
+            }
+            if (params.url && urlEl && (params.type === 'url' || params.source === 'url')) {
+                // URL-проверки: подставляем адрес, текст — из plain
+                if (activeSource !== 'url') {
+                    var urlTab = root.querySelector('[data-esenin-source="url"]');
+                    if (urlTab) {
+                        urlTab.click();
+                    }
+                }
+                urlEl.value = params.url;
+            }
+            if (text) {
+                beginHighlightProgrammaticUpdate();
+                suppressAutosave = true;
+                syncAllEditorsFromHtml(
+                    /<[a-z][\s\S]*>/i.test(text) ? text : escapeHtml(text).replace(/\n/g, '<br>')
+                );
+                suppressAutosave = false;
+                endHighlightProgrammaticUpdate(800);
+                updateCharCount();
+            }
+            if (esenin.details || esenin.highlights || esenin.highlighted_html || esenin.metrics) {
+                renderResult(esenin);
+                setAutosaveStatus('Загружено из сохранённых', 'success');
+            } else if (esenin.risk != null) {
+                lastResult = esenin;
+                resultsStale = true;
+                if (emptyState) {
+                    emptyState.classList.add('d-none');
+                }
+                if (resultsWrap) {
+                    resultsWrap.classList.remove('d-none');
+                }
+                updateStaleBanner();
+                setAutosaveStatus('Только риск — перепроверьте для подсветки', 'warning');
+                showError('В записи сохранён только риск (' + esenin.risk + '). Нажмите «Проверить», чтобы получить полную подсветку.');
+            }
+            var panel = document.querySelector('[data-cabinet-saved-checks-panel]');
+            if (panel) {
+                panel.classList.add('d-none');
+                panel.innerHTML = '';
+            }
+            if (resultsWrap) {
+                resultsWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            return;
+        }
+
+        if (uniq) {
+            renderHistoryUniquenessPanel(uniq);
+            return;
+        }
+
+        showError('В этой записи нет данных для открытия');
+    }
+
+    function initSavedChecksHistory() {
+        var card = document.querySelector('[data-cabinet-saved-checks]');
+        if (!card) {
+            return;
+        }
+        var base = card.getAttribute('data-history-url') || ((config.urls && config.urls.history) || '/esenin-text-check/history');
+        var csrf = card.getAttribute('data-csrf') || '';
+
+        card.addEventListener('click', function (event) {
+            var openBtn = event.target.closest('.cabinet-ta-uniq-history-open');
+            var delBtn = event.target.closest('.cabinet-ta-uniq-history-del');
+            if (!openBtn && !delBtn) {
+                return;
+            }
+            var tr = event.target.closest('tr[data-id]');
+            if (!tr) {
+                return;
+            }
+            var id = tr.getAttribute('data-id');
+            if (!id) {
+                return;
+            }
+
+            if (openBtn) {
+                getJson(base + '/' + id).then(function (data) {
+                    if (data && data.ok && data.item) {
+                        openSavedCheck(data.item);
+                    } else {
+                        showError((data && data.message) || 'Не удалось открыть');
+                    }
+                }).catch(function () {
+                    showError('Не удалось открыть');
+                });
+                return;
+            }
+
+            if (!window.confirm('Удалить сохранённую проверку?')) {
+                return;
+            }
+            fetch(base + '/' + id, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrf,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            }).then(function (resp) {
+                return resp.json().then(function (data) {
+                    return { ok: resp.ok, data: data };
+                });
+            }).then(function (pack) {
+                if (!pack.ok) {
+                    showError((pack.data && pack.data.message) || 'Не удалось удалить');
+                    return;
+                }
+                tr.remove();
+                var body = document.querySelector('[data-cabinet-saved-checks-body]');
+                if (body && !body.querySelector('tr[data-id]')) {
+                    body.innerHTML = '<tr data-cabinet-saved-checks-empty><td colspan="7" class="text-secondary text-center py-3">Пока нет сохранённых проверок.</td></tr>';
+                }
+                if (pack.data && pack.data.saved_count != null) {
+                    updateSavedChecksCount(pack.data.saved_count);
+                }
+            }).catch(function () {
+                showError('Не удалось удалить');
+            });
+        });
+    }
+
     initEditor();
     initPublicShare();
+    initSavedChecksHistory();
     updateCharCount();
     updateSubmitButtonLabel();
     updateCkeditorFloatVisibility();

@@ -21,17 +21,19 @@
         @endif
     </p>
     <div class="table-responsive cabinet-ta-table-wrap">
-        <table class="table table-sm table-striped table-hover align-middle mb-0 cabinet-ta-zipf-table">
+        <table class="table table-sm table-striped table-hover align-middle mb-0 cabinet-ta-zipf-table cabinet-ta-sortable-table">
             <thead class="table-light">
             <tr>
-                <th class="text-end" style="width:3rem">#</th>
-                <th>{{ __('Word') }}</th>
-                <th class="text-end">{{ $hasCompare ? __('Your page') : __('Actual values') }}</th>
-                <th class="text-end">{{ __('Ideal values') }}</th>
+                <th class="cabinet-ta-th-sort text-end" style="width:3rem" data-sort-col="0" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">#</th>
+                <th class="cabinet-ta-th-sort" data-sort-col="1" data-sort-type="str" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Word') }}</th>
+                <th class="cabinet-ta-th-sort text-end" data-sort-col="2" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ $hasCompare ? __('Your page') : __('Actual values') }}</th>
+                <th class="cabinet-ta-th-sort text-end" data-sort-col="3" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Ideal values') }}</th>
                 @if($hasCompare)
-                    <th class="text-end">{{ $competitorLabel }}</th>
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="4" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ $competitorLabel }}</th>
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="5" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">Δ</th>
+                @else
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="4" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">Δ</th>
                 @endif
-                <th class="text-end">Δ</th>
             </tr>
             </thead>
             <tbody>
@@ -42,8 +44,8 @@
                     $deltaClass = $delta > 0 ? 'text-success' : ($delta < 0 ? 'text-warning' : '');
                 @endphp
                 <tr>
-                    <td class="text-end font-monospace text-secondary">{{ $row['rank'] }}</td>
-                    <td>
+                    <td class="text-end font-monospace text-secondary" data-order="{{ (int) $row['rank'] }}">{{ $row['rank'] }}</td>
+                    <td data-order="{{ $row['word'] }}">
                         <span class="d-inline-flex flex-wrap align-items-baseline gap-1">
                             <strong class="cabinet-ta-exclude-term">{{ $row['word'] }}</strong>
                             @include('text-analyse.partials.add-to-exclude-btn', [
@@ -52,12 +54,12 @@
                             ])
                         </span>
                     </td>
-                    <td class="text-end font-monospace">{{ $row['actual'] }}</td>
-                    <td class="text-end font-monospace text-secondary">{{ $row['ideal'] }}</td>
+                    <td class="text-end font-monospace" data-order="{{ (int) $row['actual'] }}">{{ $row['actual'] }}</td>
+                    <td class="text-end font-monospace text-secondary" data-order="{{ (int) $row['ideal'] }}">{{ $row['ideal'] }}</td>
                     @if($hasCompare)
-                        <td class="text-end font-monospace">{{ $compActual !== null ? $compActual : '—' }}</td>
+                        <td class="text-end font-monospace" data-order="{{ $compActual !== null ? (int) $compActual : '' }}">{{ $compActual !== null ? $compActual : '—' }}</td>
                     @endif
-                    <td class="text-end font-monospace {{ $deltaClass }}">
+                    <td class="text-end font-monospace {{ $deltaClass }}" data-order="{{ $delta }}">
                         @if($delta > 0)+@endif{{ $delta }}
                     </td>
                 </tr>

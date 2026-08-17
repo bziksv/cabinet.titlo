@@ -496,6 +496,167 @@
         updateTableCount($input);
     }
 
+    function parseSortValue(raw, preferNum) {
+        if (raw === undefined || raw === null) {
+            return { empty: true, num: 0, str: '' };
+        }
+        var s = String(raw).replace(/\u00a0/g, ' ').trim();
+        if (s === '' || s === '—' || s === '–' || s === '-') {
+            return { empty: true, num: 0, str: '' };
+        }
+        var normalized = s.replace(/\s+/g, '').replace(',', '.').replace(/^\+/, '');
+        var num = Number(normalized);
+        var isNum = normalized !== '' && !isNaN(num) && /^-?\d+(\.\d+)?$/.test(normalized);
+        if (preferNum || isNum) {
+            return { empty: !isNum, num: isNum ? num : 0, str: s.toLowerCase() };
+        }
+        return { empty: false, num: 0, str: s.toLowerCase() };
+    }
+
+    function cellSortValue($td, preferNum) {
+        if (!$td || !$td.length) {
+            return { empty: true, num: 0, str: '' };
+        }
+        var order = $td.attr('data-order');
+        if (order !== undefined && order !== null && String(order).length) {
+            return parseSortValue(order, preferNum);
+        }
+        return parseSortValue($td.text(), preferNum);
+    }
+
+    function compareSortValues(a, b, dir) {
+        if (a.empty && b.empty) {
+            return 0;
+        }
+        if (a.empty) {
+            return 1;
+        }
+        if (b.empty) {
+            return -1;
+        }
+        var cmp = a.str.localeCompare(b.str, 'ru', { numeric: true, sensitivity: 'base' });
+        return dir === 'asc' ? cmp : -cmp;
+    }
+
+    function collectSortGroups($tbody) {
+        var groups = [];
+        $tbody.children('tr').each(function () {
+            var $tr = $(this);
+            if ($tr.hasClass('cabinet-ta-word-detail-row')) {
+                if (groups.length) {
+                    groups[groups.length - 1].detail = $tr;
+                }
+                return;
+            }
+            if ($tr.children('td[colspan]').length && $tr.find('.cabinet-ta-exclude-term').length === 0) {
+                groups.push({ row: $tr, detail: null, sticky: true });
+                return;
+            }
+            groups.push({ row: $tr, detail: null, sticky: false });
+        });
+        return groups;
+    }
+
+    function sortTableByColumn($table, colIndex, dir, preferNum) {
+        var $tbody = $table.children('tbody');
+        if (!$tbody.length) {
+            return;
+        }
+        var groups = collectSortGroups($tbody);
+        var sticky = groups.filter(function (g) { return g.sticky; });
+        var sortable = groups.filter(function (g) { return !g.sticky; });
+
+        sortable.sort(function (ga, gb) {
+            var va = cellSortValue(ga.row.children('td').eq(colIndex), preferNum);
+            var vb = cellSortValue(gb.row.children('td').eq(colIndex), preferNum);
+            if (preferNum) {
+                if (va.empty && vb.empty) return 0;
+                if (va.empty) return 1;
+                if (vb.empty) return -1;
+                var cmp = va.num - vb.num;
+                if (cmp !== 0) {
+                    return dir === 'asc' ? cmp : -cmp;
+                }
+                return dir === 'asc'
+                    ? va.str.localeCompare(vb.str, 'ru', { numeric: true, sensitivity: 'base' })
+                    : vb.str.localeCompare(va.str, 'ru', { numeric: true, sensitivity: 'base' });
+            }
+            return compareSortValues(va, vb, dir);
+        });
+
+        sticky.concat(sortable).forEach(function (g) {
+            $tbody.append(g.row);
+            if (g.detail && g.detail.length) {
+                $tbody.append(g.detail);
+            }
+        });
+    }
+
+    function setSortHeaderState($table, $activeTh, dir) {
+        $table.find('thead .cabinet-ta-th-sort').each(function () {
+            var $th = $(this);
+            var active = $th[0] === $activeTh[0];
+            $th.removeClass('is-sorted-asc is-sorted-desc');
+            $th.attr('aria-sort', active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none');
+            if (active) {
+                $th.addClass(dir === 'asc' ? 'is-sorted-asc' : 'is-sorted-desc');
+            }
+            var $icon = $th.children('.cabinet-ta-th-sort__icon');
+            if (!$icon.length) {
+                return;
+            }
+            $icon
+                .removeClass('bi-arrow-down-up bi-sort-up bi-sort-down')
+                .addClass(active ? (dir === 'asc' ? 'bi-sort-up' : 'bi-sort-down') : 'bi-arrow-down-up');
+        });
+    }
+
+    function initTableSort() {
+        $('.cabinet-text-analyzer-page table.cabinet-ta-sortable-table').each(function () {
+            var $table = $(this);
+            if ($table.data('cabinetTaSortBound')) {
+                return;
+            }
+            $table.data('cabinetTaSortBound', true);
+            $table.data('cabinetTaSort', { col: null, dir: null });
+
+            $table.find('thead .cabinet-ta-th-sort').each(function () {
+                var $th = $(this);
+                if (!$th.children('.cabinet-ta-th-sort__icon').length) {
+                    $th.append('<i class="bi bi-arrow-down-up cabinet-ta-th-sort__icon" aria-hidden="true"></i>');
+                }
+            });
+
+            $table.on('click.cabinetTaSort', 'thead .cabinet-ta-th-sort', function (e) {
+                e.preventDefault();
+                var $th = $(this);
+                var col = parseInt($th.attr('data-sort-col'), 10);
+                if (isNaN(col)) {
+                    return;
+                }
+                var preferNum = ($th.attr('data-sort-type') || '') === 'num';
+                var state = $table.data('cabinetTaSort') || { col: null, dir: null };
+                var dir;
+                if (state.col === col) {
+                    dir = state.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    dir = preferNum ? 'desc' : 'asc';
+                }
+                sortTableByColumn($table, col, dir, preferNum);
+                $table.data('cabinetTaSort', { col: col, dir: dir });
+                setSortHeaderState($table, $th, dir);
+            });
+
+            $table.on('keydown.cabinetTaSort', 'thead .cabinet-ta-th-sort', function (e) {
+                if (e.key !== 'Enter' && e.key !== ' ') {
+                    return;
+                }
+                e.preventDefault();
+                $(this).trigger('click');
+            });
+        });
+    }
+
     function initWordFormsToggle(wordForms) {
         $('#totalTable').on('click', '.cabinet-ta-word-toggle', function (e) {
             e.preventDefault();
@@ -549,6 +710,7 @@
     function initResultTables(cfg) {
         initWordFormsToggle(cfg.wordForms || {});
         initTableSearch();
+        initTableSort();
     }
 
     function initAllClouds(clouds) {
@@ -1199,29 +1361,22 @@
     }
 
     function initUniquenessHistory() {
-        var card = document.getElementById('cabinetTaFormCard');
+        var card = document.querySelector('[data-cabinet-saved-checks]') || document.getElementById('cabinetTaFormCard');
         if (!card) {
             return;
         }
         var base = card.getAttribute('data-history-url');
         var csrf = card.getAttribute('data-csrf');
+        if (!base) {
+            return;
+        }
         $(document).on('click', '.cabinet-ta-uniq-history-open', function () {
             var id = $(this).closest('tr').attr('data-id');
             if (!id) {
                 return;
             }
-            $.getJSON(base + '/' + id).done(function (data) {
-                if (data && data.ok && data.item) {
-                    var results = data.item.results || {};
-                    // История анализатора: { uniqueness, esenin }; старый модуль — плоский объект
-                    var uniq = results.uniqueness || results;
-                    renderUniquenessPanel(uniq);
-                    var el = document.getElementById('cabinet-ta-uniq-history-panel');
-                    if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                }
-            });
+            // Сначала пробуем полный снимок анализатора (слова / Zipf / галки).
+            window.location.href = base + '/' + id + '/open';
         });
         $(document).on('click', '.cabinet-ta-uniq-history-del', function () {
             var $tr = $(this).closest('tr');
@@ -1233,8 +1388,17 @@
                 type: 'DELETE',
                 url: base + '/' + id,
                 headers: { 'X-CSRF-TOKEN': csrf },
-            }).done(function () {
+            }).done(function (resp) {
                 $tr.remove();
+                var $body = $('[data-cabinet-saved-checks-body]');
+                if ($body.length && !$body.find('tr[data-id]').length) {
+                    $body.html('<tr data-cabinet-saved-checks-empty><td colspan="7" class="text-secondary text-center py-3">Пока нет сохранённых проверок.</td></tr>');
+                }
+                var $count = $('[data-cabinet-saved-checks-count]');
+                if ($count.length && resp && resp.saved_count != null) {
+                    var limitTxt = $count.text().split('/')[1];
+                    $count.text(resp.saved_count + (limitTxt ? ' /' + limitTxt : ''));
+                }
             });
         });
     }

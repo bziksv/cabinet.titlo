@@ -291,6 +291,7 @@
                 adminDebug: @json(!empty($admin)),
                 routes: {
                     startProgress: @json(route('start.cluster.progress')),
+                    activeProgress: @json(route('cluster.active.progress')),
                     analyse: @json(route('analysis.cluster')),
                     progress: @json(url('/get-cluster-progress')),
                     telegramStatus: @json(route('cluster.telegram.status')),
@@ -328,6 +329,7 @@
                     rendering: @json(__('Render data')),
                     historyHint: @json(__('The analysis has been successfully launched, the results will be automatically added to the table')),
                     longProcessHint: @json(__('Cluster analysis long process hint')),
+                    resumedHint: @json(__('Cluster analysis resumed after reload')),
                     notifyChannelsHint: @json(__('Cluster analysis notify channels hint')),
                     telegramRequired: @json(__('Subscribe to notifications in Telegram first.')),
                     connectTelegram: @json(__('Connect Telegram bot')),

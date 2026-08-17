@@ -557,3 +557,37 @@ body > .cke_float {
 .cabinet-esenin-public-banner {
     border-radius: 0.65rem;
 }
+
+.cabinet-esenin-actions-row {
+    gap: 0.75rem 1rem;
+}
+
+.cabinet-esenin-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-weight: 400;
+    font-size: 0.875rem;
+    line-height: 1.25;
+    color: var(--bs-body-color, #212529);
+    cursor: pointer;
+    user-select: none;
+}
+
+.cabinet-esenin-save input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    vertical-align: middle;
+    accent-color: var(--bs-primary, #0d6efd);
+}
+
+.cabinet-esenin-save span {
+    line-height: 1.25;
+}
+
+.cabinet-esenin-page .cabinet-text-saved-checks {
+    margin-top: 1.25rem;
+}

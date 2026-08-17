@@ -762,5 +762,19 @@
     "SEO checklist header review tip": "For review: :total. Open review queue",
     "Meta tags tag missing named": "No :tag",
     "Meta tags project auto check": "Auto-check",
-    "Meta tags project row number": "#"
+    "Meta tags project row number": "#",
+    "Text uniqueness history empty": "No saved checks yet. Enable “Save result to history” when running a check.",
+    "Saved analyses": "Saved analyses",
+    "No saved projects yet. Run an analysis on the Analyzer tab and choose Save results.": "No saved projects yet. Run an analysis on the Analyzer tab and choose Save results.",
+    "Go to Analyzer": "Go to Analyzer",
+    "Cluster level soft": "soft",
+    "Cluster level pre-hard": "pre-hard",
+    "Cluster level hard": "hard",
+    "XLS": "XLS",
+    "CSV": "CSV",
+    "Clustering": "Clustering",
+    "Go to Clustering": "Go to Clustering",
+    "No saved projects yet. Run an analysis on the Clustering tab and choose Save results.": "No saved projects yet. Run an analysis on the Clustering tab and choose Save results.",
+    "Cluster analysis long process hint": "Analysis may take from a few minutes to an hour. You can close the tab or refresh — progress will resume, and the finished result will appear under Projects (if saving is enabled).",
+    "Cluster analysis resumed after reload": "Analysis is still running — resuming progress tracking."
 }

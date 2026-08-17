@@ -10,6 +10,9 @@ use App\Support\Esenin\EseninAnalyzer;
 use App\Support\EseninTextCheckLimits;
 use App\Support\EseninTextCheckPublicShareTtl;
 use App\Support\EseninTextCheckSettingsRegistry;
+use App\Support\TextAnalyzerHistorySave;
+use App\Support\TextUniquenessLimits;
+use App\TextUniquenessHistory;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -52,6 +55,19 @@ class EseninTextCheckController extends Controller
         $publicShareAvailable = EseninTextCheckPublicShare::tableAvailable();
         $shareTtlOptions = EseninTextCheckPublicShareTtl::labelsForUi();
 
+        $user = Auth::user();
+        $canSaveUniquenessHistory = TextUniquenessLimits::canSaveHistory($user);
+        $uniquenessHistories = collect();
+        $uniquenessHistoryLimit = TextUniquenessLimits::historyLimitForUser($user);
+        $uniquenessHistoryCount = TextUniquenessLimits::savedCount($user);
+        if ($canSaveUniquenessHistory) {
+            $uniquenessHistories = TextUniquenessHistory::query()
+                ->where('user_id', $user->id)
+                ->orderByDesc('id')
+                ->limit((int) ($uniquenessHistoryLimit ?: 50))
+                ->get(['id', 'title', 'mode', 'uniqueness_pct', 'cost', 'params', 'created_at']);
+        }
+
         return view('pages.esenin-text-check', compact(
             'limit',
             'remaining',
@@ -62,7 +78,11 @@ class EseninTextCheckController extends Controller
             'autosaveDebounceMs',
             'sessionsAvailable',
             'publicShareAvailable',
-            'shareTtlOptions'
+            'shareTtlOptions',
+            'canSaveUniquenessHistory',
+            'uniquenessHistories',
+            'uniquenessHistoryLimit',
+            'uniquenessHistoryCount'
         ));
     }
 
@@ -236,6 +256,24 @@ class EseninTextCheckController extends Controller
             }
         }
 
+        $plainForHistory = $checkedText !== '' ? $checkedText : (string) $request->input('text', '');
+        if (\App\Support\Esenin\EseninHtmlHighlighter::isHtml($plainForHistory)) {
+            $plainForHistory = trim(EseninAnalyzer::extractPlainText($plainForHistory));
+        }
+        $wantSaveHistory = ! in_array($request->input('save_history'), [false, 0, '0', 'false', 'off', '', null], true);
+        $historyPack = TextAnalyzerHistorySave::maybeSaveFromEsenin(
+            $plainForHistory,
+            is_array($result) ? $result : [],
+            [
+                'name' => $request->input('name'),
+                'source' => $source,
+                'url' => $request->input('url'),
+                'tbclass' => $request->input('tbclass'),
+            ],
+            Auth::user(),
+            $wantSaveHistory
+        );
+
         $shareState = null;
         if ($userId > 0 && $sessionPayload !== null) {
             $shareState = $this->shareStateForSession(
@@ -254,6 +292,60 @@ class EseninTextCheckController extends Controller
             'result' => $result,
             'session' => $sessionPayload,
             'share' => $shareState,
+            'history_id' => $historyPack['history_id'],
+            'history_warning' => $historyPack['warning'],
+            'history_saved_count' => TextUniquenessLimits::savedCount(Auth::user()),
+            'history_limit' => TextUniquenessLimits::historyLimitForUser(Auth::user()),
+        ]);
+    }
+
+    public function historyShow(int $id): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user || ! TextUniquenessLimits::canSaveHistory($user)) {
+            return response()->json(['error' => 'forbidden', 'message' => __('Text uniqueness history paid only')], 403);
+        }
+
+        $row = TextUniquenessHistory::query()
+            ->where('user_id', $user->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $row) {
+            return response()->json(['error' => 'not_found', 'message' => __('Not found')], 404);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'item' => [
+                'id' => $row->id,
+                'title' => $row->title,
+                'mode' => $row->mode,
+                'params' => $row->params,
+                'results' => $row->results,
+                'uniqueness_pct' => $row->uniqueness_pct,
+                'cost' => $row->cost,
+                'created_at' => optional($row->created_at)->toDateTimeString(),
+            ],
+        ]);
+    }
+
+    public function historyDestroy(int $id): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user || ! TextUniquenessLimits::canSaveHistory($user)) {
+            return response()->json(['error' => 'forbidden'], 403);
+        }
+
+        $deleted = TextUniquenessHistory::query()
+            ->where('user_id', $user->id)
+            ->where('id', $id)
+            ->delete();
+
+        return response()->json([
+            'ok' => true,
+            'deleted' => (bool) $deleted,
+            'saved_count' => TextUniquenessLimits::savedCount($user),
         ]);
     }
 

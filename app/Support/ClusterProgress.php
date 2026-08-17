@@ -60,6 +60,37 @@ class ClusterProgress
         return $previous;
     }
 
+    public static function activeForUser(int $userId): ?string
+    {
+        if ($userId < 1) {
+            return null;
+        }
+
+        $progressId = (string) Cache::get(self::ACTIVE_CACHE_PREFIX . $userId, '');
+
+        return $progressId !== '' ? $progressId : null;
+    }
+
+    public static function clearActiveForUser(int $userId): void
+    {
+        if ($userId < 1) {
+            return;
+        }
+
+        Cache::forget(self::ACTIVE_CACHE_PREFIX . $userId);
+    }
+
+    public static function clearActiveIfMatches(int $userId, string $progressId): void
+    {
+        if ($userId < 1 || $progressId === '') {
+            return;
+        }
+
+        if (self::activeForUser($userId) === $progressId) {
+            self::clearActiveForUser($userId);
+        }
+    }
+
     /**
      * @return array{queue_count:int,phrases_done:int,phrases_pending:int,phrases_total:int,waiting_in_queue:bool,starting:bool}
      */

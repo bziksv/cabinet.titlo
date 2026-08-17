@@ -100,21 +100,21 @@
             <span class="cabinet-ta-table-count text-secondary small"></span>
         </div>
         <div class="table-responsive cabinet-ta-table-wrap cabinet-ta-table-scroll">
-            <table id="totalTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100 cabinet-ta-compare-table">
+            <table id="totalTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100 cabinet-ta-compare-table cabinet-ta-sortable-table">
                 <thead class="table-light">
                 <tr>
-                    <th rowspan="2">{{ __('Word') }}</th>
+                    <th rowspan="2" class="cabinet-ta-th-sort" data-sort-col="0" data-sort-type="str" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Word') }}</th>
                     <th colspan="3" class="text-center border-start">{{ __('Your page') }}</th>
                     <th colspan="3" class="text-center border-start">{{ $competitorLabel }}</th>
-                    <th rowspan="2" class="text-end border-start">Δ</th>
+                    <th rowspan="2" class="cabinet-ta-th-sort text-end border-start" data-sort-col="7" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">Δ</th>
                 </tr>
                 <tr>
-                    <th class="text-end border-start">{{ __('Common area') }}</th>
-                    <th class="text-end">{{ __('Text Area') }}</th>
-                    <th class="text-end">{{ __('Link Zone') }}</th>
-                    <th class="text-end border-start">{{ __('Common area') }}</th>
-                    <th class="text-end">{{ __('Text Area') }}</th>
-                    <th class="text-end">{{ __('Link Zone') }}</th>
+                    <th class="cabinet-ta-th-sort text-end border-start" data-sort-col="1" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Common area') }}</th>
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="2" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Text Area') }}</th>
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="3" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Link Zone') }}</th>
+                    <th class="cabinet-ta-th-sort text-end border-start" data-sort-col="4" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Common area') }}</th>
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="5" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Text Area') }}</th>
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="6" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Link Zone') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -126,7 +126,7 @@
                         $deltaClass = $delta > 0 ? 'text-success' : ($delta < 0 ? 'text-danger' : 'text-secondary');
                     @endphp
                     <tr class="cabinet-ta-word-row">
-                        <td>
+                        <td data-order="{{ $row['text'] }}">
                             <span class="d-inline-flex flex-wrap align-items-baseline gap-1">
                                 <span class="fw-medium cabinet-ta-exclude-term">{{ $row['text'] }}</span>
                                 @include('text-analyse.partials.add-to-exclude-btn', [
@@ -135,13 +135,13 @@
                                 ])
                             </span>
                         </td>
-                        <td class="text-end font-monospace border-start">{{ $main['total'] ?? '—' }}</td>
-                        <td class="text-end font-monospace">{{ $main['inText'] ?? '—' }}</td>
-                        <td class="text-end font-monospace">{{ $main['inLink'] ?? '—' }}</td>
-                        <td class="text-end font-monospace border-start">{{ $comp['total'] ?? '—' }}</td>
-                        <td class="text-end font-monospace">{{ $comp['inText'] ?? '—' }}</td>
-                        <td class="text-end font-monospace">{{ $comp['inLink'] ?? '—' }}</td>
-                        <td class="text-end font-monospace border-start {{ $deltaClass }}">
+                        <td class="text-end font-monospace border-start" data-order="{{ $main['total'] ?? '' }}">{{ $main['total'] ?? '—' }}</td>
+                        <td class="text-end font-monospace" data-order="{{ $main['inText'] ?? '' }}">{{ $main['inText'] ?? '—' }}</td>
+                        <td class="text-end font-monospace" data-order="{{ $main['inLink'] ?? '' }}">{{ $main['inLink'] ?? '—' }}</td>
+                        <td class="text-end font-monospace border-start" data-order="{{ $comp['total'] ?? '' }}">{{ $comp['total'] ?? '—' }}</td>
+                        <td class="text-end font-monospace" data-order="{{ $comp['inText'] ?? '' }}">{{ $comp['inText'] ?? '—' }}</td>
+                        <td class="text-end font-monospace" data-order="{{ $comp['inLink'] ?? '' }}">{{ $comp['inLink'] ?? '—' }}</td>
+                        <td class="text-end font-monospace border-start {{ $deltaClass }}" data-order="{{ $delta }}">
                             @if($delta > 0)+@endif{{ $delta !== 0 ? $delta : '0' }}
                         </td>
                     </tr>
@@ -169,13 +169,13 @@
             <span class="cabinet-ta-table-count text-secondary small"></span>
         </div>
         <div class="table-responsive cabinet-ta-table-wrap cabinet-ta-table-scroll">
-            <table id="phrasesTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100">
+            <table id="phrasesTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100 cabinet-ta-sortable-table">
                 <thead class="table-light">
                 <tr>
-                    <th>{{ __('Phrase') }}</th>
-                    <th class="text-end">{{ __('Your page') }}</th>
-                    <th class="text-end">{{ $competitorLabel }}</th>
-                    <th class="text-end">Δ</th>
+                    <th class="cabinet-ta-th-sort" data-sort-col="0" data-sort-type="str" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Phrase') }}</th>
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="1" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Your page') }}</th>
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="2" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ $competitorLabel }}</th>
+                    <th class="cabinet-ta-th-sort text-end" data-sort-col="3" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">Δ</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -185,7 +185,7 @@
                         $deltaClass = $delta > 0 ? 'text-success' : ($delta < 0 ? 'text-danger' : 'text-secondary');
                     @endphp
                     <tr>
-                        <td>
+                        <td data-order="{{ $row['phrase'] }}">
                             <span class="d-inline-flex flex-wrap align-items-baseline gap-1">
                                 <span class="cabinet-ta-exclude-term">{{ $row['phrase'] }}</span>
                                 @include('text-analyse.partials.add-to-exclude-btn', [
@@ -194,9 +194,9 @@
                                 ])
                             </span>
                         </td>
-                        <td class="text-end font-monospace">{{ $row['main']['count'] ?? '—' }}</td>
-                        <td class="text-end font-monospace">{{ $row['competitor']['count'] ?? '—' }}</td>
-                        <td class="text-end font-monospace {{ $deltaClass }}">
+                        <td class="text-end font-monospace" data-order="{{ $row['main']['count'] ?? '' }}">{{ $row['main']['count'] ?? '—' }}</td>
+                        <td class="text-end font-monospace" data-order="{{ $row['competitor']['count'] ?? '' }}">{{ $row['competitor']['count'] ?? '—' }}</td>
+                        <td class="text-end font-monospace {{ $deltaClass }}" data-order="{{ $delta }}">
                             @if($delta > 0)+@endif{{ $delta !== 0 ? $delta : '0' }}
                         </td>
                     </tr>

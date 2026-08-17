@@ -76,8 +76,16 @@
                 <p class="small text-secondary mt-2 mb-0">{{ __('Esenin text check tbclass hint') }}</p>
             </div>
 
-            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mt-3">
-                <p class="small text-secondary mb-0">{{ __('Esenin text check cost hint', ['cost' => $costPerCheck]) }}</p>
+            <p class="small text-secondary mb-2 mt-3">{{ __('Esenin text check cost hint', ['cost' => $costPerCheck]) }}</p>
+            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center cabinet-esenin-actions-row">
+                @if(!empty($canSaveUniquenessHistory))
+                    <label class="cabinet-esenin-save mb-0" for="cabinet-esenin-save-history">
+                        <input type="checkbox" id="cabinet-esenin-save-history" data-esenin-save-history value="1" checked>
+                        <span>{{ __('Text uniqueness save to history') }}</span>
+                    </label>
+                @else
+                    <span></span>
+                @endif
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary" data-esenin-clear>{{ __('Clear') }}</button>
                     <button type="button"
@@ -184,6 +192,15 @@
         <div class="cabinet-esenin-empty text-secondary small mt-4" data-esenin-empty>
             {{ __('Esenin text check empty state') }}
         </div>
+
+        @include('partials.text-saved-checks', [
+            'canSaveUniquenessHistory' => $canSaveUniquenessHistory ?? false,
+            'uniquenessHistories' => $uniquenessHistories ?? [],
+            'uniquenessHistoryCount' => $uniquenessHistoryCount ?? 0,
+            'uniquenessHistoryLimit' => $uniquenessHistoryLimit ?? 0,
+            'historyBaseUrl' => url('/esenin-text-check/history'),
+            'historyModule' => 'esenin-text-check',
+        ])
     </div>
 
     <script type="application/json" id="cabinet-esenin-config">{!! json_encode([
@@ -196,6 +213,7 @@
         'autosaveDebounceMs' => $autosaveDebounceMs,
         'sessionsAvailable' => $sessionsAvailable,
         'publicShareAvailable' => $publicShareAvailable,
+        'canSaveHistory' => !empty($canSaveUniquenessHistory),
         'analyzerVersion' => \App\Support\EseninTextCheckSettingsRegistry::moduleInt('analyzer_version', 1),
         'showProvidersBar' => \App\User::isUserAdmin(),
         'urls' => [
@@ -203,6 +221,7 @@
             'session' => url('/esenin-text-check/sessions'),
             'sessions' => url('/esenin-text-check/sessions'),
             'version' => url('/esenin-text-check/sessions'),
+            'history' => url('/esenin-text-check/history'),
             'shareCreate' => route('pages.esenin-text-check.public.share.create'),
             'shareRevoke' => route('pages.esenin-text-check.public.share.revoke'),
         ],

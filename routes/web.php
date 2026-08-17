@@ -450,6 +450,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('esenin-text-check/sessions', 'EseninTextCheckController@listSessions')->name('pages.esenin-text-check.sessions')->middleware('permission:Esenin text check');
     Route::get('esenin-text-check/sessions/{session}', 'EseninTextCheckController@showSession')->name('pages.esenin-text-check.session')->middleware('permission:Esenin text check');
     Route::get('esenin-text-check/sessions/{session}/versions/{version}', 'EseninTextCheckController@loadVersion')->name('pages.esenin-text-check.version')->middleware('permission:Esenin text check');
+    Route::get('esenin-text-check/history/{id}', 'EseninTextCheckController@historyShow')->name('pages.esenin-text-check.history.show')->middleware('permission:Esenin text check');
+    Route::delete('esenin-text-check/history/{id}', 'EseninTextCheckController@historyDestroy')->name('pages.esenin-text-check.history.destroy')->middleware('permission:Esenin text check');
     Route::post('esenin-text-check/public-share', 'EseninTextCheckController@createPublicShare')->name('pages.esenin-text-check.public.share.create')->middleware('permission:Esenin text check');
     Route::post('esenin-text-check/public-share/revoke', 'EseninTextCheckController@revokePublicShare')->name('pages.esenin-text-check.public.share.revoke')->middleware('permission:Esenin text check');
 
@@ -563,6 +565,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('text-analyzer/batch-item', 'TextAnalyzerController@batchItem')->name('text.analyzer.batch.item');
     Route::post('text-analyzer/uniqueness-estimate', 'TextAnalyzerController@uniquenessEstimate')->name('text.analyzer.uniqueness.estimate');
     Route::get('text-analyzer/uniqueness-history/{id}', 'TextAnalyzerController@uniquenessHistoryShow')->name('text.analyzer.uniqueness.history.show');
+    Route::get('text-analyzer/uniqueness-history/{id}/open', 'TextAnalyzerController@uniquenessHistoryOpen')->name('text.analyzer.uniqueness.history.open');
     Route::delete('text-analyzer/uniqueness-history/{id}', 'TextAnalyzerController@uniquenessHistoryDestroy')->name('text.analyzer.uniqueness.history.destroy');
     Route::post('text-analyzer/export/excel', 'TextAnalyzerController@exportExcel')->name('text.analyzer.export.excel');
     Route::post('text-analyzer/export/pdf', 'TextAnalyzerController@exportPdf')->name('text.analyzer.export.pdf');
@@ -825,6 +828,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/cluster-telegram-status', 'ClusterController@telegramStatus')->name('cluster.telegram.status');
     Route::post('/analysis-cluster', 'ClusterController@analyseCluster')->name('analysis.cluster');
     Route::get('/start-cluster-progress', 'ClusterController@startProgress')->name('start.cluster.progress');
+    Route::get('/cluster-active-progress', 'ClusterController@activeProgress')->name('cluster.active.progress');
     Route::get('/get-cluster-progress/{id}', 'ClusterController@getProgress')->name('get.cluster.progress');
     Route::get('/get-cluster-progress/{id}/modify', 'ClusterController@getProgressModify')->name('get.cluster.progress.modify');
     Route::get('/destroy-progress/{progress}', 'ClusterController@destroyProgress')->name('destroy.progress');

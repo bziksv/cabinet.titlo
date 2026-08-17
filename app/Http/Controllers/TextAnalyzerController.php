@@ -327,6 +327,61 @@ class TextAnalyzerController extends Controller
         ]);
     }
 
+    /**
+     * Открыть сохранённую проверку: полный снимок анализатора (слова / Zipf / уникальность / Есенин).
+     */
+    public function uniquenessHistoryOpen(int $id)
+    {
+        $user = Auth::user();
+        if (! $user || ! TextUniquenessLimits::canSaveHistory($user)) {
+            flash()->overlay(__('Text uniqueness history paid only'), __('Text uniqueness history title'))->warning();
+
+            return redirect()->route('text.analyzer.view');
+        }
+
+        $row = TextUniquenessHistory::query()
+            ->where('user_id', $user->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $row) {
+            flash()->overlay(__('Not found'), __('Text uniqueness history title'))->warning();
+
+            return redirect()->route('text.analyzer.view');
+        }
+
+        $params = is_array($row->params) ? $row->params : [];
+        $source = (string) ($params['source'] ?? '');
+
+        // Записи только из модуля Есенина — туда же.
+        if ($source === 'esenin-text-check' && empty($params['had_analysis'])) {
+            return redirect('/esenin-text-check?history=' . (int) $row->id);
+        }
+
+        $response = TextAnalyzerHistorySave::responseFromHistory($row);
+        if ($response === null) {
+            flash()->overlay(__('Not found'), __('Text uniqueness history title'))->warning();
+
+            return redirect()->route('text.analyzer.view');
+        }
+
+        // Нет полного анализа, но есть Есенин — открываем в модуле Есенина.
+        if (empty($params['had_analysis']) && empty($response['totalWords']) && ! empty($response['esenin']) && empty($response['uniqueness'])) {
+            return redirect('/esenin-text-check?history=' . (int) $row->id);
+        }
+
+        $request = TextAnalyzerHistorySave::requestFromHistory($row);
+
+        session()->flash('text_analyzer.response', $response);
+        session()->flash('text_analyzer.request', $request);
+        session()->flash('text_analyzer.scroll_to_results', true);
+        if (($request['type'] ?? '') === 'url' && ! empty($request['url'])) {
+            session()->flash('text_analyzer.url', $request['url']);
+        }
+
+        return redirect()->route('text.analyzer.view');
+    }
+
     public function uniquenessHistoryDestroy(int $id): JsonResponse
     {
         $user = Auth::user();

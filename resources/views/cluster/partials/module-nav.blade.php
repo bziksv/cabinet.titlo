@@ -7,7 +7,7 @@
         <ul class="nav nav-pills p-2 cabinet-cluster-module-nav mb-0 flex-wrap">
             <li class="nav-item">
                 <a href="{{ route('cluster') }}"
-                   class="nav-link{{ $active === 'analyzer' ? ' active' : '' }}">{{ __('Analyzer') }}</a>
+                   class="nav-link{{ $active === 'analyzer' ? ' active' : '' }}">{{ __('Clustering') }}</a>
             </li>
             <li class="nav-item">
                 <a href="{{ route('cluster.projects') }}"

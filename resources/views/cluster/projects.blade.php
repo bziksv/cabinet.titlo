@@ -5,7 +5,8 @@
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/style.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/common/css/datatable.css') }}">
+        {{-- common/datatable.css не подключаем: PNG sort_*.png конфликтуют со стрелками ↑↓ из bootstrap4 --}}
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-cluster.css') }}?v={{ @filemtime(public_path('css/cabinet-cluster.css')) ?: time() }}">
@@ -34,87 +35,95 @@
                 </div>
                 @if($projects->isEmpty())
                     <div class="card-body cabinet-cluster-projects-empty text-center py-5">
-                        <p class="text-secondary mb-3">{{ __('No saved projects yet. Run an analysis on the Analyzer tab and choose Save results.') }}</p>
-                        <a href="{{ route('cluster') }}" class="btn btn-primary">{{ __('Go to Analyzer') }}</a>
+                        <p class="text-secondary mb-3">{{ __('No saved projects yet. Run an analysis on the Clustering tab and choose Save results.') }}</p>
+                        <a href="{{ route('cluster') }}" class="btn btn-primary">{{ __('Go to Clustering') }}</a>
                     </div>
                 @else
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table id="my-cluster-projects" class="table table-hover table-striped mb-0 cabinet-cluster-projects-table align-middle">
-                                <thead class="table-light">
+                    <div class="card-body cabinet-cluster-projects-body">
+                        <div class="cabinet-cluster-projects-table-wrap">
+                        <table id="my-cluster-projects" class="table table-hover table-striped mb-0 cabinet-cluster-projects-table align-middle w-100">
+                            <thead class="table-light">
+                            <tr>
+                                <th>{{ __('Analysis date') }}</th>
+                                <th>{{ __('Domain') }}</th>
+                                <th>{{ __('Comment') }}</th>
+                                <th class="text-center">{{ __('Number of phrases') }}</th>
+                                <th class="text-center">{{ __('Number of groups') }}</th>
+                                <th class="text-center">{{ __('TOP') }}</th>
+                                <th>{{ __('Mode') }}</th>
+                                <th>{{ __('Region') }}</th>
+                                <th class="cabinet-cluster-projects-actions-col sorting_disabled"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($projects as $project)
                                 <tr>
-                                    <th>{{ __('Analysis date') }}</th>
-                                    <th>{{ __('Domain') }}</th>
-                                    <th>{{ __('Comment') }}</th>
-                                    <th class="text-center">{{ __('Number of phrases') }}</th>
-                                    <th class="text-center">{{ __('Number of groups') }}</th>
-                                    <th class="text-center">{{ __('TOP') }}</th>
-                                    <th>{{ __('Mode') }}</th>
-                                    <th>{{ __('Region') }}</th>
-                                    <th class="cabinet-cluster-projects-actions-col"></th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                @foreach($projects as $project)
-                                    <tr>
-                                        <td class="text-nowrap small text-secondary">{{ $project->created_at }}</td>
-                                        <td>
-                                            <textarea data-target="{{ $project->id }}" name="domain"
-                                                      class="action-edit project-domain form-control form-control-sm"
-                                                      rows="2">{{ $project->domain }}</textarea>
-                                        </td>
-                                        <td>
-                                            <textarea data-target="{{ $project->id }}" name="comment"
-                                                      class="action-edit project-comment form-control form-control-sm"
-                                                      rows="2">{{ $project->comment }}</textarea>
-                                        </td>
-                                        <td class="text-center text-num">{{ $project->count_phrases }}</td>
-                                        <td class="text-center text-num">{{ $project->count_clusters }}</td>
-                                        <td class="text-center text-num">{{ $project->top }}</td>
-                                        <td>
-                                            <span class="badge text-bg-light text-dark border">
-                                                {{ $project->clustering_level }} / {{ $project->request['engineVersion'] ?? '—' }}
-                                            </span>
-                                        </td>
-                                        <td class="project-region small">{{ $project->region }}</td>
-                                        <td>
-                                            <div class="cabinet-cluster-project-actions">
-                                                <a class="btn btn-primary btn-sm w-100"
-                                                   href="{{ route('show.cluster.result', $project->id) }}" target="_blank">
-                                                    {{ __('View results') }}
+                                    <td class="text-nowrap small text-secondary">{{ $project->created_at }}</td>
+                                    <td>
+                                        <textarea data-target="{{ $project->id }}" name="domain"
+                                                  class="action-edit project-domain form-control form-control-sm"
+                                                  rows="2">{{ $project->domain }}</textarea>
+                                    </td>
+                                    <td>
+                                        <textarea data-target="{{ $project->id }}" name="comment"
+                                                  class="action-edit project-comment form-control form-control-sm"
+                                                  rows="2">{{ $project->comment }}</textarea>
+                                    </td>
+                                    <td class="text-center text-num">{{ $project->count_phrases }}</td>
+                                    <td class="text-center text-num">{{ $project->count_clusters }}</td>
+                                    <td class="text-center text-num">{{ $project->top }}</td>
+                                    <td>
+                                        @php
+                                            $levelKey = (string) ($project->clustering_level ?? '');
+                                            $levelLabel = [
+                                                'soft' => __('Cluster level soft'),
+                                                'pre-hard' => __('Cluster level pre-hard'),
+                                                'hard' => __('Cluster level hard'),
+                                            ][$levelKey] ?? $levelKey;
+                                        @endphp
+                                        <span class="badge text-bg-light text-dark border">
+                                            {{ $levelLabel }} / {{ $project->request['engineVersion'] ?? '—' }}
+                                        </span>
+                                    </td>
+                                    <td class="project-region small">{{ $project->region }}</td>
+                                    <td>
+                                        <div class="cabinet-cluster-project-actions">
+                                            <a class="btn btn-primary btn-sm w-100"
+                                               href="{{ route('show.cluster.result', $project->id) }}" target="_blank">
+                                                {{ __('View results') }}
+                                            </a>
+                                            <div class="btn-group btn-group-sm w-100 mt-1" role="group">
+                                                <a href="{{ route('edit.clusters', $project->id) }}"
+                                                   class="btn btn-outline-secondary" target="_blank"
+                                                   aria-label="{{ __('Hands editor') }}">
+                                                    <i class="fas fa-edit" aria-hidden="true"></i><span class="visually-hidden">{{ __('Hands editor') }}</span>
                                                 </a>
-                                                <div class="btn-group btn-group-sm w-100 mt-1" role="group">
-                                                    <a href="{{ route('edit.clusters', $project->id) }}"
-                                                       class="btn btn-outline-secondary" target="_blank"
-                                                       title="{{ __('Hands editor') }}">
-                                                        <i class="fas fa-edit" aria-hidden="true"></i><span class="visually-hidden">{{ __('Hands editor') }}</span>
-                                                    </a>
-                                                    <button type="button"
-                                                            data-bs-toggle="modal"
-                                                            data-bs-target="#repeat-scan"
-                                                            data-order="{{ $project->id }}"
-                                                            class="btn btn-outline-secondary repeat-scan"
-                                                            title="{{ __('Repeat analysis') }}">
-                                                        <i class="fas fa-redo" aria-hidden="true"></i>
-                                                    </button>
-                                                    <a class="btn btn-outline-secondary"
-                                                       href="/download-cluster-result/{{ $project->id }}/csv"
-                                                       target="_blank" title="{{ __('Download csv') }}">CSV</a>
-                                                    <a class="btn btn-outline-secondary"
-                                                       href="/download-cluster-result/{{ $project->id }}/xls"
-                                                       target="_blank" title="{{ __('Download xls') }}">XLS</a>
-                                                </div>
-                                                @if($project->count_phrases >= $config->warning_limit)
-                                                    <span class="badge text-bg-warning mt-1 w-100">
-                                                        {{ __('A page can weigh a lot and work slowly') }}
-                                                    </span>
-                                                @endif
+                                                <button type="button"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#repeat-scan"
+                                                        data-order="{{ $project->id }}"
+                                                        class="btn btn-outline-secondary repeat-scan"
+                                                        aria-label="{{ __('Repeat analysis') }}">
+                                                    <i class="fas fa-redo" aria-hidden="true"></i>
+                                                </button>
+                                                <a class="btn btn-outline-secondary"
+                                                   href="/download-cluster-result/{{ $project->id }}/csv"
+                                                   target="_blank" aria-label="{{ __('Download csv') }}">{{ __('CSV') }}</a>
+                                                <a class="btn btn-outline-secondary"
+                                                   href="/download-cluster-result/{{ $project->id }}/xls"
+                                                   target="_blank" aria-label="{{ __('Download xls') }}">{{ __('XLS') }}</a>
                                             </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                                </tbody>
-                            </table>
+                                            @if($project->count_phrases >= $config->warning_limit)
+                                                <span class="badge text-bg-warning mt-1 w-100">
+                                                    {{ __('A page can weigh a lot and work slowly') }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
                         </div>
                     </div>
                 @endif
@@ -590,6 +599,11 @@
                     "order": [[0, "desc"]],
                     "pageLength": 25,
                     "searching": true,
+                    "autoWidth": false,
+                    "columnDefs": [
+                        { "orderable": false, "targets": -1 }
+                    ],
+                    "dom": "<'cabinet-cluster-dt-toolbar'<'cabinet-cluster-dt-search'f><'cabinet-cluster-dt-length'l>>rtip",
                     language: {
                         lengthMenu: "_MENU_",
                         search: "_INPUT_",
@@ -834,6 +848,14 @@
                                 let cluster = response['cluster']
                                 let domain = cluster['domain'] === null ? '' : cluster['domain']
                                 let comment = cluster['comment'] === null ? '' : cluster['comment']
+                                let levelMap = {
+                                    'soft': @json(__('Cluster level soft')),
+                                    'pre-hard': @json(__('Cluster level pre-hard')),
+                                    'hard': @json(__('Cluster level hard'))
+                                }
+                                let levelRaw = cluster['clustering_level'] || ''
+                                let levelLabel = levelMap[levelRaw] || levelRaw
+                                let engineVer = (cluster['request'] && cluster['request']['engineVersion']) ? cluster['request']['engineVersion'] : '—'
                                 let table = $('#my-cluster-projects').DataTable();
                                 table.row.add({
                                     0: cluster['created_at'],
@@ -842,15 +864,15 @@
                                     3: cluster['count_phrases'],
                                     4: cluster['count_clusters'],
                                     5: cluster['top'],
-                                    6: cluster['clustering_level'] + ' / ' + cluster['request']['engineVersion'],
+                                    6: '<span class="badge text-bg-light text-dark border">' + levelLabel + ' / ' + engineVer + '</span>',
                                     7: cluster['region'],
                                     8: '<div class="cabinet-cluster-project-actions">' +
                                         '<a href="/show-cluster-result/' + cluster['id'] + '" target="_blank" class="btn btn-primary btn-sm w-100">{{ __('View results') }}</a>' +
                                         '<div class="btn-group btn-group-sm w-100 mt-1" role="group">' +
-                                        '<a href="/edit-clusters/' + cluster['id'] + '" class="btn btn-outline-secondary" target="_blank" title="{{ __('Hands editor') }}"><i class="fas fa-edit"></i></a>' +
-                                        '<button type="button" data-bs-toggle="modal" data-bs-target="#repeat-scan" data-order="' + cluster['id'] + '" class="btn btn-outline-secondary repeat-scan" title="{{ __('Repeat analysis') }}"><i class="fas fa-redo"></i></button>' +
-                                        '<a href="/download-cluster-result/' + cluster['id'] + '/csv" target="_blank" class="btn btn-outline-secondary" title="{{ __('Download csv') }}">CSV</a>' +
-                                        '<a href="/download-cluster-result/' + cluster['id'] + '/xls" target="_blank" class="btn btn-outline-secondary" title="{{ __('Download xls') }}">XLS</a>' +
+                                        '<a href="/edit-clusters/' + cluster['id'] + '" class="btn btn-outline-secondary" target="_blank" aria-label="{{ __('Hands editor') }}"><i class="fas fa-edit" aria-hidden="true"></i></a>' +
+                                        '<button type="button" data-bs-toggle="modal" data-bs-target="#repeat-scan" data-order="' + cluster['id'] + '" class="btn btn-outline-secondary repeat-scan" aria-label="{{ __('Repeat analysis') }}"><i class="fas fa-redo" aria-hidden="true"></i></button>' +
+                                        '<a href="/download-cluster-result/' + cluster['id'] + '/csv" target="_blank" class="btn btn-outline-secondary" aria-label="{{ __('Download csv') }}">{{ __('CSV') }}</a>' +
+                                        '<a href="/download-cluster-result/' + cluster['id'] + '/xls" target="_blank" class="btn btn-outline-secondary" aria-label="{{ __('Download xls') }}">{{ __('XLS') }}</a>' +
                                         '</div></div>'
                                 });
                                 table.draw()

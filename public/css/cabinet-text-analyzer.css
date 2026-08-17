@@ -904,25 +904,49 @@
 }
 
 .cabinet-text-analyzer-page #totalTable thead th,
-.cabinet-text-analyzer-page #phrasesTable thead th {
+.cabinet-text-analyzer-page #phrasesTable thead th,
+.cabinet-text-analyzer-page .cabinet-ta-zipf-table thead th {
     white-space: nowrap;
     vertical-align: middle;
-    padding-right: 1.75rem;
     position: relative;
 }
 
-.cabinet-text-analyzer-page #totalTable thead th.sorting,
-.cabinet-text-analyzer-page #totalTable thead th.sorting_asc,
-.cabinet-text-analyzer-page #totalTable thead th.sorting_desc,
-.cabinet-text-analyzer-page #phrasesTable thead th.sorting,
-.cabinet-text-analyzer-page #phrasesTable thead th.sorting_asc,
-.cabinet-text-analyzer-page #phrasesTable thead th.sorting_desc {
-    background-position: right 0.35rem center;
-    background-size: 0.65rem;
+.cabinet-text-analyzer-page .cabinet-ta-th-sort {
+    cursor: pointer;
+    user-select: none;
+    padding-right: 1.65rem !important;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-th-sort:hover,
+.cabinet-text-analyzer-page .cabinet-ta-th-sort:focus-visible {
+    color: var(--bs-primary, #0d6efd);
+    outline: none;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-th-sort__icon {
+    position: absolute;
+    right: 0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-th-sort:hover .cabinet-ta-th-sort__icon,
+.cabinet-text-analyzer-page .cabinet-ta-th-sort:focus-visible .cabinet-ta-th-sort__icon {
+    opacity: 0.7;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-th-sort.is-sorted-asc .cabinet-ta-th-sort__icon,
+.cabinet-text-analyzer-page .cabinet-ta-th-sort.is-sorted-desc .cabinet-ta-th-sort__icon {
+    opacity: 1;
+    color: var(--bs-primary, #0d6efd);
 }
 
 .cabinet-text-analyzer-page #totalTable tbody td,
-.cabinet-text-analyzer-page #phrasesTable tbody td {
+.cabinet-text-analyzer-page #phrasesTable tbody td,
+.cabinet-text-analyzer-page .cabinet-ta-zipf-table tbody td {
     vertical-align: middle;
 }
 

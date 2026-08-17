@@ -174,14 +174,14 @@
                 <span class="cabinet-ta-table-count text-secondary small"></span>
             </div>
             <div class="table-responsive cabinet-ta-table-wrap cabinet-ta-table-scroll">
-                <table id="totalTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100">
+                <table id="totalTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100 cabinet-ta-sortable-table">
                     <thead class="table-light">
                     <tr>
-                        <th>{{ __('Word') }}</th>
-                        <th class="text-end">{{ __('Density') }}</th>
-                        <th class="text-end">{{ __('Common area') }}</th>
-                        <th class="text-end">{{ __('Text Area') }}</th>
-                        <th class="text-end">{{ __('Link Zone') }}</th>
+                        <th class="cabinet-ta-th-sort" data-sort-col="0" data-sort-type="str" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Word') }}</th>
+                        <th class="cabinet-ta-th-sort text-end" data-sort-col="1" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Density') }}</th>
+                        <th class="cabinet-ta-th-sort text-end" data-sort-col="2" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Common area') }}</th>
+                        <th class="cabinet-ta-th-sort text-end" data-sort-col="3" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Text Area') }}</th>
+                        <th class="cabinet-ta-th-sort text-end" data-sort-col="4" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Link Zone') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -248,12 +248,12 @@
                 <span class="cabinet-ta-table-count text-secondary small"></span>
             </div>
             <div class="table-responsive cabinet-ta-table-wrap cabinet-ta-table-scroll">
-                <table id="phrasesTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100">
+                <table id="phrasesTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100 cabinet-ta-sortable-table">
                     <thead class="table-light">
                     <tr>
-                        <th>{{ __('Phrase') }}</th>
-                        <th class="text-end">{{ __('Repetitions') }}</th>
-                        <th class="text-end">{{ __('Density') }}</th>
+                        <th class="cabinet-ta-th-sort" data-sort-col="0" data-sort-type="str" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Phrase') }}</th>
+                        <th class="cabinet-ta-th-sort text-end" data-sort-col="1" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Repetitions') }}</th>
+                        <th class="cabinet-ta-th-sort text-end" data-sort-col="2" data-sort-type="num" scope="col" tabindex="0" role="columnheader" aria-sort="none">{{ __('Density') }}</th>
                     </tr>
                     </thead>
                     <tbody>

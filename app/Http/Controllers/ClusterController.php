@@ -286,10 +286,79 @@ class ClusterController extends Controller
         ]);
     }
 
+    /**
+     * Активный незавершённый прогон текущего пользователя (чтобы UI переживал reload).
+     */
+    public function activeProgress(): JsonResponse
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['active' => false, 'status' => 'none'], 401);
+        }
+
+        $userId = (int) $user->id;
+        $progressId = ClusterProgress::activeForUser($userId);
+        if ($progressId === null) {
+            return response()->json(['active' => false, 'status' => 'none']);
+        }
+
+        if (ClusterProgress::isComplete($progressId)) {
+            $cluster = ClusterResults::where('progress_id', '=', $progressId)->first();
+            ClusterProgress::clearActiveForUser($userId);
+
+            return $this->withClusterDebug($progressId, [
+                'active' => false,
+                'status' => 'complete',
+                'progress_id' => $progressId,
+                'objectId' => $cluster ? $cluster->id : null,
+            ]);
+        }
+
+        $failed = ClusterProgress::getFailed($progressId);
+        if ($failed !== null) {
+            ClusterProgress::clearActiveForUser($userId);
+
+            return $this->withClusterDebug($progressId, [
+                'active' => false,
+                'status' => 'failed',
+                'progress_id' => $progressId,
+                'error' => $failed['message'] ?? __('Cluster analysis failed.'),
+            ]);
+        }
+
+        if (ClusterProgress::isDeadSession($progressId)) {
+            ClusterProgress::clearActiveForUser($userId);
+
+            return $this->withClusterDebug($progressId, [
+                'active' => false,
+                'status' => 'dead',
+                'progress_id' => $progressId,
+            ]);
+        }
+
+        $progress = ClusterProgress::snapshot($progressId);
+
+        return $this->withClusterDebug($progressId, [
+            'active' => true,
+            'status' => 'running',
+            'progress_id' => $progressId,
+            'count' => $progress['queue_count'],
+            'phrases_done' => $progress['phrases_done'],
+            'phrases_pending' => $progress['phrases_pending'],
+            'phrases_total' => $progress['phrases_total'],
+            'waiting_in_queue' => $progress['waiting_in_queue'],
+            'starting' => !empty($progress['starting']),
+            'debug_state' => $progress,
+        ]);
+    }
+
     public function getProgress(string $id): JsonResponse
     {
+        $userId = (int) (Auth::id() ?: 0);
+
         $failed = ClusterProgress::getFailed($id);
         if ($failed !== null) {
+            ClusterProgress::clearActiveIfMatches($userId, $id);
             $progress = ClusterProgress::snapshot($id);
 
             return $this->withClusterDebug($id, [
@@ -305,6 +374,7 @@ class ClusterController extends Controller
 
         $cluster = ClusterResults::where('progress_id', '=', $id)->first();
         if (isset($cluster)) {
+            ClusterProgress::clearActiveIfMatches($userId, $id);
             ClusterQueue::where('progress_id', '=', $id)->delete();
             ClusterAnalysisDebugLog::info($id, 'http.getProgress.complete', [
                 'object_id' => $cluster->id,

@@ -11,6 +11,106 @@
   const clusterAdminDebug = !!cfg.adminDebug;
   let activeProgressId = null;
   let knownTotalPhrases = 0;
+  const PROGRESS_STORAGE_KEY = 'cabinet_cluster_v2_active_progress';
+  const DRAFT_STORAGE_KEY = 'cabinet_cluster_v2_draft';
+
+  function saveProgressLocal(progressId, total) {
+    try {
+      sessionStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({
+        id: progressId,
+        total: total || 0,
+        at: Date.now(),
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  function clearProgressLocal() {
+    try {
+      sessionStorage.removeItem(PROGRESS_STORAGE_KEY);
+    } catch (e) { /* ignore */ }
+  }
+
+  function readProgressLocal() {
+    try {
+      const raw = sessionStorage.getItem(PROGRESS_STORAGE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || !data.id) return null;
+      // старше 12 часов — мусор
+      if (data.at && (Date.now() - data.at) > 12 * 60 * 60 * 1000) {
+        clearProgressLocal();
+        return null;
+      }
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveDraftLocal() {
+    try {
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
+        mode: mode,
+        phrases: $('#clv2-phrases').val() || '',
+        domain: $('#clv2-domain').val() || '',
+        comment: $('#clv2-comment').val() || '',
+        region: $('#clv2-region').val() || '',
+        clusteringLevel: $('#clv2-clustering-level').val() || '',
+        searchEngine: $('#clv2-search-engine').val() || 'yandex',
+        searchBase: $('#clv2-search-base').is(':checked'),
+        searchPhrases: $('#clv2-search-phrases').is(':checked'),
+        searchTarget: $('#clv2-search-target').is(':checked'),
+        searchRelevance: $('#clv2-search-relevance').is(':checked'),
+        save: $('#clv2-save').val(),
+        sendMessage: $('#clv2-send-message').length ? $('#clv2-send-message').val() : '0',
+        top: $('#clv2-top').val() || '',
+        at: Date.now(),
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  function restoreDraftLocal() {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+      if (!raw) return false;
+      const draft = JSON.parse(raw);
+      if (!draft || !draft.phrases) return false;
+      if ($('#clv2-phrases').val().trim() !== '') return false;
+
+      if (draft.mode === 'professional' || draft.mode === 'classic') {
+        setMode(draft.mode);
+      }
+      $('#clv2-phrases').val(draft.phrases || '');
+      $('#clv2-domain').val(draft.domain || '');
+      $('#clv2-comment').val(draft.comment || '');
+      if (draft.searchEngine) {
+        $('#clv2-search-engine').val(draft.searchEngine).trigger('change');
+      }
+      if (draft.region) {
+        const $region = $('#clv2-region');
+        if ($region.find('option[value="' + draft.region + '"]').length === 0) {
+          $region.append(new Option(draft.region, draft.region, true, true));
+        }
+        $region.val(draft.region).trigger('change');
+      }
+      if (draft.clusteringLevel) {
+        $('#clv2-clustering-level').val(draft.clusteringLevel);
+      }
+      $('#clv2-search-base').prop('checked', !!draft.searchBase);
+      $('#clv2-search-phrases').prop('checked', !!draft.searchPhrases);
+      $('#clv2-search-target').prop('checked', !!draft.searchTarget);
+      $('#clv2-search-relevance').prop('checked', !!draft.searchRelevance);
+      if (draft.save != null) $('#clv2-save').val(String(draft.save));
+      if ($('#clv2-send-message').length && draft.sendMessage != null) {
+        $('#clv2-send-message').val(String(draft.sendMessage));
+      }
+      if (draft.top) $('#clv2-top').val(draft.top);
+      updateLimits();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 
   function clusterDebugLine(level, message, context) {
     if (!clusterAdminDebug) return;
@@ -653,6 +753,7 @@
 
   function onComplete(response) {
     clusterDebugLine('info', 'analysis.complete', { objectId: response.objectId });
+    clearProgressLocal();
     if (response.debug_admin) {
       renderClusterDebugLog(response.debug_log || [], response.debug_state || null, activeProgressId);
     }
@@ -681,6 +782,84 @@
     }
   }
 
+  function resumeProgressTracking(progressId, total) {
+    if (!progressId) return;
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+
+    activeProgressId = progressId;
+    knownTotalPhrases = parseInt(total, 10) || knownTotalPhrases || 0;
+    saveProgressLocal(progressId, knownTotalPhrases);
+
+    $('#clv2-start').prop('disabled', true);
+    $('#clv2-progress-wrap').removeClass('d-none');
+    if (knownTotalPhrases > 0) {
+      setProgress(12, (cfg.i18n.preparing || cfg.i18n.started) + ' 0 / ' + knownTotalPhrases);
+    } else {
+      setProgress(12, cfg.i18n.started);
+    }
+
+    pollInterval = setInterval(function () {
+      pollProgress(progressId);
+    }, 5000);
+    pollProgress(progressId);
+  }
+
+  function resumeIfNeeded() {
+    const local = readProgressLocal();
+    const finishLocal = function () {
+      if (!local || !local.id) return;
+      resumeProgressTracking(local.id, local.total || 0);
+      restoreDraftLocal();
+      if (cfg.i18n.resumedHint) {
+        showToast('success', cfg.i18n.resumedHint);
+      }
+    };
+
+    if (!cfg.routes.activeProgress) {
+      finishLocal();
+      return;
+    }
+
+    $.ajax({
+      type: 'GET',
+      url: cfg.routes.activeProgress,
+      success: function (resp) {
+        if (resp && resp.status === 'complete' && resp.progress_id) {
+          clearProgressLocal();
+          activeProgressId = resp.progress_id;
+          $('#clv2-start').prop('disabled', true);
+          $('#clv2-progress-wrap').removeClass('d-none');
+          setProgress(95, cfg.i18n.rendering || cfg.i18n.started);
+          pollProgress(resp.progress_id);
+          return;
+        }
+
+        if (resp && resp.status === 'failed') {
+          clearProgressLocal();
+          showToast('error', resp.error || cfg.i18n.progressError);
+          return;
+        }
+
+        if (resp && resp.active && resp.progress_id) {
+          restoreDraftLocal();
+          resumeProgressTracking(resp.progress_id, resp.phrases_total || (local && local.total) || 0);
+          if (cfg.i18n.resumedHint) {
+            showToast('success', cfg.i18n.resumedHint);
+          }
+          return;
+        }
+
+        finishLocal();
+      },
+      error: function () {
+        finishLocal();
+      },
+    });
+  }
+
   function pollProgress(progressId) {
     clusterDebugPollCount += 1;
     clusterDebugLine('info', 'poll.progress', { progressId: progressId, n: clusterDebugPollCount });
@@ -695,6 +874,7 @@
 
         if (response.failed) {
           clearInterval(pollInterval);
+          clearProgressLocal();
           $('#clv2-start').prop('disabled', false);
           $('#clv2-progress-wrap').addClass('d-none');
           showToast('error', response.error || cfg.i18n.progressError);
@@ -713,6 +893,10 @@
           || (response.debug_state && response.debug_state.phrases_total)
           || knownTotalPhrases
           || 0;
+        if (total > 0) {
+          knownTotalPhrases = total;
+          saveProgressLocal(progressId, total);
+        }
         const pending = response.phrases_pending || (response.debug_state && response.debug_state.phrases_pending) || 0;
         const starting = !!(response.starting || (response.debug_state && response.debug_state.starting));
         let pct;
@@ -738,6 +922,7 @@
       error: function () {
         clusterDebugLine('error', 'poll.failed', { progressId: progressId });
         clearInterval(pollInterval);
+        clearProgressLocal();
         $('#clv2-start').prop('disabled', false);
         $('#clv2-progress-wrap').addClass('d-none');
         showToast('error', cfg.i18n.progressError);
@@ -763,6 +948,7 @@
     applyDomainFieldNormalization();
     $('#clv2-start').prop('disabled', true);
     resetResults();
+    saveDraftLocal();
 
     $.ajax({
       type: 'GET',
@@ -775,13 +961,16 @@
         clusterLastServerDebugLog = [];
         clusterLastDebugState = null;
         clusterDebugLine('info', 'progress.started', { progressId: progressId });
+        saveProgressLocal(progressId, countPhrases($('#clv2-phrases').val()));
         if (response.debug_admin) {
           renderClusterDebugLog(response.debug_log || [], null, progressId);
         }
 
         $('#clv2-progress-wrap').removeClass('d-none');
-        knownTotalPhrases = 0;
-        setProgress(12, cfg.i18n.started);
+        knownTotalPhrases = countPhrases($('#clv2-phrases').val()) || 0;
+        setProgress(12, knownTotalPhrases
+          ? ((cfg.i18n.preparing || cfg.i18n.started) + ' 0 / ' + knownTotalPhrases)
+          : cfg.i18n.started);
         $('#clv2-total-phrases').text('');
 
         pollInterval = setInterval(function () {
@@ -801,6 +990,7 @@
 
             if (resp.totalPhrases) {
               knownTotalPhrases = parseInt(resp.totalPhrases, 10) || 0;
+              saveProgressLocal(progressId, knownTotalPhrases);
               setProgress(12, (cfg.i18n.preparing || cfg.i18n.started) + ' 0 / ' + knownTotalPhrases);
             }
             if ($('#clv2-save').val() === '1') {
@@ -817,6 +1007,7 @@
           },
           error: function (xhr) {
             clearInterval(pollInterval);
+            clearProgressLocal();
             $('#clv2-start').prop('disabled', false);
             $('#clv2-progress-wrap').addClass('d-none');
             let msg = cfg.i18n.genericError;
@@ -828,6 +1019,7 @@
         });
       },
       error: function () {
+        clearProgressLocal();
         $('#clv2-start').prop('disabled', false);
         showToast('error', cfg.i18n.genericError);
       },
@@ -902,5 +1094,6 @@
 
     updateLimits();
     loadProjectFromQuery();
+    resumeIfNeeded();
   });
 })(jQuery, window);
