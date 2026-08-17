@@ -759,5 +759,8 @@
     "Completed tasks": "Completed",
     "Completed tasks filter hint": "Recently completed tasks (last months)",
     "For review filter hint": "Only tasks waiting for your review",
-    "SEO checklist header review tip": "For review: :total. Open review queue"
+    "SEO checklist header review tip": "For review: :total. Open review queue",
+    "Meta tags tag missing named": "No :tag",
+    "Meta tags project auto check": "Auto-check",
+    "Meta tags project row number": "#"
 }

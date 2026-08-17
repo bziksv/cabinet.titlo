@@ -49,7 +49,8 @@
                             <span v-for="(error_badge, tag) in (item.error && item.error.badge) || {}"
                                   :key="tag"
                                   v-if="error_badge && error_badge.length"
-                                  v-html="error_badge.join('')"></span>
+                                  class="me-1"
+                                  v-html="namedMissingBadges(tag, error_badge)"></span>
                         </div>
 
                         <div :id="'collapseHistory' + index" class="collapse" data-bs-parent="#accordion">
@@ -69,7 +70,7 @@
                                             <td><span class="badge text-bg-success">&lt; {{ tag }} &gt;</span></td>
                                             <td>
                                                 <span v-if="isTagContentPresent(value)"><textarea class="form-control form-control-sm" readonly>{{ value.join( ', \r\n' ) }}</textarea></span>
-                                                <span v-else class="badge text-bg-danger">{{ tagMissingLabel }}</span>
+                                                <span v-else class="badge text-bg-danger">{{ tagMissingLabelFor(tag) }}</span>
                                             </td>
                                             <td>
                                                 <span class="badge text-bg-warning">{{ tagContentCount(value) }}</span>
@@ -140,6 +141,24 @@
             },
             tagContentCount(value) {
                 return Array.isArray(value) ? value.length : 0;
+            },
+            tagMissingLabelFor(tag) {
+                var tpl = (this.lang && this.lang.tag_missing_named) ? this.lang.tag_missing_named : 'Нет :tag';
+                return String(tpl).replace(':tag', tag || '');
+            },
+            namedMissingBadges(tag, error_badge) {
+                var html = Array.isArray(error_badge) ? error_badge.join('') : String(error_badge || '');
+                var plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                var generic = this.tagMissingLabel;
+                if (plain === generic || plain === 'Не найден' || plain === 'Not found') {
+                    var label = this.tagMissingLabelFor(tag)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;');
+                    return '<span class="badge text-bg-danger me-1">' + label + '</span>';
+                }
+                return html;
             },
             problemHtml(item, tag) {
                 const main = item && item.error && item.error.main && item.error.main[tag];

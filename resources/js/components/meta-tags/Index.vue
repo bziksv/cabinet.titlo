@@ -152,7 +152,8 @@
                             <span v-for="(error_badge, tag) in url.error.badge"
                                   :key="tag"
                                   v-if="error_badge.length"
-                                  v-html="error_badge.join('')"></span>
+                                  class="me-1"
+                                  v-html="namedMissingBadges(tag, error_badge)"></span>
                         </div>
 
                         <div :id="'collapse' + index" class="collapse" data-bs-parent="#cabinetMtAccordion">
@@ -171,7 +172,7 @@
                                         <td><span class="badge text-bg-success">&lt; {{ tag }} &gt;</span></td>
                                         <td>
                                             <span v-if="isTagContentPresent(item)"><textarea class="form-control form-control-sm" readonly>{{ item.join( ', \r\n' ) }}</textarea></span>
-                                            <span v-else class="badge text-bg-danger">{{ tagMissingLabel }}</span>
+                                            <span v-else class="badge text-bg-danger">{{ tagMissingLabelFor(tag) }}</span>
                                         </td>
                                         <td>
                                             <span class="badge text-bg-warning">{{ tagContentCount(item) }}</span>
@@ -219,7 +220,7 @@
                 <table class="table table-sm table-hover table-striped align-middle cabinet-mt-projects-table mb-0">
                     <thead class="table-light">
                     <tr>
-                        <th style="width: 1%">{{ lang.id }}</th>
+                        <th style="width: 1%">{{ lang.row_num || '№' }}</th>
                         <th style="width: 14%">{{ lang.name }}</th>
                         <th style="width: 10%">{{ lang.period }}</th>
                         <th style="width: 10%">{{ lang.timeout }}</th>
@@ -229,8 +230,8 @@
                     </tr>
                     </thead>
                     <tbody>
-                    <tr v-for="meta in metas" :key="meta.id">
-                        <td>{{ meta.id }}</td>
+                    <tr v-for="(meta, index) in metas" :key="meta.id">
+                        <td>{{ index + 1 }}</td>
                         <td>{{ meta.name }}</td>
                         <td class="text-nowrap small">{{ lang.period_24h }}</td>
                         <td>
@@ -435,6 +436,24 @@
             },
             tagContentCount(value) {
                 return Array.isArray(value) ? value.length : 0;
+            },
+            tagMissingLabelFor(tag) {
+                var tpl = (this.lang && this.lang.tag_missing_named) ? this.lang.tag_missing_named : 'Нет :tag';
+                return String(tpl).replace(':tag', tag || '');
+            },
+            namedMissingBadges(tag, error_badge) {
+                var html = Array.isArray(error_badge) ? error_badge.join('') : String(error_badge || '');
+                var plain = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                var generic = this.tagMissingLabel;
+                if (plain === generic || plain === 'Не найден' || plain === 'Not found') {
+                    var label = this.tagMissingLabelFor(tag)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;');
+                    return '<span class="badge text-bg-danger me-1">' + label + '</span>';
+                }
+                return html;
             },
             initTagOptions(options) {
                 if (!Array.isArray(options) || !options.length) {

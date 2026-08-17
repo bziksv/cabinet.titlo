@@ -529,3 +529,7 @@
 .cabinet-mt-settings-page .info-box-number {
     font-variant-numeric: tabular-nums;
 }
+
+/* Header error badges: tag + status */
+.cabinet-mt-header-err { max-width: 100%; }
+.cabinet-mt-header-err .badge { white-space: nowrap; }

@@ -64,7 +64,7 @@
                 @if(is_array($value) && count($value) > 0)
                     <textarea class="form-control form-control-sm" rows="3" readonly>{!! implode(', ' . PHP_EOL, $value) !!}</textarea>
                 @elseif($value === false || $value === null || $value === '' || $value === 'false' || (is_array($value) && count($value) === 0))
-                    <span class="badge text-bg-danger">{{ __('Meta tags tag missing') }}</span>
+                    <span class="badge text-bg-danger">{{ __('Meta tags tag missing named', ['tag' => $tag]) }}</span>
                 @else
                     <span class="badge text-bg-danger">{{ $value }}</span>
                 @endif

@@ -6576,5 +6576,8 @@
     "Completed tasks": "Выполненные",
     "Completed tasks filter hint": "Недавно закрытые задачи (за последние месяцы)",
     "For review filter hint": "Только задачи, ожидающие вашей проверки",
-    "SEO checklist header review tip": "На проверку: :total. Открыть очередь проверки"
+    "SEO checklist header review tip": "На проверку: :total. Открыть очередь проверки",
+    "Meta tags tag missing named": "Нет :tag",
+    "Meta tags project auto check": "Автопроверка",
+    "Meta tags project row number": "№"
 }

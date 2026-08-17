@@ -169,11 +169,12 @@ class MetaTagsController extends Controller
             'projects_empty_hint' => __('Meta tags projects empty hint'),
             'projects' => __('Projects'),
             'id' => __('ID'),
+            'row_num' => __('Meta tags project row number'),
             'name' => __('Name'),
             'period' => __('Period'),
             'timeout' => __('Timeout'),
             'link' => __('Link'),
-            'status' => __('Status'),
+            'status' => __('Meta tags project auto check'),
             'off' => __('Off'),
             'on' => __('On'),
             'history' => __('History'),
@@ -215,6 +216,7 @@ class MetaTagsController extends Controller
             'count' => __('Count'),
             'main_problems' => __('Main problems'),
             'tag_missing' => __('Meta tags tag missing'),
+            'tag_missing_named' => __('Meta tags tag missing named'),
             'go_to_site' => __('Go to site'),
             'actions' => __('Actions'),
         ]);
@@ -720,7 +722,10 @@ class MetaTagsController extends Controller
 
         // Отсутствующий обязательный тег (false / null / []) раньше ошибочно шёл в «Без проблем».
         if ((! is_array($val) || count($val) === 0) && in_array($tag, $requiredTags, true)) {
-            $errors[] = $this->templateErrors(__('Meta tags tag missing'), '');
+            $errors[] = $this->templateErrors(
+                __('Meta tags tag missing named', ['tag' => $tag]),
+                ''
+            );
         } elseif (is_array($val)) {
 
             if (count($val) > 1 && in_array($tag, $requiredTags, true)) {
