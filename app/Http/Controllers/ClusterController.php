@@ -37,7 +37,8 @@ class ClusterController extends Controller
      */
     public function index($result = null)
     {
-        if (DemoCabinet::isCurrentUser()) {
+        // ?analyzer=1 — форма анализатора без редиректа на витрину (скрины / ручной прогон в демо)
+        if (DemoCabinet::isCurrentUser() && ! request()->boolean('analyzer')) {
             $showcase = DemoCabinet::clusterShowcasePath();
             if ($showcase) {
                 return redirect($showcase);

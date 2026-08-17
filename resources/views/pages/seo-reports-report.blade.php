@@ -319,7 +319,7 @@
 
             @php $comments = is_array($report->comments_json) ? $report->comments_json : []; @endphp
             @if(!empty($canEdit))
-            <form class="cabinet-sr-texts mt-4" method="post"
+            <form class="cabinet-sr-texts mt-4" method="post" data-sr-after-report
                   action="{{ route('pages.seo-reports.report.texts', ['id' => $project->id, 'reportId' => $report->id]) }}">
                 @csrf
                 <h2 class="h6">{{ __('Edit report texts') }}</h2>
@@ -387,6 +387,7 @@
     @slot('js')
         <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
         <script src="{{ asset('js/cabinet-seo-reports-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-reports-charts.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-seo-reports-toc.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-reports-toc.js')) ?: time() }}"></script>
         <script>
             (function () {
                 var page = document.querySelector('[data-sr-status-url]');

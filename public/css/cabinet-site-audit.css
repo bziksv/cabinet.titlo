@@ -7140,6 +7140,7 @@ html.sa-tour-active body {
 
 .cabinet-sa-history-table {
   width: 100%;
+  min-width: 72rem;
   margin: 0;
   border-collapse: collapse;
   table-layout: fixed;
@@ -7159,17 +7160,23 @@ html.sa-tour-active body {
   vertical-align: middle;
 }
 
-.cabinet-sa-history-table thead th:nth-child(1) { width: 18%; } /* проверка */
-.cabinet-sa-history-table thead th:nth-child(2) { width: 14%; } /* команда */
-.cabinet-sa-history-table thead th:nth-child(3) { width: 9.5rem; } /* статус */
-.cabinet-sa-history-table thead th:nth-child(4) { width: 6.5rem; } /* прогресс */
+.cabinet-sa-history-table thead th:nth-child(1) { width: 16%; } /* проверка */
+.cabinet-sa-history-table thead th:nth-child(2) { width: 12%; } /* команда */
+.cabinet-sa-history-table thead th:nth-child(3) { width: 8.5rem; } /* статус */
+.cabinet-sa-history-table thead th:nth-child(4) { width: 6rem; } /* прогресс */
 .cabinet-sa-history-table thead th:nth-child(5),
-.cabinet-sa-history-table thead th:nth-child(6) { width: 5.25rem; } /* начало / конец */
+.cabinet-sa-history-table thead th:nth-child(6) { width: 5rem; } /* начало / конец */
 .cabinet-sa-history-table thead th:nth-child(7),
 .cabinet-sa-history-table thead th:nth-child(8),
 .cabinet-sa-history-table thead th:nth-child(9),
-.cabinet-sa-history-table thead th:nth-child(10) { width: 4.75rem; } /* проблемы */
-.cabinet-sa-history-table thead th:nth-child(11) { width: 9.75rem; } /* действия */
+.cabinet-sa-history-table thead th:nth-child(10),
+.cabinet-sa-history-table thead th:nth-child(11) { width: 4.25rem; } /* грубые…инфо (5 шт.) */
+.cabinet-sa-history-table thead th:nth-child(12) { width: 10.5rem; min-width: 10.5rem; } /* действия */
+
+.cabinet-sa-history-table tbody td.cabinet-sa-ht-actions {
+  overflow: visible;
+  white-space: nowrap;
+}
 
 .cabinet-sa-history-table tbody td {
   padding: 0.55rem 0.4rem;
@@ -7372,7 +7379,7 @@ html.sa-tour-active body {
 
 .cabinet-sa-ht-actions {
   text-align: right;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cabinet-sa-history__empty {
@@ -7408,12 +7415,12 @@ html.sa-tour-active body {
 
 .cabinet-sa-history-table .cabinet-sa-row-actions {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: center;
   gap: 0.25rem;
-  max-width: 100%;
-  white-space: normal;
+  max-width: none;
+  white-space: nowrap;
 }
 
 .cabinet-sa-history-table .cabinet-sa-row-actions .btn {

@@ -75,6 +75,7 @@
 
         return $fmtNum($value);
     };
+    $reportDomain = (string) ($cover['domain'] ?? ($project->domain ?? ''));
     $trafficHeroShown = false;
 @endphp
 
@@ -82,19 +83,21 @@
      style="--sr-accent: {{ $brand }};"
      data-sr-report>
     @if(count($toc) > 1)
-        <aside class="cabinet-sr-toc" data-sr-toc aria-label="{{ __('Report sections') }}">
-            <div class="cabinet-sr-toc__head">
-                <div class="cabinet-sr-toc__title">{{ __('Report sections') }}</div>
-                <div class="cabinet-sr-toc__bar" data-sr-toc-bar></div>
-            </div>
-            <nav class="cabinet-sr-toc__links">
-                @foreach($toc as $item)
-                    <a href="#sr-{{ $item['key'] }}"
-                       data-sr-toc-link="sr-{{ $item['key'] }}"
-                       data-sr-section-jump="{{ $item['key'] }}">{{ $item['title'] }}</a>
-                @endforeach
-            </nav>
-        </aside>
+        <div class="cabinet-sr-toc-slot" data-sr-toc-slot>
+            <aside class="cabinet-sr-toc" data-sr-toc aria-label="{{ __('Report sections') }}">
+                <div class="cabinet-sr-toc__head">
+                    <div class="cabinet-sr-toc__title">{{ __('Report sections') }}</div>
+                    <div class="cabinet-sr-toc__bar" data-sr-toc-bar></div>
+                </div>
+                <nav class="cabinet-sr-toc__links">
+                    @foreach($toc as $item)
+                        <a href="#sr-{{ $item['key'] }}"
+                           data-sr-toc-link="sr-{{ $item['key'] }}"
+                           data-sr-section-jump="{{ $item['key'] }}">{{ $item['title'] }}</a>
+                    @endforeach
+                </nav>
+            </aside>
+        </div>
     @endif
 
     <div class="cabinet-sr-report__main">
@@ -150,21 +153,29 @@
                     </span>
                 @endif
             </div>
-            <div class="cabinet-sr-cover__manager">
-                @if(!empty($cover['manager']['avatar_url']))
-                    <img class="cabinet-sr-cover__avatar" src="{{ $cover['manager']['avatar_url'] }}" alt="">
-                @endif
-                @if(!empty($cover['manager']['name']))
-                    <div class="cabinet-sr-cover__manager-label">{{ __('Your manager') }}</div>
-                    <div class="cabinet-sr-cover__manager-name">{{ $cover['manager']['name'] }}</div>
+            @php
+                $hasManager = !empty($cover['manager']['name'])
+                    || !empty($cover['manager']['phone'])
+                    || !empty($cover['manager']['email'])
+                    || !empty($cover['manager']['avatar_url']);
+            @endphp
+            @if($hasManager)
+                <div class="cabinet-sr-cover__manager">
+                    @if(!empty($cover['manager']['avatar_url']))
+                        <img class="cabinet-sr-cover__avatar" src="{{ $cover['manager']['avatar_url'] }}" alt="">
+                    @endif
+                    @if(!empty($cover['manager']['name']))
+                        <div class="cabinet-sr-cover__manager-label">{{ __('Your manager') }}</div>
+                        <div class="cabinet-sr-cover__manager-name">{{ $cover['manager']['name'] }}</div>
+                    @endif
                     @if(!empty($cover['manager']['phone']))
                         <a href="tel:{{ preg_replace('/\s+/', '', $cover['manager']['phone']) }}">{{ $cover['manager']['phone'] }}</a>
                     @endif
                     @if(!empty($cover['manager']['email']))
                         <div><a href="mailto:{{ $cover['manager']['email'] }}">{{ $cover['manager']['email'] }}</a></div>
                     @endif
-                @endif
-            </div>
+                </div>
+            @endif
         </div>
     </section>
 
@@ -753,7 +764,7 @@
                             <tbody>
                             @foreach($traffic['landings'] as $row)
                                 <tr>
-                                    <td class="cabinet-sr-url">{{ $row['name'] }}</td>
+                                    <td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['name'] ?? null, 'domain' => $reportDomain])</td>
                                     <td>{{ $fmtNum($row['visits'] ?? 0) }}</td>
                                     <td>
                                         @if(isset($row['visits_delta_pct']) && $row['visits_delta_pct'] !== null)
@@ -782,7 +793,7 @@
                             <tbody>
                             @foreach($traffic['landings_search'] as $row)
                                 <tr>
-                                    <td class="cabinet-sr-url">{{ $row['name'] }}</td>
+                                    <td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['name'] ?? null, 'domain' => $reportDomain])</td>
                                     <td>{{ $fmtNum($row['visits'] ?? 0) }}</td>
                                 </tr>
                             @endforeach
@@ -804,7 +815,7 @@
                             <tbody>
                             @foreach($traffic['landings_social'] as $row)
                                 <tr>
-                                    <td class="cabinet-sr-url">{{ $row['name'] }}</td>
+                                    <td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['name'] ?? null, 'domain' => $reportDomain])</td>
                                     <td>{{ $fmtNum($row['visits'] ?? 0) }}</td>
                                 </tr>
                             @endforeach
@@ -932,7 +943,7 @@
                                             <td>{{ $row['engine'] ?? '—' }}</td>
                                             <td>{{ $row['pos_from'] ?? '—' }}</td>
                                             <td class="{{ $bucket === 'improved' ? 'text-success' : 'text-danger' }}">{{ $row['pos_to'] ?? '—' }}</td>
-                                            <td class="cabinet-sr-url">{{ !empty($row['url']) ? $row['url'] : '—' }}</td>
+                                            <td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['url'] ?? null, 'domain' => $reportDomain])</td>
                                         </tr>
                                     @endforeach
                                     </tbody>
@@ -985,7 +996,7 @@
                                     <td>{{ $row['query'] ?? '—' }}</td>
                                     <td>{{ $row['engine'] ?? '—' }}</td>
                                     <td>{{ $row['pos_to'] ?? ($row['position'] ?? '—') }}</td>
-                                    <td class="cabinet-sr-url">{{ !empty($row['url']) ? $row['url'] : '—' }}</td>
+                                    <td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['url'] ?? null, 'domain' => $reportDomain])</td>
                                 </tr>
                             @endforeach
                             </tbody>
@@ -1012,7 +1023,7 @@
                                     <td>{{ $row['engine'] ?? '—' }}</td>
                                     <td>{{ $row['pos_from'] ?? ($row['was'] ?? '—') }}</td>
                                     <td class="text-danger">{{ $row['pos_to'] ?? ($row['now'] ?? '—') }}</td>
-                                    <td class="cabinet-sr-url">{{ !empty($row['url']) ? $row['url'] : '—' }}</td>
+                                    <td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['url'] ?? null, 'domain' => $reportDomain])</td>
                                 </tr>
                             @endforeach
                             </tbody>
@@ -1065,7 +1076,7 @@
                     <h3 class="h6 mt-3">{{ __('Competitors from monitoring') }}</h3>
                     <ul class="cabinet-sr-bullets">
                         @foreach($positions['competitors']['urls'] as $url)
-                            <li>{{ $url }}</li>
+                            <li>@include('pages.partials.seo-reports-landing-link', ['value' => $url, 'domain' => $reportDomain])</li>
                         @endforeach
                     </ul>
                     <p class="small text-secondary mb-0">
@@ -1469,7 +1480,7 @@
                             <tbody>
                             @foreach($direct['landings'] as $row)
                                 <tr>
-                                    <td class="cabinet-sr-url">{{ $row['name'] }}</td>
+                                    <td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['name'] ?? null, 'domain' => $reportDomain])</td>
                                     <td>{{ $fmtNum($row['visits'] ?? 0) }}</td>
                                 </tr>
                             @endforeach
@@ -1585,7 +1596,7 @@
                             <tbody>
                             @foreach(array_slice($sc['pages'], 0, 25) as $row)
                                 <tr>
-                                    <td class="cabinet-sr-url">{{ $row['name'] ?? '—' }}</td>
+                                    <td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['name'] ?? null, 'domain' => $reportDomain])</td>
                                     <td>{{ $fmtNum($row['clicks'] ?? 0) }}</td>
                                     <td>{{ $fmtNum($row['impressions'] ?? 0) }}</td>
                                 </tr>
@@ -1665,7 +1676,7 @@
                                 <tbody>
                                 @foreach(array_slice($fp['low_quality'], 0, 30) as $row)
                                     <tr>
-                                        <td class="cabinet-sr-url">{{ $row['url'] ?? '—' }}</td>
+                                        <td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['url'] ?? null, 'domain' => $reportDomain])</td>
                                         <td>{{ $row['title'] ?? '—' }}</td>
                                         <td class="cabinet-sr-table__muted">
                                             @if(!empty($row['event_date']))
@@ -1729,7 +1740,7 @@
                             <thead><tr><th>{{ __('URL') }}</th><th>{{ __('Visits') }}</th></tr></thead>
                             <tbody>
                             @foreach($gads['landings'] as $row)
-                                <tr><td class="cabinet-sr-url">{{ $row['name'] }}</td><td>{{ $fmtNum($row['visits'] ?? 0) }}</td></tr>
+                                <tr><td class="cabinet-sr-url">@include('pages.partials.seo-reports-landing-link', ['value' => $row['name'] ?? null, 'domain' => $reportDomain])</td><td>{{ $fmtNum($row['visits'] ?? 0) }}</td></tr>
                             @endforeach
                             </tbody>
                         </table>
@@ -2282,124 +2293,3 @@
     @endforeach
     </div>
 </div>
-
-<script>
-(function () {
-    var toc = document.querySelector('[data-sr-toc]');
-    var bar = document.querySelector('[data-sr-toc-bar]');
-    var links = toc ? Array.prototype.slice.call(toc.querySelectorAll('[data-sr-toc-link]')) : [];
-    var sections = links.map(function (a) {
-        return document.getElementById(a.getAttribute('data-sr-toc-link') || '');
-    }).filter(Boolean);
-    var activeId = '';
-
-    function probeOffset() {
-        // Sticky demo banner / public header — activate when section enters upper third.
-        var banner = document.querySelector('.cabinet-sr-demo-banner');
-        var h = banner ? banner.getBoundingClientRect().height : 0;
-        var viewH = window.innerHeight || document.documentElement.clientHeight || 0;
-        return Math.max(Math.round(h + 24), Math.round(viewH * 0.32));
-    }
-
-    function setActive(id) {
-        if (!id || id === activeId) return;
-        activeId = id;
-        var activeLink = null;
-        links.forEach(function (a) {
-            var on = a.getAttribute('data-sr-toc-link') === id;
-            a.classList.toggle('is-active', on);
-            if (on) activeLink = a;
-        });
-        // Sticky TOC scrolls itself — keep the active item in view.
-        if (activeLink && toc && typeof activeLink.scrollIntoView === 'function') {
-            var linkBox = activeLink.getBoundingClientRect();
-            var tocBox = toc.getBoundingClientRect();
-            if (linkBox.top < tocBox.top + 48 || linkBox.bottom > tocBox.bottom - 8) {
-                activeLink.scrollIntoView({ block: 'nearest' });
-            }
-        }
-    }
-
-    function onScroll() {
-        var viewH = window.innerHeight || document.documentElement.clientHeight || 0;
-        var y = window.pageYOffset || document.documentElement.scrollTop || 0;
-        var docH = Math.max(
-            document.body ? document.body.scrollHeight : 0,
-            document.documentElement.scrollHeight || 0
-        );
-        if (bar) {
-            var max = Math.max(1, docH - viewH);
-            bar.style.width = Math.min(100, Math.round(y / max * 100)) + '%';
-        }
-        if (!sections.length) return;
-
-        // Trailing sections often sit below max scroll (short blocks + footer) —
-        // near the bottom widen the probe so they can become active.
-        var probe = probeOffset();
-        if ((y + viewH) >= (docH - 80)) {
-            probe = Math.max(probe, Math.round(viewH * 0.78));
-        }
-
-        var current = sections[0];
-        for (var i = 0; i < sections.length; i++) {
-            if (sections[i].getBoundingClientRect().top <= probe) {
-                current = sections[i];
-            } else {
-                break;
-            }
-        }
-        if (current && current.id) setActive(current.id);
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-    onScroll();
-
-    // Jump like SEO Checklist stage-nav (open target, smooth scroll)
-    if (toc) {
-        toc.querySelectorAll('[data-sr-section-jump]').forEach(function (a) {
-            a.addEventListener('click', function (e) {
-                var key = a.getAttribute('data-sr-section-jump');
-                var el = key ? document.getElementById('sr-' + key) : null;
-                if (!el) return;
-                e.preventDefault();
-                setActive('sr-' + key);
-                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                if (history && history.replaceState) {
-                    history.replaceState(null, '', '#sr-' + key);
-                }
-            });
-        });
-    }
-
-    var report = document.querySelector('[data-sr-report]');
-    var toggle = document.querySelector('[data-sr-compare-toggle]');
-    if (report && toggle) {
-        toggle.addEventListener('change', function () {
-            report.setAttribute('data-sr-hide-compare', toggle.checked ? '0' : '1');
-        });
-    }
-    document.querySelectorAll('table[data-sr-sortable]').forEach(function (table) {
-        table.querySelectorAll('thead th').forEach(function (th, idx) {
-            th.addEventListener('click', function () {
-                var tbody = table.tBodies[0];
-                if (!tbody) return;
-                var rows = Array.prototype.slice.call(tbody.rows);
-                var asc = th.getAttribute('data-sort') !== 'asc';
-                rows.sort(function (a, b) {
-                    var av = (a.cells[idx] ? a.cells[idx].innerText : '').trim();
-                    var bv = (b.cells[idx] ? b.cells[idx].innerText : '').trim();
-                    var an = parseFloat(av.replace(/\s/g, '').replace(',', '.'));
-                    var bn = parseFloat(bv.replace(/\s/g, '').replace(',', '.'));
-                    if (!isNaN(an) && !isNaN(bn)) {
-                        return asc ? an - bn : bn - an;
-                    }
-                    return asc ? av.localeCompare(bv, 'ru') : bv.localeCompare(av, 'ru');
-                });
-                th.setAttribute('data-sort', asc ? 'asc' : 'desc');
-                rows.forEach(function (r) { tbody.appendChild(r); });
-            });
-        });
-    });
-})();
-</script>

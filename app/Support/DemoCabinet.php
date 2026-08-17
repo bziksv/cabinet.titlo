@@ -537,11 +537,58 @@ class DemoCabinet
         foreach ($allowed as $prefix) {
             $prefix = rtrim((string) $prefix, '/') ?: '/';
             if ($path === $prefix || strpos($path, $prefix . '/') === 0) {
+                // Аудит: сразу детальная сводка демо-краула, не пустая форма запуска.
+                if ($path === '/site-audit') {
+                    $crawlPath = self::siteAuditDemoCrawlPath();
+                    if ($crawlPath !== null) {
+                        return $crawlPath;
+                    }
+                }
+
                 return $path;
             }
         }
 
         return $default;
+    }
+
+    /**
+     * Путь к готовой демо-проверке Site Audit (фикстура demo-audit.titlo.ru).
+     */
+    public static function siteAuditDemoCrawlPath(): ?string
+    {
+        $user = self::findUser();
+        if (! $user) {
+            return null;
+        }
+
+        try {
+            if (! \Illuminate\Support\Facades\Schema::hasTable('site_audit_projects')
+                || ! \Illuminate\Support\Facades\Schema::hasTable('site_audit_crawls')) {
+                return null;
+            }
+
+            $projectId = (int) \Illuminate\Support\Facades\DB::table('site_audit_projects')
+                ->where('user_id', $user->id)
+                ->where('domain', \App\Support\SiteAuditDemoFixture::DOMAIN)
+                ->orderByDesc('id')
+                ->value('id');
+            if ($projectId < 1) {
+                return null;
+            }
+
+            $crawlId = (int) \Illuminate\Support\Facades\DB::table('site_audit_crawls')
+                ->where('project_id', $projectId)
+                ->orderByDesc('id')
+                ->value('id');
+            if ($crawlId < 1) {
+                return null;
+            }
+
+            return '/site-audit/crawl/' . $crawlId;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**

@@ -110,8 +110,11 @@ class SeoReportsGenerateMonthlyCommand extends Command
         foreach ($emails as $email) {
             Mail::to($email)->send(new SeoReportShareMail($project, $report, $publicUrl, $message, null));
         }
-        if ($ccManager && $project->manager_email && filter_var($project->manager_email, FILTER_VALIDATE_EMAIL)) {
-            Mail::to($project->manager_email)->send(new SeoReportShareMail(
+        $managerEmail = method_exists($project, 'brandingManagerEmail')
+            ? $project->brandingManagerEmail()
+            : $project->manager_email;
+        if ($ccManager && $managerEmail && filter_var($managerEmail, FILTER_VALIDATE_EMAIL)) {
+            Mail::to($managerEmail)->send(new SeoReportShareMail(
                 $project,
                 $report,
                 $publicUrl,

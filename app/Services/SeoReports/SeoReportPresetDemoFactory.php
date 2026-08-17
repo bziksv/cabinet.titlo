@@ -110,8 +110,8 @@ class SeoReportPresetDemoFactory
     {
         $toggles = $template->resolvedSectionToggles();
         $settings = $template->reportSettings();
-        $preset = $this->presetForToggles($toggles);
-        $demo = $this->make($preset);
+        // Полный снимок: у включённых в шаблон разделов не должно быть пустых KPI/таблиц.
+        $demo = $this->make('complex');
 
         /** @var SeoReportProject $project */
         $project = $demo['project'];
@@ -180,29 +180,6 @@ class SeoReportPresetDemoFactory
         ];
     }
 
-    /**
-     * @param array<string,bool> $toggles
-     */
-    private function presetForToggles(array $toggles): string
-    {
-        $ads = ['direct', 'google_ads', 'vk_ads', 'vk_smm', 'ecommerce', 'calls'];
-        $hasAds = false;
-        foreach ($ads as $key) {
-            if (!empty($toggles[$key])) {
-                $hasAds = true;
-                break;
-            }
-        }
-        if ($hasAds && (!empty($toggles['ecommerce']) || !empty($toggles['calls']) || !empty($toggles['vk_smm']))) {
-            return 'complex';
-        }
-        if ($hasAds) {
-            return 'seo_ads';
-        }
-
-        return 'seo_only';
-    }
-
     private function summaryFor(string $preset): string
     {
         if ($preset === 'complex') {
@@ -264,11 +241,13 @@ class SeoReportPresetDemoFactory
     private function snapshot(SeoReportProject $project, SeoReport $report, string $preset): array
     {
         $series = [];
+        $searchSeries = [];
         $day = optional($report->period_from)->copy() ?: Carbon::today()->startOfMonth();
         $end = optional($report->period_to)->copy() ?: Carbon::today();
         $i = 0;
         while ($day->lte($end) && $i < 31) {
             $series[$day->format('Y-m-d')] = 120 + ($i % 7) * 18 + ($i * 3);
+            $searchSeries[$day->format('Y-m-d')] = 70 + ($i % 7) * 12 + ($i * 2);
             $day->addDay();
             $i++;
         }
@@ -317,34 +296,76 @@ class SeoReportPresetDemoFactory
                 ],
                 'series_users' => $series,
                 'channels' => [
-                    ['name' => 'Поисковые системы', 'visits' => 7200, 'visits_prev' => 6600],
-                    ['name' => 'Прямые заходы', 'visits' => 2100, 'visits_prev' => 2050],
-                    ['name' => 'Социальные сети', 'visits' => 980, 'visits_prev' => 870],
-                    ['name' => 'Реклама', 'visits' => 1640, 'visits_prev' => 1720],
+                    ['name' => 'Поисковые системы', 'visits' => 7200, 'visits_prev' => 6600, 'users' => 6100, 'bounce_rate' => 28.4, 'page_depth' => 2.6, 'avg_visit_duration' => 168],
+                    ['name' => 'Прямые заходы', 'visits' => 2100, 'visits_prev' => 2050, 'users' => 1780, 'bounce_rate' => 41.2, 'page_depth' => 2.1, 'avg_visit_duration' => 132],
+                    ['name' => 'Социальные сети', 'visits' => 980, 'visits_prev' => 870, 'users' => 820, 'bounce_rate' => 52.8, 'page_depth' => 1.7, 'avg_visit_duration' => 95],
+                    ['name' => 'Реклама', 'visits' => 1640, 'visits_prev' => 1720, 'users' => 1390, 'bounce_rate' => 38.6, 'page_depth' => 2.0, 'avg_visit_duration' => 118],
+                ],
+                'sources' => [
+                    ['name' => 'yandex / organic', 'visits' => 4800, 'users' => 4100],
+                    ['name' => 'google / organic', 'visits' => 2400, 'users' => 2000],
+                    ['name' => '(direct)', 'visits' => 2100, 'users' => 1780],
+                    ['name' => 'yandex / cpc', 'visits' => 920, 'users' => 780],
+                    ['name' => 'google / cpc', 'visits' => 720, 'users' => 610],
+                    ['name' => 'vk.com / social', 'visits' => 540, 'users' => 460],
+                ],
+                'channel_months' => [
+                    ['month' => optional($report->period_from)->copy()->subMonthsNoOverflow(2)->format('Y-m'), 'channels' => [['name' => 'Поисковые системы', 'visits' => 6100]]],
+                    ['month' => optional($report->period_from)->copy()->subMonthsNoOverflow(1)->format('Y-m'), 'channels' => [['name' => 'Поисковые системы', 'visits' => 6600]]],
+                    ['month' => optional($report->period_from)->format('Y-m'), 'channels' => [['name' => 'Поисковые системы', 'visits' => 7200]]],
                 ],
                 'devices' => [
-                    ['name' => 'Смартфоны', 'visits' => 7800],
-                    ['name' => 'ПК', 'visits' => 3900],
-                    ['name' => 'Планшеты', 'visits' => 780],
+                    ['name' => 'Смартфоны', 'visits' => 7800, 'users' => 6400, 'bounce_rate' => 38.5, 'page_depth' => 2.1, 'avg_visit_duration' => 118],
+                    ['name' => 'ПК', 'visits' => 3900, 'users' => 2900, 'bounce_rate' => 26.2, 'page_depth' => 2.9, 'avg_visit_duration' => 196],
+                    ['name' => 'Планшеты', 'visits' => 780, 'users' => 520, 'bounce_rate' => 33.8, 'page_depth' => 2.3, 'avg_visit_duration' => 142],
                 ],
                 'geo' => [
-                    ['name' => 'Москва', 'visits' => 4200],
-                    ['name' => 'Санкт-Петербург', 'visits' => 1800],
-                    ['name' => 'Казань', 'visits' => 640],
+                    ['name' => 'Москва', 'visits' => 4200, 'users' => 3400, 'bounce_rate' => 31.2, 'page_depth' => 2.5, 'avg_visit_duration' => 158],
+                    ['name' => 'Санкт-Петербург', 'visits' => 1800, 'users' => 1450, 'bounce_rate' => 33.8, 'page_depth' => 2.3, 'avg_visit_duration' => 149],
+                    ['name' => 'Казань', 'visits' => 640, 'users' => 510, 'bounce_rate' => 36.4, 'page_depth' => 2.1, 'avg_visit_duration' => 131],
+                    ['name' => 'Екатеринбург', 'visits' => 520, 'users' => 410, 'bounce_rate' => 35.1, 'page_depth' => 2.2, 'avg_visit_duration' => 136],
+                    ['name' => 'Новосибирск', 'visits' => 410, 'users' => 330, 'bounce_rate' => 37.0, 'page_depth' => 2.0, 'avg_visit_duration' => 124],
                 ],
                 'landings' => [
-                    ['name' => '/', 'visits' => 3200, 'visits_delta_pct' => 12],
-                    ['name' => '/services', 'visits' => 1450, 'visits_delta_pct' => 28],
-                    ['name' => '/prices', 'visits' => 920, 'visits_delta_pct' => -4],
+                    ['name' => '/', 'visits' => 3200, 'visits_delta_pct' => 12.0, 'bounce_rate' => 29.4],
+                    ['name' => '/services', 'visits' => 1450, 'visits_delta_pct' => 28.0, 'bounce_rate' => 24.8],
+                    ['name' => '/prices', 'visits' => 920, 'visits_delta_pct' => -4.0, 'bounce_rate' => 41.2],
+                    ['name' => '/contacts', 'visits' => 610, 'visits_delta_pct' => 6.5, 'bounce_rate' => 22.1],
+                ],
+                'landings_search' => [
+                    ['name' => '/', 'visits' => 2100],
+                    ['name' => '/services', 'visits' => 980],
+                    ['name' => '/prices', 'visits' => 640],
+                    ['name' => '/blog/windows', 'visits' => 310],
                 ],
                 'landings_social' => [
                     ['name' => '/promo', 'visits' => 420],
                     ['name' => '/blog/case', 'visits' => 210],
+                    ['name' => '/services', 'visits' => 180],
+                ],
+                'social' => [
+                    'kpis' => [
+                        'visits' => ['value' => 980, 'prev' => 870, 'delta_pct' => 12.6],
+                        'users' => ['value' => 820, 'prev' => 740, 'delta_pct' => 10.8],
+                        'bounce_rate' => ['value' => 52.8, 'prev' => 55.1, 'delta_pct' => -4.2],
+                        'page_depth' => ['value' => 1.7, 'prev' => 1.6, 'delta_pct' => 6.3],
+                        'avg_visit_duration' => ['value' => 95, 'prev' => 88, 'delta_pct' => 8.0],
+                    ],
                 ],
                 'search' => [
                     'kpis' => [
-                        'visits' => ['value' => 7200, 'delta_pct' => 9.1],
-                        'users' => ['value' => 6100, 'delta_pct' => 7.4],
+                        'visits' => ['value' => 7200, 'prev' => 6600, 'delta_pct' => 9.1],
+                        'users' => ['value' => 6100, 'prev' => 5680, 'delta_pct' => 7.4],
+                        'pageviews' => ['value' => 17200, 'prev' => 15400, 'delta_pct' => 11.7],
+                        'bounce_rate' => ['value' => 28.4, 'prev' => 30.1, 'delta_pct' => -5.6],
+                        'page_depth' => ['value' => 2.6, 'prev' => 2.5, 'delta_pct' => 4.0],
+                        'avg_visit_duration' => ['value' => 168, 'prev' => 160, 'delta_pct' => 5.0],
+                    ],
+                    'series_visits' => $searchSeries,
+                    'engines' => [
+                        ['name' => 'Яндекс', 'visits' => 4800, 'visits_prev' => 4400, 'visits_delta_pct' => 9.1, 'bounce_rate' => 27.2],
+                        ['name' => 'Google', 'visits' => 2100, 'visits_prev' => 1950, 'visits_delta_pct' => 7.7, 'bounce_rate' => 30.8],
+                        ['name' => 'Другие', 'visits' => 300, 'visits_prev' => 250, 'visits_delta_pct' => 20.0, 'bounce_rate' => 34.5],
                     ],
                 ],
                 'auto_comment' => 'Поисковый трафик растёт, рекламный канал чуть просел — смотрите блок рекламы.',
@@ -375,6 +396,22 @@ class SeoReportPresetDemoFactory
                             'delta' => -6,
                             'url' => 'https://demo-shop.titlo.ru/services',
                         ],
+                        [
+                            'query' => 'окна пвх цена',
+                            'engine' => 'google',
+                            'pos_from' => 22,
+                            'pos_to' => 11,
+                            'delta' => -11,
+                            'url' => 'https://demo-shop.titlo.ru/prices',
+                        ],
+                        [
+                            'query' => 'замер окон бесплатно',
+                            'engine' => 'yandex',
+                            'pos_from' => 17,
+                            'pos_to' => 9,
+                            'delta' => -8,
+                            'url' => 'https://demo-shop.titlo.ru/contacts',
+                        ],
                     ],
                     'worsened' => [
                         [
@@ -384,6 +421,14 @@ class SeoReportPresetDemoFactory
                             'pos_to' => 15,
                             'delta' => 6,
                             'url' => 'https://demo-shop.titlo.ru/',
+                        ],
+                        [
+                            'query' => 'окна недорого',
+                            'engine' => 'yandex',
+                            'pos_from' => 11,
+                            'pos_to' => 18,
+                            'delta' => 7,
+                            'url' => 'https://demo-shop.titlo.ru/prices',
                         ],
                     ],
                 ],
@@ -603,21 +648,58 @@ class SeoReportPresetDemoFactory
         );
 
         if (in_array($preset, ['seo_ads', 'complex'], true)) {
+            $adSeries = [];
+            $adDay = optional($report->period_from)->copy() ?: Carbon::today()->startOfMonth();
+            $adEnd = optional($report->period_to)->copy() ?: Carbon::today();
+            $ai = 0;
+            while ($adDay->lte($adEnd) && $ai < 31) {
+                $adSeries[$adDay->format('Y-m-d')] = 18 + ($ai % 5) * 4 + ($ai % 3);
+                $adDay->addDay();
+                $ai++;
+            }
+
             $snap['direct'] = [
                 'source' => 'demo',
                 'note' => 'Демо Яндекс.Директ (из среза Метрики)',
                 'kpis' => [
-                    'visits' => ['value' => 920, 'delta_pct' => -3.2],
-                    'users' => ['value' => 780, 'delta_pct' => -2.1],
-                    'bounce_rate' => ['value' => 41.0, 'delta_pct' => 8.0],
-                    'page_depth' => ['value' => 1.6, 'delta_pct' => -4.0],
-                    'avg_visit_duration' => ['value' => 98, 'delta_pct' => -5.0],
+                    'visits' => ['value' => 920, 'prev' => 950, 'delta_pct' => -3.2],
+                    'users' => ['value' => 780, 'prev' => 797, 'delta_pct' => -2.1],
+                    'bounce_rate' => ['value' => 41.0, 'prev' => 38.0, 'delta_pct' => 8.0],
+                    'page_depth' => ['value' => 1.6, 'prev' => 1.7, 'delta_pct' => -4.0],
+                    'avg_visit_duration' => ['value' => 98, 'prev' => 103, 'delta_pct' => -5.0],
+                ],
+                'spend' => [
+                    'cost' => 86400,
+                    'clicks' => 4120,
+                    'impressions' => 186000,
+                    'cpc' => 21.0,
+                    'ctr' => 2.22,
+                ],
+                'series_visits' => $adSeries,
+                'engines' => [
+                    ['name' => 'Яндекс', 'visits' => 720, 'bounce_rate' => 39.5],
+                    ['name' => 'РСЯ', 'visits' => 200, 'bounce_rate' => 46.2],
+                ],
+                'campaigns' => [
+                    ['name' => 'Бренд · Москва', 'visits' => 340, 'bounce_rate' => 28.4],
+                    ['name' => 'Общие · окна', 'visits' => 410, 'bounce_rate' => 44.8],
+                    ['name' => 'Ретаргет', 'visits' => 170, 'bounce_rate' => 36.1],
+                ],
+                'platforms' => [
+                    ['name' => 'Поиск', 'visits' => 620],
+                    ['name' => 'Сети', 'visits' => 300],
+                ],
+                'phrases' => [
+                    ['name' => 'купить окна', 'visits' => 120],
+                    ['name' => 'окна пвх москва', 'visits' => 95],
+                    ['name' => 'установка окон цена', 'visits' => 70],
                 ],
                 'landings' => [
-                    ['name' => '/services', 'visits' => 310],
-                    ['name' => '/prices', 'visits' => 180],
+                    ['name' => '/services', 'visits' => 310, 'bounce_rate' => 42.0],
+                    ['name' => '/prices', 'visits' => 180, 'bounce_rate' => 48.5],
+                    ['name' => '/', 'visits' => 140, 'bounce_rate' => 35.2],
                 ],
-                'fix' => [
+                'notes' => [
                     'Высокий отказ в рекламном трафике — проверить посадочные и соответствие объявлений.',
                 ],
             ];
@@ -625,24 +707,27 @@ class SeoReportPresetDemoFactory
                 'source' => 'demo',
                 'note' => 'Демо Google Ads',
                 'kpis' => [
-                    'visits' => ['value' => 720, 'delta_pct' => 2.4],
-                    'users' => ['value' => 610, 'delta_pct' => 1.8],
-                    'bounce_rate' => ['value' => 38.0, 'delta_pct' => -1.0],
-                    'page_depth' => ['value' => 1.8, 'delta_pct' => 2.0],
-                    'avg_visit_duration' => ['value' => 110, 'delta_pct' => 1.0],
+                    'visits' => ['value' => 720, 'prev' => 703, 'delta_pct' => 2.4],
+                    'users' => ['value' => 610, 'prev' => 599, 'delta_pct' => 1.8],
+                    'bounce_rate' => ['value' => 38.0, 'prev' => 38.4, 'delta_pct' => -1.0],
+                    'page_depth' => ['value' => 1.8, 'prev' => 1.76, 'delta_pct' => 2.0],
+                    'avg_visit_duration' => ['value' => 110, 'prev' => 109, 'delta_pct' => 1.0],
                 ],
                 'campaigns' => [
-                    ['name' => 'Brand · RU', 'visits' => 280, 'users' => 240],
-                    ['name' => 'Generic · Windows', 'visits' => 440, 'users' => 370],
+                    ['name' => 'Brand · RU', 'visits' => 280, 'users' => 240, 'bounce_rate' => 29.5],
+                    ['name' => 'Generic · Windows', 'visits' => 440, 'users' => 370, 'bounce_rate' => 42.1],
                 ],
                 'landings' => [
-                    ['name' => '/promo', 'visits' => 190],
+                    ['name' => '/promo', 'visits' => 190, 'bounce_rate' => 36.8],
+                    ['name' => '/services', 'visits' => 160, 'bounce_rate' => 40.2],
                 ],
                 'phrases' => [
                     ['name' => 'окна купить', 'visits' => 90],
+                    ['name' => 'pvc windows moscow', 'visits' => 55],
                 ],
                 'conversions' => [
                     ['name' => 'Заявка', 'reaches' => 22, 'conversion_rate' => 3.1],
+                    ['name' => 'Звонок', 'reaches' => 9, 'conversion_rate' => 1.3],
                 ],
             ];
             $snap['progress']['direct'] = 'ok';

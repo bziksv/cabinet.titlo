@@ -222,7 +222,8 @@ class MetaTagsController extends Controller
 
     public function index()
     {
-        if (\App\Support\DemoCabinet::isCurrentUser()) {
+        // ?form=1 — форма модуля без редиректа на витрину снимка (скрины / ручной прогон в демо)
+        if (\App\Support\DemoCabinet::isCurrentUser() && ! request()->boolean('form')) {
             $showcase = \App\Support\DemoCabinet::metaTagsShowcasePath();
             if ($showcase) {
                 return redirect($showcase);

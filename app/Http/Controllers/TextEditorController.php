@@ -36,7 +36,7 @@ class TextEditorController extends Controller
      */
     public function index()
     {
-        if (\App\Support\DemoCabinet::isCurrentUser()) {
+        if (\App\Support\DemoCabinet::isCurrentUser() && ! request()->boolean('list')) {
             $showcase = \App\Support\DemoCabinet::htmlEditorShowcasePath();
             if ($showcase) {
                 return redirect($showcase);

@@ -16,7 +16,16 @@ class SeoReportSectionRegistry
     public const SOURCE_STATUS_MANUAL = 'manual';
 
     /**
-     * @return array<string, array{title:string,hint:string,group:string,source:string,default:bool,mvp:bool}>
+     * @return array<string, array{
+     *   title:string,
+     *   hint:string,
+     *   origin:string,
+     *   origin_kind:string,
+     *   group:string,
+     *   source:string,
+     *   default:bool,
+     *   mvp:bool
+     * }>
      */
     public static function all(): array
     {
@@ -24,14 +33,18 @@ class SeoReportSectionRegistry
             'cover' => [
                 'title' => 'Обложка',
                 'hint' => 'Титул отчёта: период, логотип агентства, контакты менеджера.',
+                'origin' => 'Текст менеджера',
+                'origin_kind' => 'manual',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
                 'mvp' => true,
             ],
             'summary' => [
-                'title' => 'Резюме / ключевые выводы',
+                'title' => 'Резюме и выводы',
                 'hint' => 'Короткий текст для клиента: что выросло, что упало, главный фокус месяца.',
+                'origin' => 'Текст менеджера',
+                'origin_kind' => 'manual',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
@@ -40,14 +53,18 @@ class SeoReportSectionRegistry
             'kpi_goals' => [
                 'title' => 'Цели и KPI',
                 'hint' => 'Светофор по целям: визиты, TOP-10, конверсии, выручка — факт vs план.',
+                'origin' => 'Текст менеджера',
+                'origin_kind' => 'manual',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
                 'mvp' => true,
             ],
             'traffic' => [
-                'title' => 'Трафик (Метрика)',
+                'title' => 'Трафик',
                 'hint' => 'Визиты, пользователи, отказы, каналы, устройства, гео и топ посадочных из Метрики.',
+                'origin' => 'Яндекс.Метрика · API',
+                'origin_kind' => 'api',
                 'group' => 'seo',
                 'source' => 'metrika',
                 'default' => true,
@@ -56,6 +73,8 @@ class SeoReportSectionRegistry
             'positions' => [
                 'title' => 'Позиции',
                 'hint' => 'Видимость, TOP-10, выросшие/упавшие, почти в TOP-10 и сильно просевшие запросы из мониторинга.',
+                'origin' => 'Мониторинг позиций Titlo',
+                'origin_kind' => 'titlo',
                 'group' => 'seo',
                 'source' => 'monitoring',
                 'default' => true,
@@ -64,6 +83,8 @@ class SeoReportSectionRegistry
             'work_done' => [
                 'title' => 'Выполненные работы',
                 'hint' => 'Закрытые задачи из SEO-чеклиста за период + комментарий менеджера.',
+                'origin' => 'SEO-чеклист Titlo + текст менеджера',
+                'origin_kind' => 'manual',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
@@ -72,6 +93,8 @@ class SeoReportSectionRegistry
             'work_plan' => [
                 'title' => 'План работ',
                 'hint' => 'Ближайшие задачи из SEO-чеклиста + план менеджера на следующий период.',
+                'origin' => 'SEO-чеклист Titlo + текст менеджера',
+                'origin_kind' => 'manual',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
@@ -79,7 +102,9 @@ class SeoReportSectionRegistry
             ],
             'gsc' => [
                 'title' => 'Google Search Console',
-                'hint' => 'Клики, показы, CTR и топ запросов/страниц из GSC через API.',
+                'hint' => 'Клики, показы, CTR и топ запросов/страниц из Search Console через API.',
+                'origin' => 'Google Search Console · API',
+                'origin_kind' => 'api',
                 'group' => 'seo',
                 'source' => 'gsc',
                 'default' => false,
@@ -88,6 +113,8 @@ class SeoReportSectionRegistry
             'webmaster' => [
                 'title' => 'Яндекс.Вебмастер',
                 'hint' => 'Данные Вебмастера по запросам и страницам через API.',
+                'origin' => 'Яндекс.Вебмастер · API',
+                'origin_kind' => 'api',
                 'group' => 'seo',
                 'source' => 'webmaster',
                 'default' => false,
@@ -96,6 +123,8 @@ class SeoReportSectionRegistry
             'conversions' => [
                 'title' => 'Конверсии',
                 'hint' => 'Цели Метрики: достижения, конверсия по каналам поиска / рекламы / соцсетей.',
+                'origin' => 'Яндекс.Метрика · API',
+                'origin_kind' => 'api',
                 'group' => 'seo',
                 'source' => 'metrika',
                 'default' => true,
@@ -104,6 +133,8 @@ class SeoReportSectionRegistry
             'direct' => [
                 'title' => 'Яндекс.Директ',
                 'hint' => 'Рекламный трафик Директа: визиты, отказы, посадочные и заметки по кампаниям.',
+                'origin' => 'Яндекс.Директ · API',
+                'origin_kind' => 'api',
                 'group' => 'ads',
                 'source' => 'direct',
                 'default' => false,
@@ -112,30 +143,38 @@ class SeoReportSectionRegistry
             'google_ads' => [
                 'title' => 'Google Ads',
                 'hint' => 'Кампании Google Ads: визиты, посадочные, фразы и конверсии из среза.',
+                'origin' => 'Google Ads · API',
+                'origin_kind' => 'api',
                 'group' => 'ads',
                 'source' => 'google_ads',
                 'default' => false,
                 'mvp' => false,
             ],
             'vk_ads' => [
-                'title' => 'VK Реклама',
+                'title' => 'Реклама VK',
                 'hint' => 'Таргет VK: охваты, клики и эффективность через API.',
+                'origin' => 'VK Реклама · API',
+                'origin_kind' => 'api',
                 'group' => 'ads',
                 'source' => 'vk_ads',
                 'default' => false,
                 'mvp' => false,
             ],
             'vk_smm' => [
-                'title' => 'VK / SMM',
-                'hint' => 'Сообщество VK: охват, ER, топ-посты за период.',
+                'title' => 'Сообщество VK',
+                'hint' => 'Сообщество VK: охват, вовлечённость и топ-посты за период.',
+                'origin' => 'VK · API',
+                'origin_kind' => 'api',
                 'group' => 'smm',
                 'source' => 'vk_smm',
                 'default' => false,
                 'mvp' => false,
             ],
             'ecommerce' => [
-                'title' => 'Ecommerce',
-                'hint' => 'Покупки и выручка из Метрики Ecommerce — для интернет-магазинов.',
+                'title' => 'Электронная коммерция',
+                'hint' => 'Покупки и выручка из электронной коммерции Яндекс.Метрики — для интернет-магазинов.',
+                'origin' => 'Яндекс.Метрика · API',
+                'origin_kind' => 'api',
                 'group' => 'commerce',
                 'source' => 'metrika',
                 'default' => false,
@@ -144,46 +183,58 @@ class SeoReportSectionRegistry
             'calls' => [
                 'title' => 'Звонки',
                 'hint' => 'Динамика звонков (коллтрекинг / ручной импорт) рядом с SEO и рекламой.',
+                'origin' => 'Коллтрекинг / импорт',
+                'origin_kind' => 'api',
                 'group' => 'commerce',
                 'source' => 'calls',
                 'default' => false,
                 'mvp' => false,
             ],
             'titlo_audit' => [
-                'title' => 'Аудит сайта (Titlo)',
-                'hint' => 'Сводка Site Audit: критичные / предупреждения / инфо за период — наше преимущество.',
+                'title' => 'Аудит сайта',
+                'hint' => 'Сводка аудита сайта: критичные / предупреждения / инфо за период.',
+                'origin' => 'Модуль Titlo',
+                'origin_kind' => 'titlo',
                 'group' => 'titlo',
                 'source' => 'site_audit',
                 'default' => true,
                 'mvp' => true,
             ],
             'titlo_checklist' => [
-                'title' => 'SEO-чеклист (Titlo)',
+                'title' => 'SEO-чеклист',
                 'hint' => 'Прогресс чеклиста: закрыто за период, просрочки, общий % — связка с работой команды.',
+                'origin' => 'Модуль Titlo',
+                'origin_kind' => 'titlo',
                 'group' => 'titlo',
                 'source' => 'seo_checklist',
                 'default' => true,
                 'mvp' => true,
             ],
             'titlo_relevance' => [
-                'title' => 'Релевантность (Titlo)',
+                'title' => 'Релевантность',
                 'hint' => 'Средний балл релевантности и позиция по проверкам модуля Релевантность.',
+                'origin' => 'Модуль Titlo',
+                'origin_kind' => 'titlo',
                 'group' => 'titlo',
                 'source' => 'relevance',
                 'default' => true,
                 'mvp' => true,
             ],
             'titlo_uptime' => [
-                'title' => 'Доступность (мониторинг)',
+                'title' => 'Доступность сайта',
                 'hint' => 'Аптайм, инциденты и срок домена из мониторинга доступности.',
+                'origin' => 'Модуль Titlo',
+                'origin_kind' => 'titlo',
                 'group' => 'titlo',
                 'source' => 'site_monitoring',
                 'default' => true,
                 'mvp' => true,
             ],
             'insights' => [
-                'title' => 'Инсайты Titlo',
+                'title' => 'Инсайты',
                 'hint' => 'Автоматические выводы P1–P3 по трафику, позициям и модулям Titlo.',
+                'origin' => 'Считается в Titlo автоматически',
+                'origin_kind' => 'auto',
                 'group' => 'titlo',
                 'source' => 'computed',
                 'default' => true,
@@ -247,24 +298,38 @@ class SeoReportSectionRegistry
     public static function sourceLabel(string $source): string
     {
         $map = [
-            'manual' => 'Вручную',
-            'metrika' => 'Метрика',
-            'monitoring' => 'Позиции',
-            'gsc' => 'GSC',
-            'webmaster' => 'Вебмастер',
-            'direct' => 'Директ',
+            'manual' => 'Текст менеджера',
+            'metrika' => 'Яндекс.Метрика',
+            'monitoring' => 'Мониторинг позиций Titlo',
+            'gsc' => 'Google Search Console',
+            'webmaster' => 'Яндекс.Вебмастер',
+            'direct' => 'Яндекс.Директ',
             'google_ads' => 'Google Ads',
-            'vk_ads' => 'VK Ads',
+            'vk_ads' => 'VK Реклама',
             'vk_smm' => 'VK',
-            'calls' => 'Звонки',
-            'site_audit' => 'Аудит',
-            'seo_checklist' => 'Чеклист',
-            'relevance' => 'Релевантность',
-            'site_monitoring' => 'Uptime',
-            'computed' => 'Titlo',
+            'calls' => 'Коллтрекинг',
+            'site_audit' => 'Аудит сайта Titlo',
+            'seo_checklist' => 'SEO-чеклист Titlo',
+            'relevance' => 'Релевантность Titlo',
+            'site_monitoring' => 'Доступность Titlo',
+            'computed' => 'Автоматически в Titlo',
         ];
 
         return $map[$source] ?? $source;
+    }
+
+    public static function origin(string $key): string
+    {
+        $all = self::all();
+
+        return (string) ($all[$key]['origin'] ?? self::sourceLabel((string) ($all[$key]['source'] ?? '')));
+    }
+
+    public static function originKind(string $key): string
+    {
+        $all = self::all();
+
+        return (string) ($all[$key]['origin_kind'] ?? 'manual');
     }
 
     /**
@@ -353,7 +418,7 @@ class SeoReportSectionRegistry
             ],
             'complex' => [
                 'title' => 'Комплексный',
-                'lead' => 'Все блоки: SEO, реклама, SMM, ecommerce, звонки, Titlo-модули.',
+                'lead' => 'Все блоки: SEO, реклама, соцсети, продажи, звонки, модули Titlo.',
                 'for_whom' => 'Полный отчёт агентства «под ключ» для крупного клиента.',
                 'demo' => [
                     'kpis' => [
@@ -362,9 +427,9 @@ class SeoReportSectionRegistry
                         ['label' => 'ER VK', 'value' => '4,2%', 'delta' => '+0,5'],
                     ],
                     'bullets' => [
-                        'Ecommerce и звонки в одном отчёте с SEO',
-                        'VK Ads + сообщество: охват и топ-посты',
-                        'Инсайты Titlo + аудит + чеклист за период',
+                        'Электронная коммерция и звонки в одном отчёте с SEO',
+                        'Реклама VK + сообщество: охват и топ-посты',
+                        'Инсайты + аудит + чеклист за период',
                     ],
                 ],
             ],

@@ -378,6 +378,7 @@ final class EseninAnalyzer
         });
 
         $lower = mb_strtolower($plain, 'UTF-8');
+        $wordSpans = self::plainWordSpans($plain);
         $used = [];
         $matches = [];
 
@@ -387,26 +388,43 @@ final class EseninAnalyzer
                 continue;
             }
 
-            $offset = 0;
-            while (($pos = mb_stripos($lower, $phrase, $offset, 'UTF-8')) !== false) {
-                $end = $pos + mb_strlen($phrase, 'UTF-8');
-                $overlap = false;
-                for ($i = $pos; $i < $end; $i++) {
-                    if (! empty($used[$i])) {
-                        $overlap = true;
-                        break;
+            $weight = (int) ($entry['weight'] ?? 1);
+            $hint = (string) ($entry['hint'] ?? '');
+
+            // Single-token entries: match whole words by lemma (саму/самую → сам/самый), not substrings.
+            if (mb_strpos($phrase, ' ', 0, 'UTF-8') === false) {
+                $targetLemmas = self::styleEntryLemmas($entry, $phrase);
+                foreach ($wordSpans as $span) {
+                    $wordLemma = EseninMorphology::lemma((string) $span['word']);
+                    if (! in_array($wordLemma, $targetLemmas, true)) {
+                        continue;
+                    }
+                    $pos = (int) $span['offset'];
+                    $len = (int) $span['length'];
+                    if (self::reserveStyleSpan($used, $pos, $len)) {
+                        $matches[] = [
+                            'phrase' => $phrase,
+                            'weight' => $weight,
+                            'hint' => $hint,
+                            'offset' => $pos,
+                            'length' => $len,
+                            'block' => 'style',
+                        ];
                     }
                 }
-                if (! $overlap) {
-                    for ($i = $pos; $i < $end; $i++) {
-                        $used[$i] = true;
-                    }
+                continue;
+            }
+
+            $len = mb_strlen($phrase, 'UTF-8');
+            $offset = 0;
+            while (($pos = mb_stripos($lower, $phrase, $offset, 'UTF-8')) !== false) {
+                if (self::isWholeWordAt($lower, $pos, $len) && self::reserveStyleSpan($used, $pos, $len)) {
                     $matches[] = [
                         'phrase' => $phrase,
-                        'weight' => (int) ($entry['weight'] ?? 1),
-                        'hint' => (string) ($entry['hint'] ?? ''),
+                        'weight' => $weight,
+                        'hint' => $hint,
                         'offset' => $pos,
-                        'length' => mb_strlen($phrase, 'UTF-8'),
+                        'length' => $len,
                         'block' => 'style',
                     ];
                 }
@@ -415,6 +433,108 @@ final class EseninAnalyzer
         }
 
         return $matches;
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     * @return array<int, string>
+     */
+    private static function styleEntryLemmas(array $entry, string $phrase): array
+    {
+        $lemmas = [];
+        if (! empty($entry['lemmas']) && is_array($entry['lemmas'])) {
+            foreach ($entry['lemmas'] as $lemma) {
+                $lemma = mb_strtolower(trim((string) $lemma), 'UTF-8');
+                if ($lemma !== '') {
+                    $lemmas[] = EseninMorphology::lemma($lemma);
+                }
+            }
+        }
+
+        if ($lemmas === []) {
+            $lemmas[] = EseninMorphology::lemma($phrase);
+        }
+
+        if (! empty($entry['forms']) && is_array($entry['forms'])) {
+            foreach ($entry['forms'] as $form) {
+                $form = mb_strtolower(trim((string) $form), 'UTF-8');
+                if ($form !== '') {
+                    $lemmas[] = EseninMorphology::lemma($form);
+                }
+            }
+        }
+
+        return array_values(array_unique($lemmas));
+    }
+
+    /**
+     * @return array<int, array{offset: int, length: int, word: string}>
+     */
+    private static function plainWordSpans(string $plain): array
+    {
+        if (! preg_match_all('/[\p{L}\p{N}_]+/u', $plain, $matches, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        $spans = [];
+        foreach ($matches[0] as $match) {
+            $spans[] = [
+                'offset' => self::byteOffsetToChar($plain, (int) $match[1]),
+                'length' => mb_strlen((string) $match[0], 'UTF-8'),
+                'word' => (string) $match[0],
+            ];
+        }
+
+        return $spans;
+    }
+
+    /**
+     * @param array<int, bool> $used
+     */
+    private static function reserveStyleSpan(array &$used, int $pos, int $len): bool
+    {
+        $end = $pos + $len;
+        for ($i = $pos; $i < $end; $i++) {
+            if (! empty($used[$i])) {
+                return false;
+            }
+        }
+        for ($i = $pos; $i < $end; $i++) {
+            $used[$i] = true;
+        }
+
+        return true;
+    }
+
+    /**
+     * Phrase / dictionary hit must not sit inside a longer token (сам ⊂ самую).
+     */
+    public static function isWholeWordAt(string $plain, int $pos, int $length): bool
+    {
+        if ($pos < 0 || $length <= 0) {
+            return false;
+        }
+
+        $plainLen = mb_strlen($plain, 'UTF-8');
+        if ($pos + $length > $plainLen) {
+            return false;
+        }
+
+        if ($pos > 0) {
+            $before = mb_substr($plain, $pos - 1, 1, 'UTF-8');
+            if (preg_match('/[\p{L}\p{N}_]/u', $before)) {
+                return false;
+            }
+        }
+
+        if ($pos + $length < $plainLen) {
+            $after = mb_substr($plain, $pos + $length, 1, 'UTF-8');
+            if (preg_match('/[\p{L}\p{N}_]/u', $after)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -466,8 +586,10 @@ final class EseninAnalyzer
             $offset = 0;
             while (($pos = mb_stripos($lower, $phrase, $offset, 'UTF-8')) !== false) {
                 $len = mb_strlen($phrase, 'UTF-8');
-                for ($i = $pos; $i < $pos + $len; $i++) {
-                    $covered[$i] = true;
+                if (self::isWholeWordAt($lower, $pos, $len)) {
+                    for ($i = $pos; $i < $pos + $len; $i++) {
+                        $covered[$i] = true;
+                    }
                 }
                 $offset = $pos + 1;
             }
@@ -793,15 +915,18 @@ final class EseninAnalyzer
         $lower = mb_strtolower($plain, 'UTF-8');
         $needle = mb_strtolower($phrase, 'UTF-8');
         $offset = 0;
+        $len = mb_strlen($needle, 'UTF-8');
         while (($pos = mb_stripos($lower, $needle, $offset, 'UTF-8')) !== false) {
-            $marks[] = [
-                'offset' => $pos,
-                'length' => mb_strlen($needle, 'UTF-8'),
-                'block' => $block,
-                'hint' => $hint,
-                'variant' => $variant,
-                'weight' => 1,
-            ];
+            if (self::isWholeWordAt($lower, $pos, $len)) {
+                $marks[] = [
+                    'offset' => $pos,
+                    'length' => $len,
+                    'block' => $block,
+                    'hint' => $hint,
+                    'variant' => $variant,
+                    'weight' => 1,
+                ];
+            }
             $offset = $pos + 1;
         }
 

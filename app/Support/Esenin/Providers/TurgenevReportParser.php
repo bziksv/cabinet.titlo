@@ -2,6 +2,7 @@
 
 namespace App\Support\Esenin\Providers;
 
+use App\Support\Esenin\EseninAnalyzer;
 use App\Support\EseninTextCheckSettingsRegistry;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -447,15 +448,19 @@ final class TurgenevReportParser
             return null;
         }
 
-        $pos = mb_stripos($plain, $spanText, 0, 'UTF-8');
-        if ($pos !== false) {
-            return [
-                'offset' => $pos,
-                'length' => mb_strlen($spanText, 'UTF-8'),
-            ];
+        $len = mb_strlen($spanText, 'UTF-8');
+        $searchFrom = 0;
+        while (($pos = mb_stripos($plain, $spanText, $searchFrom, 'UTF-8')) !== false) {
+            if (EseninAnalyzer::isWholeWordAt($plain, $pos, $len)) {
+                return [
+                    'offset' => $pos,
+                    'length' => $len,
+                ];
+            }
+            $searchFrom = $pos + 1;
         }
 
-        $pattern = '/\b' . preg_replace('/\s+/u', '\\s+', preg_quote($spanText, '/')) . '\b/iu';
+        $pattern = '/(?<![\p{L}\p{N}_])' . preg_replace('/\s+/u', '\\s+', preg_quote($spanText, '/')) . '(?![\p{L}\p{N}_])/iu';
         if (preg_match($pattern, $plain, $matches, PREG_OFFSET_CAPTURE)) {
             $byteOffset = (int) ($matches[0][1] ?? -1);
             if ($byteOffset >= 0) {

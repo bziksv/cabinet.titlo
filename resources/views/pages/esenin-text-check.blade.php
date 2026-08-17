@@ -139,6 +139,7 @@
                             <div class="cabinet-esenin-text-view__wrap">
                                 <div class="cabinet-esenin-legend small text-secondary mb-3 d-none" data-esenin-legend></div>
                                 <div class="cabinet-esenin-text-view__content cabinet-esenin-text-view__content--editable"
+                                     id="cabinet-esenin-highlight"
                                      data-esenin-highlight
                                      contenteditable="true"
                                      spellcheck="true"

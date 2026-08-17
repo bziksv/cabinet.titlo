@@ -5,6 +5,18 @@
     <title>{{ $project->domain }} — SEO Report</title>
     @php
         $pdfBrand = \App\SeoReports\SeoReportBrandColor::normalize($project->brand_color ?: '#0f172a');
+        $pdfDomain = (string) ($project->domain ?? '');
+        $pdfLanding = static function ($value) use ($pdfDomain) {
+            $value = trim((string) ($value ?? ''));
+            $href = \App\SeoReports\SeoReportLandingUrl::href($value !== '' ? $value : null, $pdfDomain);
+            if ($href) {
+                $label = e($value !== '' ? $value : $href);
+
+                return '<a href="' . e($href) . '">' . $label . '</a>';
+            }
+
+            return e($value !== '' ? $value : '—');
+        };
     @endphp
     <style>
         body {
@@ -232,7 +244,7 @@
                 <tbody>
                 @foreach(array_slice($traffic['landings'], 0, 15) as $row)
                     <tr>
-                        <td>{{ $row['name'] }}</td>
+                        <td>{!! $pdfLanding($row['name'] ?? null) !!}</td>
                         <td>{{ $fmt($row['visits'] ?? 0) }}</td>
                         <td>
                             @if(isset($row['visits_delta_pct']) && $row['visits_delta_pct'] !== null)
@@ -289,7 +301,7 @@
                         <td>{{ $row['query'] }}</td>
                         <td>{{ $row['pos_from'] }}</td>
                         <td>{{ $row['pos_to'] }}</td>
-                        <td>{{ $row['url'] ?? '—' }}</td>
+                        <td>{!! $pdfLanding($row['url'] ?? null) !!}</td>
                     </tr>
                 @endforeach
                 </tbody>
@@ -426,7 +438,7 @@
                 <thead><tr><th>URL</th><th>Визиты</th></tr></thead>
                 <tbody>
                 @foreach(array_slice($direct['landings'], 0, 12) as $row)
-                    <tr><td>{{ $row['name'] }}</td><td>{{ $fmt($row['visits'] ?? 0) }}</td></tr>
+                    <tr><td>{!! $pdfLanding($row['name'] ?? null) !!}</td><td>{{ $fmt($row['visits'] ?? 0) }}</td></tr>
                 @endforeach
                 </tbody>
             </table>
@@ -440,7 +452,7 @@
 
 @if(is_array($ecommerce) && !empty($ecommerce['available']))
     <div class="section">
-        <h2>Ecommerce</h2>
+        <h2>Электронная коммерция</h2>
         <table class="kpis">
             <tr>
                 <td><div class="kpi-label">Покупки</div><div class="kpi-value">{{ $fmt($ecommerce['purchases'] ?? 0) }}</div></td>
@@ -483,7 +495,7 @@
         $topIssues = is_array($audit['top_issues'] ?? null) ? array_slice($audit['top_issues'], 0, 6) : [];
     @endphp
     <div class="section">
-        <h2>Аудит сайта (Titlo)</h2>
+        <h2>Аудит сайта</h2>
         @if(!empty($audit['summary']))
             <div class="meta">{{ $audit['summary'] }}</div>
         @endif
@@ -512,7 +524,7 @@
 @if(!empty($snapshot['titlo_checklist']))
     @php $c = $snapshot['titlo_checklist']; @endphp
     <div class="section">
-        <h2>Чеклист SEO (Titlo)</h2>
+        <h2>SEO-чеклист</h2>
         <div class="meta">Закрыто за период: {{ (int)($c['closed_in_period'] ?? 0) }} · просрочено: {{ (int)($c['overdue'] ?? 0) }}</div>
     </div>
 @endif
@@ -526,7 +538,7 @@
         }
     @endphp
     <div class="section">
-        <h2>Релевантность (Titlo)</h2>
+        <h2>Релевантность</h2>
         @if(!empty($rel['summary']))
             <div class="meta">{{ $rel['summary'] }}</div>
         @endif
@@ -541,7 +553,7 @@
 @if(!empty($snapshot['titlo_uptime']))
     @php $u = $snapshot['titlo_uptime']; @endphp
     <div class="section">
-        <h2>Аптайм (Titlo)</h2>
+        <h2>Доступность сайта</h2>
         <div class="meta">Uptime: {{ $u['uptime_percent'] !== null ? $fmt($u['uptime_percent'], 2) . '%' : '—' }} · домен дней: {{ $u['domain_days_left'] !== null ? (int)$u['domain_days_left'] : '—' }}</div>
     </div>
 @endif

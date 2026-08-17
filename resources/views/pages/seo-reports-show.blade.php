@@ -76,52 +76,6 @@
             </div>
         @endif
 
-        <div class="cabinet-sr-dq mb-3">
-            <div class="cabinet-sr-dq__head">
-                <span class="fw-semibold">{{ __('Connections health') }}</span>
-                @if(!empty($isOwner))
-                    <a href="{{ route('pages.seo-reports.settings', ['id' => $project->id]) }}" class="cabinet-sr-dq__head-link">
-                        {{ __('Project settings') }} →
-                    </a>
-                @endif
-            </div>
-            <ul class="cabinet-sr-dq__connections">
-                @foreach($sections as $section)
-                    @if(in_array($section['source'], ['manual', 'computed'], true))
-                        @continue
-                    @endif
-                    @if(empty($section['enabled']))
-                        @continue
-                    @endif
-                    @php
-                        $status = $section['source_status'] ?? 'not_connected';
-                        $connect = $section['connect'] ?? null;
-                        $isOk = $status === 'ok';
-                        $isDev = is_array($connect) && ($connect['kind'] ?? '') === 'dev';
-                    @endphp
-                    <li class="cabinet-sr-dq__conn @if($isOk) is-ok @elseif($isDev) is-dev @else is-off @endif">
-                        <div class="cabinet-sr-dq__conn-main">
-                            <strong>{{ $section['title'] }}</strong>
-                            @if($isOk)
-                                <span class="cabinet-sr-dq__conn-status">{{ __('Connected') }}</span>
-                            @elseif($isDev)
-                                <span class="cabinet-sr-dq__conn-status">{{ __('In development') }}</span>
-                            @else
-                                <span class="cabinet-sr-dq__conn-status">{{ __('Not connected') }}</span>
-                            @endif
-                        </div>
-                        @if(is_array($connect) && ($connect['kind'] ?? '') === 'link' && !empty($connect['url']))
-                            <a class="cabinet-sr-dq__conn-action" href="{{ $connect['url'] }}">
-                                {{ $connect['label'] ?? __('Connect') }}
-                            </a>
-                        @elseif($isDev)
-                            <span class="cabinet-sr-dq__conn-muted" title="{{ $connect['hint'] ?? '' }}">{{ __('Soon') }}</span>
-                        @endif
-                    </li>
-                @endforeach
-            </ul>
-        </div>
-
         @if(!empty($isOwner))
             <div class="cabinet-sr-dq mb-3">
                 <div class="cabinet-sr-dq__head">
@@ -326,18 +280,28 @@
                         @php
                             $connect = $section['connect'] ?? null;
                             $isDev = is_array($connect) && ($connect['kind'] ?? '') === 'dev';
+                            $originKind = (string) ($section['origin_kind'] ?? 'manual');
                             $dead = in_array($section['source_status'], ['not_connected', 'error', 'empty'], true);
                             $cls = $isDev ? 'is-dev' : ($dead ? 'is-dead' : 'is-ok');
                             if ($section['source_status'] === 'manual') {
-                                $cls = 'is-manual';
+                                $cls = $originKind === 'auto' ? 'is-auto' : 'is-manual';
+                            }
+                            if ($originKind === 'titlo' && !$isDev && !$dead) {
+                                $cls = 'is-titlo';
                             }
                             $badgeText = __('Connected');
-                            if ($section['source_status'] === 'manual') {
+                            if ($originKind === 'auto') {
+                                $badgeText = __('Auto');
+                            } elseif ($section['source_status'] === 'manual') {
                                 $badgeText = __('Manual');
                             } elseif ($isDev) {
                                 $badgeText = __('In development');
                             } elseif ($dead) {
                                 $badgeText = __('Not connected');
+                            }
+                            $actionClass = 'cabinet-sr-section-chip__action';
+                            if (in_array((string) ($section['source'] ?? ''), ['site_audit', 'seo_checklist', 'relevance', 'site_monitoring'], true)) {
+                                $actionClass .= ' cabinet-sr-section-chip__action--module';
                             }
                         @endphp
                         <div class="cabinet-sr-section-chip {{ $cls }}">
@@ -345,12 +309,15 @@
                                 <span class="cabinet-sr-section-chip__title">{{ $section['title'] }}</span>
                                 <span class="cabinet-sr-section-chip__badge">{{ $badgeText }}</span>
                             </div>
+                            <div class="cabinet-sr-section-chip__origin">{{ $section['origin'] ?? '' }}</div>
                             <div class="cabinet-sr-section-chip__meta">
                                 @if($section['enabled'] && !$section['client_visible'] && !$isDev)
                                     <span class="cabinet-sr-section-chip__note">{{ __('Hidden for client') }}</span>
                                 @endif
-                                @if(is_array($connect) && ($connect['kind'] ?? '') === 'link' && !empty($connect['url']) && $dead)
-                                    <a href="{{ $connect['url'] }}">{{ $connect['label'] ?? __('Connect') }}</a>
+                                @if(is_array($connect) && ($connect['kind'] ?? '') === 'link' && !empty($connect['url']))
+                                    <a class="{{ $actionClass }}" href="{{ $connect['url'] }}">
+                                        {{ $connect['label'] ?? __('Change') }}
+                                    </a>
                                 @elseif($isDev)
                                     <span class="cabinet-sr-section-chip__note">{{ __('Soon') }}</span>
                                 @endif
@@ -368,6 +335,9 @@
                                         <span class="cabinet-sr-section-chip__title">{{ $section['title'] }}</span>
                                         <span class="cabinet-sr-section-chip__badge">{{ __('Off') }}</span>
                                     </div>
+                                    @if(!empty($section['origin']))
+                                        <div class="cabinet-sr-section-chip__origin">{{ $section['origin'] }}</div>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>

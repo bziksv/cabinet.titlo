@@ -6,14 +6,14 @@
     $volumeKeys = ['users', 'visits', 'pageviews'];
     $qualityKeys = ['page_depth', 'avg_visit_duration', 'bounce_rate'];
     $kpiTitleKeys = [
-        'users' => 'Traffic KPI users count',
-        'visits' => 'Traffic KPI visits count',
-        'pageviews' => 'Traffic KPI pageviews count',
+        'users' => 'Users',
+        'visits' => 'Visits',
+        'pageviews' => 'Pageviews',
     ];
     $qualityTitleKeys = [
-        'page_depth' => 'Traffic quality page depth',
-        'avg_visit_duration' => 'Traffic quality visit duration',
-        'bounce_rate' => 'Traffic quality bounce rate',
+        'page_depth' => 'Page depth',
+        'avg_visit_duration' => 'Avg. visit duration',
+        'bounce_rate' => 'Bounce rate',
     ];
     $chartRows = [];
     foreach ($volumeKeys as $metric) {

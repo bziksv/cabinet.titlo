@@ -101,6 +101,7 @@ class SeedDemoCabinet extends Command
             ['Генератор паролей', '/password-generator', $extra['password-generator'] ?? '?'],
             ['Генератор ключей', '/keyword-generator', !empty(\App\Support\DemoCabinet::keywordGeneratorShowcase()) ? 'ok' : 'stateless'],
             ['ROI-калькулятор', '/roi-calculator', !empty(\App\Support\DemoCabinet::roiCalculatorShowcase()) ? 'ok' : 'stateless'],
+            ['Аудит сайта', '/site-audit', $extra['site-audit'] ?? '?'],
             ['AI-генерация', '/ai-generation/prompt', $extra['ai-generation'] ?? 'n/a'],
         ];
 

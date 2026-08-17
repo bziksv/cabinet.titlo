@@ -51,11 +51,7 @@
         body.cabinet-sr-public {
             padding-top: 0;
         }
-        /* Demo banner is sticky — keep sidebar under it, not over content */
-        body.cabinet-sr-public .cabinet-sr-toc {
-            top: 4.35rem;
-            max-height: calc(100vh - 5.1rem);
-        }
+        /* Demo banner height is accounted for in TOC pin JS (stickLine). */
     </style>
 </head>
 <body class="cabinet-sr-public">
@@ -98,5 +94,8 @@
             {{ __('Powered by Titlo') }} · {{ __('Demo data') }}
         </p>
     </div>
+    <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
+    <script src="{{ asset('js/cabinet-seo-reports-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-reports-charts.js')) ?: time() }}"></script>
+    <script src="{{ asset('js/cabinet-seo-reports-toc.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-reports-toc.js')) ?: time() }}"></script>
 </body>
 </html>

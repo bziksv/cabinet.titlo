@@ -623,6 +623,30 @@
         }
     }
 
+    function progressWaitHint(elapsed, estimatedReqs) {
+        var depth = parseInt((document.getElementById('cabinetSsDepth') || {}).value || '1', 10) || 1;
+        var hasAlpha = checked('mode_en') || checked('mode_ru') || checked('mode_digits');
+        if (elapsed < 15000) {
+            return '≈ ' + estimatedReqs + ' запросов · идёт сбор, подождите';
+        }
+        if (elapsed < 45000) {
+            if (depth >= 2 && hasAlpha) {
+                return 'Ещё собираем — при алфавите и глубине ' + depth + ' это нормально';
+            }
+            if (depth >= 2) {
+                return 'Ещё собираем — при глубине ' + depth + ' это нормально';
+            }
+            if (hasAlpha) {
+                return 'Ещё собираем — алфавит и много ключей дают длинный прогон';
+            }
+            if (estimatedReqs >= 200) {
+                return 'Ещё собираем — большой список запросов, это нормально';
+            }
+            return 'Ещё собираем, подождите';
+        }
+        return 'Долгий прогон · сервер всё ещё опрашивает подсказки';
+    }
+
     function startProgress(estimatedReqs) {
         var pauseMs = parseInt(root.getAttribute('data-pause-ms') || '80', 10) || 80;
         // pause + сеть ≈ 150–220 мс на запрос; при «Максимум» это легко минуты.
@@ -641,12 +665,7 @@
             var elapsed = Date.now() - progressStartedAt;
             // Асимптота к 92%: полоска живёт всё время запроса, не «зависает» на 0.
             var pct = Math.min(92, Math.round(100 * (1 - Math.exp(-elapsed / (progressExpectedMs * 0.55)))));
-            var hint = elapsed < 15000
-                ? '≈ ' + estimatedReqs + ' запросов · идёт сбор, подождите'
-                : elapsed < 45000
-                    ? 'Ещё собираем — при алфавите и глубине 2 это нормально'
-                    : 'Долгий прогон · сервер всё ещё опрашивает подсказки';
-            paintProgress(Math.max(4, pct), 'Сбор подсказок…', hint);
+            paintProgress(Math.max(4, pct), 'Сбор подсказок…', progressWaitHint(elapsed, estimatedReqs));
         }, 400);
     }
 

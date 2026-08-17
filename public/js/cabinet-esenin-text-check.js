@@ -90,6 +90,7 @@
     var autosaveInFlight = false;
     var suppressAutosave = false;
     var suppressHighlightSync = false;
+    var pendingCkHtmlFromHighlight = null;
     var sessionsAvailable = config.sessionsAvailable !== false;
     var publicShareAvailable = config.publicShareAvailable !== false;
     var analyzerVersion = Number(config.analyzerVersion || 1);
@@ -100,6 +101,7 @@
     var lastResult = null;
     var activeBlock = 'risk';
     var ckEditor = null;
+    var highlightInlineEditor = null;
     var codeMirrorSplit = null;
     var codeMirrorFull = null;
     var syncingFromSource = false;
@@ -541,15 +543,369 @@
         return clone.innerHTML;
     }
 
+    function findEseninMarkFromNode(node) {
+        while (node && node !== highlightEl) {
+            if (node.nodeType === 1 && node.classList && node.classList.contains('esenin-mark')) {
+                return node;
+            }
+            node = node.parentNode;
+        }
+        return null;
+    }
+
+    function unwrapMarkElement(mark) {
+        if (!mark || !mark.parentNode) {
+            return null;
+        }
+        var icon = mark.querySelector('.esenin-mark__icon');
+        if (icon) {
+            icon.remove();
+        }
+        var parent = mark.parentNode;
+        var last = null;
+        while (mark.firstChild) {
+            last = mark.firstChild;
+            parent.insertBefore(last, mark);
+        }
+        parent.removeChild(mark);
+        return last;
+    }
+
+    function getTextOffsetInHighlight(root, targetNode, targetOffset) {
+        var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (node) {
+                if (node.parentElement && node.parentElement.classList.contains('esenin-mark__icon')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        var total = 0;
+        var node;
+        while ((node = walker.nextNode())) {
+            if (node === targetNode) {
+                return total + targetOffset;
+            }
+            total += (node.nodeValue || '').length;
+        }
+        return total;
+    }
+
+    function setTextOffsetInHighlight(root, offset) {
+        var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+        var total = 0;
+        var node;
+        while ((node = walker.nextNode())) {
+            if (node.parentElement && node.parentElement.classList.contains('esenin-mark__icon')) {
+                continue;
+            }
+            var len = (node.nodeValue || '').length;
+            if (total + len >= offset) {
+                var range = document.createRange();
+                range.setStart(node, Math.max(0, offset - total));
+                range.collapse(true);
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+                return;
+            }
+            total += len;
+        }
+        // конец
+        var endRange = document.createRange();
+        endRange.selectNodeContents(root);
+        endRange.collapse(false);
+        var endSel = window.getSelection();
+        endSel.removeAllRanges();
+        endSel.addRange(endRange);
+    }
+
+    /**
+     * Перед вводом внутри/по подсветке снимаем mark+!, чтобы набор шёл обычным текстом.
+     */
+    function unwrapMarksTouchingSelection() {
+        if (!highlightEl) {
+            return false;
+        }
+        var sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) {
+            return false;
+        }
+        var range = sel.getRangeAt(0);
+        var startNode = range.startContainer;
+        if (startNode.nodeType === 3) {
+            /* ok */
+        } else if (!highlightEl.contains(startNode) && startNode !== highlightEl) {
+            return false;
+        }
+
+        var marks = [];
+        var seen = {};
+        function addMark(mark) {
+            if (!mark || seen[mark]) {
+                return;
+            }
+            seen[mark] = true;
+            marks.push(mark);
+        }
+
+        addMark(findEseninMarkFromNode(range.startContainer));
+        addMark(findEseninMarkFromNode(range.endContainer));
+
+        if (!range.collapsed) {
+            highlightEl.querySelectorAll('mark.esenin-mark').forEach(function (mark) {
+                try {
+                    if (range.intersectsNode(mark)) {
+                        addMark(mark);
+                    }
+                } catch (e) {
+                    /* ignore */
+                }
+            });
+        }
+
+        // Каретка сразу после/перед mark — тоже снимаем соседний mark при печати
+        if (range.collapsed && marks.length === 0) {
+            var container = range.startContainer;
+            var offset = range.startOffset;
+            if (container.nodeType === 1) {
+                var before = container.childNodes[offset - 1];
+                var after = container.childNodes[offset];
+                if (before && before.nodeType === 1 && before.classList && before.classList.contains('esenin-mark')) {
+                    addMark(before);
+                }
+                if (after && after.nodeType === 1 && after.classList && after.classList.contains('esenin-mark')) {
+                    addMark(after);
+                }
+            }
+        }
+
+        if (!marks.length) {
+            return false;
+        }
+
+        var caretOffset = getTextOffsetInHighlight(highlightEl, range.startContainer, range.startOffset);
+        marks.forEach(unwrapMarkElement);
+        highlightEl.querySelectorAll('.esenin-mark__icon').forEach(function (icon) {
+            if (!icon.closest('mark.esenin-mark')) {
+                icon.remove();
+            }
+        });
+        setTextOffsetInHighlight(highlightEl, caretOffset);
+        hideMarkTip();
+        return true;
+    }
+
+    function shouldUnwrapMarksForKey(event) {
+        if (!event) {
+            return false;
+        }
+        if (event.type === 'beforeinput') {
+            var inputType = event.inputType || '';
+            if (inputType.indexOf('history') === 0) {
+                return false;
+            }
+            return true;
+        }
+        if (event.type !== 'keydown') {
+            return false;
+        }
+        var key = event.key || '';
+        if (!key || key === 'Shift' || key === 'Control' || key === 'Alt' || key === 'Meta'
+            || key === 'CapsLock' || key === 'Escape' || key === 'Tab'
+            || key.indexOf('Arrow') === 0 || key === 'Home' || key === 'End'
+            || key === 'PageUp' || key === 'PageDown') {
+            return false;
+        }
+        if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+            var lower = key.toLowerCase();
+            return lower === 'v' || lower === 'x' || lower === 'backspace';
+        }
+        return true;
+    }
+
+    function prepareHighlightEdit(event) {
+        if (!shouldUnwrapMarksForKey(event)) {
+            return;
+        }
+        if (unwrapMarksTouchingSelection()) {
+            // каретка уже в чистом тексте — браузер/CK вставит символ нормально
+        }
+    }
+
+    function hardenHighlightMarkIcons(container) {
+        if (!container) {
+            return;
+        }
+        container.querySelectorAll('.esenin-mark__icon').forEach(function (icon) {
+            icon.setAttribute('contenteditable', 'false');
+            icon.setAttribute('aria-hidden', 'true');
+        });
+    }
+
     function syncFromHighlightEdit() {
         if (!highlightEl || suppressHighlightSync) {
             return;
         }
+
+        var html = unwrapHighlightMarks(highlightEl);
+        var scrollX = window.scrollX || window.pageXOffset || 0;
+        var scrollY = window.scrollY || window.pageYOffset || 0;
+        var caret = saveContentEditableCaret(highlightEl);
+
         suppressAutosave = true;
-        syncAllEditorsFromHtml(unwrapHighlightMarks(highlightEl));
+        cancelSyncToVisual();
+        syncingEditors = true;
+
+        writeCodeMirrorValue(codeMirrorSplit, htmlSourceEl, html);
+        writeCodeMirrorValue(codeMirrorFull, htmlSourceFullEl, html);
+        if (textEl) {
+            textEl.value = html;
+        }
+        if (plainEl) {
+            var div = document.createElement('div');
+            div.innerHTML = html;
+            plainEl.value = (div.textContent || div.innerText || '').trim();
+        }
+
+        // Не дергаем ckEditor.setData во время правки подсветки — iframe забирает фокус и кидает скролл вверх.
+        pendingCkHtmlFromHighlight = html;
+
+        syncingEditors = false;
         suppressAutosave = false;
+
+        updateCharCount();
         markResultsStale();
         updateSharePanelStale();
+        scheduleAutosave();
+
+        // При inline-CK не трогаем selection — редактор сам держит каретку.
+        if (!highlightInlineEditor) {
+            restoreContentEditableCaret(highlightEl, caret);
+            window.scrollTo(scrollX, scrollY);
+            window.requestAnimationFrame(function () {
+                restoreContentEditableCaret(highlightEl, caret);
+                window.scrollTo(scrollX, scrollY);
+            });
+        } else {
+            window.scrollTo(scrollX, scrollY);
+        }
+    }
+
+    function isHighlightFocused() {
+        var active = document.activeElement;
+        if (!active) {
+            return false;
+        }
+        if (highlightEl && (active === highlightEl || highlightEl.contains(active))) {
+            return true;
+        }
+        // Фокус может быть в iframe/кнопках плавающего .cke_float
+        if (active.closest && active.closest('.cke_float')) {
+            return true;
+        }
+        return false;
+    }
+
+    function flushPendingCkFromHighlight() {
+        if (pendingCkHtmlFromHighlight === null || !ckEditor) {
+            return;
+        }
+        if (isHighlightFocused()) {
+            return;
+        }
+
+        var html = pendingCkHtmlFromHighlight;
+        pendingCkHtmlFromHighlight = null;
+        if (safeCkGetData() === html) {
+            return;
+        }
+
+        var scrollX = window.scrollX || window.pageXOffset || 0;
+        var scrollY = window.scrollY || window.pageYOffset || 0;
+        syncingFromSource = true;
+        try {
+            safeCkSetData(html);
+        } finally {
+            syncingFromSource = false;
+            window.scrollTo(scrollX, scrollY);
+        }
+    }
+
+    function saveContentEditableCaret(el) {
+        var sel = window.getSelection();
+        if (!el || !sel || sel.rangeCount === 0) {
+            return null;
+        }
+        var anchor = sel.anchorNode;
+        if (!anchor || (anchor !== el && !el.contains(anchor))) {
+            return null;
+        }
+        var range = sel.getRangeAt(0);
+        var pre = range.cloneRange();
+        pre.selectNodeContents(el);
+        pre.setEnd(range.startContainer, range.startOffset);
+        var start = pre.toString().length;
+        return {
+            start: start,
+            end: start + range.toString().length
+        };
+    }
+
+    function restoreContentEditableCaret(el, saved) {
+        if (!el || !saved) {
+            return;
+        }
+        try {
+            el.focus({ preventScroll: true });
+        } catch (e) {
+            try {
+                el.focus();
+            } catch (e2) {
+                return;
+            }
+        }
+
+        var chars = 0;
+        var startNode = null;
+        var startOff = 0;
+        var endNode = null;
+        var endOff = 0;
+        var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+
+        while (walker.nextNode()) {
+            var node = walker.currentNode;
+            var len = (node.nodeValue || '').length;
+            if (!startNode && chars + len >= saved.start) {
+                startNode = node;
+                startOff = saved.start - chars;
+            }
+            if (chars + len >= saved.end) {
+                endNode = node;
+                endOff = saved.end - chars;
+                break;
+            }
+            chars += len;
+        }
+
+        if (!startNode) {
+            return;
+        }
+        if (!endNode) {
+            endNode = startNode;
+            endOff = startOff;
+        }
+
+        try {
+            var range = document.createRange();
+            range.setStart(startNode, Math.max(0, Math.min(startOff, startNode.nodeValue.length)));
+            range.setEnd(endNode, Math.max(0, Math.min(endOff, endNode.nodeValue.length)));
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } catch (e3) {
+            /* ignore */
+        }
     }
 
     function resetSessionState() {
@@ -876,6 +1232,14 @@
             return readCodeMirrorValue(codeMirrorFull, htmlSourceFullEl);
         }
 
+        // Пока правим подсветку / ждём flush в CK — берём свежий HTML, иначе getData() устареет.
+        if (pendingCkHtmlFromHighlight !== null) {
+            return pendingCkHtmlFromHighlight;
+        }
+        if (isHighlightFocused()) {
+            return unwrapHighlightMarks(highlightEl);
+        }
+
         var ckHtml = safeCkGetData();
         var splitHtml = readCodeMirrorValue(codeMirrorSplit, htmlSourceEl);
         if (!isEditorHtmlEmpty(ckHtml)) {
@@ -912,6 +1276,7 @@
         cancelSyncToVisual();
         syncingEditors = true;
         html = html || '';
+        pendingCkHtmlFromHighlight = null;
 
         if (ckEditor && safeCkGetData() !== html) {
             syncingFromSource = true;
@@ -1278,9 +1643,14 @@
             textEl.value = initialHtml;
         }
 
+        if (typeof window.CKEDITOR !== 'undefined') {
+            window.CKEDITOR.disableAutoInline = true;
+        }
+
         window.jQuery(textEl).ckeditor({
             language: 'ru',
             height: 320,
+            // Только classic replace — без inline/floatSpace на соседних contenteditable.
             toolbar: [
                 { name: 'basicstyles', items: ['Bold', 'Italic', 'Underline', 'Strike'] },
                 { name: 'paragraph', items: ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent'] },
@@ -1736,14 +2106,183 @@
         refreshCodeMirrors();
     }
 
+    function destroyHighlightInlineEditor() {
+        if (highlightInlineEditor) {
+            try {
+                highlightInlineEditor.destroy(true);
+            } catch (e) {
+                try {
+                    highlightInlineEditor.destroy(false);
+                } catch (e2) {
+                    /* ignore */
+                }
+            }
+            highlightInlineEditor = null;
+        }
+        destroyStrayInlineOnHighlight();
+        document.body.classList.remove('esenin-highlight-toolbar-open');
+    }
+
+    function destroyStrayInlineOnHighlight() {
+        if (!highlightEl || typeof window.CKEDITOR === 'undefined' || !window.CKEDITOR.instances) {
+            return;
+        }
+
+        Object.keys(window.CKEDITOR.instances).forEach(function (name) {
+            var ed = window.CKEDITOR.instances[name];
+            if (!ed || ed === ckEditor || ed === highlightInlineEditor) {
+                return;
+            }
+            if (!ed.element || !ed.element.$) {
+                return;
+            }
+            if (ed.element.$ === highlightEl || highlightEl.contains(ed.element.$)) {
+                try {
+                    ed.destroy(true);
+                } catch (e) {
+                    /* ignore */
+                }
+            }
+        });
+    }
+
+    /**
+     * CK floatSpace на длинном contenteditable кидает панель вниз блока.
+     * Держим её прилипшей к верху viewport (pin).
+     */
+    function repositionHighlightFloatToolbar() {
+        if (!highlightInlineEditor) {
+            return;
+        }
+        var space = document.getElementById('cke_' + highlightInlineEditor.name);
+        if (!space || space.style.display === 'none') {
+            return;
+        }
+
+        var scrollX = window.scrollX || window.pageXOffset || 0;
+        var scrollY = window.scrollY || window.pageYOffset || 0;
+        var panelW = space.offsetWidth || 640;
+        var gap = 8;
+        var left = gap;
+
+        if (highlightEl) {
+            var box = highlightEl.getBoundingClientRect();
+            left = Math.max(gap, box.left);
+        }
+
+        left = Math.max(gap, Math.min(left, window.innerWidth - panelW - gap));
+
+        space.style.position = 'fixed';
+        space.style.top = gap + 'px';
+        space.style.left = Math.round(left) + 'px';
+        space.style.right = 'auto';
+        space.style.bottom = 'auto';
+
+        if ((window.scrollX || window.pageXOffset || 0) !== scrollX
+            || (window.scrollY || window.pageYOffset || 0) !== scrollY) {
+            window.scrollTo(scrollX, scrollY);
+        }
+    }
+
+    /**
+     * Плавающий тулбар CKEditor, прилипший к верху экрана.
+     * allowedContent: true — не сжирает <mark class="esenin-mark">.
+     * Синк в основной CK отложен (pendingCkHtml), чтобы не кидало скролл вверх.
+     */
+    function ensureHighlightInlineEditor() {
+        if (!highlightEl || typeof window.CKEDITOR === 'undefined') {
+            return;
+        }
+
+        window.CKEDITOR.disableAutoInline = true;
+        destroyStrayInlineOnHighlight();
+
+        if (highlightInlineEditor) {
+            setTimeout(repositionHighlightFloatToolbar, 0);
+            return;
+        }
+
+        if (!highlightEl.getAttribute('id')) {
+            highlightEl.setAttribute('id', 'cabinet-esenin-highlight');
+        }
+
+        try {
+            highlightInlineEditor = window.CKEDITOR.inline(highlightEl, {
+                language: 'ru',
+                title: false,
+                allowedContent: true,
+                // Сразу режим pin у верха viewport
+                floatSpacePinnedOffsetY: 8,
+                floatSpacePinnedOffsetX: 8,
+                floatSpaceDockedOffsetY: 8,
+            });
+        } catch (e) {
+            highlightInlineEditor = null;
+            return;
+        }
+
+        highlightInlineEditor.on('change', function () {
+            syncFromHighlightEdit();
+            setTimeout(repositionHighlightFloatToolbar, 0);
+        });
+
+        highlightInlineEditor.on('key', function (evt) {
+            var domEvent = evt.data && evt.data.domEvent && evt.data.domEvent.$;
+            if (domEvent) {
+                prepareHighlightEdit(domEvent);
+            }
+        }, null, null, 1);
+
+        highlightInlineEditor.on('selectionChange', function () {
+            setTimeout(repositionHighlightFloatToolbar, 0);
+        });
+
+        highlightInlineEditor.on('focus', function () {
+            setTimeout(repositionHighlightFloatToolbar, 0);
+        });
+
+        highlightInlineEditor.on('blur', function () {
+            setTimeout(function () {
+                flushPendingCkFromHighlight();
+            }, 0);
+        });
+
+        highlightInlineEditor.on('floatingSpaceLayout', function () {
+            setTimeout(repositionHighlightFloatToolbar, 0);
+        }, null, null, 999);
+
+        if (!window.__eseninHighlightFloatScrollBound) {
+            window.__eseninHighlightFloatScrollBound = true;
+            window.addEventListener('scroll', function () {
+                if (highlightInlineEditor) {
+                    repositionHighlightFloatToolbar();
+                }
+            }, { passive: true });
+            window.addEventListener('resize', function () {
+                if (highlightInlineEditor) {
+                    repositionHighlightFloatToolbar();
+                }
+            }, { passive: true });
+        }
+
+        setTimeout(repositionHighlightFloatToolbar, 0);
+    }
+
     function updateCkeditorFloatVisibility() {
+        if (typeof window.CKEDITOR !== 'undefined') {
+            window.CKEDITOR.disableAutoInline = true;
+        }
+        // Не прячем .cke_float — это и есть нужная плавающая панель.
+        destroyStrayInlineOnHighlight();
         document.body.classList.remove('esenin-hide-ck-float');
+        document.body.classList.remove('esenin-highlight-toolbar-open');
     }
 
     function clearResults() {
         lastResult = null;
         activeBlock = 'risk';
         resultsStale = false;
+        destroyHighlightInlineEditor();
         if (resultsWrap) {
             resultsWrap.classList.add('d-none');
         }
@@ -1813,10 +2352,12 @@
         }
 
         if (highlightEl) {
+            destroyHighlightInlineEditor();
             suppressHighlightSync = true;
             highlightEl.innerHTML = (lastResult.highlights && lastResult.highlights[block]) || lastResult.highlighted_html || '';
             highlightEl.setAttribute('contenteditable', 'true');
             suppressHighlightSync = false;
+            hardenHighlightMarkIcons(highlightEl);
             initMarkTooltips(highlightEl);
         }
 
@@ -2048,8 +2589,26 @@
     }
 
     if (highlightEl) {
+        highlightEl.addEventListener('beforeinput', prepareHighlightEdit);
+        highlightEl.addEventListener('keydown', prepareHighlightEdit, true);
+        highlightEl.addEventListener('paste', function () {
+            unwrapMarksTouchingSelection();
+        }, true);
         highlightEl.addEventListener('input', debounce(syncFromHighlightEdit, 300));
-        highlightEl.addEventListener('focus', updateCkeditorFloatVisibility);
+        highlightEl.addEventListener('focus', function () {
+            ensureHighlightInlineEditor();
+            updateCkeditorFloatVisibility();
+            setTimeout(function () {
+                hardenHighlightMarkIcons(highlightEl);
+                initMarkTooltips(highlightEl);
+            }, 0);
+        });
+        highlightEl.addEventListener('blur', function () {
+            setTimeout(function () {
+                flushPendingCkFromHighlight();
+                updateCkeditorFloatVisibility();
+            }, 0);
+        });
     }
 
     if (taskNameEl) {

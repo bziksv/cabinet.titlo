@@ -1,9 +1,9 @@
 @php
     $sectionMetrics = $metricCatalog[$key] ?? [];
-    $sourceLabel = \App\SeoReports\SeoReportSectionRegistry::sourceLabel($meta['source']);
+    $origin = $meta['origin'] ?? \App\SeoReports\SeoReportSectionRegistry::origin($key);
     $groupKey = $meta['group'] ?? 'core';
     $groupLabel = $groupLabels[$groupKey] ?? $groupKey;
-    $isTitlo = $groupKey === 'titlo';
+    $isTitlo = ($meta['origin_kind'] ?? '') === 'titlo' || $groupKey === 'titlo';
 @endphp
 <div class="cabinet-sr-builder__row {{ $enabled ? 'is-on' : 'is-off' }}"
      @if($enabled) draggable="true" @endif
@@ -13,11 +13,10 @@
      data-hint="{{ $meta['hint'] ?? '' }}"
      data-group="{{ $groupKey }}"
      data-source="{{ $meta['source'] }}"
-     data-source-label="{{ $sourceLabel }}"
+     data-source-label="{{ $origin }}"
      data-titlo="{{ $isTitlo ? '1' : '0' }}"
-     data-enabled="{{ $enabled ? '1' : '0' }}"
-     title="{{ $meta['hint'] ?? '' }}">
-    <label class="cabinet-sr-builder__switch" title="{{ $enabled ? __('Disable block') : __('Enable block') }}">
+     data-enabled="{{ $enabled ? '1' : '0' }}">
+    <label class="cabinet-sr-builder__switch">
         <input type="checkbox" data-sr-toggle @if($enabled) checked @endif>
         <span class="cabinet-sr-builder__switch-ui" aria-hidden="true"></span>
         <span class="sr-only">{{ $meta['title'] }}</span>
@@ -30,13 +29,7 @@
     <span class="cabinet-sr-builder__block-body">
         <span class="cabinet-sr-builder__block-title">{{ $meta['title'] }}</span>
         <span class="cabinet-sr-builder__block-hint">{{ $meta['hint'] ?? '' }}</span>
-        <span class="cabinet-sr-builder__block-meta">
-            {{ $sourceLabel }}
-            · {{ $groupLabel }}
-            @if($isTitlo)
-                · Titlo
-            @endif
-        </span>
+        <span class="cabinet-sr-builder__block-meta">{{ $origin }} · {{ $groupLabel }}</span>
     </span>
     @if($sectionMetrics !== [])
         <details class="cabinet-sr-builder__metrics" data-sr-metrics @if(!$enabled) hidden @endif>

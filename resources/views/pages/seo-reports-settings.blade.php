@@ -59,11 +59,11 @@
                 'hint' => __('Google Ads in development hint'),
             ],
             [
-                'title' => 'VK Реклама',
+                'title' => 'Реклама VK',
                 'hint' => __('VK Ads in development hint'),
             ],
             [
-                'title' => 'VK / SMM',
+                'title' => 'Сообщество VK',
                 'hint' => __('VK SMM in development hint'),
             ],
             [
@@ -374,11 +374,33 @@
                         <label class="form-label">{{ __('Email message') }}</label>
                         <textarea class="form-control form-control-sm" name="auto_email_message" rows="2">{{ old('auto_email_message', $settings['auto_email_message'] ?? '') }}</textarea>
                     </div>
-                    <label class="cabinet-sr-toggle-row mb-0">
+                    @php
+                        $managerEmailCc = method_exists($project, 'brandingManagerEmail')
+                            ? trim((string) ($project->brandingManagerEmail() ?? ''))
+                            : trim((string) ($project->manager_email ?? ''));
+                        $managerEmailOk = $managerEmailCc !== '' && filter_var($managerEmailCc, FILTER_VALIDATE_EMAIL);
+                        $templateEditUrl = !empty($project->template_id)
+                            ? route('pages.seo-reports.templates.edit', ['id' => $project->template_id])
+                            : route('pages.seo-reports.templates');
+                    @endphp
+                    <label class="cabinet-sr-toggle-row mb-1">
                         <input type="checkbox" name="auto_email_cc_manager" value="1"
                             @if(!empty($settings['auto_email_cc_manager'])) checked @endif>
                         <span>{{ __('CC manager') }}</span>
                     </label>
+                    @if($managerEmailOk)
+                        <p class="cabinet-sr-step__note mb-2">
+                            {{ __('CC manager goes to') }}:
+                            <strong>{{ $managerEmailCc }}</strong>
+                            · <a href="{{ $templateEditUrl }}">{{ __('Change in template branding') }}</a>
+                        </p>
+                    @else
+                        <p class="cabinet-sr-step__note mb-2 is-warn">
+                            {{ __('CC manager needs email') }}
+                            <a href="{{ $templateEditUrl }}">{{ __('Set manager email in template') }}</a>
+                        </p>
+                    @endif
+                    <p class="cabinet-sr-step__note mb-0">{{ __('SEO report email delivery hint') }}</p>
                 </div>
             </details>
 
@@ -391,47 +413,7 @@
     </div>
 
     @include('pages.partials.seo-reports-metrika-modal')
-
-    <div class="modal fade" id="cabinet-sr-webmaster-modal" tabindex="-1" aria-labelledby="cabinet-sr-webmaster-modal-title" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="cabinet-sr-webmaster-modal-title">{{ __('Yandex Webmaster') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="small text-secondary mb-2">
-                        {{ __('Choose Webmaster host for domain') }}:
-                        <strong data-webmaster-domain-label>—</strong>
-                    </p>
-                    <div data-webmaster-current class="alert alert-light border py-2 px-3 small d-none mb-3"></div>
-                    <div data-webmaster-loading class="text-secondary small py-3 d-none">{{ __('Loading Webmaster hosts') }}…</div>
-                    <div data-webmaster-error class="alert alert-danger py-2 px-3 small d-none"></div>
-                    <div data-webmaster-auth class="text-center py-3 d-none">
-                        <p class="mb-3">{{ __('Connect Yandex Webmaster to pick a host') }}</p>
-                        <a href="#" class="btn btn-primary" data-webmaster-auth-link>
-                            <i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>
-                            {{ __('Authorize Yandex Webmaster') }}
-                        </a>
-                    </div>
-                    <div data-webmaster-search-wrap class="mb-2 d-none">
-                        <input type="search"
-                               class="form-control form-control-sm"
-                               data-webmaster-search
-                               placeholder="{{ __('Search by site or host ID') }}"
-                               autocomplete="off">
-                    </div>
-                    <div class="list-group list-group-flush border rounded" data-webmaster-list style="max-height: 22rem; overflow: auto;"></div>
-                </div>
-                <div class="modal-footer justify-content-between">
-                    <button type="button" class="btn btn-outline-danger btn-sm d-none" data-webmaster-unbind>
-                        {{ __('Unbind Webmaster host') }}
-                    </button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    @include('pages.partials.seo-reports-webmaster-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
@@ -440,10 +422,6 @@
                 if (typeof window.jQuery !== 'undefined' && typeof window.jQuery.fn.select2 === 'function') {
                     window.jQuery('[data-sr-select2]').each(function () {
                         var $el = window.jQuery(this);
-                        var realOptions = $el.find('option').filter(function () {
-                            return String(this.value || '') !== '';
-                        }).length;
-                        if (realOptions < 10) return;
                         $el.select2({
                             theme: 'bootstrap4',
                             width: '100%',

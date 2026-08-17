@@ -125,11 +125,16 @@ class SeoReportsController extends Controller
         foreach (SeoReportBindings::monitoringOptionsForUser($userId) as $option) {
             $monitoringById[(int) $option['id']] = $option;
         }
+        $webmasterByDomain = [];
+        foreach (SeoReportBindings::webmasterBindingsForUser($userId) as $binding) {
+            $webmasterByDomain[(string) $binding->domain] = $binding;
+        }
 
         $domainHints = [];
         foreach ($availableDomains as $domain) {
             $metrikaId = SeoReportBindings::resolveMetrikaCounterId($userId, $domain);
             $monitoringId = SeoReportBindings::resolveMonitoringProjectId($userId, $domain);
+            $webmasterId = SeoReportBindings::resolveWebmasterHost($userId, $domain);
             $metrikaLabel = '';
             if ($metrikaId) {
                 $binding = $metrikaByDomain[$domain] ?? null;
@@ -145,11 +150,25 @@ class SeoReportsController extends Controller
             } elseif ($monitoringId) {
                 $monitoringLabel = $domain;
             }
+            $webmasterLabel = '';
+            if ($webmasterId) {
+                $wmBinding = $webmasterByDomain[$domain] ?? null;
+                if ($wmBinding) {
+                    $hostUrl = trim((string) ($wmBinding->host_url ?? ''));
+                    $webmasterLabel = $hostUrl !== ''
+                        ? ((string) $wmBinding->domain) . ' · ' . $hostUrl
+                        : ((string) $wmBinding->domain) . ' · ' . $webmasterId;
+                } else {
+                    $webmasterLabel = $domain . ' · ' . $webmasterId;
+                }
+            }
             $domainHints[$domain] = [
                 'metrika' => $metrikaId,
                 'metrika_label' => $metrikaLabel,
                 'monitoring' => $monitoringId,
                 'monitoring_label' => $monitoringLabel,
+                'webmaster' => $webmasterId,
+                'webmaster_label' => $webmasterLabel,
             ];
         }
 
@@ -200,6 +219,10 @@ class SeoReportsController extends Controller
             'metrikaBindings' => SeoReportBindings::metrikaBindingsForUser($userId),
             'metrikaConfigured' => $this->metrika->isConfigured(),
             'metrikaConnected' => $this->metrika->isConnected($userId),
+            'monitoringOptions' => SeoReportBindings::monitoringOptionsForUser($userId),
+            'webmasterBindings' => SeoReportBindings::webmasterBindingsForUser($userId),
+            'webmasterConfigured' => $this->webmaster->isConfigured(),
+            'webmasterConnected' => $this->webmaster->isConnected($userId),
         ]);
     }
 
@@ -409,6 +432,12 @@ class SeoReportsController extends Controller
         if ($request->filled('monitoring_project_id')) {
             $project->monitoring_project_id = (int) $request->input('monitoring_project_id') ?: null;
         }
+        $webmasterHost = trim((string) $request->input('webmaster_host', ''));
+        if ($webmasterHost !== '') {
+            $settings = is_array($project->settings_json) ? $project->settings_json : [];
+            $settings['webmaster_host'] = $webmasterHost;
+            $project->settings_json = $settings;
+        }
         $project->save();
 
         return redirect()
@@ -454,6 +483,8 @@ class SeoReportsController extends Controller
             $sections[] = [
                 'key' => $key,
                 'title' => $meta['title'],
+                'origin' => $meta['origin'] ?? SeoReportSectionRegistry::origin($key),
+                'origin_kind' => $meta['origin_kind'] ?? SeoReportSectionRegistry::originKind($key),
                 'group' => $meta['group'],
                 'source' => $meta['source'],
                 'enabled' => $enabled,
@@ -1845,10 +1876,12 @@ class SeoReportsController extends Controller
             return null;
         }
 
-        if ($source === 'metrika') {
+        if ($source === 'metrika' || $source === 'conversions' || $source === 'ecommerce') {
+            $hasMetrika = (int) ($project->metrika_counter_id ?? 0) > 0;
+
             return [
                 'kind' => 'link',
-                'label' => $project->metrika_counter_id ? __('Change') : __('Connect'),
+                'label' => $hasMetrika ? __('Change') : __('Connect'),
                 'url' => $settingsUrl(3),
             ];
         }
@@ -1900,7 +1933,7 @@ class SeoReportsController extends Controller
 
         return [
             'kind' => 'link',
-            'label' => __('Settings'),
+            'label' => __('Change'),
             'url' => $settingsUrl(3),
         ];
     }

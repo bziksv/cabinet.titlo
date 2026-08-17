@@ -198,7 +198,9 @@
                                             data-metrika="{{ $domainHints[$domain]['metrika'] ?? '' }}"
                                             data-metrika-label="{{ $domainHints[$domain]['metrika_label'] ?? '' }}"
                                             data-monitoring="{{ $domainHints[$domain]['monitoring'] ?? '' }}"
-                                            data-monitoring-label="{{ $domainHints[$domain]['monitoring_label'] ?? '' }}">
+                                            data-monitoring-label="{{ $domainHints[$domain]['monitoring_label'] ?? '' }}"
+                                            data-webmaster="{{ $domainHints[$domain]['webmaster'] ?? '' }}"
+                                            data-webmaster-label="{{ $domainHints[$domain]['webmaster_label'] ?? '' }}">
                                         {{ $domain }}
                                     </option>
                                 @endforeach
@@ -222,11 +224,16 @@
                              data-metrika-bind-url="{{ route('yandex-metrika.bind') }}"
                              data-metrika-unbind-url="{{ route('yandex-metrika.unbind') }}"
                              data-metrika-return="{{ route('pages.seo-reports') }}">
-                            <label class="form-label">{{ __('Yandex Metrika') }}</label>
+                            <label class="form-label" for="cabinetSrMetrika">{{ __('Yandex Metrika') }}</label>
                             <div class="d-flex flex-wrap gap-2 align-items-start mb-1">
                                 <div class="flex-grow-1" style="min-width: 12rem;">
-                                    <select class="form-select form-select-sm" name="metrika_counter_id" data-sr-metrika-select>
-                                        <option value="">{{ __('Not connected') }}</option>
+                                    <select class="form-select form-select-sm"
+                                            name="metrika_counter_id"
+                                            id="cabinetSrMetrika"
+                                            data-sr-wizard-select2
+                                            data-sr-metrika-select
+                                            data-placeholder="{{ __('Not connected') }}">
+                                        <option value=""></option>
                                         @foreach(($metrikaBindings ?? collect()) as $binding)
                                             <option value="{{ $binding->counter_id }}"
                                                     data-domain="{{ $binding->domain }}">
@@ -242,11 +249,58 @@
                             </div>
                             <div class="form-text">{{ __('Metrika connect from create hint') }}</div>
                         </div>
+
+                        <div class="mb-2"
+                             data-sr-webmaster
+                             data-webmaster-configured="{{ !empty($webmasterConfigured) ? '1' : '0' }}"
+                             data-webmaster-connected="{{ !empty($webmasterConnected) ? '1' : '0' }}"
+                             data-webmaster-connect-url="{{ route('yandex-webmaster.connect') }}"
+                             data-webmaster-binding-url="{{ route('yandex-webmaster.binding') }}"
+                             data-webmaster-hosts-url="{{ route('yandex-webmaster.hosts') }}"
+                             data-webmaster-bind-url="{{ route('yandex-webmaster.bind') }}"
+                             data-webmaster-unbind-url="{{ route('yandex-webmaster.unbind') }}"
+                             data-webmaster-return="{{ route('pages.seo-reports') }}">
+                            <label class="form-label" for="cabinetSrWebmaster">{{ __('Yandex Webmaster') }}</label>
+                            <div class="d-flex flex-wrap gap-2 align-items-start mb-1">
+                                <div class="flex-grow-1" style="min-width: 12rem;">
+                                    <select class="form-select form-select-sm"
+                                            name="webmaster_host"
+                                            id="cabinetSrWebmaster"
+                                            data-sr-wizard-select2
+                                            data-sr-webmaster-select
+                                            data-placeholder="{{ __('Not connected') }}">
+                                        <option value=""></option>
+                                        @foreach(($webmasterBindings ?? collect()) as $binding)
+                                            <option value="{{ $binding->host_id }}"
+                                                    data-domain="{{ $binding->domain }}">
+                                                {{ $binding->domain }}
+                                                @if($binding->host_url) · {{ $binding->host_url }}@endif
+                                                · {{ $binding->host_id }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-outline-primary btn-sm" data-sr-webmaster-open>
+                                    {{ __('Connect or change Webmaster') }}
+                                </button>
+                            </div>
+                            <div class="form-text">{{ __('Webmaster connect from create hint') }}</div>
+                        </div>
+
                         <div class="mb-0">
-                            <label class="form-label">{{ __('Position monitoring') }}</label>
-                            <input type="text" class="form-control form-control-sm" data-sr-hint-monitoring readonly
-                                   placeholder="{{ __('Will auto-bind by domain') }}">
-                            <input type="hidden" name="monitoring_project_id" data-sr-monitoring-id value="">
+                            <label class="form-label" for="cabinetSrMonitoring">{{ __('Position monitoring') }}</label>
+                            <select class="form-select form-select-sm"
+                                    name="monitoring_project_id"
+                                    id="cabinetSrMonitoring"
+                                    data-sr-wizard-select2
+                                    data-sr-monitoring-select
+                                    data-placeholder="{{ __('Not connected') }}">
+                                <option value=""></option>
+                                @foreach(($monitoringOptions ?? []) as $option)
+                                    <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">{{ __('Monitoring connect from create hint') }}</div>
                         </div>
                     </div>
 
@@ -322,6 +376,7 @@
     </div>
 
     @include('pages.partials.seo-reports-metrika-modal')
+    @include('pages.partials.seo-reports-webmaster-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
@@ -368,27 +423,68 @@
                 });
                 var domainSelect = form.querySelector('[data-sr-domain]');
                 var metrikaSelect = form.querySelector('[data-sr-metrika-select]');
-                var hintMon = form.querySelector('[data-sr-hint-monitoring]');
-                var idMon = form.querySelector('[data-sr-monitoring-id]');
+                var webmasterSelect = form.querySelector('[data-sr-webmaster-select]');
+                var monitoringSelect = form.querySelector('[data-sr-monitoring-select]');
                 var btnPrev = form.querySelector('[data-sr-prev]');
                 var btnNext = form.querySelector('[data-sr-next]');
                 var btnFinish = form.querySelector('[data-sr-finish]');
                 var modal = document.getElementById('cabinetSrCreateModal');
 
+                function elevateNestedModal(modalEl) {
+                    if (!modalEl) return;
+                    var onShow = function () {
+                        modalEl.classList.add('cabinet-sr-modal-nested');
+                    };
+                    var onShown = function () {
+                        var backs = document.querySelectorAll('.modal-backdrop');
+                        if (backs.length) {
+                            backs[backs.length - 1].classList.add('cabinet-sr-modal-nested-backdrop');
+                        }
+                    };
+                    var onHidden = function () {
+                        modalEl.classList.remove('cabinet-sr-modal-nested');
+                        document.querySelectorAll('.modal-backdrop.cabinet-sr-modal-nested-backdrop').forEach(function (el) {
+                            el.classList.remove('cabinet-sr-modal-nested-backdrop');
+                        });
+                    };
+                    modalEl.addEventListener('show.bs.modal', onShow, { once: true });
+                    modalEl.addEventListener('shown.bs.modal', onShown, { once: true });
+                    modalEl.addEventListener('hidden.bs.modal', onHidden, { once: true });
+                }
+
+                function setSelectValue(el, val) {
+                    if (!el) return;
+                    var next = val == null ? '' : String(val);
+                    if (typeof window.jQuery !== 'undefined' && window.jQuery(el).data('select2')) {
+                        window.jQuery(el).val(next || null).trigger('change');
+                        return;
+                    }
+                    el.value = next;
+                }
+
                 function syncHints() {
                     var opt = domainSelect.options[domainSelect.selectedIndex];
                     var m = opt ? (opt.getAttribute('data-metrika') || '') : '';
                     var mon = opt ? (opt.getAttribute('data-monitoring') || '') : '';
-                    var monLabel = opt ? (opt.getAttribute('data-monitoring-label') || '') : '';
-                    idMon.value = mon;
-                    hintMon.value = mon ? (monLabel || mon) : '';
-                    hintMon.placeholder = mon ? '' : @json(__('Will auto-bind by domain'));
+                    var wm = opt ? (opt.getAttribute('data-webmaster') || '') : '';
+                    setSelectValue(monitoringSelect, mon);
                     if (metrikaSelect) {
                         if (m) {
-                            metrikaSelect.value = String(m);
+                            setSelectValue(metrikaSelect, m);
                         } else if (!metrikaSelect.value) {
-                            metrikaSelect.value = '';
+                            setSelectValue(metrikaSelect, '');
                         }
+                    }
+                    if (webmasterSelect) {
+                        if (wm) {
+                            setSelectValue(webmasterSelect, wm);
+                        } else if (!webmasterSelect.value) {
+                            setSelectValue(webmasterSelect, '');
+                        }
+                    }
+                    var wmBox = form.querySelector('[data-sr-webmaster]');
+                    if (wmBox) {
+                        wmBox.setAttribute('data-domain', domainSelect.value || '');
                     }
                 }
 
@@ -407,64 +503,85 @@
                 var restoreCreateState = null;
                 try {
                     var bootParams = new URLSearchParams(window.location.search);
-                    if (bootParams.get('sr_create') === '1' || bootParams.get('metrika_picker') === '1') {
+                    if (bootParams.get('sr_create') === '1' || bootParams.get('metrika_picker') === '1' || bootParams.get('webmaster_picker') === '1') {
                         restoreCreateState = {
-                            domain: bootParams.get('domain') || bootParams.get('metrika_domain') || '',
+                            domain: bootParams.get('domain') || bootParams.get('metrika_domain') || bootParams.get('webmaster_domain') || '',
                             picker: bootParams.get('metrika_picker') === '1',
-                            create: bootParams.get('sr_create') === '1' || bootParams.get('metrika_picker') === '1',
+                            webmasterPicker: bootParams.get('webmaster_picker') === '1',
+                            create: bootParams.get('sr_create') === '1' || bootParams.get('metrika_picker') === '1' || bootParams.get('webmaster_picker') === '1',
                         };
                     }
                 } catch (e) {}
 
-                function initDomainSelect2() {
+                function mountWizardSelect2($select) {
+                    if (!$select || !$select.length) return;
+                    if ($select.hasClass('select2-hidden-accessible')) {
+                        $select.select2('destroy');
+                    }
+                    var $modal = modal ? window.jQuery(modal) : null;
+                    $select.select2({
+                        theme: 'bootstrap4',
+                        width: '100%',
+                        placeholder: $select.attr('data-placeholder') || '',
+                        allowClear: true,
+                        dropdownParent: $modal && $modal.length ? $modal : window.jQuery(document.body),
+                        language: {
+                            noResults: function () { return 'Ничего не найдено'; },
+                            searching: function () { return 'Поиск…'; }
+                        }
+                    });
+                }
+
+                function destroyWizardSelect2($select) {
+                    if ($select && $select.length && $select.hasClass('select2-hidden-accessible')) {
+                        $select.select2('destroy');
+                    }
+                }
+
+                function initWizardSelect2() {
                     if (typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.select2 !== 'function') {
                         return;
                     }
                     if (!domainSelect) return;
                     var $ = window.jQuery;
-                    var $select = $(domainSelect);
+                    var $domain = $(domainSelect);
                     var $modal = modal ? $(modal) : null;
-                    var placeholder = $select.attr('data-placeholder') || '';
+                    var $extra = form.querySelectorAll('[data-sr-wizard-select2]');
 
-                    function mount() {
-                        if ($select.hasClass('select2-hidden-accessible')) {
-                            $select.select2('destroy');
-                        }
-                        $select.select2({
-                            theme: 'bootstrap4',
-                            width: '100%',
-                            placeholder: placeholder,
-                            allowClear: true,
-                            dropdownParent: $modal && $modal.length ? $modal : $(document.body),
-                            language: {
-                                noResults: function () { return 'Ничего не найдено'; },
-                                searching: function () { return 'Поиск…'; }
-                            }
+                    function mountAll() {
+                        mountWizardSelect2($domain);
+                        Array.prototype.forEach.call($extra, function (el) {
+                            mountWizardSelect2($(el));
+                        });
+                    }
+
+                    function destroyAll() {
+                        destroyWizardSelect2($domain);
+                        Array.prototype.forEach.call($extra, function (el) {
+                            destroyWizardSelect2($(el));
                         });
                     }
 
                     if ($modal && $modal.length) {
                         $modal.on('shown.bs.modal', function () {
-                            mount();
+                            mountAll();
                             if (restoreCreateState && restoreCreateState.domain) {
-                                $select.val(restoreCreateState.domain).trigger('change');
+                                $domain.val(restoreCreateState.domain).trigger('change');
                                 step = 2;
                                 syncHints();
                                 render();
                             } else {
-                                $select.val(null).trigger('change');
+                                $domain.val(null).trigger('change');
                                 step = 1;
                                 render();
                             }
                         });
                         $modal.on('hidden.bs.modal', function () {
-                            if ($select.hasClass('select2-hidden-accessible')) {
-                                $select.select2('destroy');
-                            }
+                            destroyAll();
                             restoreCreateState = null;
                         });
                     } else {
-                        mount();
+                        mountAll();
                     }
                 }
 
@@ -493,7 +610,7 @@
                         render();
                     }
                 });
-                initDomainSelect2();
+                initWizardSelect2();
                 render();
 
                 (function initMetrikaPicker() {
@@ -519,10 +636,12 @@
 
                     function showModal() {
                         if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            elevateNestedModal(modalEl);
                             bootstrap.Modal.getOrCreateInstance(modalEl).show();
                             return;
                         }
                         if (typeof $ !== 'undefined' && $.fn.modal) {
+                            elevateNestedModal(modalEl);
                             $(modalEl).modal('show');
                         }
                     }
@@ -775,10 +894,285 @@
                                 params.delete('sr_create');
                                 params.delete('metrika_picker');
                                 params.delete('metrika_domain');
+                                params.delete('webmaster_picker');
+                                params.delete('webmaster_domain');
                                 params.delete('domain');
                                 var q = params.toString();
                                 window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
                             }
+                        }
+                    } catch (e) {}
+                })();
+
+                (function initWebmasterPicker() {
+                    var box = form.querySelector('[data-sr-webmaster]');
+                    var modalEl = document.getElementById('cabinet-sr-webmaster-modal');
+                    if (!box || !modalEl) return;
+
+                    var csrfEl = document.querySelector('meta[name="csrf-token"]');
+                    var csrfToken = csrfEl ? csrfEl.getAttribute('content') : '';
+                    var currentDomain = '';
+                    var allHosts = [];
+                    var selectedHostId = '';
+                    var listEl = modalEl.querySelector('[data-webmaster-list]');
+                    var loadingEl = modalEl.querySelector('[data-webmaster-loading]');
+                    var errorEl = modalEl.querySelector('[data-webmaster-error]');
+                    var authEl = modalEl.querySelector('[data-webmaster-auth]');
+                    var authLink = modalEl.querySelector('[data-webmaster-auth-link]');
+                    var domainLabel = modalEl.querySelector('[data-webmaster-domain-label]');
+                    var currentEl = modalEl.querySelector('[data-webmaster-current]');
+                    var unbindBtn = modalEl.querySelector('[data-webmaster-unbind]');
+                    var searchWrap = modalEl.querySelector('[data-webmaster-search-wrap]');
+                    var searchInput = modalEl.querySelector('[data-webmaster-search]');
+
+                    function showModal() {
+                        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            elevateNestedModal(modalEl);
+                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                            return;
+                        }
+                        if (typeof $ !== 'undefined' && $.fn.modal) {
+                            elevateNestedModal(modalEl);
+                            $(modalEl).modal('show');
+                        }
+                    }
+
+                    function connectUrl(domain) {
+                        var base = box.getAttribute('data-webmaster-connect-url') || '';
+                        var ret = box.getAttribute('data-webmaster-return') || location.href;
+                        try {
+                            var u = new URL(ret, window.location.origin);
+                            u.searchParams.set('sr_create', '1');
+                            u.searchParams.set('webmaster_picker', '1');
+                            if (domain) {
+                                u.searchParams.set('domain', domain);
+                                u.searchParams.set('webmaster_domain', domain);
+                            }
+                            ret = u.pathname + u.search;
+                        } catch (e) {}
+                        return base + (base.indexOf('?') === -1 ? '?' : '&') +
+                            'domain=' + encodeURIComponent(domain || '') +
+                            '&return=' + encodeURIComponent(ret);
+                    }
+
+                    function setError(msg) {
+                        if (!errorEl) return;
+                        errorEl.textContent = msg || '';
+                        errorEl.classList.toggle('d-none', !msg);
+                    }
+
+                    function setLoading(on) {
+                        if (loadingEl) loadingEl.classList.toggle('d-none', !on);
+                    }
+
+                    function setSearchVisible(on) {
+                        if (searchWrap) searchWrap.classList.toggle('d-none', !on);
+                        if (!on && searchInput) searchInput.value = '';
+                    }
+
+                    function filterHosts(hosts, query) {
+                        var q = String(query || '').trim().toLowerCase();
+                        if (!q) return hosts.slice();
+                        return hosts.filter(function (h) {
+                            var url = String(h.unicode_url || h.url || '').toLowerCase();
+                            var id = String(h.id || '').toLowerCase();
+                            var domain = String(h.domain || '').toLowerCase();
+                            return url.indexOf(q) !== -1 || id.indexOf(q) !== -1 || domain.indexOf(q) !== -1;
+                        });
+                    }
+
+                    function renderHosts(hosts, selectedId) {
+                        if (!listEl) return;
+                        listEl.innerHTML = '';
+                        if (!hosts.length) {
+                            listEl.innerHTML = '<div class="list-group-item text-secondary small">' +
+                                (allHosts.length
+                                    ? @json(__('No hosts match the search'))
+                                    : @json(__('No Webmaster hosts found'))) + '</div>';
+                            return;
+                        }
+                        hosts.forEach(function (h) {
+                            var btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2';
+                            btn.setAttribute('data-webmaster-host-id', String(h.id));
+                            if (selectedId && String(selectedId) === String(h.id)) {
+                                btn.classList.add('active');
+                            }
+                            var title = String(h.unicode_url || h.url || h.id || '').replace(/</g, '&lt;');
+                            var meta = String(h.id || '').replace(/</g, '&lt;');
+                            if (h.verified) {
+                                meta += ' · ' + @json(__('Webmaster host verified'));
+                            }
+                            btn.innerHTML =
+                                '<span class="text-start">' +
+                                '<strong>' + title + '</strong>' +
+                                '<br><span class="small opacity-75">' + meta + '</span></span>';
+                            btn.addEventListener('click', function () {
+                                bindHost(String(h.id));
+                            });
+                            listEl.appendChild(btn);
+                        });
+                    }
+
+                    function applyHostFilter() {
+                        renderHosts(
+                            filterHosts(allHosts, searchInput ? searchInput.value : ''),
+                            selectedHostId
+                        );
+                    }
+
+                    function openForDomain(domain) {
+                        currentDomain = domain || (domainSelect ? domainSelect.value : '') || '';
+                        if (!currentDomain) {
+                            step = 1;
+                            render();
+                            if (typeof window.jQuery !== 'undefined' && window.jQuery(domainSelect).data('select2')) {
+                                window.jQuery(domainSelect).select2('open');
+                            }
+                            return;
+                        }
+                        allHosts = [];
+                        selectedHostId = '';
+                        if (domainLabel) domainLabel.textContent = currentDomain || '—';
+                        if (authEl) authEl.classList.add('d-none');
+                        if (listEl) listEl.innerHTML = '';
+                        setSearchVisible(false);
+                        if (currentEl) {
+                            currentEl.classList.add('d-none');
+                            currentEl.textContent = '';
+                        }
+                        if (unbindBtn) unbindBtn.classList.add('d-none');
+                        setError('');
+                        setLoading(true);
+                        if (authLink) authLink.href = connectUrl(currentDomain);
+                        showModal();
+
+                        if (box.getAttribute('data-webmaster-configured') !== '1') {
+                            setLoading(false);
+                            setError(@json(__('Yandex Webmaster is not configured')));
+                            return;
+                        }
+
+                        var bindingUrl = box.getAttribute('data-webmaster-binding-url') +
+                            '?domain=' + encodeURIComponent(currentDomain);
+                        fetch(bindingUrl, {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (binding) {
+                                if (binding && binding.connected === false) {
+                                    setLoading(false);
+                                    if (authEl) authEl.classList.remove('d-none');
+                                    return null;
+                                }
+                                if (binding && binding.host_id) {
+                                    selectedHostId = String(binding.host_id);
+                                    if (currentEl) {
+                                        currentEl.textContent = (binding.host_url || binding.host_id) +
+                                            (binding.verified ? (' · ' + @json(__('Webmaster host verified'))) : '');
+                                        currentEl.classList.remove('d-none');
+                                    }
+                                    if (unbindBtn) unbindBtn.classList.remove('d-none');
+                                }
+                                return fetch(box.getAttribute('data-webmaster-hosts-url'), {
+                                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                                    credentials: 'same-origin',
+                                });
+                            })
+                            .then(function (r) {
+                                if (!r) return null;
+                                return r.json();
+                            })
+                            .then(function (data) {
+                                if (!data) return;
+                                setLoading(false);
+                                allHosts = Array.isArray(data.hosts) ? data.hosts : [];
+                                setSearchVisible(allHosts.length > 8);
+                                applyHostFilter();
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not load Webmaster hosts')));
+                            });
+                    }
+
+                    function bindHost(hostId) {
+                        setError('');
+                        setLoading(true);
+                        fetch(box.getAttribute('data-webmaster-bind-url'), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ domain: currentDomain, host_id: hostId }),
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (data) {
+                                if (!data || !data.ok) throw new Error((data && data.message) || 'bind');
+                                var ret = box.getAttribute('data-webmaster-return') || location.pathname;
+                                try {
+                                    var u = new URL(ret, window.location.origin);
+                                    u.searchParams.set('sr_create', '1');
+                                    if (currentDomain) u.searchParams.set('domain', currentDomain);
+                                    ret = u.pathname + u.search;
+                                } catch (e) {}
+                                window.location.href = ret;
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not bind Webmaster host')));
+                            });
+                    }
+
+                    if (unbindBtn) {
+                        unbindBtn.addEventListener('click', function () {
+                            if (!currentDomain) return;
+                            setLoading(true);
+                            fetch(box.getAttribute('data-webmaster-unbind-url'), {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                credentials: 'same-origin',
+                                body: JSON.stringify({ domain: currentDomain }),
+                            })
+                                .then(function (r) { return r.json(); })
+                                .then(function (data) {
+                                    if (!data || !data.ok) throw new Error('unbind');
+                                    window.location.reload();
+                                })
+                                .catch(function () {
+                                    setLoading(false);
+                                    setError(@json(__('Could not unbind Webmaster host')));
+                                });
+                        });
+                    }
+
+                    if (searchInput) {
+                        searchInput.addEventListener('input', applyHostFilter);
+                    }
+
+                    var openBtn = box.querySelector('[data-sr-webmaster-open]');
+                    if (openBtn) {
+                        openBtn.addEventListener('click', function () {
+                            openForDomain(domainSelect ? domainSelect.value : '');
+                        });
+                    }
+
+                    try {
+                        if (restoreCreateState && restoreCreateState.webmasterPicker) {
+                            setTimeout(function () {
+                                openForDomain(restoreCreateState.domain || (domainSelect ? domainSelect.value : ''));
+                            }, 450);
                         }
                     } catch (e) {}
                 })();

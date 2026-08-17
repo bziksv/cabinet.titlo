@@ -52,7 +52,7 @@
                 <th class="cabinet-sa-ht-num is-important" title="Важные замечания">Важн.</th>
                 <th class="cabinet-sa-ht-num is-warning" title="Предупреждения">Пред.</th>
                 <th class="cabinet-sa-ht-num is-info" title="Информация">Инфо</th>
-                <th></th>
+                <th class="cabinet-sa-ht-actions" scope="col"><span class="visually-hidden">Действия</span></th>
             </tr>
             </thead>
             <tbody>
@@ -275,7 +275,7 @@
                 </tr>
             @empty
                 <tr data-sa-empty>
-                    <td colspan="11" class="cabinet-sa-history__empty">История пуста — запустите первую проверку.</td>
+                    <td colspan="12" class="cabinet-sa-history__empty">История пуста — запустите первую проверку.</td>
                 </tr>
             @endforelse
             </tbody>

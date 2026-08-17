@@ -71,13 +71,15 @@ class SiteAuditController extends Controller
             && class_exists(SeoChecklistService::class)
             && \App\SeoChecklist\SeoChecklistTeam::tableReady();
 
-        if ($user && ! DemoCabinet::isCurrentUser()) {
-            $teamIds = SiteAuditProject::teamIdsForMember((int) $user->id);
+        if ($user) {
+            $isDemo = DemoCabinet::isCurrentUser();
+            // Демо: только свои проекты/краулы (фикстура), без команд.
+            $teamIds = $isDemo ? [] : SiteAuditProject::teamIdsForMember((int) $user->id);
 
             $projectsQuery = SiteAuditProject::query()
-                ->where(function ($q) use ($user, $teamIds) {
+                ->where(function ($q) use ($user, $teamIds, $isDemo) {
                     $q->where('user_id', $user->id);
-                    if ($teamIds !== [] && SiteAuditProject::teamColumnReady()) {
+                    if (! $isDemo && $teamIds !== [] && SiteAuditProject::teamColumnReady()) {
                         $q->orWhereIn('team_id', $teamIds);
                     }
                 })
@@ -89,7 +91,7 @@ class SiteAuditController extends Controller
                             'pages_total', 'pages_fetched', 'finished_at', 'created_at',
                         ]);
                 }]);
-            if (SiteAuditProject::teamColumnReady()) {
+            if (! $isDemo && SiteAuditProject::teamColumnReady()) {
                 $projectsQuery->with('team:id,title');
             }
             $projects = $projectsQuery
@@ -100,16 +102,16 @@ class SiteAuditController extends Controller
             $historyDomain = trim((string) $request->input('domain', ''));
 
             $crawlsQuery = SiteAuditCrawl::query()
-                ->where(function ($q) use ($user, $teamIds) {
+                ->where(function ($q) use ($user, $teamIds, $isDemo) {
                     $q->where('user_id', $user->id);
-                    if ($teamIds !== [] && SiteAuditProject::teamColumnReady()) {
+                    if (! $isDemo && $teamIds !== [] && SiteAuditProject::teamColumnReady()) {
                         $q->orWhereHas('project', function ($pq) use ($teamIds) {
                             $pq->whereIn('team_id', $teamIds);
                         });
                     }
                 })
-                ->with(['project' => function ($q) {
-                    if (SiteAuditProject::teamColumnReady()) {
+                ->with(['project' => function ($q) use ($isDemo) {
+                    if (! $isDemo && SiteAuditProject::teamColumnReady()) {
                         $q->with('team:id,title');
                     }
                 }])
@@ -136,15 +138,19 @@ class SiteAuditController extends Controller
 
             $crawlSizes = SiteAuditCrawlStorage::payloadBytesByCrawlIds($crawls->pluck('id')->all());
 
-            $schedules = SiteAuditSchedule::query()
-                ->where('user_id', $user->id)
-                ->get()
-                ->keyBy('project_id');
+            if ($isDemo) {
+                $schedules = collect();
+            } else {
+                $schedules = SiteAuditSchedule::query()
+                    ->where('user_id', $user->id)
+                    ->get()
+                    ->keyBy('project_id');
 
-            if ($teamAccessReady) {
-                $svc = app(SeoChecklistService::class);
-                $checklistTeams = $svc->teamsForUser((int) $user->id);
-                $teamCandidates = $svc->teamCandidates((int) $user->id);
+                if ($teamAccessReady) {
+                    $svc = app(SeoChecklistService::class);
+                    $checklistTeams = $svc->teamsForUser((int) $user->id);
+                    $teamCandidates = $svc->teamCandidates((int) $user->id);
+                }
             }
         } else {
             $schedules = collect();
