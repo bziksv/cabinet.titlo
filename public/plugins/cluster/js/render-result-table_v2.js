@@ -135,9 +135,12 @@ function renderResultTable_v2(data, objectId) {
                                     '       <div class="d-flex justify-content-between"> ' +
                                     '          <div class="cluster-id-' + clusterId + '">' + string + '</div> ' +
                                     '          <div class="ml-1">' +
-                                    '             <i class="fa fa-copy copy-full-urls click_tracking" data-click="Copy urls" data-action="' + phrase + '"></i>' +
+                                    '             <span class="clv2-phrase-act" tabindex="0">' +
+                                    '                 <i class="fa fa-copy copy-full-urls click_tracking" data-click="Copy urls" data-action="' + phrase + '" aria-label="Скопировать URL из выдачи"></i>' +
+                                    '                 <span class="clv2-phrase-act__popover" role="tooltip">Скопировать URL из поисковой выдачи по этой фразе (ТОП). Это не поле «Релевантные url».</span>' +
+                                    '             </span>' +
                                     '             <span class="__helper-link ui_tooltip_w click_tracking" data-click="View links phrases">' +
-                                    '                 <i class="fa fa-paperclip" data-action="' + phrase + '"></i>' +
+                                    '                 <i class="fa fa-paperclip" data-action="' + phrase + '" aria-label="Показать URL из выдачи"></i>' +
                                     '                 <span class="ui_tooltip __bottom" style="min-width: 250px;">' +
                                     '                     <span class="ui_tooltip_content" data-action="' + phrase + '"> </span>' +
                                     '                 </span>' +
@@ -250,6 +253,8 @@ function prepareFunctions(alone, iterator, colspan, copyGroupBool, objectId) {
     $('.copy-full-urls').unbind().on('click', function () {
         let target = $(this).attr('data-action')
         downloadSites(objectId, target, 'copy')
+    }).on('mouseenter', function () {
+        downloadSites(objectId, $(this).attr('data-action'), 'download')
     })
 
     $('.fa.fa-paperclip').hover(function () {
@@ -377,9 +382,12 @@ function renderAlonePhrases(alone, iterator, colspan) {
                         '       <div class="d-flex justify-content-between"> ' +
                         '          <div class="cluster-id-' + clusterId + '">' + string + '</div> ' +
                         '          <div class="ml-1">' +
-                        '             <i class="fa fa-copy copy-full-urls click_tracking" data-click="Copy urls" data-action="' + phrase + '"></i>' +
+                        '             <span class="clv2-phrase-act" tabindex="0">' +
+                        '                 <i class="fa fa-copy copy-full-urls click_tracking" data-click="Copy urls" data-action="' + phrase + '" aria-label="Скопировать URL из выдачи"></i>' +
+                        '                 <span class="clv2-phrase-act__popover" role="tooltip">Скопировать URL из поисковой выдачи по этой фразе (ТОП). Это не поле «Релевантные url».</span>' +
+                        '             </span>' +
                         '             <span class="__helper-link ui_tooltip_w click_tracking" data-click="View links phrases">' +
-                        '                 <i class="fa fa-paperclip" data-action="' + phrase + '"></i>' +
+                        '                 <i class="fa fa-paperclip" data-action="' + phrase + '" aria-label="Показать URL из выдачи"></i>' +
                         '                 <span class="ui_tooltip __bottom" style="min-width: 250px;">' +
                         '                     <span class="ui_tooltip_content" data-action="' + phrase + '"> </span>' +
                         '                 </span>' +
@@ -490,113 +498,106 @@ function coloredPhrases() {
     })
 }
 
+function collectCopyTexts($nodes) {
+    var lines = [];
+    $nodes.each(function () {
+        var phrase = ($(this).text() || $(this).html() || '').replace(/<[^>]+>/g, '').trim();
+        if (phrase) {
+            lines.push(phrase);
+        }
+    });
+    return lines.join('\n');
+}
+
 function copyCluster() {
     $('.copy-cluster-phrases').unbind().on('click', function () {
-        $('#hiddenForCopy').css('display', 'block')
-        $('#hiddenForCopy').val('')
-        let iterator = $(this).attr('data-target')
-        let trs = $('.cluster-id-' + iterator)
-
-        $.each(trs, function (key, value) {
-            let phrase = ($(this).html()).trim();
-            if ($('#hiddenForCopy').val() === '') {
-                $('#hiddenForCopy').val(phrase)
-            } else {
-                $('#hiddenForCopy').val($('#hiddenForCopy').val() + "\n" + phrase)
-            }
-        })
-
-        copyInBuffer()
-        successCopiedMessage()
-    })
+        var iterator = $(this).attr('data-target');
+        copyInBuffer(collectCopyTexts($('.cluster-id-' + iterator)));
+    });
 }
 
 function copyGroup() {
     $('.copy-group').unbind().on('click', function () {
-        $('#hiddenForCopy').css('display', 'block')
-        $('#hiddenForCopy').val('')
-        let iterator = $(this).attr('data-target')
-        let trs = $('.group-' + iterator)
-
-        $.each(trs, function (key, value) {
-            let phrase = ($(this).html()).trim();
-            if ($('#hiddenForCopy').val() === '') {
-                $('#hiddenForCopy').val(phrase)
-            } else {
-                $('#hiddenForCopy').val($('#hiddenForCopy').val() + "\n" + phrase)
-            }
-        })
-
-        copyInBuffer()
-    })
+        var iterator = $(this).attr('data-target');
+        copyInBuffer(collectCopyTexts($('.group-' + iterator)));
+    });
 }
 
 function copyBased() {
     $('.copy-based').unbind().on('click', function () {
-        $('#hiddenForCopy').css('display', 'block')
-        $('#hiddenForCopy').val('')
-        let iterator = $(this).attr('data-target')
-        let trs = $('.base-' + iterator)
-
-        $.each(trs, function (key, value) {
-            let phrase = ($(this).html()).trim();
-            if ($('#hiddenForCopy').val() === '') {
-                $('#hiddenForCopy').val(phrase)
-            } else {
-                $('#hiddenForCopy').val($('#hiddenForCopy').val() + "\n" + phrase)
-            }
-        })
-
-        copyInBuffer()
-    })
+        var iterator = $(this).attr('data-target');
+        copyInBuffer(collectCopyTexts($('.base-' + iterator)));
+    });
 }
 
 function copyPhrases() {
     $('.copy-phrase').unbind().on('click', function () {
-        $('#hiddenForCopy').css('display', 'block')
-        $('#hiddenForCopy').val('')
-        let iterator = $(this).attr('data-target')
-        let trs = $('.phrase-' + iterator)
-
-        $.each(trs, function (key, value) {
-            let phrase = ($(this).html()).trim();
-            if ($('#hiddenForCopy').val() === '') {
-                $('#hiddenForCopy').val(phrase)
-            } else {
-                $('#hiddenForCopy').val($('#hiddenForCopy').val() + "\n" + phrase)
-            }
-        })
-
-        copyInBuffer()
-    })
+        var iterator = $(this).attr('data-target');
+        copyInBuffer(collectCopyTexts($('.phrase-' + iterator)));
+    });
 }
 
 function copyTarget() {
     $('.copy-target').unbind().on('click', function () {
-        $('#hiddenForCopy').css('display', 'block')
-        $('#hiddenForCopy').val('')
-        let iterator = $(this).attr('data-target')
-        let trs = $('.target-' + iterator)
-
-        $.each(trs, function (key, value) {
-            let phrase = ($(this).html()).trim();
-            if ($('#hiddenForCopy').val() === '') {
-                $('#hiddenForCopy').val(phrase)
-            } else {
-                $('#hiddenForCopy').val($('#hiddenForCopy').val() + "\n" + phrase)
-            }
-        })
-
-        copyInBuffer()
-    })
+        var iterator = $(this).attr('data-target');
+        copyInBuffer(collectCopyTexts($('.target-' + iterator)));
+    });
 }
 
-function copyInBuffer() {
-    successCopiedMessage()
-    $('#hiddenForCopy').css('display', 'block')
+function copyInBuffer(textOpt) {
+    var text = typeof textOpt === 'string' ? textOpt : String($('#hiddenForCopy').val() || '');
+    if (!text) {
+        if (typeof toastr !== 'undefined') {
+            toastr.warning('Нечего копировать');
+        }
+        return;
+    }
 
-    let text = document.getElementById("hiddenForCopy");
-    text.select();
-    document.execCommand("copy");
-    $('#hiddenForCopy').css('display', 'none')
+    // Храним значение скрыто — никогда не показываем #hiddenForCopy на экране.
+    var $store = $('#hiddenForCopy');
+    if ($store.length) {
+        $store.val(text).css('display', 'none').attr('aria-hidden', 'true');
+        if (!$store.hasClass('visually-hidden')) {
+            $store.addClass('visually-hidden');
+        }
+    }
+
+    function done() {
+        if (typeof successCopiedMessage === 'function') {
+            successCopiedMessage();
+        } else if (typeof toastr !== 'undefined') {
+            toastr.success('Скопировано');
+        }
+    }
+
+    function fallbackCopy() {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;border:0;padding:0;margin:0;';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        if (typeof ta.setSelectionRange === 'function') {
+            ta.setSelectionRange(0, ta.value.length);
+        }
+        var ok = false;
+        try {
+            ok = document.execCommand('copy');
+        } catch (e) {
+            ok = false;
+        }
+        document.body.removeChild(ta);
+        if (ok) {
+            done();
+        } else if (typeof toastr !== 'undefined') {
+            toastr.error('Не удалось скопировать');
+        }
+    }
+
+    if (navigator.clipboard && window.isSecureContext && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(fallbackCopy);
+        return;
+    }
+    fallbackCopy();
 }

@@ -86,8 +86,8 @@ class ClusterController extends Controller
             'searchPhrases' => (bool) ($preset['search_phrases'] ?? false),
             'searchTarget' => (bool) ($preset['search_target'] ?? false),
             'searchRelevance' => (bool) ($preset['search_relevance'] ?? false),
-            'save' => (string) ($preset['save'] ?? '0'),
-            'sendMessage' => (string) (($preset['send_message'] ?? false) ? '1' : '0'),
+            'save' => (string) ($preset['save'] ?? '1'),
+            'sendMessage' => (string) (($preset['send_message'] ?? true) ? '1' : '0'),
         ];
     }
 
@@ -125,13 +125,14 @@ class ClusterController extends Controller
             'region_text' => $regionItem['name'] ?? ($regionItem['text'] ?? (string) $config->region),
             'count' => $config->count ?? 30,
             'clustering_level' => $config->clustering_level,
-            'save_results' => (bool) $config->save_results,
+            // Product defaults for the analyzer form: always Yes (user can still change before run).
+            'save_results' => true,
             'search_base' => (bool) $config->search_base,
             'search_phrased' => (bool) $config->search_phrased,
             'search_target' => (bool) $config->search_target,
             'search_relevance' => (bool) $config->search_relevance,
             'search_engine' => $engine,
-            'send_message' => (bool) $config->send_message,
+            'send_message' => true,
             'brut_force' => (bool) $config->brut_force,
             'gain_factor' => $config->gain_factor,
             'brut_force_count' => $config->brut_force_count,

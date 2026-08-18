@@ -171,6 +171,24 @@
     @include('users.modal.index', ['id' => 'exportModal', 'action' => route('filter.exports.users'), 'title' => __('User Upload Filter')])
     @include('users.modal.index', ['id' => 'assignTariffModal', 'action' => route('users.tariff'), 'title' => __('Assign tariff')])
     @include('users.partials.inactive-purge-modal')
+
+    <div class="modal fade" id="cabinetUsersUtmModal" tabindex="-1" aria-labelledby="cabinetUsersUtmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cabinetUsersUtmModalLabel">{{ __('utm metrics') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-secondary mb-3" id="cabinet-users-utm-user"></p>
+                    <div id="cabinet-users-utm-body"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('js')
@@ -469,39 +487,30 @@
                         title: @json(__('Actions')),
                         data: function (row) {
                             var html = '<div class="cabinet-users-actions">';
-                            html += '<a class="btn btn-outline-secondary btn-sm" href="' + userUrl(routes.login, row.id) + '" title="' + @json(__('Login')) + '"><i class="bi bi-box-arrow-in-right"></i></a>';
-                            html += '<a class="btn btn-outline-primary btn-sm" href="' + userUrl(routes.edit, row.id) + '" title="' + @json(__('Edit')) + '"><i class="bi bi-pencil"></i></a>';
-                            html += '<a class="btn btn-outline-info btn-sm" href="' + userUrl(routes.stats, row.id) + '" title="' + @json(__('User statistic')) + '"><i class="bi bi-pie-chart"></i></a>';
-
-                            if (row.metrics) {
-                                html += '<a class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" href="#metrics-' + row.id + '" title="' + @json(__('utm metrics')) + '"><i class="bi bi-share"></i></a>';
-                            }
-
-                            html += '<button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteUser(' + row.id + ')" title="' + @json(__('Delete')) + '"><i class="bi bi-trash"></i></button>';
+                            html += '<a class="btn btn-outline-secondary btn-sm" href="' + userUrl(routes.login, row.id) + '" aria-label="' + @json(__('Login')) + '"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i></a>';
+                            html += '<a class="btn btn-outline-primary btn-sm" href="' + userUrl(routes.edit, row.id) + '" aria-label="' + @json(__('Edit')) + '"><i class="bi bi-pencil" aria-hidden="true"></i></a>';
+                            html += '<a class="btn btn-outline-info btn-sm" href="' + userUrl(routes.stats, row.id) + '" aria-label="' + @json(__('User statistic')) + '"><i class="bi bi-pie-chart" aria-hidden="true"></i></a>';
+                            html += '<button type="button" class="btn btn-outline-secondary btn-sm cabinet-users-utm-btn" data-user-id="' + row.id + '" aria-label="' + @json(__('utm metrics')) + '"><i class="bi bi-share" aria-hidden="true"></i></button>';
+                            html += '<button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteUser(' + row.id + ')" aria-label="' + @json(__('Delete')) + '"><i class="bi bi-trash" aria-hidden="true"></i></button>';
                             html += '</div>';
-
-                            if (row.metrics) {
-                                html += metricsBlock(row);
-                            }
-
                             return html;
                         },
                     },
                 ],
                 initComplete: function () {
-                    if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
-                        document.querySelectorAll('#service-users [title]').forEach(function (el) {
-                            if (!bootstrap.Tooltip.getInstance(el)) {
-                                new bootstrap.Tooltip(el);
-                            }
-                        });
-                    }
                 },
                 drawCallback: function () {
                     if (typeof window.cabinetUsersEnsureVisibleFootprints === 'function') {
                         window.cabinetUsersEnsureVisibleFootprints(this.api());
                     }
                 },
+            });
+
+            $(document).on('click', '.cabinet-users-utm-btn', function () {
+                var id = $(this).data('user-id');
+                var api = usersTable.ajax.json();
+                var row = ((api && api.data) || []).find(function (r) { return String(r.id) === String(id); });
+                showUserUtmMetrics(row || {id: id, metrics: null});
             });
 
             $('#cabinet-users-page-length').on('change', function () {
@@ -621,25 +630,63 @@
             return false;
         }
 
-        function metricsBlock(user) {
-            var collapse = $('<div />', {
-                class: 'collapse cabinet-users-metrics text-start mt-2',
-                id: 'metrics-' + user.id,
-            });
+        function parseUserUtmMetrics(raw) {
+            if (raw == null || raw === '' || raw === '[]' || raw === '{}') {
+                return null;
+            }
+            var info = raw;
+            if (typeof raw === 'string') {
+                try {
+                    info = JSON.parse(raw);
+                } catch (e) {
+                    return null;
+                }
+            }
+            if (!info || typeof info !== 'object' || Array.isArray(info)) {
+                return null;
+            }
+            var keys = Object.keys(info);
+            if (!keys.length) {
+                return null;
+            }
+            return info;
+        }
 
-            try {
-                var info = typeof user.metrics === 'string' ? JSON.parse(user.metrics) : user.metrics;
+        function showUserUtmMetrics(user) {
+            var $modalEl = document.getElementById('cabinetUsersUtmModal');
+            if (!$modalEl || typeof bootstrap === 'undefined') {
+                return;
+            }
+            var name = (((user && user.name) || '') + ' ' + ((user && user.last_name) || '')).trim();
+            var email = (user && user.email) || '';
+            var label = name || email || ('#' + ((user && user.id) || ''));
+            if (name && email) {
+                label = name + ' · ' + email;
+            }
+            $('#cabinet-users-utm-user').text(label);
+
+            var info = parseUserUtmMetrics(user && user.metrics);
+            var $body = $('#cabinet-users-utm-body');
+            $body.empty();
+            if (!info) {
+                $body.html('<p class="text-secondary mb-0">' + @json(__('No UTM metrics for this user')) + '</p>');
+            } else {
+                var $list = $('<dl class="cabinet-users-utm-list mb-0" />');
                 $.each(info, function (k, v) {
-                    collapse.append(
-                        $('<div />', {class: 'row-metrics'}).html(
-                            '<strong>' + $('<div>').text(k).html() + '</strong>: ' + $('<div>').text(decodeURIComponent(v)).html()
-                        )
+                    var value = v;
+                    try {
+                        value = decodeURIComponent(String(v));
+                    } catch (e) {
+                        value = String(v);
+                    }
+                    $list.append(
+                        $('<dt class="small text-secondary mb-0" />').text(k),
+                        $('<dd class="mb-2" />').text(value)
                     );
                 });
-            } catch (e) {
+                $body.append($list);
             }
-
-            return $('<div />').append(collapse)[0].outerHTML;
+            bootstrap.Modal.getOrCreateInstance($modalEl).show();
         }
 
         function cabinetUsersPurgeInactive(years) {

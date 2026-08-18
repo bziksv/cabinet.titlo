@@ -18,7 +18,7 @@ class ClusterResultExport implements FromCollection
 
     public function collection(): Collection
     {
-        $file[] = [__('Sequence number'), __('Sequence number in the cluster'), __('Key query'), __('Group'), __('Relevant Page'), __('Base'), __('Phrasal'), __('Target')];
+        $file[] = [__('Sequence number'), __('Sequence number in the cluster'), __('Key query'), __('Group'), __('Relevant Page'), __('Base'), __('Phrasal'), __('Accurate')];
         $results = Cluster::unpackCluster($this->cluster->default_result);
         $clusterIterator = 1;
         $iterator = 1;

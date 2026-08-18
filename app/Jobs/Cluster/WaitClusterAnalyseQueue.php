@@ -71,7 +71,32 @@ class WaitClusterAnalyseQueue implements ShouldQueue
             }
         } else {
             ClusterAnalysisDebugLog::info($progressId, 'job.wait.calculate');
-            $this->cluster->calculate();
+            try {
+                $this->cluster->calculate();
+            } catch (\Throwable $e) {
+                ClusterAnalysisDebugLog::error($progressId, 'job.wait.calculate_failed', [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]);
+                ClusterProgress::markFailed(
+                    $progressId,
+                    __('Cluster analysis failed.') . ' ' . $e->getMessage()
+                );
+                throw $e;
+            }
         }
+    }
+
+    public function failed(\Throwable $exception)
+    {
+        $progressId = $this->cluster->getProgressId();
+        ClusterAnalysisDebugLog::error($progressId, 'job.wait.failed', [
+            'message' => $exception->getMessage(),
+        ]);
+        ClusterProgress::markFailed(
+            $progressId,
+            __('Cluster analysis failed.') . ' ' . $exception->getMessage()
+        );
     }
 }

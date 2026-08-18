@@ -183,10 +183,10 @@
 
                 <a class="btn btn-secondary mb-2 click_tracking" data-click="Download csv"
                    href="/download-cluster-result/{{ $cluster['id'] }}/csv"
-                   target="_blank">{{ __('Download csv') }}</a>
+                   download>{{ __('Download csv') }}</a>
                 <a class="btn btn-secondary mb-2 click_tracking" data-click="Download xls"
                    href="/download-cluster-result/{{ $cluster['id'] }}/xls"
-                   target="_blank">{{ __('Download xls') }}</a>
+                   download>{{ __('Download xls') }}</a>
 
                 <div id="block-for-downloads-files" style="display: none">
                     <div>

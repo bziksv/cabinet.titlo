@@ -812,8 +812,8 @@
                             destroyProgress(interval)
 
                             $('#files-downloads').html(
-                                '<a class="btn btn-secondary mb-2" href="/download-cluster-result/' + response['objectId'] + '/csv" target="_blank">{{ __('Download csv') }}</a>' +
-                                ' <a class="btn btn-secondary mb-2" href="/download-cluster-result/' + response['objectId'] + '/xls" target="_blank">{{ __('Download xls') }}</a>'
+                                '<a class="btn btn-secondary mb-2" href="/download-cluster-result/' + response['objectId'] + '/csv" download>{{ __('Download csv') }}</a>' +
+                                ' <a class="btn btn-secondary mb-2" href="/download-cluster-result/' + response['objectId'] + '/xls" download>{{ __('Download xls') }}</a>'
                             );
 
                             $('.save-relevance-url').unbind().on('click', function () {

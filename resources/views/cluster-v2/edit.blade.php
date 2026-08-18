@@ -48,7 +48,7 @@
                         <a href="{{ route('show.cluster.result', $cluster['id']) }}" class="btn btn-outline-secondary btn-sm">
                             {{ __('Project') }}
                         </a>
-                        <a href="{{ route('download.cluster.result', ['cluster' => $cluster['id'], 'type' => 'xls']) }}" class="btn btn-outline-secondary btn-sm" target="_blank">XLS</a>
+                        <a href="{{ route('download.cluster.result', ['cluster' => $cluster['id'], 'type' => 'xls']) }}" class="btn btn-outline-secondary btn-sm" download>XLS</a>
                     </div>
                 </div>
             </div>

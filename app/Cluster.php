@@ -376,11 +376,13 @@ class Cluster
     {
         foreach ($this->sites as $phrase => $item) {
             unset($this->sites[$phrase]['mark']);
-        }
-
-        foreach ($this->sites as $phrase => $item) {
+            if (!isset($this->sites[$phrase]['sites']) || !is_array($this->sites[$phrase]['sites'])) {
+                $this->sites[$phrase]['sites'] = [];
+            }
+            // Пустая выдача (ошибка XML) — всё равно нужен mark[], иначе calculate падает.
+            $this->sites[$phrase]['mark'] = [];
             $count = 0;
-            foreach ($item['sites'] as $key => $site) {
+            foreach ($this->sites[$phrase]['sites'] as $key => $site) {
                 if ($count < $this->count) {
                     foreach ($this->ignoredDomains as $ignoredDomain) {
                         if (strpos($site, $ignoredDomain)) {
@@ -486,13 +488,13 @@ class Cluster
                 continue;
             }
             $intersect = [];
-            $mainSites = $this->getNotIgnoredDomains($this->sites[$mainPhrase]['mark']);
+            $mainSites = $this->getNotIgnoredDomains($this->sites[$mainPhrase]['mark'] ?? []);
             foreach ($phrases as $phrase => $minimum) {
                 if (isset($willClustered[$phrase]) || $mainPhrase === $phrase) {
                     continue;
                 }
 
-                $phraseSites = $this->getNotIgnoredDomains($this->sites[$phrase]['mark']);
+                $phraseSites = $this->getNotIgnoredDomains($this->sites[$phrase]['mark'] ?? []);
                 $ideal = count(array_intersect($mainSites, $phraseSites));
                 if ($ideal < $minimum) {
                     continue;
@@ -502,7 +504,7 @@ class Cluster
                         continue;
                     }
 
-                    $phSites = $this->getNotIgnoredDomains($this->sites[$ph]['mark']);
+                    $phSites = $this->getNotIgnoredDomains($this->sites[$ph]['mark'] ?? []);
                     $c = count(array_intersect($phSites, $phraseSites));
                     if ($c > $checked) {
                         $intersect[$ph] = $c;
@@ -530,7 +532,7 @@ class Cluster
             foreach ($this->clusters as $ph => $cluster) {
                 $max = 0;
                 foreach ($cluster as $phrase => $val) {
-                    $count = count(array_intersect($this->getNotIgnoredDomains($item['mark']), $this->getNotIgnoredDomains($this->sites[$phrase]['mark'])));
+                    $count = count(array_intersect($this->getNotIgnoredDomains($item['mark'] ?? []), $this->getNotIgnoredDomains($this->sites[$phrase]['mark'] ?? [])));
                     if ($count >= $this->minimum && $count > $max) {
                         $max = $count;
                         $intersect[$ph] = [$phrase => $count];
@@ -629,7 +631,7 @@ class Cluster
                 continue;
             }
             $intersect = [];
-            $mainSites = $this->getNotIgnoredDomains($this->sites[$mainPhrase]['mark']);
+            $mainSites = $this->getNotIgnoredDomains($this->sites[$mainPhrase]['mark'] ?? []);
             foreach ($phrases as $phrase => $minimum) {
                 if (isset($willClustered[$phrase])) {
                     continue;
@@ -638,7 +640,7 @@ class Cluster
                     continue;
                 }
 
-                $phraseSites = $this->getNotIgnoredDomains($this->sites[$phrase]['mark']);
+                $phraseSites = $this->getNotIgnoredDomains($this->sites[$phrase]['mark'] ?? []);
                 $ideal = count(array_intersect($mainSites, $phraseSites));
                 if ($ideal < $minimum) {
                     continue;
@@ -649,7 +651,7 @@ class Cluster
                         continue;
                     }
 
-                    $phSites = $this->getNotIgnoredDomains($this->sites[$ph]['mark']);
+                    $phSites = $this->getNotIgnoredDomains($this->sites[$ph]['mark'] ?? []);
                     $c = count(array_intersect($phSites, $phraseSites));
                     if ($c > $checked) {
                         $intersect[$ph] = $c;
@@ -675,7 +677,7 @@ class Cluster
             foreach ($this->clusters as $ph => $cluster) {
                 $max = 0;
                 foreach ($cluster as $phrase => $val) {
-                    $count = count(array_intersect($this->getNotIgnoredDomains($item['mark']), $this->getNotIgnoredDomains($this->sites[$phrase]['mark'])));
+                    $count = count(array_intersect($this->getNotIgnoredDomains($item['mark'] ?? []), $this->getNotIgnoredDomains($this->sites[$phrase]['mark'] ?? [])));
                     if ($count >= $this->minimum && $count > $max) {
                         $max = $count;
                         $intersect[$ph] = [$phrase => $count];
@@ -709,6 +711,10 @@ class Cluster
     {
         $result = [];
 
+        if (!is_array($sites)) {
+            return $result;
+        }
+
         foreach ($sites as $site => $boolean) {
             if ($boolean) {
                 continue;
@@ -734,7 +740,7 @@ class Cluster
                 $intersects = [];
                 foreach ($cluster as $key => $item) {
                     foreach ($cluster2 as $key2 => $item2) {
-                        $inter = count(array_intersect($this->getNotIgnoredDomains($item['mark']), $this->getNotIgnoredDomains($item2['mark'])));
+                        $inter = count(array_intersect($this->getNotIgnoredDomains($item['mark'] ?? []), $this->getNotIgnoredDomains($item2['mark'] ?? [])));
                         if (
                             isset($this->wordRatio[$key][$key2]) &&
                             $inter >= $this->wordRatio[$key][$key2] ||

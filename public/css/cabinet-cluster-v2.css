@@ -583,6 +583,73 @@
     word-break: break-word;
 }
 
+/* Список URL фразы: не обрезать results-scroll, дать прокрутку */
+.cabinet-cluster-v2-page .ui_tooltip_w[data-click="View links phrases"] .ui_tooltip_content {
+    max-height: min(50vh, 22rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    min-width: 11rem;
+}
+
+.cabinet-cluster-v2-page .clv2-phrase-act {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+}
+
+.cabinet-cluster-v2-page .clv2-phrase-act__popover {
+    display: none;
+    position: absolute;
+    z-index: 1090;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: min(18rem, 70vw);
+    padding: 0.45rem 0.65rem;
+    background: #111827;
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.28);
+    text-align: left;
+    white-space: normal;
+    pointer-events: none;
+}
+
+.cabinet-cluster-v2-page .clv2-phrase-act:hover > .clv2-phrase-act__popover,
+.cabinet-cluster-v2-page .clv2-phrase-act:focus-within > .clv2-phrase-act__popover {
+    display: block;
+}
+
+.cabinet-cluster-v2-page .clv2-phrase-act__popover.is-clv2-phrase-links-floating,
+.clv2-phrase-act__popover.is-clv2-phrase-links-floating {
+    display: block !important;
+    position: fixed !important;
+    transform: none !important;
+    bottom: auto !important;
+    z-index: 2000;
+    pointer-events: none;
+}
+
+.cabinet-cluster-v2-page .clv2-phrase-links-caption {
+    margin: 0 0 0.35rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+    letter-spacing: 0.01em;
+}
+
+.cabinet-cluster-v2-page .clv2-phrase-links-loading {
+    padding: 0.15rem 0;
+    font-style: italic;
+}
+
 .cabinet-cluster-v2-page .ui_tooltip.__bottom {
     left: 50%;
     top: 100%;
@@ -602,6 +669,20 @@
     display: block;
 }
 
+.cabinet-cluster-v2-page .ui_tooltip.is-clv2-phrase-links-floating,
+.ui_tooltip.is-clv2-phrase-links-floating {
+    display: block !important;
+    position: fixed !important;
+    z-index: 2000;
+    left: auto;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    padding: 0 !important;
+    transform: none !important;
+    max-width: min(32rem, calc(100vw - 1rem));
+}
+
 .cabinet-cluster-v2-page .dataTables_info,
 .cabinet-cluster-v2-page .hidden-result-table_filter {
     display: none;
@@ -615,6 +696,18 @@
     .cabinet-cluster-v2-page .cabinet-cluster-v2-run-panel {
         position: static;
     }
+}
+
+.cabinet-cluster-v2-page .cabinet-cluster-v2-edit-hint {
+    background: var(--bs-primary-bg-subtle);
+    color: var(--bs-body-color);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+.cabinet-cluster-v2-page .cabinet-cluster-v2-edit-hint__text {
+    flex: 1 1 16rem;
+    min-width: 0;
 }
 
 .cabinet-cluster-v2-page .cabinet-clv2-admin-debug-log {

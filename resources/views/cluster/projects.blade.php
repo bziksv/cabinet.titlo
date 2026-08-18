@@ -108,10 +108,10 @@
                                                 </button>
                                                 <a class="btn btn-outline-secondary"
                                                    href="/download-cluster-result/{{ $project->id }}/csv"
-                                                   target="_blank" aria-label="{{ __('Download csv') }}">{{ __('CSV') }}</a>
+                                                   download aria-label="{{ __('Download csv') }}">{{ __('CSV') }}</a>
                                                 <a class="btn btn-outline-secondary"
                                                    href="/download-cluster-result/{{ $project->id }}/xls"
-                                                   target="_blank" aria-label="{{ __('Download xls') }}">{{ __('XLS') }}</a>
+                                                   download aria-label="{{ __('Download xls') }}">{{ __('XLS') }}</a>
                                             </div>
                                             @if($project->count_phrases >= $config->warning_limit)
                                                 <span class="badge text-bg-warning mt-1 w-100">
@@ -871,8 +871,8 @@
                                         '<div class="btn-group btn-group-sm w-100 mt-1" role="group">' +
                                         '<a href="/edit-clusters/' + cluster['id'] + '" class="btn btn-outline-secondary" target="_blank" aria-label="{{ __('Hands editor') }}"><i class="fas fa-edit" aria-hidden="true"></i></a>' +
                                         '<button type="button" data-bs-toggle="modal" data-bs-target="#repeat-scan" data-order="' + cluster['id'] + '" class="btn btn-outline-secondary repeat-scan" aria-label="{{ __('Repeat analysis') }}"><i class="fas fa-redo" aria-hidden="true"></i></button>' +
-                                        '<a href="/download-cluster-result/' + cluster['id'] + '/csv" target="_blank" class="btn btn-outline-secondary" aria-label="{{ __('Download csv') }}">{{ __('CSV') }}</a>' +
-                                        '<a href="/download-cluster-result/' + cluster['id'] + '/xls" target="_blank" class="btn btn-outline-secondary" aria-label="{{ __('Download xls') }}">{{ __('XLS') }}</a>' +
+                                        '<a href="/download-cluster-result/' + cluster['id'] + '/csv" download class="btn btn-outline-secondary" aria-label="{{ __('Download csv') }}">{{ __('CSV') }}</a>' +
+                                        '<a href="/download-cluster-result/' + cluster['id'] + '/xls" download class="btn btn-outline-secondary" aria-label="{{ __('Download xls') }}">{{ __('XLS') }}</a>' +
                                         '</div></div>'
                                 });
                                 table.draw()

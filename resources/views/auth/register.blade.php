@@ -64,7 +64,7 @@
 
                     <div class="input-group mb-3">
                         <input id="email" type="email" class="form-control @error('email') is-invalid @enderror"
-                               name="email" value="{{ old('email') }}" placeholder="{{ __('E-Mail') }}"
+                               name="email" value="{{ old('email', request('email')) }}" placeholder="{{ __('E-Mail') }}"
                                autocomplete="email" required>
                         <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                         @error('email')

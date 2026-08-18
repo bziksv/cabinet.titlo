@@ -776,5 +776,13 @@
     "Go to Clustering": "Go to Clustering",
     "No saved projects yet. Run an analysis on the Clustering tab and choose Save results.": "No saved projects yet. Run an analysis on the Clustering tab and choose Save results.",
     "Cluster analysis long process hint": "Analysis may take from a few minutes to an hour. You can close the tab or refresh — progress will resume, and the finished result will appear under Projects (if saving is enabled).",
-    "Cluster analysis resumed after reload": "Analysis is still running — resuming progress tracking."
+    "Cluster analysis resumed after reload": "Analysis is still running — resuming progress tracking.",
+    "No UTM metrics for this user": "No UTM metrics saved for this user",
+    "Cluster copy SERP urls tip": "Copy URLs from search results for this phrase (TOP). Not the “Relevant URL” field.",
+    "Cluster view SERP urls tip": "Show URLs from search results for this phrase",
+    "Cluster SERP urls caption": "From search results for this phrase",
+    "Cluster edit words hint saved": "Word management and cluster redistribution are available in the manual editor of a saved project.",
+    "Cluster edit words hint unsaved": "Word management and cluster redistribution are available after you save the result — open the project in the projects list.",
+    "Cluster open manual editor": "Open manual editor",
+    "Cluster open projects": "Go to projects"
 }

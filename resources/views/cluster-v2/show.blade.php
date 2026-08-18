@@ -61,8 +61,8 @@
                         <h2 class="h5 mb-0">{{ $regionName }} · ТОП {{ $request['count'] ?? '—' }}@if($isPro) · {{ $request['clusteringLevel'] ?? '' }}@endif</h2>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-outline-secondary btn-sm" href="{{ route('download.cluster.result', ['cluster' => $cluster['id'], 'type' => 'csv']) }}" target="_blank" rel="noopener">{{ __('Download csv') }}</a>
-                        <a class="btn btn-outline-secondary btn-sm" href="{{ route('download.cluster.result', ['cluster' => $cluster['id'], 'type' => 'xls']) }}" target="_blank" rel="noopener">{{ __('Download xls') }}</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="{{ route('download.cluster.result', ['cluster' => $cluster['id'], 'type' => 'csv']) }}" download>{{ __('Download csv') }}</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="{{ route('download.cluster.result', ['cluster' => $cluster['id'], 'type' => 'xls']) }}" download>{{ __('Download xls') }}</a>
                         <a class="btn btn-primary btn-sm" href="{{ route('edit.clusters', $cluster['id']) }}">{{ __('Hands editor') }}</a>
                         @if($isPro)
                             <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#fastScan">{{ __('Rebuild') }}</button>
@@ -131,19 +131,24 @@
                     downloadPhrases: @json(url('/download-cluster-phrases')),
                 },
                 i18n: {
-                    copyUrls: @json('Копировать URL'),
-                    viewLinks: @json(__('View links phrases')),
+                    copyUrls: @json(__('Cluster copy SERP urls tip')),
+                    copyUrlsTip: @json(__('Cluster copy SERP urls tip')),
+                    viewLinks: @json(__('Cluster view SERP urls tip')),
+                    viewLinksTip: @json(__('Cluster view SERP urls tip')),
+                    serpUrlsCaption: @json(__('Cluster SERP urls caption')),
                     resultsMeta: @json('Кластеров: :clusters · Фраз: :phrases'),
                     freqZeroHint: @json('Частотность 0: проверьте queue worker и Wordstat. Перезапустите анализ при необходимости.'),
                     copied: @json(__('Successfully copied')),
                 },
             };
         </script>
-        <script src="{{ asset('plugins/cluster/js/common_v2.min.js') }}"></script>
-        <script src="{{ asset('plugins/cluster/js/render-result-table_v2.min.js') }}"></script>
+        <script src="{{ asset('plugins/cluster/js/common_v2.min.js') }}?v={{ @filemtime(public_path('plugins/cluster/js/common_v2.min.js')) ?: time() }}"></script>
+        <script src="{{ asset('plugins/cluster/js/render-result-table_v2.min.js') }}?v={{ @filemtime(public_path('plugins/cluster/js/render-result-table_v2.min.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/cluster/js/render-result-fast-table.min.js') }}"></script>
         <script src="{{ asset('plugins/cluster/js/render-hidden-fast.min.js') }}"></script>
         <script src="{{ asset('plugins/common/js/common.js') }}"></script>
+        <script src="{{ asset('js/cabinet-cluster-phrase-links-tip.js') }}?v={{ @filemtime(public_path('js/cabinet-cluster-phrase-links-tip.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-cluster-result-polish.js') }}?v={{ @filemtime(public_path('js/cabinet-cluster-result-polish.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-cluster-result-v2.js') }}?v={{ @filemtime(public_path('js/cabinet-cluster-result-v2.js')) ?: time() }}"></script>
     @endslot
 @endcomponent

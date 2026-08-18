@@ -100,9 +100,9 @@
       $('#clv2-search-phrases').prop('checked', !!draft.searchPhrases);
       $('#clv2-search-target').prop('checked', !!draft.searchTarget);
       $('#clv2-search-relevance').prop('checked', !!draft.searchRelevance);
-      if (draft.save != null) $('#clv2-save').val(String(draft.save));
+      if (draft.save != null) $('#clv2-save').val(yesNoSelectVal(draft.save, true));
       if ($('#clv2-send-message').length && draft.sendMessage != null) {
-        $('#clv2-send-message').val(String(draft.sendMessage));
+        $('#clv2-send-message').val(yesNoSelectVal(draft.sendMessage, true));
       }
       if (draft.top) $('#clv2-top').val(draft.top);
       updateLimits();
@@ -328,6 +328,17 @@
     updateLimits();
   }
 
+  function truthyRequestFlag(value) {
+    return value === true || value === 'true' || value === 1 || value === '1';
+  }
+
+  function yesNoSelectVal(value, defaultYes) {
+    if (value === undefined || value === null || value === '') {
+      return defaultYes ? '1' : '0';
+    }
+    return truthyRequestFlag(value) ? '1' : '0';
+  }
+
   function applyDefaults(targetMode) {
     const data = targetMode === 'professional' ? cfg.defaults.pro : cfg.defaults.classic;
     if (!data) return;
@@ -337,7 +348,8 @@
     applyRegionForEngine(engine, data.region, data.region_text);
     $('#clv2-clustering-level').val(data.clustering_level);
     $('#clv2-top').val(String(data.count || 30));
-    $('#clv2-save').val(String(data.save_results));
+    // Product default: save + notify = yes (coerce bool true → '1', never String(true)).
+    $('#clv2-save').val(yesNoSelectVal(data.save_results, true));
     $('#clv2-search-base').prop('checked', !!data.search_base);
     $('#clv2-search-phrases').prop('checked', !!data.search_phrased);
     $('#clv2-search-target').prop('checked', !!data.search_target);
@@ -349,16 +361,12 @@
     $('#clv2-ignored-domains').val(data.ignored_domains || '');
     $('#clv2-ignored-words').val(data.ignored_words || '');
     if ($('#clv2-send-message').length) {
-      $('#clv2-send-message').val(data.send_message ? '1' : '0');
+      $('#clv2-send-message').val(yesNoSelectVal(data.send_message, true));
     }
 
     toggleBrutForce();
     syncTopVisibility();
     updateLimits();
-  }
-
-  function truthyRequestFlag(value) {
-    return value === true || value === 'true' || value === 1 || value === '1';
   }
 
   function applyFromSavedProject(request) {
@@ -384,7 +392,7 @@
       $('#clv2-top').val(String(request.count));
     }
     if (request.save !== undefined && request.save !== null) {
-      $('#clv2-save').val(String(request.save));
+      $('#clv2-save').val(yesNoSelectVal(request.save, true));
     }
 
     $('#clv2-search-base').prop('checked', truthyRequestFlag(request.searchBase));
@@ -448,9 +456,9 @@
     $('#clv2-search-phrases').prop('checked', !!preset.searchPhrases);
     $('#clv2-search-target').prop('checked', !!preset.searchTarget);
     $('#clv2-search-relevance').prop('checked', !!preset.searchRelevance);
-    $('#clv2-save').val(String(preset.save || '0'));
+    $('#clv2-save').val(yesNoSelectVal(preset.save, true));
     if ($('#clv2-send-message').length) {
-      $('#clv2-send-message').val(String(preset.sendMessage || '0'));
+      $('#clv2-send-message').val(yesNoSelectVal(preset.sendMessage, true));
     }
 
     applyDomainFieldNormalization();
@@ -643,6 +651,7 @@
     $('#result-table').hide();
     $('#clv2-results-meta').text('');
     $('#files-downloads').empty();
+    $('#clv2-edit-words-hint').addClass('d-none').empty();
     $.each($('.render-table'), function () {
       const id = $(this).attr('id');
       if (id && $.fn.dataTable && $(this).dataTable) {
@@ -652,6 +661,54 @@
       }
     });
     $('.render-table, .render').remove();
+  }
+
+  function showEditWordsHint(objectId) {
+    var $hint = $('#clv2-edit-words-hint');
+    if (!$hint.length) {
+      return;
+    }
+    var saved = $('#clv2-save').val() === '1';
+    var projectsUrl = (cfg.routes && cfg.routes.projects) || '/cluster-projects';
+    var editBase = (cfg.routes && cfg.routes.editCluster) || '/edit-clusters';
+    var text;
+    var links = '';
+
+    if (saved && objectId) {
+      text = cfg.i18n.editWordsHintSaved || '';
+      links =
+        '<a class="btn btn-sm btn-outline-primary" href="' +
+        editBase +
+        '/' +
+        encodeURIComponent(objectId) +
+        '">' +
+        (cfg.i18n.openManualEditor || 'Ручное редактирование') +
+        '</a>' +
+        '<a class="btn btn-sm btn-link px-1" href="' +
+        projectsUrl +
+        '">' +
+        (cfg.i18n.openProjects || 'Проекты') +
+        '</a>';
+    } else {
+      text = cfg.i18n.editWordsHintUnsaved || '';
+      links =
+        '<a class="btn btn-sm btn-outline-primary" href="' +
+        projectsUrl +
+        '">' +
+        (cfg.i18n.openProjects || 'Проекты') +
+        '</a>';
+    }
+
+    $hint
+      .html(
+        '<div class="d-flex flex-wrap align-items-center gap-2">' +
+          '<span class="cabinet-cluster-v2-edit-hint__text">' +
+          text +
+          '</span>' +
+          links +
+          '</div>'
+      )
+      .removeClass('d-none');
   }
 
   function initResultsTooltips() {
@@ -669,22 +726,17 @@
       return;
     }
 
-    $rows.each(function () {
-      $(this).find('> td:first-child').addClass('cabinet-cluster-v2-cluster-data');
-      $(this).find('> td:last-child').addClass('cabinet-cluster-v2-cluster-actions');
-    });
-
-    $('#clusters-table .fa-copy.copy-full-urls').attr({
-      'data-bs-toggle': 'tooltip',
-      'data-bs-placement': 'top',
-      title: cfg.i18n.copyUrls,
-    });
-
-    $('#clusters-table .fa-paperclip').attr({
-      'data-bs-toggle': 'tooltip',
-      'data-bs-placement': 'top',
-      title: cfg.i18n.viewLinks,
-    });
+    var polish = window.cabinetClusterResultPolish;
+    if (polish) {
+      polish.polishClusterBlocks();
+      polish.rebindCopyHandlers();
+      polish.applyPhraseActionTips(cfg.i18n || {});
+    } else {
+      $rows.each(function () {
+        $(this).find('> td:first-child').addClass('cabinet-cluster-v2-cluster-data');
+        $(this).find('> td:last-child').addClass('cabinet-cluster-v2-cluster-actions');
+      });
+    }
 
     var phraseCount = $('#rendered-clusters').text();
     var clusterCount = $rows.length;
@@ -712,8 +764,6 @@
         '</div>'
       );
     }
-
-    initResultsTooltips();
   }
 
   var enhanceClusterV2Timer = null;
@@ -767,9 +817,11 @@
     }
 
     $('#files-downloads').html(
-      '<a class="btn btn-outline-secondary btn-sm me-1" href="/download-cluster-result/' + response.objectId + '/csv" target="_blank">CSV</a>' +
-      '<a class="btn btn-outline-secondary btn-sm" href="/download-cluster-result/' + response.objectId + '/xls" target="_blank">XLS</a>'
+      '<a class="btn btn-outline-secondary btn-sm me-1" href="/download-cluster-result/' + response.objectId + '/csv" download>CSV</a>' +
+      '<a class="btn btn-outline-secondary btn-sm" href="/download-cluster-result/' + response.objectId + '/xls" download>XLS</a>'
     );
+
+    showEditWordsHint(response.objectId);
 
     if (typeof saveAllUrls === 'function') {
       saveAllUrls(response.objectId);

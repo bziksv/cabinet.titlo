@@ -69,8 +69,161 @@ $('#save').on('change', function () {
     }
 })
 
+var __clusterSitesCache = Object.create(null);
+var __clusterSitesInflight = Object.create(null);
+
+function clusterSitesCacheKey(id, phrase) {
+    return String(id) + '\0' + String(phrase);
+}
+
+function clusterSitesContentSpans(phrase) {
+    return $('span.ui_tooltip_content').filter(function () {
+        return $(this).attr('data-action') === phrase;
+    });
+}
+
+function clusterSitesHost(site) {
+    try {
+        return new URL(site).host;
+    } catch (e) {
+        return site;
+    }
+}
+
+function clusterSerpCaption() {
+    var cfg = window.cabinetClusterResultV2 || window.cabinetClusterV2 || {};
+    return (cfg.i18n && cfg.i18n.serpUrlsCaption) || 'Из поисковой выдачи по фразе';
+}
+
+function buildClusterSitesHtml(response) {
+    const caption =
+        '<div class="clv2-phrase-links-caption">' + clusterSerpCaption() + '</div>';
+    let sitesBlock = '';
+    if (response && 'mark' in response && response['mark'] !== 0) {
+        $.each(response['mark'], function (site, boolean) {
+            if (boolean) {
+                sitesBlock +=
+                    '<div class="text-muted">' +
+                    '   <a href="' + site + '" target="_blank" rel="noopener noreferrer">' + clusterSitesHost(site) + '</a> (игнорируемый)' +
+                    '</div>';
+            } else {
+                sitesBlock +=
+                    '<div>' +
+                    '   <a href="' + site + '" target="_blank" rel="noopener noreferrer">' + clusterSitesHost(site) + '</a>' +
+                    '</div>';
+            }
+        });
+    } else if (response && response['sites']) {
+        $.each(response['sites'], function (key, site) {
+            sitesBlock +=
+                '<div>' +
+                '   <a href="' + site + '" target="_blank" rel="noopener noreferrer">' + clusterSitesHost(site) + '</a>' +
+                '</div>';
+        });
+    }
+    if (!sitesBlock) {
+        sitesBlock = '<div class="text-muted">Нет ссылок в выдаче</div>';
+    }
+    return caption + sitesBlock;
+}
+
+function applyClusterSitesCopy(response) {
+    const urls = clusterSitesUrlsFromResponse(response);
+    if (!urls.length) {
+        if (typeof toastr !== 'undefined') {
+            toastr.warning('Нет ссылок для копирования');
+        } else if (typeof successCopiedMessage === 'function') {
+            // не показываем «скопировано»
+        }
+        return;
+    }
+    $('#hiddenForCopy').val(urls.join('\n'));
+    copyInBuffer(urls.join('\n'));
+}
+
+function clusterSitesUrlsFromResponse(response) {
+    const urls = [];
+    if (response && 'mark' in response && response['mark'] && response['mark'] !== 0 && typeof response['mark'] === 'object') {
+        $.each(response['mark'], function (site, boolean) {
+            if (!boolean && site) {
+                urls.push(site);
+            }
+        });
+        return urls;
+    }
+    const sites = (response && response['sites']) || [];
+    if (Array.isArray(sites)) {
+        return sites.filter(Boolean);
+    }
+    if (sites && typeof sites === 'object') {
+        $.each(sites, function (key, site) {
+            // sites как список значений или map url=>…
+            if (typeof site === 'string' && /^https?:\/\//i.test(site)) {
+                urls.push(site);
+            } else if (typeof key === 'string' && /^https?:\/\//i.test(key)) {
+                urls.push(key);
+            } else if (typeof site === 'string' && site) {
+                urls.push(site);
+            }
+        });
+    }
+    return urls;
+}
+
 function downloadSites(id, target, type) {
-    if (type === 'download' && $("span[data-action='" + target + "']").html() !== ' ') {
+    const cacheKey = clusterSitesCacheKey(id, target);
+
+    if (type === 'download') {
+        const $els = clusterSitesContentSpans(target);
+
+        if (cacheKey in __clusterSitesCache) {
+            $els.html(__clusterSitesCache[cacheKey].html);
+            $(document).trigger('clv2:phrase-links-ready', [target]);
+            return;
+        }
+
+        const alreadyLoading = $els.find('.clv2-phrase-links-loading').length > 0;
+        const alreadyFilled = $els.find('div').length > 0 && !alreadyLoading;
+        if (alreadyFilled) {
+            return;
+        }
+        if (!alreadyLoading) {
+            $els.html(
+                '<div class="clv2-phrase-links-caption">' +
+                    clusterSerpCaption() +
+                    '</div><div class="text-muted clv2-phrase-links-loading">Загрузка…</div>'
+            );
+            $(document).trigger('clv2:phrase-links-ready', [target]);
+        }
+        if (cacheKey in __clusterSitesInflight) {
+            return;
+        }
+
+        __clusterSitesInflight[cacheKey] = $.ajax({
+            type: "POST",
+            url: "/download-cluster-sites",
+            dataType: 'json',
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                phrase: target,
+                projectId: id,
+            },
+        }).done(function (response) {
+            const html = buildClusterSitesHtml(response);
+            __clusterSitesCache[cacheKey] = { html: html, response: response };
+            clusterSitesContentSpans(target).html(html);
+            $(document).trigger('clv2:phrase-links-ready', [target]);
+        }).fail(function () {
+            clusterSitesContentSpans(target).html('<div class="text-muted">Не удалось загрузить ссылки</div>');
+            $(document).trigger('clv2:phrase-links-ready', [target]);
+        }).always(function () {
+            delete __clusterSitesInflight[cacheKey];
+        });
+        return;
+    }
+
+    if (cacheKey in __clusterSitesCache) {
+        applyClusterSitesCopy(__clusterSitesCache[cacheKey].response);
         return;
     }
 
@@ -84,51 +237,13 @@ function downloadSites(id, target, type) {
             projectId: id,
         },
         success: function (response) {
-            if (type === 'download') {
-                let element = $("span[data-action='" + target + "']")
-                let sitesBlock = ''
-                if ('mark' in response && response['mark'] !== 0) {
-                    $.each(response['mark'], function (site, boolean) {
-                        if (boolean) {
-                            sitesBlock +=
-                                '<div class="text-muted">' +
-                                '   <a href="' + site + '" target="_blank">' + new URL(site)['host'] + '</a> (игнорируемый)' +
-                                '</div>'
-                        } else {
-                            sitesBlock +=
-                                '<div>' +
-                                '   <a href="' + site + '" target="_blank">' + new URL(site)['host'] + '</a>' +
-                                '</div>'
-                        }
-                    })
-                } else {
-                    $.each(response['sites'], function (key, site) {
-                        sitesBlock +=
-                            '<div>' +
-                            '   <a href="' + site + '" target="_blank">' + new URL(site)['host'] + '</a>' +
-                            '</div>'
-                    })
-                }
-
-                element.html('')
-                element.append(sitesBlock)
-            } else {
-                if ('mark' in response && response['mark'] !== 0) {
-                    let mark = [];
-                    $.each(response['mark'], function (site, boolean) {
-                        if (!boolean) {
-                            mark.push(site)
-                        }
-                    })
-
-                    $('#hiddenForCopy').val(mark.join("\r"))
-                } else {
-                    $('#hiddenForCopy').val(response['sites'].join("\r"))
-                }
-                copyInBuffer()
-            }
+            __clusterSitesCache[cacheKey] = {
+                html: buildClusterSitesHtml(response),
+                response: response,
+            };
+            applyClusterSitesCopy(response);
         },
-        error: function (response) {
+        error: function () {
         }
     });
 }

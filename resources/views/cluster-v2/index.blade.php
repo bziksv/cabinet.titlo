@@ -197,10 +197,10 @@
                                     <h3 class="cabinet-cluster-v2-option-block__title">{{ __('Saving') }}</h3>
                                     <div class="cabinet-cluster-v2-option-block__body">
                                         <label class="form-label" for="clv2-save">{{ __('Save results') }}</label>
-                                        {!! Form::select('save', ['1'=>__('Save'),'0'=>__('Do not save')], $config_classic->save_results, ['class'=>'form-select','id'=>'clv2-save']) !!}
+                                        {!! Form::select('save', ['1'=>__('Save'),'0'=>__('Do not save')], '1', ['class'=>'form-select','id'=>'clv2-save']) !!}
                                         <div class="mt-2" id="clv2-telegram-block">
                                             <label class="form-label" for="clv2-send-message">{{ __('Notify on cluster completion') }}</label>
-                                            {!! Form::select('sendMessage', ['0' => __('No'), '1' => __('Yes')], $config_classic->send_message ? '1' : '0', ['class' => 'form-select form-select-sm', 'id' => 'clv2-send-message']) !!}
+                                            {!! Form::select('sendMessage', ['1' => __('Yes'), '0' => __('No')], '1', ['class' => 'form-select form-select-sm', 'id' => 'clv2-send-message']) !!}
                                             <div class="form-text small">{{ __('Notify on cluster completion hint') }}</div>
                                             <div id="clv2-telegram-hint" class="alert alert-warning py-2 px-3 mt-2 mb-0 small{{ ($telegramConnected ?? false) ? ' d-none' : '' }}">
                                                 {{ __('Subscribe to notifications in Telegram first.') }}
@@ -256,7 +256,7 @@
 
         @include('cluster-v2.partials.admin-debug-log', ['admin' => $admin ?? false])
 
-        <section id="cabinet-cluster-v2-results" class="cabinet-cluster-v2-results-wrap mt-4 d-none" aria-live="polite">
+        <section id="cabinet-cluster-v2-results" class="cabinet-cluster-v2-results-wrap cabinet-cluster-result-v2 mt-4 d-none" aria-live="polite">
             <div class="card cabinet-cluster-v2-results-card shadow-sm">
                 <div class="card-header cabinet-cluster-v2-results-head d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
                     <div>
@@ -265,6 +265,7 @@
                     </div>
                     <div id="files-downloads" class="cabinet-cluster-v2-results-downloads d-flex flex-wrap gap-1"></div>
                 </div>
+                <div id="clv2-edit-words-hint" class="cabinet-cluster-v2-edit-hint px-3 py-2 border-bottom d-none" role="status"></div>
                 <div class="card-body p-0">
                     <div id="result-table" class="cabinet-cluster-v2-results-scroll table-responsive" style="display:none;">
                         <table id="clusters-table" class="table table-sm mb-0 cabinet-cluster-v2-clusters-table">
@@ -298,6 +299,8 @@
                     profile: @json(route('profile.index')),
                     regions: @json(route('cluster.regions')),
                     getClusterRequest: @json(route('get.cluster.request')),
+                    projects: @json(route('cluster.projects')),
+                    editCluster: @json(url('/edit-clusters')),
                 },
                 defaultRegion: @json($clusterV2DefaultRegion),
                 defaultRegions: @json($clusterV2DefaultRegions ?? ['yandex' => null, 'google' => null]),
@@ -328,6 +331,10 @@
                     waitingQueue: @json('Ожидание воркера'),
                     rendering: @json(__('Render data')),
                     historyHint: @json(__('The analysis has been successfully launched, the results will be automatically added to the table')),
+                    editWordsHintSaved: @json(__('Cluster edit words hint saved')),
+                    editWordsHintUnsaved: @json(__('Cluster edit words hint unsaved')),
+                    openManualEditor: @json(__('Cluster open manual editor')),
+                    openProjects: @json(__('Cluster open projects')),
                     longProcessHint: @json(__('Cluster analysis long process hint')),
                     resumedHint: @json(__('Cluster analysis resumed after reload')),
                     notifyChannelsHint: @json(__('Cluster analysis notify channels hint')),
@@ -337,8 +344,11 @@
                     regionSearchMin: @json(__('Enter at least 1 character to search')),
                     regionNotFound: @json(__('No regions found')),
                     regionSearching: @json(__('Searching…')),
-                    copyUrls: @json('Копировать URL'),
-                    viewLinks: @json(__('View links phrases')),
+                    copyUrls: @json(__('Cluster copy SERP urls tip')),
+                    copyUrlsTip: @json(__('Cluster copy SERP urls tip')),
+                    viewLinks: @json(__('Cluster view SERP urls tip')),
+                    viewLinksTip: @json(__('Cluster view SERP urls tip')),
+                    serpUrlsCaption: @json(__('Cluster SERP urls caption')),
                     resultsMeta: @json('Кластеров: :clusters · Фраз: :phrases'),
                     freqZeroHint: @json('Частотность 0: проверьте локальный queue worker (scripts/dev-cluster-queue.sh) и сбор частотности. Перезапустите анализ после правки.'),
                     presetApplied: @json('Пресет Демо применён'),
@@ -348,10 +358,12 @@
         </script>
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}"></script>
-        <script src="{{ asset('plugins/cluster/js/common_v2.min.js') }}"></script>
-        <script src="{{ asset('plugins/cluster/js/render-result-table_v2.min.js') }}"></script>
+        <script src="{{ asset('plugins/cluster/js/common_v2.min.js') }}?v={{ @filemtime(public_path('plugins/cluster/js/common_v2.min.js')) ?: time() }}"></script>
+        <script src="{{ asset('plugins/cluster/js/render-result-table_v2.min.js') }}?v={{ @filemtime(public_path('plugins/cluster/js/render-result-table_v2.min.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
+        <script src="{{ asset('js/cabinet-cluster-phrase-links-tip.js') }}?v={{ @filemtime(public_path('js/cabinet-cluster-phrase-links-tip.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-cluster-result-polish.js') }}?v={{ @filemtime(public_path('js/cabinet-cluster-result-polish.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-cluster-v2.js') }}?v={{ @filemtime(public_path('js/cabinet-cluster-v2.js')) ?: time() }}"></script>
     @endslot
 @endcomponent

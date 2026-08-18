@@ -6590,5 +6590,13 @@
     "XLS": "XLS",
     "Go to Clustering": "К кластеризации",
     "No saved projects yet. Run an analysis on the Clustering tab and choose Save results.": "Пока нет сохранённых проектов. Запустите анализ на вкладке «Кластеризация» и сохраните результат.",
-    "Cluster analysis resumed after reload": "Анализ ещё идёт — продолжаем следить за прогрессом."
+    "Cluster analysis resumed after reload": "Анализ ещё идёт — продолжаем следить за прогрессом.",
+    "No UTM metrics for this user": "У этого пользователя нет сохранённых UTM-меток",
+    "Cluster copy SERP urls tip": "Скопировать URL из поисковой выдачи по этой фразе (ТОП). Это не поле «Релевантные url».",
+    "Cluster view SERP urls tip": "Показать URL из поисковой выдачи по этой фразе",
+    "Cluster SERP urls caption": "Из поисковой выдачи по фразе",
+    "Cluster edit words hint saved": "Управление словами и распределение по кластерам доступны в ручном редактировании сохранённого проекта.",
+    "Cluster edit words hint unsaved": "Управление словами и распределение по кластерам доступны после сохранения результата — откройте проект в списке проектов.",
+    "Cluster open manual editor": "Открыть ручное редактирование",
+    "Cluster open projects": "Перейти к проектам"
 }

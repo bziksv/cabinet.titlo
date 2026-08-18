@@ -305,10 +305,56 @@ class UsersController extends Controller
             'telegram_connected' => $user->isTelegramConnected(),
             'telegram_chat_id' => $user->isTelegramConnected() ? (string) $user->chat_id : null,
             'telegram_sort' => $user->isTelegramConnected() ? 1 : 0,
-            'metrics' => $user->metrics,
+            'metrics' => $this->normalizeUserMetricsForList($user->metrics),
             'storage' => $footprint,
             'storage_sort' => $footprint !== null ? (int) ($footprint['rows'] ?? 0) : null,
         ];
+    }
+
+    /**
+     * UTM из users.metrics для списка: пустой "[]"/{} → null, иначе ассоциативный массив меток.
+     *
+     * @param mixed $metrics
+     * @return array<string, string>|null
+     */
+    protected function normalizeUserMetricsForList($metrics): ?array
+    {
+        if ($metrics === null || $metrics === '') {
+            return null;
+        }
+
+        if (is_string($metrics)) {
+            $trim = trim($metrics);
+            if ($trim === '' || $trim === '[]' || $trim === '{}' || $trim === 'null') {
+                return null;
+            }
+            $decoded = json_decode($metrics, true);
+            if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                return null;
+            }
+            $metrics = $decoded;
+        }
+
+        if (!is_array($metrics) || $metrics === []) {
+            return null;
+        }
+
+        // Список (в т.ч. пустой JSON-массив), а не объект меток.
+        if (array_values($metrics) === $metrics) {
+            return null;
+        }
+
+        $out = [];
+        foreach ($metrics as $key => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+            if (is_scalar($value)) {
+                $out[(string) $key] = (string) $value;
+            }
+        }
+
+        return $out === [] ? null : $out;
     }
 
     /**
