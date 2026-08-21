@@ -2,37 +2,39 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\RedirectResponse;
 
-use App\PolicyTermsDocs;
-
+/**
+ * Юр. документы живут на titlo.ru — кабинетные URL только редиректят.
+ */
 class AccessController extends Controller
 {
-
-    public function getRuPersonalData()
+    public function getRuPersonalData(): RedirectResponse
     {
-        $doc = PolicyTermsDocs::first();
-
-        return view('users.docs.personal-data', ['doc' => $doc->policy_ru]);
+        return $this->awayMarketing('/legal/doc/personal-data-consent/');
     }
 
-    public function getEnPersonalData()
+    public function getEnPersonalData(): RedirectResponse
     {
-        $doc = PolicyTermsDocs::first();
-
-        return view('users.docs.personal-data', ['doc' => $doc->policy_en]);
+        return $this->awayMarketing('/legal/doc/personal-data-consent/');
     }
 
-    public function getRuPrivacyPolicy()
+    public function getRuPrivacyPolicy(): RedirectResponse
     {
-        $doc = PolicyTermsDocs::first();
-
-        return view('users.docs.privacy-policy', ['doc' => $doc->terms_ru]);
+        return $this->awayMarketing('/legal/doc/privacy-policy/');
     }
 
-    public function getEnPrivacyPolicy()
+    public function getEnPrivacyPolicy(): RedirectResponse
     {
-        $doc = PolicyTermsDocs::first();
+        return $this->awayMarketing('/legal/doc/privacy-policy/');
+    }
 
-        return view('users.docs.privacy-policy', ['doc' => $doc->terms_en]);
+    private function awayMarketing(string $path): RedirectResponse
+    {
+        $base = app()->environment('local')
+            ? 'http://localhost:3001'
+            : 'https://titlo.ru';
+
+        return redirect()->away(rtrim($base, '/') . $path);
     }
 }

@@ -101,14 +101,22 @@
                     </ul>
                     <div class="row">
                         <div class="col-12">
+                            @php
+                                $marketingBase = app()->environment('local')
+                                    ? 'http://localhost:3001'
+                                    : 'https://titlo.ru';
+                                $consentUrl = rtrim($marketingBase, '/') . '/legal/doc/personal-data-consent/';
+                                $privacyUrl = rtrim($marketingBase, '/') . '/legal/doc/privacy-policy/';
+                            @endphp
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="agreeTerms" name="terms" value="agree" required>
-                                <label class="form-check-label" for="agreeTerms">
-                                    <span>{{ __('I give my consent to the processing') }}</span>
-                                    <a href="/personal-data/ru" target="_blank">{{ __('personal data') }}</a>
-
-                                    <span>{{ __('and agree to the terms') }}</span>
-                                    <a href="/privacy-policy/ru" target="_blank">{{ __('privacy policy') }}</a>
+                                <label class="form-check-label" for="agreeTerms" id="register-consent-label"
+                                       data-consent-url="{{ $consentUrl }}"
+                                       data-privacy-url="{{ $privacyUrl }}">
+                                    <span data-i18n="consent-prefix">{{ __('Register consent prefix') }}</span>
+                                    <a href="{{ $consentUrl }}" target="_blank" rel="noopener" data-i18n="consent-link">{{ __('Register consent link') }}</a>
+                                    <span data-i18n="consent-mid">{{ __('Register consent mid') }}</span>
+                                    <a href="{{ $privacyUrl }}" target="_blank" rel="noopener" data-i18n="privacy-link">{{ __('Register privacy link') }}</a>
                                 </label>
                             </div>
                         </div>
@@ -146,12 +154,8 @@
     <script>
         if (navigator.language === 'en') {
             $('#select-language').val('en')
-            $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(2)').attr('href', '/personal-data/en')
-            $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(4)').attr('href', '/privacy-policy/en')
         } else {
             $('#select-language').val('ru')
-            $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(4)').attr('href', '/privacy-policy/ru')
-            $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(2)').attr('href', '/personal-data/ru')
         }
 
         @if(config('app.env') !== 'local')
@@ -180,12 +184,10 @@
                     $('#last_name').attr('placeholder', 'Last name')
                     $('#password').attr('placeholder', 'Password')
                     $('#password-confirm').attr('placeholder', 'Confirm password')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > span:nth-child(1)').html('I give my consent to the processing')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(2)').html('personal data')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(2)').attr('href', '/personal-data/en')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > span:nth-child(3)').html('and agree to the terms')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(4)').html('privacy policy')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(4)').attr('href', '/privacy-policy/en')
+                    $('#register-consent-label [data-i18n="consent-prefix"]').text('I give my')
+                    $('#register-consent-label [data-i18n="consent-link"]').text('consent')
+                    $('#register-consent-label [data-i18n="consent-mid"]').text('to the processing and agree to the')
+                    $('#register-consent-label [data-i18n="privacy-link"]').text('personal data policy')
                     $('body > div > div > div.card-body > form > div.row > div.col-12.mt-2 > button').html('<i class="fas fa-user-plus"></i> Registration')
                     $('body > div > div > div.card-body > div > a.btn.btn-block.btn-primary').html('<i class="fas fa-key mr-2"></i> Forgot your password?')
                     $('body > div > div > div.card-body > div > a.btn.btn-block.btn-danger').html('<i class="fas fa-user mr-2"></i> Login membership')
@@ -198,12 +200,10 @@
                     $('#last_name').attr('placeholder', 'Фамилия')
                     $('#password').attr('placeholder', 'Пароль')
                     $('#password-confirm').attr('placeholder', 'Подтвердить пароль')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > span:nth-child(1)').html('Я даю свое согласие на обработку')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(2)').html('персональных данных')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(2)').attr('href', '/personal-data/ru')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > span:nth-child(3)').html('и соглашаюсь с условиями')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(4)').html('политики конфиденциальности')
-                    $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(4)').attr('href', '/privacy-policy/ru')
+                    $('#register-consent-label [data-i18n="consent-prefix"]').text('Я даю свое')
+                    $('#register-consent-label [data-i18n="consent-link"]').text('согласие')
+                    $('#register-consent-label [data-i18n="consent-mid"]').text('на обработку и соглашаюсь с')
+                    $('#register-consent-label [data-i18n="privacy-link"]').text('политикой персональных данных')
                     $('body > div > div > div.card-body > form > div.row > div.col-12.mt-2 > button').html('<i class="fas fa-user-plus"></i> Регистрация')
                     $('body > div > div > div.card-body > div > a.btn.btn-block.btn-primary').html('<i class="fas fa-key mr-2"></i> Забыли пароль?')
                     $('body > div > div > div.card-body > div > a.btn.btn-block.btn-danger').html('<i class="fas fa-user mr-2"></i> Уже зарегистрирован')
