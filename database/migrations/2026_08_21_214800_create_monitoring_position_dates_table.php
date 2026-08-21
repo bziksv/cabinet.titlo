@@ -13,13 +13,17 @@ class CreateMonitoringPositionDatesTable extends Migration
 {
     public function up()
     {
-        if (!Schema::hasTable('monitoring_position_dates')) {
-            Schema::create('monitoring_position_dates', function (Blueprint $table) {
-                $table->unsignedBigInteger('monitoring_searchengine_id');
-                $table->date('check_date');
-                $table->primary(['monitoring_searchengine_id', 'check_date']);
-            });
-        }
+        // Короткое имя PK: автоген > 64 символов → MySQL 1059 (ломало prod migrate).
+        // dropIfExists: после failed migrate таблица могла остаться без PK.
+        Schema::dropIfExists('monitoring_position_dates');
+        Schema::create('monitoring_position_dates', function (Blueprint $table) {
+            $table->unsignedBigInteger('monitoring_searchengine_id');
+            $table->date('check_date');
+            $table->primary(
+                ['monitoring_searchengine_id', 'check_date'],
+                'mon_pos_dates_pk'
+            );
+        });
 
         $dbName = Schema::getConnection()->getDatabaseName();
         $hasEngineCreated = (int) DB::table('information_schema.statistics')
