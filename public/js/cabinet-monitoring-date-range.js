@@ -56,6 +56,9 @@
             });
 
             container.append($wrap.append($ul));
+        } else if (initialMode) {
+            container.children('.mode').find('input[name="mode"]').prop('checked', false);
+            container.children('.mode').find('input[value="' + initialMode + '"]').prop('checked', true);
         }
 
         // [calendars | mode | presets | buttons]
@@ -66,6 +69,20 @@
             container.children('.ranges'),
             container.children('.drp-buttons')
         );
+    }
+
+    function layoutPickerColumns(picker) {
+        if (!picker || !picker.container) {
+            return;
+        }
+        appendModeRadios(
+            picker.container,
+            picker.__monDrI18n || {},
+            picker.__monDrMode || 'range'
+        );
+        if (typeof picker.move === 'function') {
+            picker.move();
+        }
     }
 
     function collectVisibleDates(picker) {
@@ -140,6 +157,7 @@
 
         $range.daterangepicker({
             opens: options.opens || 'left',
+            parentEl: options.parentEl || 'body',
             startDate: options.startDate || moment().subtract(30, 'days'),
             endDate: options.endDate || moment(),
             ranges: buildRanges(i18n),
@@ -149,13 +167,28 @@
             autoUpdateInput: options.autoUpdateInput !== false,
         });
 
+        var pickerInst = $range.data('daterangepicker');
+        if (pickerInst) {
+            pickerInst.__monDrI18n = i18n;
+            pickerInst.__monDrMode = initialMode;
+        }
+
         if (options.includeModeRadios !== false) {
             $range.on('show.daterangepicker', function (ev, picker) {
-                appendModeRadios(picker.container, i18n, $range.data('mon-date-mode'));
+                picker.__monDrI18n = i18n;
+                picker.__monDrMode = $range.data('mon-date-mode') || 'range';
+                layoutPickerColumns(picker);
             });
         }
 
         $range.on('apply.daterangepicker', function (ev, picker) {
+            // autoUpdateInput: false — daterangepicker сам value не пишет.
+            if (options.autoUpdateInput === false) {
+                var fmt = 'DD-MM-YYYY';
+                $range.val(
+                    picker.startDate.format(fmt) + ' - ' + picker.endDate.format(fmt)
+                );
+            }
             if (options.includeModeRadios !== false) {
                 var mode = picker.container.find('input[name="mode"]:checked').val() || 'range';
                 $range.data('mon-date-mode', mode);

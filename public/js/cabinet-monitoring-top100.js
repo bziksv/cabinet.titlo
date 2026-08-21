@@ -52,7 +52,8 @@
         $('#top100-empty-state').toggleClass('d-none', mode !== 'empty');
         $('#top100-no-data').toggleClass('d-none', mode !== 'no-data');
         $('#progress').toggleClass('d-none', mode !== 'loading');
-        $('#top100-result-wrap').toggleClass('d-none', mode !== 'result');
+        // Во время loading показываем колонки по мере появления чанков.
+        $('#top100-result-wrap').toggleClass('d-none', mode !== 'result' && mode !== 'loading');
         $('#top100-results-head').toggleClass('d-none', mode !== 'result');
     }
 
@@ -233,25 +234,28 @@
             '</div>';
     }
 
-    function sendAjaxRequest(word, date, regionLr) {
-        var currentDate = moment(date, 'DD-MM-YYYY').format('YYYY-MM-DD');
-
+    function sendBatchAjaxRequest(word, isoDates, regionLr) {
         return new Promise(function (resolve) {
             $.ajax({
                 url: cfg.routes.getTopSites,
                 type: 'POST',
+                timeout: 120000,
                 data: {
                     _token: cfg.csrf,
                     word: word,
-                    date: currentDate,
                     region: regionLr,
+                    dates: isoDates,
                 },
                 success: function (response) {
-                    resolve(Array.isArray(response) ? response : []);
+                    if (response && typeof response === 'object' && !Array.isArray(response)) {
+                        resolve(response);
+                        return;
+                    }
+                    resolve({});
                 },
                 error: function (error) {
-                    console.error('top100 request error:', error);
-                    resolve([]);
+                    console.error('top100 batch request error:', error);
+                    resolve({});
                 },
             });
         });
@@ -262,18 +266,29 @@
         var $columns = $board.find('.cabinet-mon-top100-columns');
         $('#top100-result-wrap').append($board);
 
-        var hasData = false;
-        var date;
+        var isoDates = dates.map(function (d) {
+            return moment(d, 'DD-MM-YYYY').format('YYYY-MM-DD');
+        });
 
-        for (date of dates) {
-            var response = await sendAjaxRequest(word, date, region.lr);
-            if (response.length > 0) {
-                $columns.append(generateKanbanCard(response, date));
-                hasData = true;
-            } else {
-                $columns.append(generateEmptyColumn(date));
-            }
-            analysedProgress++;
+        // Недельными чанками: прогресс и колонки появляются по ходу, не 30 одиночных запросов.
+        var CHUNK = 7;
+        var hasData = false;
+        var offset;
+        for (offset = 0; offset < isoDates.length; offset += CHUNK) {
+            var sliceIso = isoDates.slice(offset, offset + CHUNK);
+            var sliceDates = dates.slice(offset, offset + CHUNK);
+            var part = await sendBatchAjaxRequest(word, sliceIso, region.lr);
+
+            sliceDates.forEach(function (date, i) {
+                var response = part[sliceIso[i]] || [];
+                if (response.length > 0) {
+                    $columns.append(generateKanbanCard(response, date));
+                    hasData = true;
+                }
+                // Дней без снимка в топе не рисуем — пустая колонка только шумит.
+            });
+
+            analysedProgress += sliceIso.length;
             $('#analysed-days').text(analysedProgress);
         }
 
