@@ -25,6 +25,7 @@ use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class MonitoringKeywordsController extends Controller
 {
@@ -32,6 +33,9 @@ class MonitoringKeywordsController extends Controller
 
     /** Короткий формат даты в заголовках колонок таблицы позиций (влезает в ~88px). */
     private const MONITORING_TABLE_DATE_FORMAT = 'd.m.y';
+
+    /** Сколько дней позиций грузить в одном чанке (поэтапная заливка ячеек). */
+    private const TABLE_POSITION_CHUNK_DAYS = 14;
 
     protected $user;
     protected $project;
@@ -42,6 +46,10 @@ class MonitoringKeywordsController extends Controller
     protected $mode = "range";
     protected $total = 0;
     protected $offset = [];
+    /** @var bool */
+    protected $lazyPositions = false;
+    /** @var list<array{from: string, to: string}>|null */
+    protected $positionChunks = null;
 
     public function __construct()
     {
@@ -137,15 +145,63 @@ class MonitoringKeywordsController extends Controller
             'dates_range',
             'mode_range',
             'search',
-            'columns',
-            'order',
             'offset',
         ]);
+        // Сортировка: DT шлёт индекс колонки, early prefetch — пусто. Нормализуем к имени.
+        $payload['order_norm'] = $this->normalizeOrderForCache(
+            $request->input('order'),
+            $request->input('columns', [])
+        );
+        // Только фильтры колонок (group/url/…), не весь DT-meta: иначе early prefetch
+        // (columns:[]) и ajax DataTables никогда не шарят кэш → 2–3 холодных /table.
+        $filters = [];
+        foreach ((array) $request->input('columns', []) as $col) {
+            if (!is_array($col) || empty($col['data'])) {
+                continue;
+            }
+            $searchVal = '';
+            if (isset($col['search']) && is_array($col['search'])) {
+                $searchVal = trim((string) ($col['search']['value'] ?? ''));
+            }
+            if ($searchVal !== '') {
+                $filters[(string) $col['data']] = $searchVal;
+            }
+        }
+        ksort($filters);
+        $payload['col_filters'] = $filters;
+        $payload['lazy'] = $request->boolean('lazy_positions', true) ? 1 : 0;
         // Видимость URL влияет на setUrls — иначе после включения колонки отдаётся кэш без urls.
         $payload['url_col'] = $this->isUrlColumnVisibleForProject($projectId) ? 1 : 0;
         $payload['ver'] = MonitoringTableResponseCache::version($projectId);
 
-        return 'monitoring.table.v2.' . $projectId . '.' . Auth::id() . '.' . md5(json_encode($payload));
+        return 'monitoring.table.v4.' . $projectId . '.' . Auth::id() . '.' . md5(json_encode($payload));
+    }
+
+    /**
+     * @param mixed $order
+     * @param mixed $columns
+     */
+    private function normalizeOrderForCache($order, $columns): string
+    {
+        $column = 'query';
+        $direction = 'asc';
+
+        if (is_array($order)) {
+            $order = collect($order)->collapse();
+            $colIdx = $order->get('column');
+            $dir = strtolower((string) $order->get('dir', 'asc'));
+            if ($dir === 'desc') {
+                $direction = 'desc';
+            }
+            if ($colIdx !== null && is_array($columns) && isset($columns[$colIdx]['data'])) {
+                $column = (string) $columns[$colIdx]['data'];
+                if ($column === 'group') {
+                    $column = 'group';
+                }
+            }
+        }
+
+        return $column . ':' . $direction;
     }
 
     private function isUrlColumnVisible(): bool
@@ -204,8 +260,19 @@ class MonitoringKeywordsController extends Controller
             $dates = explode(' - ', $datesRange, 2);
         }
 
+        $this->lazyPositions = $this->shouldLazyLoadPositions($dates, $collection);
+        $this->positionChunks = null;
+
         $this->loadKeywordPricesForTable();
-        $this->loadPositions($dates);
+
+        if ($this->lazyPositions) {
+            $this->queries->each(function ($keyword) {
+                $keyword->setRelation('positions', collect());
+            });
+            $this->positionChunks = $this->buildPositionChunks($dates);
+        } else {
+            $this->loadPositions($dates);
+        }
 
         if (!$this->isMainView()) {
             $this->setOccurrence();
@@ -214,13 +281,21 @@ class MonitoringKeywordsController extends Controller
         if ($this->regions && $this->regions->isNotEmpty()) {
             if ($this->isMainView()) {
                 if ($this->isUrlColumnVisible()) {
-                    $this->setUrls($dates);
+                    if ($this->lazyPositions) {
+                        $this->loadUrlsFromDb($dates);
+                    } else {
+                        $this->setUrls($dates);
+                    }
                 }
                 $this->mainView();
                 $this->columns->forget(['dynamics', 'base', 'phrasal', 'exact']);
             } else {
                 if ($this->isUrlColumnVisible()) {
-                    $this->setUrls($dates);
+                    if ($this->lazyPositions) {
+                        $this->loadUrlsFromDb($dates);
+                    } else {
+                        $this->setUrls($dates);
+                    }
                 }
                 $this->getLatestPositions($dates)->updateDynamics();
             }
@@ -294,7 +369,166 @@ class MonitoringKeywordsController extends Controller
             'draw' => $draw,
             'recordsFiltered' => $this->total,
             'recordsTotal' => $this->total,
+            'lazy_positions' => $this->lazyPositions,
+            'position_chunks' => $this->positionChunks,
+            'keyword_ids' => $this->queries->pluck('id')->values()->all(),
         ]);
+    }
+
+    /**
+     * Поэтапная заливка ячеек позиций (чанки по датам) — без полного loadPositions.
+     */
+    public function showDataTablePositions(Request $request, $id)
+    {
+        @set_time_limit(60);
+        @ini_set('memory_limit', '512M');
+
+        apply_team_permissions($id);
+        $this->setProjectID($id);
+        $this->init();
+
+        $regionId = (int) $request->input('region_id', 0);
+        if ($regionId > 0) {
+            $this->regions = $this->regions->where('id', $regionId);
+        }
+
+        $keywordIds = array_values(array_filter(array_map('intval', (array) $request->input('keyword_ids', []))));
+        if ($keywordIds === [] || $this->regions->isEmpty()) {
+            return ['cells' => new \stdClass()];
+        }
+
+        $this->setMode($request->input('mode_range', 'range'));
+        $datesRange = (string) $request->input('dates_range', '');
+        $fullDates = null;
+        if (strlen($datesRange) > 1) {
+            $fullDates = explode(' - ', $datesRange, 2);
+        }
+
+        $chunkFrom = (string) $request->input('from', '');
+        $chunkTo = (string) $request->input('to', '');
+        if ($chunkFrom === '' || $chunkTo === '') {
+            return ['cells' => new \stdClass()];
+        }
+
+        $this->queries = MonitoringKeyword::query()
+            ->where('monitoring_project_id', (int) $id)
+            ->whereIn('id', $keywordIds)
+            ->get();
+
+        $this->loadPositions([$chunkFrom, $chunkTo]);
+
+        $columnCollection = $this->collectProjectDateColumns($fullDates);
+        $labelToCol = [];
+        foreach ($columnCollection as $colKey => $label) {
+            $labelToCol[$label] = $colKey;
+        }
+
+        // Колонки дат, которые этот чанк «закрыл» — чтобы фронт сбросил «…» в «-».
+        $coveredCols = [];
+        try {
+            $chunkStart = Carbon::parse($chunkFrom)->startOfDay();
+            $chunkEnd = Carbon::parse($chunkTo)->endOfDay();
+            foreach ($columnCollection as $colKey => $label) {
+                $day = Carbon::createFromFormat(self::MONITORING_TABLE_DATE_FORMAT, $label)->startOfDay();
+                if ($day->gte($chunkStart) && $day->lte($chunkEnd)) {
+                    $coveredCols[] = $colKey;
+                }
+            }
+        } catch (\Throwable $e) {
+            $coveredCols = [];
+        }
+
+        $cells = [];
+        foreach ($this->queries as $keyword) {
+            $byCol = [];
+            $positions = $keyword->positions ?? collect();
+            $byDate = $positions->groupBy(function ($item) {
+                return $item->created_at->format(self::MONITORING_TABLE_DATE_FORMAT);
+            })->map(function ($items) {
+                return $items->sortByDesc(function ($i) {
+                    return $i->created_at->timestamp;
+                })->first();
+            });
+
+            foreach ($byDate as $label => $model) {
+                $colKey = $labelToCol[$label] ?? null;
+                if ($colKey === null) {
+                    continue;
+                }
+                $byCol[$colKey] = $this->positionCellPayload($model, false);
+            }
+
+            if ($byCol !== []) {
+                $cells[(string) $keyword->id] = $byCol;
+            }
+        }
+
+        return [
+            'cells' => $cells === [] ? new \stdClass() : $cells,
+            'covered_cols' => $coveredCols,
+            'from' => $chunkFrom,
+            'to' => $chunkTo,
+        ];
+    }
+
+    /**
+     * @param list<string>|null $dates
+     */
+    private function shouldLazyLoadPositions(?array $dates, Collection $collection): bool
+    {
+        if ($collection->get('lazy_positions') === false || $collection->get('lazy_positions') === '0') {
+            return false;
+        }
+        if ($this->mode === 'datesFind') {
+            return false;
+        }
+        if ($dates === null || count($dates) < 2) {
+            return false;
+        }
+        try {
+            $span = Carbon::parse($dates[0])->diffInDays(Carbon::parse($dates[1])) + 1;
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        // Короткие диапазоны — одним запросом; длинные — чанками.
+        return $span > self::TABLE_POSITION_CHUNK_DAYS;
+    }
+
+    /**
+     * Чанки от новых дат к старым (сначала свежие ячейки).
+     *
+     * @param list<string>|null $dates
+     * @return list<array{from: string, to: string}>
+     */
+    private function buildPositionChunks(?array $dates): array
+    {
+        if ($dates === null || count($dates) < 2) {
+            return [];
+        }
+
+        try {
+            $start = Carbon::parse($dates[0])->startOfDay();
+            $end = Carbon::parse($dates[1])->endOfDay();
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $chunks = [];
+        $cursorEnd = $end->copy();
+        while ($cursorEnd->gte($start)) {
+            $cursorStart = $cursorEnd->copy()->subDays(self::TABLE_POSITION_CHUNK_DAYS - 1)->startOfDay();
+            if ($cursorStart->lt($start)) {
+                $cursorStart = $start->copy();
+            }
+            $chunks[] = [
+                'from' => $cursorStart->toDateString(),
+                'to' => $cursorEnd->toDateString(),
+            ];
+            $cursorEnd = $cursorStart->copy()->subDay()->endOfDay();
+        }
+
+        return $chunks;
     }
 
     private function _offsetPositions(&$positions, $offset)
@@ -322,6 +556,9 @@ class MonitoringKeywordsController extends Controller
     {
         $row = collect([]);
         $collectionPositions = $keyword->positions_view;
+        if (!$collectionPositions instanceof Collection) {
+            $collectionPositions = collect($collectionPositions ?: []);
+        }
 
         if (count($this->offset)) {
 
@@ -334,7 +571,7 @@ class MonitoringKeywordsController extends Controller
             }
         }
 
-        if ($this->mode == 'finance') {
+        if ($this->mode == 'finance' && !$this->lazyPositions) {
             $priceByKeyword = null;
             $engineID = $this->regions->pluck('id')->first();
             $priceRow = null;
@@ -432,6 +669,10 @@ class MonitoringKeywordsController extends Controller
                     $row->put('target', view('monitoring.partials.show.target', ['key' => $keyword])->render());
                     break;
                 case 'dynamics':
+                    if ($this->lazyPositions) {
+                        $row->put('dynamics', '…');
+                        break;
+                    }
                     $dynamics = 0;
                     if ($collectionPositions && $collectionPositions->count() > 1)
                         $dynamics = ($collectionPositions->last()->position - $collectionPositions->first()->position);
@@ -510,17 +751,18 @@ class MonitoringKeywordsController extends Controller
                     break;
                 default:
                     $mode = $this->mode;
+                    $emptyCell = $this->lazyPositions ? '…' : '-';
                     if ($mode === "dates" || $mode === "main") {
                         if (isset($collectionPositions[$i])) {
                             $row->put($i, $this->positionCellPayload($collectionPositions[$i], true));
                         } else {
-                            $row->put($i, '-');
+                            $row->put($i, $emptyCell);
                         }
                     } else {
                         if (isset($collectionPositions[$i])) {
                             $row->put($i, $this->positionCellPayload($collectionPositions[$i], false));
                         } else {
-                            $row->put($i, '-');
+                            $row->put($i, $emptyCell);
                         }
                     }
             }
@@ -874,6 +1116,67 @@ class MonitoringKeywordsController extends Controller
         return [$start, $end];
     }
 
+    /**
+     * Для /table на странице ключей (десятки–сотни id) нужен индекс
+     * (engine, keyword, created_at). FORCE INDEX (engine, created_at) на полугоде
+     * сканирует сотни тысяч строк региона и тормозит на десятки секунд.
+     */
+    private function positionsForceEngineCreatedIndex(array $regionIds): bool
+    {
+        if ($regionIds === []) {
+            return false;
+        }
+
+        static $hasIndex = null;
+        if ($hasIndex === null) {
+            try {
+                $hasIndex = DB::table('information_schema.statistics')
+                    ->where('table_schema', DB::getDatabaseName())
+                    ->where('table_name', 'monitoring_positions')
+                    ->where('index_name', 'mon_pos_engine_created_idx')
+                    ->exists();
+            } catch (\Throwable $e) {
+                $hasIndex = false;
+            }
+        }
+
+        return (bool) $hasIndex;
+    }
+
+    private function positionsHasEngineKwCreatedIndex(): bool
+    {
+        static $hasIndex = null;
+        if ($hasIndex === null) {
+            try {
+                $hasIndex = DB::table('information_schema.statistics')
+                    ->where('table_schema', DB::getDatabaseName())
+                    ->where('table_name', 'monitoring_positions')
+                    ->where('index_name', 'mon_pos_engine_kw_created_idx')
+                    ->exists();
+            } catch (\Throwable $e) {
+                $hasIndex = false;
+            }
+        }
+
+        return (bool) $hasIndex;
+    }
+
+    /**
+     * FROM-клауза для loadPositions: при списке keyword id — kw-индекс.
+     */
+    private function positionsMpFromClause(array $regionIds, int $keywordCount): string
+    {
+        if ($keywordCount > 0 && $keywordCount <= 2000 && $this->positionsHasEngineKwCreatedIndex()) {
+            return 'monitoring_positions as mp FORCE INDEX (mon_pos_engine_kw_created_idx)';
+        }
+
+        if ($this->positionsForceEngineCreatedIndex($regionIds)) {
+            return 'monitoring_positions as mp FORCE INDEX (mon_pos_engine_created_idx)';
+        }
+
+        return 'monitoring_positions as mp';
+    }
+
     private function setUrls(?array $dates = null)
     {
         $region = $this->regions->first();
@@ -921,6 +1224,55 @@ class MonitoringKeywordsController extends Controller
         });
     }
 
+    /**
+     * URL в выдаче при lazy-позициях: лёгкий GROUP BY (keyword, url), без дневных рядов.
+     */
+    private function loadUrlsFromDb(?array $dates = null): void
+    {
+        $region = $this->regions->first();
+        if (!$region) {
+            return;
+        }
+
+        $regionId = (int) $region['id'];
+        $keywordIds = $this->queries->pluck('id')->values()->all();
+        if ($keywordIds === []) {
+            return;
+        }
+
+        [$start, $end] = $this->positionsDateBounds($dates);
+        $fromMp = $this->positionsMpFromClause([$regionId], count($keywordIds));
+
+        $rows = DB::table(DB::raw($fromMp))
+            ->whereIn('mp.monitoring_keyword_id', $keywordIds)
+            ->where('mp.monitoring_searchengine_id', $regionId)
+            ->where('mp.created_at', '>=', $start)
+            ->where('mp.created_at', '<=', $end)
+            ->whereNotNull('mp.url')
+            ->where('mp.url', '!=', '')
+            ->selectRaw('mp.monitoring_keyword_id, mp.url, MAX(mp.created_at) as last_at')
+            ->groupBy('mp.monitoring_keyword_id', 'mp.url')
+            ->get()
+            ->groupBy('monitoring_keyword_id');
+
+        $this->queries->each(function ($keyword) use ($rows) {
+            $items = ($rows->get($keyword->id) ?? collect())
+                ->map(function ($row) {
+                    return (object) [
+                        'monitoring_keyword_id' => (int) $row->monitoring_keyword_id,
+                        'url' => (string) $row->url,
+                        'created_at' => Carbon::parse($row->last_at),
+                    ];
+                })
+                ->sortByDesc(function ($row) {
+                    return $row->created_at->getTimestamp();
+                })
+                ->values();
+
+            $keyword->urls = $items;
+        });
+    }
+
     private function loadPositions($dates)
     {
         if ($this->mode === 'datesFind') {
@@ -938,21 +1290,22 @@ class MonitoringKeywordsController extends Controller
 
         [$start, $end] = $this->positionsDateBounds($dates);
 
-        // JOIN к MAX(id) вместо WHERE id IN (subquery): на 100 ключах ~0.26с vs ~4.8с.
-        $latestIdsQuery = DB::table('monitoring_positions')
-            ->selectRaw('MAX(id) as id')
-            ->whereIn('monitoring_keyword_id', $keywordIds)
-            ->where('created_at', '>=', $start)
-            ->where('created_at', '<=', $end);
+        $fromMp = $this->positionsMpFromClause($regionIds, count($keywordIds));
+
+        $latestIdsQuery = DB::table(DB::raw($fromMp))
+            ->selectRaw('MAX(mp.id) as id')
+            ->whereIn('mp.monitoring_keyword_id', $keywordIds)
+            ->where('mp.created_at', '>=', $start)
+            ->where('mp.created_at', '<=', $end);
 
         if ($regionIds !== []) {
-            $latestIdsQuery->whereIn('monitoring_searchengine_id', $regionIds);
+            $latestIdsQuery->whereIn('mp.monitoring_searchengine_id', $regionIds);
         }
 
         $latestIdsQuery->groupBy(
-            'monitoring_keyword_id',
-            'monitoring_searchengine_id',
-            DB::raw('DATE(created_at)')
+            'mp.monitoring_keyword_id',
+            'mp.monitoring_searchengine_id',
+            DB::raw('DATE(mp.created_at)')
         );
 
         $rows = DB::table('monitoring_positions as p')
@@ -974,18 +1327,19 @@ class MonitoringKeywordsController extends Controller
 
         $this->queries->each(function ($keyword) use ($rows) {
             $items = ($rows->get($keyword->id) ?? collect())->map(function ($row) {
-                $model = new MonitoringPosition([
-                    'monitoring_searchengine_id' => $row->monitoring_searchengine_id,
+                $model = new MonitoringPosition();
+                $model->exists = true;
+                $model->setRawAttributes([
+                    'id' => (int) $row->id,
+                    'monitoring_keyword_id' => (int) $row->monitoring_keyword_id,
+                    'monitoring_searchengine_id' => (int) $row->monitoring_searchengine_id,
                     'position' => $row->position,
                     'url' => $row->url,
                     'target' => $row->target,
                     'created_at' => $row->created_at,
-                ]);
-                // monitoring_keyword_id не в $fillable — иначе Mastered/«Освоено» всегда 0.
-                $model->setAttribute('monitoring_keyword_id', (int) $row->monitoring_keyword_id);
-                $model->id = (int) $row->id;
-                $model->exists = true;
-                $model->created_at = Carbon::parse($row->created_at);
+                    'updated_at' => $row->created_at,
+                ], true);
+                $model->syncOriginal();
 
                 return $model;
             })->values();

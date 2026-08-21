@@ -44,6 +44,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\PermissionRegistrar;
 
 class MonitoringController extends Controller
@@ -656,24 +657,71 @@ class MonitoringController extends Controller
         /** @var User $user */
         $user = $this->user;
         $project = $user->monitoringProjects()->find($request->input('projectId'));
+        if (!$project) {
+            return [];
+        }
+
         $region = $project->searchengines();
 
-        if ($request->input('regionId'))
+        if ($request->input('regionId')) {
             $region->where('id', $request->input('regionId'));
+        }
 
         $region = $region->orderBy('id', 'asc')->first();
-        $keywordsId = $project->keywords->pluck('id');
+        if (!$region) {
+            return [];
+        }
 
-        $dates = collect($request->input('dates'))->pluck('date');
+        $keywordsId = $project->keywords->pluck('id')->map(static function ($id) {
+            return (int) $id;
+        })->all();
+        if ($keywordsId === []) {
+            return [];
+        }
 
-        $positions = MonitoringPosition::select(DB::raw('*, DATE(created_at) as dateOnly'))
-            ->where('monitoring_searchengine_id', $region->id)
-            ->whereIn('monitoring_keyword_id', $keywordsId)
-            ->whereIn(DB::raw('DATE(created_at)'), $dates)
-            ->groupBy(DB::raw('DATE(created_at)'))
+        $dates = collect($request->input('dates'))->pluck('date')->filter()->map(static function ($d) {
+            return Carbon::parse($d)->toDateString();
+        })->unique()->values();
+        if ($dates->isEmpty()) {
+            return [];
+        }
+
+        $start = Carbon::parse($dates->min())->startOfDay();
+        $end = Carbon::parse($dates->max())->endOfDay();
+        $wanted = array_flip($dates->all());
+
+        // Без DATE(created_at) IN (...): на большой таблице это минуты.
+        $fromMp = Schema::hasTable('monitoring_positions')
+            ? (DB::table('information_schema.statistics')
+                ->where('table_schema', DB::getDatabaseName())
+                ->where('table_name', 'monitoring_positions')
+                ->where('index_name', 'mon_pos_engine_created_idx')
+                ->exists()
+                ? 'monitoring_positions as mp FORCE INDEX (mon_pos_engine_created_idx)'
+                : 'monitoring_positions as mp')
+            : 'monitoring_positions as mp';
+
+        $rows = DB::table(DB::raw($fromMp))
+            ->where('mp.monitoring_searchengine_id', (int) $region->id)
+            ->whereIn('mp.monitoring_keyword_id', $keywordsId)
+            ->whereBetween('mp.created_at', [$start, $end])
+            ->selectRaw('DATE(mp.created_at) as dateOnly, MAX(mp.id) as id')
+            ->groupBy(DB::raw('DATE(mp.created_at)'))
             ->get();
 
-        return $positions;
+        $out = [];
+        foreach ($rows as $row) {
+            $day = Carbon::parse($row->dateOnly)->toDateString();
+            if (!isset($wanted[$day])) {
+                continue;
+            }
+            $out[] = [
+                'id' => (int) $row->id,
+                'dateOnly' => $day,
+            ];
+        }
+
+        return $out;
     }
 
     private function navigations(MonitoringProject $project): array

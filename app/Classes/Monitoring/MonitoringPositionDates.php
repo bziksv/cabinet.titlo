@@ -60,6 +60,15 @@ class MonitoringPositionDates
     {
         $span = self::coverageSpan($engineId);
 
+        // Cache miss после flush/рестарта: НЕ сканировать 13M positions —
+        // сначала восстановить span из уже заполненной monitoring_position_dates.
+        if ($span === null) {
+            $span = self::coverageSpanFromTable($engineId);
+            if ($span !== null) {
+                self::rememberCoverageSpan($engineId, $span['min'], $span['max']);
+            }
+        }
+
         if ($span === null) {
             self::discoverEngineRangeLocked($engineId, $startDate, $endDate);
             self::rememberCoverageSpan($engineId, $startDate, $endDate);
@@ -86,18 +95,31 @@ class MonitoringPositionDates
         }
     }
 
+    /**
+     * @return array{min: string, max: string}|null
+     */
+    private static function coverageSpanFromTable(int $engineId): ?array
+    {
+        $row = DB::table('monitoring_position_dates')
+            ->where('monitoring_searchengine_id', $engineId)
+            ->selectRaw('MIN(check_date) as min_d, MAX(check_date) as max_d')
+            ->first();
+
+        if (!$row || empty($row->min_d) || empty($row->max_d)) {
+            return null;
+        }
+
+        return [
+            'min' => Carbon::parse($row->min_d)->toDateString(),
+            'max' => Carbon::parse($row->max_d)->toDateString(),
+        ];
+    }
+
     private static function discoverEngineRangeLocked(int $engineId, string $startDate, string $endDate): void
     {
         $lockKey = 'mon.pos_dates.discover.' . $engineId . '.' . $startDate . '.' . $endDate;
         if (!Cache::add($lockKey, 1, 90)) {
-            $deadline = microtime(true) + 3.0;
-            while (microtime(true) < $deadline) {
-                usleep(100000);
-                if (!Cache::has($lockKey)) {
-                    break;
-                }
-            }
-
+            // Другой запрос уже сканирует — не ждём секундами в HTTP /table.
             return;
         }
 
@@ -159,7 +181,20 @@ class MonitoringPositionDates
             return [];
         }
 
-        $rows = DB::table('monitoring_positions')
+        $from = 'monitoring_positions';
+        try {
+            $hasIdx = DB::table('information_schema.statistics')
+                ->where('table_schema', DB::getDatabaseName())
+                ->where('table_name', 'monitoring_positions')
+                ->where('index_name', 'mon_pos_engine_created_idx')
+                ->exists();
+            if ($hasIdx) {
+                $from = 'monitoring_positions FORCE INDEX (mon_pos_engine_created_idx)';
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $rows = DB::table(DB::raw($from))
             ->whereIn('monitoring_searchengine_id', $engineIds)
             ->where('created_at', '>=', $start)
             ->where('created_at', '<=', $end)

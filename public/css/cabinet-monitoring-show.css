@@ -948,6 +948,16 @@ button.cabinet-btn-busy:disabled {
     max-width: 104px;
 }
 
+.cabinet-mon-project-page .dynamics.text-green,
+.cabinet-mon-project-page #monitoringTable_wrapper .dynamics.text-green {
+    color: #28a745 !important;
+}
+
+.cabinet-mon-project-page .dynamics.text-red,
+.cabinet-mon-project-page #monitoringTable_wrapper .dynamics.text-red {
+    color: #dc3545 !important;
+}
+
 .cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-col-target,
 .cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-col-dynamics {
     font-size: 0.75rem;

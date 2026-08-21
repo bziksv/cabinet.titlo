@@ -139,6 +139,23 @@
                 if (typeof axios === 'undefined') {
                     return;
                 }
+                // На «Обзоре» не греем тяжёлый /table — иначе PHP/MySQL заняты минутами
+                // и «Загрузка графика…» висит. Prefetch только если сразу keywords.
+                var startView = 'keywords';
+                try {
+                    var hash = window.location.hash || '';
+                    if (hash === '#overview') {
+                        startView = 'overview';
+                    } else if (hash !== '#keywords' && hash !== '#detailed') {
+                        var saved = localStorage.getItem('cabinet-mon-project-view-v2');
+                        if (saved === 'overview') {
+                            startView = 'overview';
+                        }
+                    }
+                } catch (e) {}
+                if (startView === 'overview') {
+                    return;
+                }
                 var payload = {
                     draw: 1,
                     start: 0,
@@ -148,6 +165,7 @@
                     region_id: @json($monChartRegion ? (string) $monChartRegion->id : ''),
                     dates_range: @json(request('dates')),
                     mode_range: @json(request('mode')),
+                    lazy_positions: 1,
                 };
                 var groupId = @json(request('group') ? (string) request('group') : '');
                 if (groupId) {
@@ -921,6 +939,33 @@
                 return moment().subtract(29, 'days').format('YYYY-MM-DD') + ' - ' + moment().format('YYYY-MM-DD');
             }
 
+            /** Год + «По дням» валит MySQL — синхронизируем селект с длиной диапазона. */
+            function syncChartPeriodToDateSpan() {
+                var $period = $('#chartFilterPeriod');
+                if (!$period.length || typeof moment === 'undefined') {
+                    return;
+                }
+                var parts = String(chartDateRange()).split(' - ');
+                if (parts.length !== 2) {
+                    return;
+                }
+                var start = moment(parts[0].trim(), ['YYYY-MM-DD', 'DD-MM-YYYY', 'DD.MM.YYYY'], true);
+                var end = moment(parts[1].trim(), ['YYYY-MM-DD', 'DD-MM-YYYY', 'DD.MM.YYYY'], true);
+                if (!start.isValid() || !end.isValid()) {
+                    return;
+                }
+                var days = end.diff(start, 'days') + 1;
+                var want = 'days';
+                if (days > 120) {
+                    want = 'month';
+                } else if (days > 45) {
+                    want = 'weeks';
+                }
+                if ($period.val() !== want) {
+                    $period.val(want);
+                }
+            }
+
             function cabinetMonWirePopovers(root) {
                 if (typeof bootstrap === 'undefined' || !bootstrap.Popover) {
                     return;
@@ -1221,12 +1266,16 @@
 
             var monTablePrefetch = null;
             var monTablePrefetchUsed = false;
+            var monTableInflight = {};
 
             function monTableAjaxPayload(payload) {
                 payload = payload || {};
                 payload.region_id = REGION_ID;
                 payload.dates_range = DATES;
                 payload.mode_range = MODE;
+                if (payload.lazy_positions == null) {
+                    payload.lazy_positions = 1;
+                }
                 if (GROUP_ID) {
                     payload.columns = payload.columns || [];
                     var groupCol = null;
@@ -1251,6 +1300,29 @@
                 return payload;
             }
 
+            function monTableRequestKey(payload) {
+                var filters = {};
+                (payload.columns || []).forEach(function (col) {
+                    if (!col || !col.data) {
+                        return;
+                    }
+                    var searchVal = col.search && col.search.value != null ? String(col.search.value).trim() : '';
+                    if (searchVal !== '') {
+                        filters[col.data] = searchVal;
+                    }
+                });
+                return [
+                    payload.start || 0,
+                    payload.length || 0,
+                    payload.region_id || '',
+                    payload.dates_range || '',
+                    payload.mode_range || '',
+                    payload.search && payload.search.value ? payload.search.value : '',
+                    JSON.stringify(payload.order || []),
+                    JSON.stringify(filters),
+                ].join('|');
+            }
+
             function monTableBootstrapPayload() {
                 return monTableAjaxPayload({
                     draw: 1,
@@ -1262,7 +1334,379 @@
             }
 
             function monTableFetch(payload) {
-                return axios.post('/monitoring/' + PROJECT_ID + '/table', monTableAjaxPayload(payload));
+                var body = monTableAjaxPayload(payload);
+                var key = monTableRequestKey(body);
+                if (monTableInflight[key]) {
+                    return monTableInflight[key];
+                }
+                var req = axios.post('/monitoring/' + PROJECT_ID + '/table', body).then(function (resp) {
+                    delete monTableInflight[key];
+                    return resp;
+                }, function (err) {
+                    delete monTableInflight[key];
+                    throw err;
+                });
+                monTableInflight[key] = req;
+                return req;
+            }
+
+            var monPosChunkSeq = 0;
+
+            function monPositionCellHtml(data) {
+                return monRenderPositionCell(data, 'display');
+            }
+
+            function monDynamicsHtml(dynamics) {
+                dynamics = Number(dynamics) || 0;
+                if (dynamics === 0) {
+                    return '<span class="dynamics"> - </span>';
+                }
+                if (dynamics > 0) {
+                    return '<span class="dynamics text-green"> +' + dynamics + ' </span>';
+                }
+                return '<span class="dynamics text-red"> ' + dynamics + ' </span>';
+            }
+
+            function monRefreshDynamicsColumn(api, keywordIds) {
+                if (!api || !keywordIds || !keywordIds.length) {
+                    return;
+                }
+                var dynIdx = null;
+                var dateCols = [];
+                api.columns().every(function (idx) {
+                    var src = this.dataSrc();
+                    if (src === 'dynamics') {
+                        dynIdx = idx;
+                    } else if (typeof src === 'string' && src.indexOf('col_') === 0) {
+                        dateCols.push({ key: src, idx: idx });
+                    }
+                    return true;
+                });
+                if (dynIdx == null || dateCols.length < 2) {
+                    return;
+                }
+                // col_0 — самая новая дата (как на бэке), последняя — самая старая.
+                dateCols.sort(function (a, b) {
+                    var na = parseInt(String(a.key).replace('col_', ''), 10) || 0;
+                    var nb = parseInt(String(b.key).replace('col_', ''), 10) || 0;
+                    return na - nb;
+                });
+
+                keywordIds.forEach(function (id, rowIdx) {
+                    var row = api.row(rowIdx);
+                    if (!row.any()) {
+                        return;
+                    }
+                    var rowData = row.data();
+                    if (!rowData) {
+                        return;
+                    }
+                    var newest = null;
+                    var oldest = null;
+                    for (var i = 0; i < dateCols.length; i++) {
+                        var cell = rowData[dateCols[i].key];
+                        var pos = cell && typeof cell === 'object' && cell.p != null ? Number(cell.p) : null;
+                        if (pos == null || !isFinite(pos)) {
+                            continue;
+                        }
+                        if (newest == null) {
+                            newest = pos;
+                        }
+                        oldest = pos;
+                    }
+                    if (newest == null || oldest == null) {
+                        rowData.dynamics = '-';
+                        var emptyNode = api.cell(rowIdx, dynIdx).node();
+                        if (emptyNode) {
+                            emptyNode.innerHTML = '-';
+                        }
+                        return;
+                    }
+                    var dynamics = oldest - newest;
+                    rowData.dynamics = monDynamicsHtml(dynamics);
+                    var node = api.cell(rowIdx, dynIdx).node();
+                    if (node) {
+                        node.innerHTML = rowData.dynamics;
+                    }
+                });
+            }
+
+            function monIsLazyPlaceholder(val) {
+                return val === '…' || val === '...' || val === '&hellip;';
+            }
+
+            /** Дни чанка без позиции: «…» → «-». */
+            function monClearCoveredPlaceholders(api, keywordIds, coveredCols) {
+                if (!api || !keywordIds || !keywordIds.length || !coveredCols || !coveredCols.length) {
+                    return;
+                }
+                var colMap = {};
+                api.columns().every(function (idx) {
+                    var src = this.dataSrc();
+                    if (typeof src === 'string' && src.indexOf('col_') === 0) {
+                        colMap[src] = idx;
+                    }
+                    return true;
+                });
+                keywordIds.forEach(function (id, rowIdx) {
+                    var row = api.row(rowIdx);
+                    if (!row.any()) {
+                        return;
+                    }
+                    var rowData = row.data();
+                    if (!rowData) {
+                        return;
+                    }
+                    coveredCols.forEach(function (colKey) {
+                        if (!monIsLazyPlaceholder(rowData[colKey])) {
+                            return;
+                        }
+                        rowData[colKey] = '-';
+                        var colIdx = colMap[colKey];
+                        if (colIdx == null) {
+                            return;
+                        }
+                        var node = api.cell(rowIdx, colIdx).node();
+                        if (node) {
+                            node.innerHTML = '-';
+                        }
+                    });
+                });
+            }
+
+            /** После всех чанков — любые оставшиеся «…» в датах/динамике. */
+            function monClearAllLazyPlaceholders(api, keywordIds) {
+                if (!api || !keywordIds || !keywordIds.length) {
+                    return;
+                }
+                var colMap = {};
+                var dynIdx = null;
+                api.columns().every(function (idx) {
+                    var src = this.dataSrc();
+                    if (src === 'dynamics') {
+                        dynIdx = idx;
+                    } else if (typeof src === 'string' && src.indexOf('col_') === 0) {
+                        colMap[src] = idx;
+                    }
+                    return true;
+                });
+                keywordIds.forEach(function (id, rowIdx) {
+                    var row = api.row(rowIdx);
+                    if (!row.any()) {
+                        return;
+                    }
+                    var rowData = row.data();
+                    if (!rowData) {
+                        return;
+                    }
+                    Object.keys(colMap).forEach(function (colKey) {
+                        if (!monIsLazyPlaceholder(rowData[colKey])) {
+                            return;
+                        }
+                        rowData[colKey] = '-';
+                        var node = api.cell(rowIdx, colMap[colKey]).node();
+                        if (node) {
+                            node.innerHTML = '-';
+                        }
+                    });
+                    if (dynIdx != null && monIsLazyPlaceholder(rowData.dynamics)) {
+                        rowData.dynamics = '-';
+                        var dynNode = api.cell(rowIdx, dynIdx).node();
+                        if (dynNode) {
+                            dynNode.innerHTML = '-';
+                        }
+                    }
+                });
+            }
+
+            function monApplyPositionDecorations(api) {
+                if (!api) {
+                    return;
+                }
+                var data = api.data();
+                var $bodyRows = $('#monitoringTable_wrapper .dataTables_scrollBody tbody tr');
+                if (!$bodyRows.length) {
+                    return;
+                }
+
+                $bodyRows.each(function (i, item) {
+                    var target = 0;
+                    if (data[i] && data[i].target != null) {
+                        target = parseInt(String($('<div />').html(data[i].target).text()).replace(/\D+/g, ''), 10) || 0;
+                    }
+                    var $positions = $(item).find('td span[data-position]');
+                    $(item).find('td').removeClass('cabinet-mon-pos-hit cabinet-mon-pos-near');
+
+                    $positions.each(function (pi) {
+                        var current = parseInt($(this).attr('data-position'), 10) || 0;
+                        var $next = $positions.eq(pi + 1);
+                        var nextTo = $next.length ? (parseInt($next.attr('data-position'), 10) || 0) : 0;
+                        var $cell = $(this).closest('td');
+
+                        if (target > 0 && target >= current) {
+                            $cell.addClass('cabinet-mon-pos-hit');
+                        } else if (target > 0 && nextTo > 0 && target >= nextTo) {
+                            $cell.addClass('cabinet-mon-pos-near');
+                        }
+                    });
+                });
+            }
+
+            function monRefreshAdjacentDiffs(api, keywordIds) {
+                if (!api || !keywordIds || !keywordIds.length) {
+                    return;
+                }
+                var dateCols = [];
+                api.columns().every(function (idx) {
+                    var src = this.dataSrc();
+                    if (typeof src === 'string' && src.indexOf('col_') === 0) {
+                        dateCols.push({ key: src, idx: idx });
+                    }
+                    return true;
+                });
+                dateCols.sort(function (a, b) {
+                    var na = parseInt(String(a.key).replace('col_', ''), 10) || 0;
+                    var nb = parseInt(String(b.key).replace('col_', ''), 10) || 0;
+                    return na - nb;
+                });
+                if (dateCols.length < 2) {
+                    return;
+                }
+
+                keywordIds.forEach(function (id, rowIdx) {
+                    var row = api.row(rowIdx);
+                    if (!row.any()) {
+                        return;
+                    }
+                    var rowData = row.data();
+                    if (!rowData) {
+                        return;
+                    }
+                    var prevPos = null;
+                    // col_0 — новая дата; идём от старых к новым, как diffPositionExtension на бэке.
+                    for (var i = dateCols.length - 1; i >= 0; i--) {
+                        var colKey = dateCols[i].key;
+                        var cell = rowData[colKey];
+                        if (!cell || typeof cell !== 'object' || cell.p == null) {
+                            prevPos = null;
+                            continue;
+                        }
+                        var pos = Number(cell.p);
+                        if (prevPos != null) {
+                            cell.d = prevPos - pos;
+                        } else {
+                            delete cell.d;
+                        }
+                        prevPos = pos;
+                        var node = api.cell(rowIdx, dateCols[i].idx).node();
+                        if (node) {
+                            node.innerHTML = monPositionCellHtml(cell);
+                        }
+                    }
+                });
+            }
+
+            function monApplyPositionCells(api, keywordIds, cells, coveredCols) {
+                if (!api || !keywordIds || !keywordIds.length) {
+                    return;
+                }
+                cells = cells || {};
+                var kidToIdx = {};
+                keywordIds.forEach(function (id, i) {
+                    kidToIdx[String(id)] = i;
+                });
+                var colMap = {};
+                api.columns().every(function (idx) {
+                    var src = this.dataSrc();
+                    if (typeof src === 'string' && src.indexOf('col_') === 0) {
+                        colMap[src] = idx;
+                    }
+                    return true;
+                });
+
+                // Только патч данных + DOM ячеек. Без api.draw / FixedColumns —
+                // иначе таблица мерцает на каждый чанк.
+                Object.keys(cells).forEach(function (kid) {
+                    var rowIdx = kidToIdx[String(kid)];
+                    if (rowIdx == null) {
+                        return;
+                    }
+                    var row = api.row(rowIdx);
+                    if (!row.any()) {
+                        return;
+                    }
+                    var rowData = row.data();
+                    if (!rowData) {
+                        return;
+                    }
+                    var patch = cells[kid] || {};
+                    Object.keys(patch).forEach(function (colKey) {
+                        rowData[colKey] = patch[colKey];
+                        var colIdx = colMap[colKey];
+                        if (colIdx == null) {
+                            return;
+                        }
+                        var node = api.cell(rowIdx, colIdx).node();
+                        if (node) {
+                            node.innerHTML = monPositionCellHtml(patch[colKey]);
+                        }
+                    });
+                });
+                // Динамику не трогаем здесь — только после всех чанков.
+                monClearCoveredPlaceholders(api, keywordIds, coveredCols || []);
+                monRefreshAdjacentDiffs(api, keywordIds);
+                monApplyPositionDecorations(api);
+            }
+
+            function monFillPositionChunks(api, payload) {
+                if (!api || !payload || !payload.lazy_positions) {
+                    return;
+                }
+                var chunks = (payload.position_chunks || []).slice();
+                var keywordIds = payload.keyword_ids || [];
+                if (!chunks.length || !keywordIds.length) {
+                    return;
+                }
+                var seq = ++monPosChunkSeq;
+                function next() {
+                    if (seq !== monPosChunkSeq) {
+                        return;
+                    }
+                    if (!chunks.length) {
+                        monClearAllLazyPlaceholders(api, keywordIds);
+                        monRefreshDynamicsColumn(api, keywordIds);
+                        monRefreshAdjacentDiffs(api, keywordIds);
+                        monApplyPositionDecorations(api);
+                        return;
+                    }
+                    var chunk = chunks.shift();
+                    axios.post('/monitoring/' + PROJECT_ID + '/table/positions', {
+                        region_id: REGION_ID,
+                        dates_range: DATES,
+                        mode_range: MODE,
+                        keyword_ids: keywordIds,
+                        from: chunk.from,
+                        to: chunk.to,
+                    }).then(function (resp) {
+                        if (seq !== monPosChunkSeq) {
+                            return;
+                        }
+                        requestAnimationFrame(function () {
+                            if (seq !== monPosChunkSeq) {
+                                return;
+                            }
+                            var data = resp.data || {};
+                            monApplyPositionCells(api, keywordIds, data.cells || {}, data.covered_cols || []);
+                            next();
+                        });
+                    }).catch(function (err) {
+                        console.error('monitoring table positions chunk', err);
+                        if (seq === monPosChunkSeq) {
+                            next();
+                        }
+                    });
+                }
+                next();
             }
 
             toastr.options = {
@@ -1270,7 +1714,44 @@
                 "timeOut": "5000"
             };
 
-            (window.__monTableEarlyPrefetch || axios.post('/monitoring/' + PROJECT_ID + '/table', monTableBootstrapPayload())).then(function (response) {
+            var monKeywordsTableBootStarted = false;
+
+            function monStartViewIsOverview() {
+                try {
+                    var el = document.getElementById('cabinet-mon-project-root');
+                    if (el && el.getAttribute('data-view') === 'overview') {
+                        return true;
+                    }
+                    var hash = window.location.hash || '';
+                    if (hash === '#overview') {
+                        return true;
+                    }
+                    if (hash !== '#keywords' && hash !== '#detailed') {
+                        return localStorage.getItem('cabinet-mon-project-view-v2') === 'overview';
+                    }
+                } catch (e) {}
+                return false;
+            }
+
+            function ensureMonitoringKeywordsTableBoot() {
+                if (monKeywordsTableBootStarted) {
+                    return;
+                }
+                monKeywordsTableBootStarted = true;
+
+            var bootPayload = monTableBootstrapPayload();
+            var bootKey = monTableRequestKey(bootPayload);
+            var bootReq = window.__monTableEarlyPrefetch;
+            if (bootReq && !monTableInflight[bootKey]) {
+                monTableInflight[bootKey] = bootReq.then(function (response) {
+                    delete monTableInflight[bootKey];
+                    return response;
+                }, function (err) {
+                    delete monTableInflight[bootKey];
+                    throw err;
+                });
+            }
+            (bootReq || monTableFetch(bootPayload)).then(function (response) {
                 monTablePrefetch = response.data;
 
                 let tableRegions = response.data.region || [];
@@ -1355,17 +1836,8 @@
                     processing: true,
                     serverSide: true,
                     ajax: function (data, callback) {
-                        if (monTablePrefetch && !monTablePrefetchUsed) {
-                            monTablePrefetchUsed = true;
-                            var cached = monTablePrefetch;
-                            monTablePrefetch = null;
-                            cached.draw = data.draw;
-                            callback(cached);
-                            return;
-                        }
-                        monTableFetch(data).then(function (resp) {
-                            var payload = resp.data || {};
-                            // Подставляем missing col_* — иначе DataTables tn/4 при смене страницы.
+                        function applyTablePayload(payload) {
+                            payload = payload || {};
                             if (Array.isArray(payload.data) && columns.length) {
                                 payload.data = payload.data.map(function (row) {
                                     row = row || {};
@@ -1378,6 +1850,24 @@
                                 });
                             }
                             callback(payload);
+                            if (window.__cabinetMonKeywordsTableApi) {
+                                monFillPositionChunks(window.__cabinetMonKeywordsTableApi, payload);
+                            } else {
+                                window.__monPendingPosChunks = payload;
+                            }
+                        }
+                        if (monTablePrefetch && !monTablePrefetchUsed) {
+                            monTablePrefetchUsed = true;
+                            var cached = monTablePrefetch;
+                            monTablePrefetch = null;
+                            cached.draw = data.draw;
+                            applyTablePayload(cached);
+                            return;
+                        }
+                        monTableFetch(data).then(function (resp) {
+                            var payload = resp.data || {};
+                            payload.draw = data.draw;
+                            applyTablePayload(payload);
                         }).catch(function (err) {
                             console.error('monitoring table fetch failed', err);
                             monitoringTableHideProcessing();
@@ -1399,6 +1889,11 @@
                     ],
                     initComplete: function () {
                         let api = this.api();
+                        window.__cabinetMonKeywordsTableApi = api;
+                        if (window.__monPendingPosChunks) {
+                            monFillPositionChunks(api, window.__monPendingPosChunks);
+                            window.__monPendingPosChunks = null;
+                        }
 
                         if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.wireMonTableDataRefresh) {
                             window.cabinetMonitoringShowChrome.wireMonTableDataRefresh(api);
@@ -1899,35 +2394,7 @@
                         }
 
                         var applyDrawDecorations = function () {
-                            let data = api.data();
-                            let $bodyRows = $('#monitoringTable_wrapper .dataTables_scrollBody tbody tr');
-
-                            if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.clearMonTableRowHover) {
-                                window.cabinetMonitoringShowChrome.clearMonTableRowHover();
-                            }
-
-                            $bodyRows.each(function (i, item) {
-                                let target = 0;
-                                if ('target' in data[i]) {
-                                    target = $('<div />').html(data[i].target).text();
-                                }
-                                let positions = $(item).find('td span[data-position]');
-
-                                $(item).find('td').removeClass('cabinet-mon-pos-hit cabinet-mon-pos-near');
-
-                                $.each(positions, function (i, item) {
-                                    let current = $(item).data('position');
-                                    let nextTo = $(positions[i + 1]).data('position');
-                                    let $cell = $(item).closest('td');
-
-                                    if (target >= current) {
-                                        $cell.addClass('cabinet-mon-pos-hit');
-                                    } else if (target >= nextTo) {
-                                        $cell.addClass('cabinet-mon-pos-near');
-                                    }
-                                });
-                            });
-
+                            monApplyPositionDecorations(api);
                             $('.pagination').addClass('pagination-sm');
                             cabinetMonWirePopovers(table[0]);
                         };
@@ -2152,6 +2619,25 @@
                 console.error('monitoring table bootstrap request failed', err);
                 monitoringTableShowLoadErrorToast();
             });
+            } // ensureMonitoringKeywordsTableBoot
+
+            if (monStartViewIsOverview()) {
+                (function wireKeywordsTableLazyBoot() {
+                    var rootEl = document.getElementById('cabinet-mon-project-root');
+                    if (!rootEl) {
+                        return;
+                    }
+                    var obs = new MutationObserver(function () {
+                        if (rootEl.getAttribute('data-view') === 'keywords') {
+                            obs.disconnect();
+                            ensureMonitoringKeywordsTableBoot();
+                        }
+                    });
+                    obs.observe(rootEl, { attributes: true, attributeFilter: ['data-view'] });
+                })();
+            } else {
+                ensureMonitoringKeywordsTableBoot();
+            }
 
             $('#reservation').daterangepicker({
                 locale: {
@@ -2707,6 +3193,7 @@
             var topChartRef = null;
             var chartLoadsPending = 0;
             var chartLoadFailed = false;
+            var chartLoadSeq = 0;
             var chartLoadingLabel = @json(__('Monitoring show chart loading'));
             var chartRenderingLabel = @json(__('Monitoring show chart rendering'));
             var chartLoadErrorLabel = @json(__('Monitoring show chart load error'));
@@ -2920,10 +3407,17 @@
                         topChartRef = chart;
                     }
                     chartInstances[key] = chart;
+                });
 
-                    chartFilterPeriod.on('change.monChartInstance.' + key, function () {
-                        loadChartData(chart, obj, $(this).val());
-                    });
+                chartFilterPeriod.off('change.monChartPeriod').on('change.monChartPeriod', function () {
+                    if (!isMonOverviewView()) {
+                        chartsNetworkDirty = true;
+                        monChartsLoadedKeys = {};
+                        return;
+                    }
+                    monChartsLoadedKeys = {};
+                    var activeHref = $('.cabinet-mon-project-charts .nav-pills a.active').attr('href') || '#tab_1';
+                    loadMonChartTab(activeHref, $(this).val());
                 });
 
                 if (window.cabinetMonitoringShowCharts && $('.cabinet-mon-top-presets').length) {
@@ -2958,11 +3452,41 @@
                 }
                 chartsNetworkLoaded = true;
                 chartsNetworkDirty = false;
+                monChartsLoadedKeys = {};
                 var range = chartFilterPeriod.val();
-                $.each(chartInstances, function (key, chart) {
-                    loadChartData(chart, charts[key], range);
-                });
-                loadDistributionChart();
+                // Только активная вкладка: иначе 3× /charts по 30+ с параллельно.
+                var activeHref = $('.cabinet-mon-project-charts .nav-pills a.active').attr('href') || '#tab_1';
+                loadMonChartTab(activeHref, range);
+            }
+
+            var monChartsLoadedKeys = {};
+            var monChartTabKey = {
+                '#tab_1': 'top',
+                '#tab_2': 'middle',
+                '#tab_3': 'distribution',
+                '#tab_regions_top': 'regions_top',
+                '#tab_regions_middle': 'regions_middle',
+            };
+
+            function loadMonChartTab(href, range) {
+                range = range || chartFilterPeriod.val();
+                var key = monChartTabKey[href] || 'top';
+                if (monChartsLoadedKeys[key] && !chartsNetworkDirty) {
+                    return;
+                }
+                monChartsLoadedKeys[key] = true;
+                if (key === 'distribution') {
+                    loadDistributionChart();
+                    return;
+                }
+                if (chartInstances[key] && charts[key]) {
+                    loadChartData(chartInstances[key], charts[key], range);
+                    return;
+                }
+                if (chartInstances.top && charts.top) {
+                    monChartsLoadedKeys.top = true;
+                    loadChartData(chartInstances.top, charts.top, range);
+                }
             }
 
             function ensureOverviewChartsLoaded() {
@@ -3174,6 +3698,7 @@
             }
 
             function loadChartData(chart, obj, range) {
+                var seq = ++chartLoadSeq;
                 chartLoadingStart();
 
                 var baseParams = chartParamsForProject(PROJECT_ID, GROUP_ID, range, obj.chart);
@@ -3193,6 +3718,9 @@
 
                 return Promise.all(requests)
                     .then(function (results) {
+                        if (seq !== chartLoadSeq) {
+                            return null;
+                        }
                         var basePayload = results[0];
                         var comparePayload = results[1] || null;
                         if (compareApi && compareApi.setIntersectMeta && basePayload && basePayload._meta) {
@@ -3211,8 +3739,10 @@
                         chartLoadingEnd(false);
                     })
                     .catch(function () {
-                        chartLoadingEnd(true);
-                        toastr.error(chartLoadErrorLabel);
+                        chartLoadingEnd(seq !== chartLoadSeq ? false : true);
+                        if (seq === chartLoadSeq) {
+                            toastr.error(chartLoadErrorLabel);
+                        }
                     });
             }
 
@@ -3221,6 +3751,9 @@
                 var showPeriod = target === '#tab_1' || target === '#tab_2'
                     || target === '#tab_regions_middle' || target === '#tab_regions_top';
                 chartFilterPeriod.toggleClass('d-none', !showPeriod);
+                if (isMonOverviewView() && chartsNetworkLoaded) {
+                    loadMonChartTab(target, chartFilterPeriod.val());
+                }
             });
 
             chartFilterPeriod.on('change.monChartsDefer', function () {

@@ -40,6 +40,9 @@ class MonitoringChartPositionSeries
 
     public static function resolveBucket(?string $range, Carbon $start, Carbon $end): string
     {
+        $days = $start->diffInDays($end) + 1;
+
+        // Явный выбор в UI важнее авто-режима.
         if ($range === 'month') {
             return self::BUCKET_MONTH;
         }
@@ -47,10 +50,14 @@ class MonitoringChartPositionSeries
             return self::BUCKET_WEEK;
         }
         if ($range === 'days') {
+            // Страховка: год «по дням» валит MySQL — укрупняем до недель.
+            if ($days > 120) {
+                return self::BUCKET_WEEK;
+            }
+
             return self::BUCKET_DAY;
         }
 
-        $days = $start->diffInDays($end) + 1;
         if ($days > 120) {
             return self::BUCKET_MONTH;
         }
@@ -213,22 +220,54 @@ class MonitoringChartPositionSeries
         bool $aggregateMiddle
     ): Collection {
         $bucketExpr = self::bucketExpression($bucket);
-
-        $keywords = DB::table('monitoring_keywords')
-            ->where('monitoring_project_id', $projectId);
-        if ($keywordIds !== null) {
-            if ($keywordIds === []) {
-                return collect();
-            }
-            $keywords->whereIn('id', $keywordIds);
-        } elseif ($groupId !== null && $groupId > 0) {
-            $keywords->where('monitoring_group_id', $groupId);
+        $engineIds = array_values(array_unique(array_map('intval', $engineIds)));
+        if ($engineIds === []) {
+            return collect();
+        }
+        if ($keywordIds !== null && $keywordIds === []) {
+            return collect();
         }
 
-        $latestSub = DB::table('monitoring_positions as mp')
-            ->joinSub($keywords->select('id'), 'mk', 'mk.id', '=', 'mp.monitoring_keyword_id')
-            ->whereIn('mp.monitoring_searchengine_id', $engineIds)
-            ->whereBetween('mp.created_at', [$start, $end])
+        // Важно: гнать от engine+created_at (диапазон ~десятки тысяч строк),
+        // а не от keywords→positions (на 10M+ таблице это десятки секунд).
+        // FORCE INDEX — иначе optimizer часто выбирает mon_pos_engine_kw_created_idx.
+        $fromMp = self::hasEngineCreatedIndex()
+            ? 'monitoring_positions as mp FORCE INDEX (mon_pos_engine_created_idx)'
+            : 'monitoring_positions as mp';
+
+        // month/week на длинном диапазоне: не сканируем все дни года (~170k строк),
+        // а берём только якорные дни съёма из monitoring_position_dates.
+        $anchorDays = self::anchorCheckDates($engineIds, $start, $end, $bucket);
+
+        $latestSub = DB::table(DB::raw($fromMp))
+            ->join('monitoring_keywords as mk', function ($join) use ($projectId, $groupId, $keywordIds) {
+                $join->on('mk.id', '=', 'mp.monitoring_keyword_id')
+                    ->where('mk.monitoring_project_id', '=', $projectId);
+                if ($keywordIds !== null) {
+                    $join->whereIn('mk.id', $keywordIds);
+                } elseif ($groupId !== null && $groupId > 0) {
+                    $join->where('mk.monitoring_group_id', '=', $groupId);
+                }
+            })
+            ->whereIn('mp.monitoring_searchengine_id', $engineIds);
+
+        if ($anchorDays !== null) {
+            if ($anchorDays === []) {
+                return collect();
+            }
+            $latestSub->where(function ($outer) use ($anchorDays) {
+                foreach ($anchorDays as $day) {
+                    $outer->orWhereBetween('mp.created_at', [
+                        $day . ' 00:00:00',
+                        $day . ' 23:59:59',
+                    ]);
+                }
+            });
+        } else {
+            $latestSub->whereBetween('mp.created_at', [$start, $end]);
+        }
+
+        $latestSub
             ->selectRaw(
                 'mp.monitoring_keyword_id, mp.monitoring_searchengine_id, '
                 . $bucketExpr . ' as pos_bucket, MAX(mp.id) as latest_id'
@@ -252,6 +291,66 @@ class MonitoringChartPositionSeries
             ->selectRaw('p.monitoring_keyword_id, p.monitoring_searchengine_id, latest.pos_bucket, p.position')
             ->orderBy('latest.pos_bucket')
             ->get();
+    }
+
+    /**
+     * Якорные дни для week/month: последний день съёма в каждом ведре.
+     * null = сканировать весь диапазон (day-bucket или нет light-таблицы).
+     *
+     * @param int[] $engineIds
+     * @return list<string>|null Y-m-d
+     */
+    private static function anchorCheckDates(array $engineIds, Carbon $start, Carbon $end, string $bucket): ?array
+    {
+        if ($bucket === self::BUCKET_DAY) {
+            return null;
+        }
+
+        if (!\Illuminate\Support\Facades\Schema::hasTable('monitoring_position_dates')) {
+            return null;
+        }
+
+        $dateExpr = $bucket === self::BUCKET_MONTH
+            ? 'DATE_FORMAT(check_date, "%Y-%m")'
+            : 'DATE(DATE_SUB(check_date, INTERVAL WEEKDAY(check_date) DAY))';
+
+        $rows = DB::table('monitoring_position_dates')
+            ->whereIn('monitoring_searchengine_id', $engineIds)
+            ->where('check_date', '>=', $start->toDateString())
+            ->where('check_date', '<=', $end->toDateString())
+            ->selectRaw($dateExpr . ' as bucket_key, MAX(check_date) as last_day')
+            ->groupBy(DB::raw($dateExpr))
+            ->pluck('last_day');
+
+        if ($rows->isEmpty()) {
+            // Таблица пуста для региона — пусть сработает полный scan / discover снаружи.
+            return null;
+        }
+
+        return $rows->map(static function ($d) {
+            return Carbon::parse($d)->toDateString();
+        })->unique()->values()->all();
+    }
+
+    private static function hasEngineCreatedIndex(): bool
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        try {
+            $dbName = DB::getDatabaseName();
+            $cached = DB::table('information_schema.statistics')
+                ->where('table_schema', $dbName)
+                ->where('table_name', 'monitoring_positions')
+                ->where('index_name', 'mon_pos_engine_created_idx')
+                ->exists();
+        } catch (\Throwable $e) {
+            $cached = false;
+        }
+
+        return $cached;
     }
 
     private static function bucketExpression(string $bucket): string

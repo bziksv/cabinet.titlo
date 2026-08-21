@@ -2,6 +2,20 @@
     $regionCount = $project->searchengines->count();
     $multiRegion = $regionCount > 1 && empty(request('region'));
     $manyRegions = $multiRegion && $regionCount >= 4;
+    $chartPeriodDefault = 'days';
+    $datesRaw = trim((string) request('dates', ''));
+    if ($datesRaw !== '' && strpos($datesRaw, ' - ') !== false) {
+        try {
+            [$d0, $d1] = array_map('trim', explode(' - ', $datesRaw, 2));
+            $spanDays = \Carbon\Carbon::parse($d0)->diffInDays(\Carbon\Carbon::parse($d1)) + 1;
+            if ($spanDays > 120) {
+                $chartPeriodDefault = 'month';
+            } elseif ($spanDays > 45) {
+                $chartPeriodDefault = 'weeks';
+            }
+        } catch (\Throwable $e) {
+        }
+    }
 @endphp
 <div class="card card-charts cabinet-mon-project-charts" data-mon-view-panel="overview"@if($manyRegions) data-many-regions="1"@endif>
     <div class="cabinet-mon-project-charts__intro">
@@ -34,9 +48,9 @@
             </ul>
         </div>
         <select class="form-select form-select-sm" id="chartFilterPeriod">
-            <option value="days" selected>{{ __('Monitoring show chart by days') }}</option>
-            <option value="weeks">{{ __('Monitoring show chart by weeks') }}</option>
-            <option value="month">{{ __('Monitoring show chart by months') }}</option>
+            <option value="days" @if($chartPeriodDefault === 'days') selected @endif>{{ __('Monitoring show chart by days') }}</option>
+            <option value="weeks" @if($chartPeriodDefault === 'weeks') selected @endif>{{ __('Monitoring show chart by weeks') }}</option>
+            <option value="month" @if($chartPeriodDefault === 'month') selected @endif>{{ __('Monitoring show chart by months') }}</option>
         </select>
     </div>
 

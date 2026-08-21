@@ -767,6 +767,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/monitoring/{project_id}/table', 'MonitoringKeywordsController@showDataTable')->name('monitoring.get.table.keywords');
     Route::post('/monitoring/{project_id}/table', 'MonitoringKeywordsController@showDataTable')->name('monitoring.get.table.keywords');
+    Route::post('/monitoring/{project_id}/table/positions', 'MonitoringKeywordsController@showDataTablePositions')->name('monitoring.table.positions');
 
     Route::post('/monitoring/projects/get-positions-for-calendars', 'MonitoringController@getPositionsForCalendars')->name('monitoring.projects.get.positions.for.calendars');
 
