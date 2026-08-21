@@ -10,7 +10,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc47' }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc52' }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-export.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-export.css')) ?: time() }}">
     @endslot
 
@@ -177,7 +177,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/fixedColumns.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc49' }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc52' }}"></script>
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
@@ -1037,26 +1037,38 @@
                     return;
                 }
 
+                // Не снимаем is-table-booting до готовности FC — иначе «дыра» вместо «Запрос».
                 monTableBoot.revealed = true;
                 monitoringTableHideProcessing();
-                $('#cabinet-mon-show-table-host').removeClass('is-table-booting');
-                $('#cabinetMonShowTableLoader').remove();
+
+                var unveiled = false;
+                var unveilTable = function () {
+                    if (unveiled) {
+                        return;
+                    }
+                    unveiled = true;
+                    $('#cabinet-mon-show-table-host').removeClass('is-table-booting');
+                    $('#cabinetMonShowTableLoader').remove();
+                    if (window.cabinetMonitoringShowChrome) {
+                        window.cabinetMonitoringShowChrome.onTableReady(api, { skipRelayout: true });
+                    }
+                };
+
+                // Страховка: не зависать на лоадере, если layout callback не пришёл.
+                setTimeout(unveilTable, 4000);
 
                 requestAnimationFrame(function () {
-                    var finishReady = function () {
-                        if (window.cabinetMonitoringShowChrome) {
-                            window.cabinetMonitoringShowChrome.onTableReady(api, { skipRelayout: true });
-                        }
-                    };
                     try {
                         if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.finalizeMonTableLayout) {
                             window.cabinetMonitoringShowChrome.finalizeMonTableLayout(api, {
-                                onComplete: finishReady,
+                                force: true,
+                                rebuildFixedColumns: true,
+                                onComplete: unveilTable,
                             });
                             return;
                         }
                         if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutKeywordsTable) {
-                            window.cabinetMonitoringShowChrome.relayoutKeywordsTable(finishReady, {
+                            window.cabinetMonitoringShowChrome.relayoutKeywordsTable(unveilTable, {
                                 adjustColumns: true,
                             });
                             return;
@@ -1064,7 +1076,7 @@
                     } catch (layoutErr) {
                         console.error('monitoring table unveil layout failed', layoutErr);
                     }
-                    finishReady();
+                    unveilTable();
                 });
             }
 
@@ -1138,6 +1150,9 @@
             }
 
             function monColumnVisible(name) {
+                if (name === 'query') {
+                    return true;
+                }
                 if (monIsMultiRegionView() && ['dynamics', 'base', 'phrasal', 'exact'].indexOf(name) >= 0) {
                     return false;
                 }
@@ -1687,6 +1702,9 @@
                                 }
 
                                 let name = $(this).data('column');
+                                if (name === 'query') {
+                                    return;
+                                }
                                 if (monIsMultiRegionView() && ['dynamics', 'base', 'phrasal', 'exact'].indexOf(name) >= 0) {
                                     toastr.info(@json(__('Monitoring column occurrence multi region')));
                                     return;

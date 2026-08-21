@@ -1,11 +1,10 @@
-# Таблица ключевых слов мониторинга: FixedColumns (эталон fc47)
+# Таблица ключевых слов мониторинга: FixedColumns (эталон fc52)
 
 Страница: `/monitoring/{id}#keywords` (пример: `/monitoring/63#keywords`).
 
 **Это проверенный production-ready эталон.** Не переписывать на CSS `position: sticky` и не «упрощать» без чтения этого документа — иначе снова получите наложение колонок, щель между «Запрос» и «URL», гигантские строки, пропавший заголовок «Запрос», сдвиг шапки при горизонтальном скролле и отставание при вертикальном скролле.
 
-**Baseline tag: `fc47`** — зафиксирован 2026-07-14. Cache-bust в `show.blade.php`: `-fc47`.
-
+**Baseline tag: `fc52`** — 2026-08-21 (unveil после FC). Prior: `fc50`/`fc47`. Cache-bust: `-fc52`.
 ---
 
 ## Симптомы, если сломать
@@ -22,7 +21,8 @@
 | Layout «плывёт» через ~1 с после reload | `api.columns.adjust()` / `tryRevealMonitoringTable` ломает FC colgroup |
 | Нет серой полоски hover на строке | CSS `#fff !important` на ячейках; нужен `paintMonTableRowHover` с inline `background-color` |
 | Шапка «уезжает» при докрутке вправо | `scrollHeadInner` шире viewport тела; нет `fitMonTableScrollHeadInner` |
-| macOS: шапка короче тела, сдвиг в конце | **Не чинить** fallback `barGap=15` и `scrollbar-gutter: stable` — fc48 ломало выравнивание (`lastDelta: -15`). Эталон fc47: только `offsetWidth - clientWidth` |
+| Шапка и тело разъезжаются при 2–3 датах / выключенных столбцах | Таблица растянута на 100% viewport; нет `lockMonScrollTablesWidth` |
+| macOS: шапка короче тела, сдвиг в конце | **Не чинить** fallback `barGap=15` и `scrollbar-gutter: stable` — fc48 ломало выравнивание (`lastDelta: -15`). Эталон: только `offsetWidth - clientWidth` |
 
 ---
 
@@ -257,5 +257,9 @@ CSS дублирует: `.dataTables_scrollHeadInner { box-sizing: content-box; 
 | fc46 | `#cabinetMonScrollNav` scroll page buttons |
 | fc47 | **`fitMonTableScrollHeadInner`** — horizontal scroll header sync; **эталон** |
 | fc48 | ❌ macOS barGap=15, scrollbar-gutter — **откат**, ломало выравнивание |
+| fc50 | Мало дат + скрытые столбцы: `lockMonScrollTablesWidth` (не 100% viewport), gap-correct inset, left-hidden vs col min-width |
+| fc51 | Unveil после FC: не снимать `is-table-booting` до `onComplete` (иначе пустота вместо «Запрос») |
+| fc52 | Gap ~488px при toggle столбцов: порог коррекции >480 мешал; zero left-hidden до замера; `--mon-fc-left-width` ≠ nudge |
 
-**Baseline tag: `fc47`** — production-ready для monitoring keywords (2026-07-14).
+**Baseline tag: `fc51`** — production-ready для monitoring keywords (2026-08-21).
+**Prior baseline: `fc50` / `fc47`.

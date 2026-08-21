@@ -1034,6 +1034,9 @@ button.cabinet-btn-busy:disabled {
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollHeadInner table,
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody table {
     margin-left: var(--mon-scroll-edge-nudge, 0);
+    /* fc50: не растягивать на 100% viewport при малом числе дат/столбцов */
+    width: var(--mon-scroll-table-width, auto);
+    max-width: none;
 }
 
 .cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scroll-edge-col {
@@ -1051,7 +1054,15 @@ button.cabinet-btn-busy:disabled {
 }
 
 .cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden,
-.cabinet-mon-project-page .dataTables_scrollBody tbody td.cabinet-mon-scrollbody-left-hidden {
+.cabinet-mon-project-page .dataTables_scrollBody tbody td.cabinet-mon-scrollbody-left-hidden,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody td.cabinet-mon-scrollbody-left-hidden,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden.cabinet-mon-col-query,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody td.cabinet-mon-scrollbody-left-hidden.cabinet-mon-col-query,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden.cabinet-mon-col-checkbox,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody td.cabinet-mon-scrollbody-left-hidden.cabinet-mon-col-checkbox,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden.cabinet-mon-col-btn,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody td.cabinet-mon-scrollbody-left-hidden.cabinet-mon-col-btn {
     width: 0 !important;
     min-width: 0 !important;
     max-width: 0 !important;
@@ -1553,7 +1564,8 @@ button.cabinet-btn-busy:disabled {
 .cabinet-mon-project-table-panel__loader {
     position: absolute;
     inset: 0;
-    z-index: 3;
+    /* Выше DTFC_LeftWrapper (z-index: 12), иначе FC просвечивает до unveil */
+    z-index: 30;
     display: none;
     flex-direction: column;
     align-items: center;
@@ -1681,7 +1693,12 @@ button.cabinet-btn-busy:disabled {
 
 .cabinet-mon-project-table-panel.is-table-booting .cabinet-mon-project-table-panel__loader {
     display: flex;
-    z-index: 10;
+    z-index: 30;
+}
+
+/* Пока лоадер — не показывать «дыру» вместо колонки «Запрос» */
+.cabinet-mon-project-table-panel.is-table-booting #monitoringTable_wrapper {
+    visibility: hidden;
 }
 
 /* DataTables scrollX: не display:none — иначе ломается ширина колонок при возврате */

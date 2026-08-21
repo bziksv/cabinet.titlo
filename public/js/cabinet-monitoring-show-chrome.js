@@ -1,7 +1,7 @@
 /**
  * /monitoring/{id} — SER: «Обзор» = графики, «Ключевые слова» = таблица (без дубля «Позиции»).
  *
- * Таблица #monitoringTable: FixedColumns baseline fc21.
+ * Таблица #monitoringTable: FixedColumns baseline fc52.
  * Док: docs/frontend/monitoring-keywords-fixed-columns.md
  */
 (function () {
@@ -63,6 +63,37 @@
         });
     }
 
+    function sumColWidthsPx(widths) {
+        var total = 0;
+        (widths || []).forEach(function (px) {
+            total += parseInt(px, 10) || 0;
+        });
+        return total;
+    }
+
+    /**
+     * При малом числе колонок DataTables тянет table на 100% viewport —
+     * шапка и тело расходятся. Жёстко фиксируем ширину = сумма colgroup.
+     */
+    function lockMonScrollTablesWidth($wrapper, contentPx) {
+        if (!$wrapper || !window.jQuery) {
+            return;
+        }
+        var w = Math.max(0, Math.ceil(contentPx || 0));
+        if (w < 1) {
+            return;
+        }
+        var px = w + 'px';
+        $wrapper.find('.dataTables_scroll > .dataTables_scrollHead table, .dataTables_scroll > .dataTables_scrollBody table').each(function () {
+            this.style.setProperty('width', px, 'important');
+            this.style.setProperty('min-width', px, 'important');
+            this.style.setProperty('max-width', px, 'important');
+        });
+        if (root && root.style) {
+            root.style.setProperty('--mon-scroll-table-width', px);
+        }
+    }
+
     function columnWidthPx(col) {
         var name = col.sName || col.mData || '';
         var named = monTableColWidth(name);
@@ -86,11 +117,16 @@
             if (!col.length) {
                 return;
             }
-            var wantVisible = !!settings[name];
+            // «Запрос» всегда в таблице (левый FixedColumns-блок).
+            var wantVisible = name === 'query' ? true : !!settings[name];
             if (col.visible() !== wantVisible) {
                 col.visible(wantVisible, false);
             }
         });
+        var queryCol = api.column('query:name');
+        if (queryCol.length && !queryCol.visible()) {
+            queryCol.visible(true, false);
+        }
     }
 
     function buildColumnWidthPlan(api) {
@@ -481,6 +517,14 @@
         syncMainTableLeftHiddenWidths($wrapper, leftCount, settings, api);
         var totalLeft = restoreFcLeftColgroup(api);
         applyScrollTableFcInset($wrapper, totalLeft);
+        var scrollColWidths = [];
+        settings.aoColumns.forEach(function (col, idx) {
+            if (!col.bVisible) {
+                return;
+            }
+            scrollColWidths.push(idx < leftCount ? '0px' : columnWidthPx(col));
+        });
+        lockMonScrollTablesWidth($wrapper, sumColWidthsPx(scrollColWidths));
     }
 
     function relayoutMonTableFcLayout(api) {
@@ -655,22 +699,63 @@
             $wrapper.find('.dataTables_scrollHeadInner table, .dataTables_scrollBody table').css('margin-left', '');
             return;
         }
+        var fcWidthPx = Math.ceil(fcEl.getBoundingClientRect().width)
+            || Math.ceil(knownLeftPx || 0)
+            || (parseInt((root && root.style && root.style.getPropertyValue('--mon-fc-left-width')) || '', 10) || 0);
         var insetPx = knownLeftPx != null
             ? Math.ceil(knownLeftPx)
-            : (parseInt((root && root.style && root.style.getPropertyValue('--mon-fc-left-width')) || '', 10) || 0);
+            : fcWidthPx;
         if (!insetPx) {
-            insetPx = fixedLeftTotalPx(window.__cabinetMonKeywordsTableApi || null);
-        }
-        if (!insetPx) {
-            insetPx = Math.ceil(fcEl.getBoundingClientRect().width);
+            insetPx = fixedLeftTotalPx(window.__cabinetMonKeywordsTableApi || null) || fcWidthPx;
         }
         if (insetPx < 0) {
             insetPx = 0;
         }
+
+        // Перед замером — гарантированно обнулить left-placeholder в scroll-таблице
+        // (иначе margin+ширина left ≈ двойной зазор ~488px; старый порог >480 его не чинил).
+        var zeroCss = {
+            width: '0px',
+            minWidth: '0px',
+            maxWidth: '0px',
+            paddingLeft: '0',
+            paddingRight: '0',
+            borderLeftWidth: '0',
+            borderRightWidth: '0',
+        };
+        $wrapper.find(
+            '.dataTables_scrollHead .cabinet-mon-scrollhead-left-hidden, .dataTables_scrollBody .cabinet-mon-scrollbody-left-hidden'
+        ).css(zeroCss);
+
         var inset = insetPx + 'px';
         if (root && root.style) {
             root.style.setProperty('--mon-scroll-edge-nudge', inset);
-            root.style.setProperty('--mon-fc-left-width', inset);
+            // Ширину FC не подменяем nudge'ем — иначе клон схлопывается.
+            if (fcWidthPx > 0) {
+                root.style.setProperty('--mon-fc-left-width', fcWidthPx + 'px');
+            }
+        }
+        $wrapper.find('.dataTables_scrollHeadInner table, .dataTables_scrollBody table').css('margin-left', inset);
+        resetFcCloneTableMargin($wrapper);
+
+        var edgeEl = $wrapper.find('.dataTables_scrollBody tbody tr:first-child td.cabinet-mon-scroll-edge-col')[0]
+            || $wrapper.find('.dataTables_scrollHead thead tr:first-child th.cabinet-mon-scroll-edge-col')[0];
+        if (!edgeEl) {
+            return;
+        }
+        var gap = Math.round(edgeEl.getBoundingClientRect().left - fcEl.getBoundingClientRect().right);
+        if (!gap) {
+            return;
+        }
+        // Допускаем коррекцию до ширины FC (+запас): как раз кейс «двойной» inset ~488.
+        var maxCorrect = Math.max(fcWidthPx, insetPx) + 80;
+        if (Math.abs(gap) > maxCorrect) {
+            return;
+        }
+        insetPx = Math.max(0, insetPx - gap);
+        inset = insetPx + 'px';
+        if (root && root.style) {
+            root.style.setProperty('--mon-scroll-edge-nudge', inset);
         }
         $wrapper.find('.dataTables_scrollHeadInner table, .dataTables_scrollBody table').css('margin-left', inset);
         resetFcCloneTableMargin($wrapper);
@@ -948,9 +1033,10 @@
 
         clearHiddenColumnInlineWidths(api, plan);
         var settings = plan.settings;
+        var scrollColWidths = null;
         if (settings._oFixedColumns) {
             var leftCount = monFixedLeftCount(api);
-            var scrollColWidths = [];
+            scrollColWidths = [];
             settings.aoColumns.forEach(function (col, idx) {
                 if (!col.bVisible) {
                     return;
@@ -968,10 +1054,12 @@
 
         var $bodyTable = $wrapper.find('.dataTables_scrollBody table');
         var $headInner = $wrapper.find('.dataTables_scrollHeadInner');
-        var totalW = applyPlanColumnWidths(api, plan);
-
-        $bodyTable.width(totalW);
-        $headInner.find('table').width(totalW);
+        applyPlanColumnWidths(api, plan);
+        // Ширина scroll-таблицы = сумма colgroup (left FC-слоты = 0). Не 100% viewport.
+        var contentW = scrollColWidths
+            ? sumColWidthsPx(scrollColWidths)
+            : sumColWidthsPx(plan.colgroup);
+        lockMonScrollTablesWidth($wrapper, contentW);
 
         var $scrollBody = $wrapper.find('.dataTables_scrollBody');
         if ($scrollBody.length) {
@@ -986,6 +1074,7 @@
         }
 
         syncFixedLeftBlock(api);
+        lockMonScrollTablesWidth($wrapper, contentW);
         fitMonTableScrollHeadInner($wrapper);
         if ($scrollBody.length) {
             syncMonTableScrollPositions($wrapper, $scrollBody[0], true);
@@ -1313,7 +1402,10 @@
                 finalized = true;
                 requestAnimationFrame(function () {
                     requestAnimationFrame(function () {
-                        finalizeMonTableLayout(api, { force: true });
+                        finalizeMonTableLayout(api, {
+                            force: true,
+                            rebuildFixedColumns: true,
+                        });
                         monColumnTogglePending = false;
                     });
                 });

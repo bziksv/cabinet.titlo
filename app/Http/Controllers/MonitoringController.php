@@ -621,8 +621,14 @@ class MonitoringController extends Controller
 
     public function setColumnSettingsForProject(Request $request)
     {
+        $name = (string) $request->input('name');
+        // «Запрос» всегда виден — не сохраняем скрытие (ломает FixedColumns).
+        if ($name === 'query') {
+            return;
+        }
+
         MonitoringProjectColumnsSetting::updateOrCreate(
-            ['monitoring_project_id' => $request->input('monitoring_project_id'), 'name' => $request->input('name')],
+            ['monitoring_project_id' => $request->input('monitoring_project_id'), 'name' => $name],
             ['state' => $request->input('state')]
         );
     }

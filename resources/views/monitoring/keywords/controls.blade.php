@@ -90,8 +90,8 @@
              title="{{ __('Monitoring show columns hint') }}">
             <span class="cabinet-mon-column-toggles__label">{{ __('Columns') }}:</span>
             <div class="cabinet-mon-column-toggles__list">
+                {{-- «Запрос» всегда виден (FixedColumns); тоггл убран — скрытие только мигало --}}
                 @foreach ([
-                    ['name' => 'query', 'text' => __('Query'), 'default' => 'on'],
                     ['name' => 'url', 'text' => __('URL'), 'default' => 'off'],
                     ['name' => 'group', 'text' => __('Group'), 'default' => 'on'],
                     ['name' => 'target_url', 'text' => __('Target URL'), 'default' => 'off'],

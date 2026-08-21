@@ -39,6 +39,9 @@ class MonitoringProjectColumnsSetting extends Model
             }
         }
 
+        // Колонка «Запрос» — часть FixedColumns; скрывать нельзя.
+        $map['query'] = true;
+
         return $map;
     }
 }
