@@ -52,7 +52,10 @@ class Handler extends ExceptionHandler
     public function render($request, Exception $exception)
     {
         if (OutagePage::isDatabaseUnavailable($exception)) {
-            // Локально нет nginx — ставим флаг, чтобы следующие запросы не ждали таймаут БД.
+            // Prod: флаг + заглушка. Local: не липнем на outage — покажем реальную ошибку.
+            if (app()->environment('local')) {
+                return parent::render($request, $exception);
+            }
             if (!OutagePage::isEnabled()) {
                 OutagePage::enable($exception->getMessage());
             }

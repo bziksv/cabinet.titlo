@@ -21,9 +21,10 @@ alwaysApply: false
 9. Scroll nav: **`#cabinetMonScrollNav`** / **`wireCabinetMonScrollNav`** — не удалять.
 10. Layout pipeline: **`finalizeMonTableLayout`** → enforce widths → `syncFixedLeftBlock` → hover → double rAF relayout. **Не вызывать `api.columns.adjust()`**.
 11. Empty tbody repair: **`repairMonTableRenderedRows`** в draw/finalize pipeline.
-12. Минимальный diff — не рефакторить соседний код. Cache-bust **`-fc51`** (увеличивать при изменениях).
+12. Минимальный diff — не рефакторить соседний код. Cache-bust **`-fc61`** (увеличивать при изменениях).
 13. Мало дат / выключенные столбцы: **`lockMonScrollTablesWidth`** — width scroll-таблиц = сумма colgroup, не 100% viewport.
 14. Первый показ: не снимать `is-table-booting` до `finalizeMonTableLayout` `onComplete` (иначе пустота вместо «Запрос»).
+15. После toggle столбцов при scrollLeft>0: **`syncMonTableScrollPositions`** обязан clamp body.scrollLeft к max и выровнять head — иначе шапка уезжает вправо (~100–200px).
 
 ## Запрещено (регрессии)
 

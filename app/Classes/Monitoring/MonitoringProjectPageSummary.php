@@ -9,12 +9,16 @@ use App\MonitoringSearchengine;
 use App\Support\MonitoringProjectPublicStats;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * KPI на /monitoring/{id}: актуальные цифры (не застрявший кэш 2024 при графиках 2026).
  */
 class MonitoringProjectPageSummary
 {
+    /** TTL кэша KPI по project+region (секунды). */
+    private const CACHE_TTL_SECONDS = 45;
+
     /**
      * @return array<string, mixed>
      */
@@ -23,20 +27,29 @@ class MonitoringProjectPageSummary
         apply_team_permissions($project->id);
 
         try {
-            if ($regionId !== null && $regionId > 0) {
-                $summary = self::liveForRegion($project, $regionId);
-            } else {
+            $cacheKey = sprintf(
+                'mon.page_summary.v1.%d.%s',
+                (int) $project->id,
+                ($regionId !== null && $regionId > 0) ? (string) (int) $regionId : 'all'
+            );
+
+            /** @var array<string, mixed> $summary */
+            $summary = Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, static function () use ($project, $regionId) {
+                if ($regionId !== null && $regionId > 0) {
+                    return self::liveForRegion($project, $regionId);
+                }
+
                 $snap = MonitoringDataTableColumnsProject::query()
                     ->where('monitoring_project_id', $project->id)
                     ->first();
                 $snapshot = MonitoringProjectPublicStats::summaryFromSnapshot($project, $snap);
 
                 if (self::summaryNeedsLiveFallback($snapshot, $project, $snap)) {
-                    $summary = self::liveForAllRegions($project, $snapshot);
-                } else {
-                    $summary = $snapshot;
+                    return self::liveForAllRegions($project, $snapshot);
                 }
-            }
+
+                return $snapshot;
+            });
 
             $summary['scope_label'] = self::scopeLabel($project, $regionId);
 

@@ -12,7 +12,8 @@ class ServeOutagePage
 {
     public function handle($request, Closure $next)
     {
-        if (OutagePage::isEnabled()) {
+        // Local: не блокируем кабинет флагом outage (его мог выставить gone away / healthcheck).
+        if (!app()->environment('local') && OutagePage::isEnabled()) {
             return OutagePage::response();
         }
 

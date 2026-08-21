@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Classes\Monitoring\Mastered;
+use App\Classes\Monitoring\MonitoringPositionDates;
+use App\Classes\Monitoring\MonitoringTableResponseCache;
 use App\Classes\Position\PositionStore;
 use App\Jobs\PositionQueue;
 use App\Location;
@@ -100,25 +102,35 @@ class MonitoringKeywordsController extends Controller
 
         apply_team_permissions($id);
 
-        $cacheKey = $this->tableResponseCacheKey($id, $request);
+        $cacheKey = $this->tableResponseCacheKey((int) $id, $request);
         $cached = Cache::get($cacheKey);
         if ($cached !== null) {
+            $draw = (int) $request->input('draw', 0);
+            if ($cached instanceof Collection) {
+                $cached = $cached->all();
+            }
+            if (is_array($cached)) {
+                $cached['draw'] = $draw;
+
+                return $cached;
+            }
+
             return $cached;
         }
 
         $this->setProjectID($id);
-        $request = collect($request->all());
+        $requestData = collect($request->all());
 
-        $response = $this->dataPrepare($request)->generateDataTable($request->get('draw', 0));
-        Cache::put($cacheKey, $response, now()->addSeconds(20));
+        $response = $this->dataPrepare($requestData)->generateDataTable($request->get('draw', 0));
+        Cache::put($cacheKey, $response, now()->addSeconds(MonitoringTableResponseCache::TTL_SECONDS));
 
         return $response;
     }
 
     private function tableResponseCacheKey(int $projectId, Request $request): string
     {
+        // Без draw: DataTables инкрементит его на каждый ajax — иначе кэш почти не попадает.
         $payload = $request->only([
-            'draw',
             'start',
             'length',
             'region_id',
@@ -129,8 +141,23 @@ class MonitoringKeywordsController extends Controller
             'order',
             'offset',
         ]);
+        // Видимость URL влияет на setUrls — иначе после включения колонки отдаётся кэш без urls.
+        $payload['url_col'] = $this->isUrlColumnVisibleForProject($projectId) ? 1 : 0;
+        $payload['ver'] = MonitoringTableResponseCache::version($projectId);
 
-        return 'monitoring.table.' . $projectId . '.' . Auth::id() . '.' . md5(json_encode($payload));
+        return 'monitoring.table.v2.' . $projectId . '.' . Auth::id() . '.' . md5(json_encode($payload));
+    }
+
+    private function isUrlColumnVisible(): bool
+    {
+        return $this->isUrlColumnVisibleForProject((int) $this->getProjectID());
+    }
+
+    private function isUrlColumnVisibleForProject(int $projectId): bool
+    {
+        $map = MonitoringProjectColumnsSetting::visibilityMapForProject($projectId);
+
+        return !empty($map['url']);
     }
 
     public function dataPrepare(Collection $collection)
@@ -186,11 +213,15 @@ class MonitoringKeywordsController extends Controller
 
         if ($this->regions && $this->regions->isNotEmpty()) {
             if ($this->isMainView()) {
-                $this->setUrls($dates);
+                if ($this->isUrlColumnVisible()) {
+                    $this->setUrls($dates);
+                }
                 $this->mainView();
                 $this->columns->forget(['dynamics', 'base', 'phrasal', 'exact']);
             } else {
-                $this->setUrls($dates);
+                if ($this->isUrlColumnVisible()) {
+                    $this->setUrls($dates);
+                }
                 $this->getLatestPositions($dates)->updateDynamics();
             }
         }
@@ -481,13 +512,13 @@ class MonitoringKeywordsController extends Controller
                     $mode = $this->mode;
                     if ($mode === "dates" || $mode === "main") {
                         if (isset($collectionPositions[$i])) {
-                            $row->put($i, $this->renderPositionWithDateCell($collectionPositions[$i]));
+                            $row->put($i, $this->positionCellPayload($collectionPositions[$i], true));
                         } else {
                             $row->put($i, '-');
                         }
                     } else {
                         if (isset($collectionPositions[$i])) {
-                            $row->put($i, $this->renderPositionCell($collectionPositions[$i]));
+                            $row->put($i, $this->positionCellPayload($collectionPositions[$i], false));
                         } else {
                             $row->put($i, '-');
                         }
@@ -498,6 +529,25 @@ class MonitoringKeywordsController extends Controller
         return $row;
     }
 
+    /**
+     * Компактный payload ячейки позиции для /table (рендер HTML на клиенте).
+     *
+     * @return array{p: int, d?: int, t?: string}
+     */
+    private function positionCellPayload($model, bool $withDate = false): array
+    {
+        $payload = ['p' => (int) $model->position];
+        if (!empty($model->diffPosition)) {
+            $payload['d'] = (int) $model->diffPosition;
+        }
+        if ($withDate) {
+            $payload['t'] = (string) $model->date;
+        }
+
+        return $payload;
+    }
+
+    /** @deprecated оставлен для экспортов/совместимости; /table использует positionCellPayload */
     private function renderPositionCell($model): string
     {
         $position = (int) $model->position;
@@ -703,29 +753,34 @@ class MonitoringKeywordsController extends Controller
     {
         [$start, $end] = $this->positionsDateBounds($dates);
         $regionIds = $this->regions->pluck('id')->filter()->values()->all();
-        $projectId = $this->getProjectID();
+        $projectId = (int) $this->getProjectID();
 
-        $query = DB::table('monitoring_positions as mp')
-            ->join('monitoring_keywords as mk', 'mk.id', '=', 'mp.monitoring_keyword_id')
-            ->where('mk.monitoring_project_id', $projectId)
-            ->where('mp.created_at', '>=', $start)
-            ->where('mp.created_at', '<=', $end);
+        $cacheKey = 'mon.date_cols.' . $projectId . '.' . md5(json_encode([$start, $end, $regionIds]));
 
-        if ($regionIds !== []) {
-            $query->whereIn('mp.monitoring_searchengine_id', $regionIds);
-        }
+        /** @var list<string> $rawDates */
+        $rawDates = Cache::remember($cacheKey, 90, static function () use ($start, $end, $regionIds, $projectId) {
+            // Не JOIN'ить keywords на 13M positions — только engine_id (короткий IN, префикс индекса).
+            $engineIds = $regionIds;
+            if ($engineIds === []) {
+                $engineIds = DB::table('monitoring_searchengines')
+                    ->where('monitoring_project_id', $projectId)
+                    ->pluck('id')
+                    ->map(static function ($id) {
+                        return (int) $id;
+                    })
+                    ->all();
+            }
 
-        $rawDates = $query
-            ->selectRaw('DATE(mp.created_at) as d')
-            ->distinct()
-            ->orderByDesc('d')
-            ->pluck('d');
+            if ($engineIds === []) {
+                return [];
+            }
+
+            // Лёгкая таблица дней съёма (с авто-прогревом из positions при первом miss).
+            return MonitoringPositionDates::datesForEngines($engineIds, $start, $end);
+        });
 
         $columnCollection = collect([]);
         foreach ($rawDates as $colIdx => $rawDate) {
-            if ($rawDate === null || $rawDate === '') {
-                continue;
-            }
             $columnCollection->put(
                 'col_' . $colIdx,
                 Carbon::parse($rawDate)->format(self::MONITORING_TABLE_DATE_FORMAT)
@@ -821,35 +876,46 @@ class MonitoringKeywordsController extends Controller
 
     private function setUrls(?array $dates = null)
     {
-        $ids = $this->queries->pluck('id');
         $region = $this->regions->first();
-
-        if ($ids->isEmpty() || !$region) {
+        if (!$region) {
             return;
         }
 
-        // DISTINCT в SQL: иначе грузим всю историю позиций (сотни тысяч строк) ради unique('url') в PHP.
-        $query = MonitoringPosition::query()
-            ->select('monitoring_keyword_id', 'url', DB::raw('MAX(created_at) as created_at'))
-            ->where('monitoring_searchengine_id', $region['id'])
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
-            ->whereIn('monitoring_keyword_id', $ids);
+        $regionId = (int) $region['id'];
 
-        if ($dates && count($dates) >= 2) {
-            [$start, $end] = $this->positionsDateBounds($dates);
-            $query->where('created_at', '>=', $start)
-                ->where('created_at', '<=', $end);
-        }
+        // Без отдельного GROUP BY по monitoring_positions (на крупных регионах 1–3+ с):
+        // URL уже есть в loadPositions (по дню). Собираем unique url на странице в PHP.
+        $this->queries->transform(function ($item) use ($regionId) {
+            $byUrl = [];
+            $positions = $item->positions ?? collect();
+            foreach ($positions as $pos) {
+                if ((int) $pos->monitoring_searchengine_id !== $regionId) {
+                    continue;
+                }
+                $url = isset($pos->url) ? trim((string) $pos->url) : '';
+                if ($url === '') {
+                    continue;
+                }
+                $ts = $pos->created_at ? $pos->created_at->getTimestamp() : 0;
+                if (!isset($byUrl[$url]) || $ts > $byUrl[$url]->_ts) {
+                    $row = (object) [
+                        'monitoring_keyword_id' => (int) $item->id,
+                        'url' => $url,
+                        'created_at' => $pos->created_at,
+                        '_ts' => $ts,
+                    ];
+                    $byUrl[$url] = $row;
+                }
+            }
 
-        $rows = $query->groupBy('monitoring_keyword_id', 'url')
-            ->orderByDesc('created_at')
-            ->get();
+            $urls = collect(array_values($byUrl))
+                ->sortByDesc('_ts')
+                ->values()
+                ->each(static function ($row) {
+                    unset($row->_ts);
+                });
 
-        $urls = $rows->groupBy('monitoring_keyword_id');
-
-        $this->queries->transform(function ($item) use ($urls) {
-            $item->urls = $urls->get($item->id, collect([]));
+            $item->urls = $urls;
 
             return $item;
         });
@@ -872,6 +938,7 @@ class MonitoringKeywordsController extends Controller
 
         [$start, $end] = $this->positionsDateBounds($dates);
 
+        // JOIN к MAX(id) вместо WHERE id IN (subquery): на 100 ключах ~0.26с vs ~4.8с.
         $latestIdsQuery = DB::table('monitoring_positions')
             ->selectRaw('MAX(id) as id')
             ->whereIn('monitoring_keyword_id', $keywordIds)
@@ -888,18 +955,20 @@ class MonitoringKeywordsController extends Controller
             DB::raw('DATE(created_at)')
         );
 
-        $rows = DB::table('monitoring_positions')
+        $rows = DB::table('monitoring_positions as p')
             ->select([
-                'id',
-                'monitoring_keyword_id',
-                'monitoring_searchengine_id',
-                'position',
-                'url',
-                'target',
-                'created_at',
+                'p.id',
+                'p.monitoring_keyword_id',
+                'p.monitoring_searchengine_id',
+                'p.position',
+                'p.url',
+                'p.target',
+                'p.created_at',
             ])
-            ->whereIn('id', $latestIdsQuery)
-            ->orderBy('created_at')
+            ->joinSub($latestIdsQuery, 'latest', static function ($join) {
+                $join->on('p.id', '=', 'latest.id');
+            })
+            ->orderBy('p.created_at')
             ->get()
             ->groupBy('monitoring_keyword_id');
 

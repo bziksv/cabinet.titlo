@@ -28,6 +28,11 @@ class OutagePage
 
     public static function enable(string $reason = ''): void
     {
+        // Локально один «gone away» от тяжёлого запроса не должен блокировать весь кабинет.
+        if (function_exists('app') && app()->environment('local')) {
+            return;
+        }
+
         $dir = dirname(self::flagPath());
         if (!is_dir($dir)) {
             @mkdir($dir, 0775, true);

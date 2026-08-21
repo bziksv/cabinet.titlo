@@ -1,10 +1,10 @@
-# Таблица ключевых слов мониторинга: FixedColumns (эталон fc52)
+# Таблица ключевых слов мониторинга: FixedColumns (эталон fc53)
 
 Страница: `/monitoring/{id}#keywords` (пример: `/monitoring/63#keywords`).
 
 **Это проверенный production-ready эталон.** Не переписывать на CSS `position: sticky` и не «упрощать» без чтения этого документа — иначе снова получите наложение колонок, щель между «Запрос» и «URL», гигантские строки, пропавший заголовок «Запрос», сдвиг шапки при горизонтальном скролле и отставание при вертикальном скролле.
 
-**Baseline tag: `fc52`** — 2026-08-21 (unveil после FC). Prior: `fc50`/`fc47`. Cache-bust: `-fc52`.
+**Baseline tag: `fc53`** — 2026-08-21 (unveil после FC). Prior: `fc50`/`fc47`. Cache-bust: `-fc53`.
 ---
 
 ## Симптомы, если сломать
@@ -260,6 +260,7 @@ CSS дублирует: `.dataTables_scrollHeadInner { box-sizing: content-box; 
 | fc50 | Мало дат + скрытые столбцы: `lockMonScrollTablesWidth` (не 100% viewport), gap-correct inset, left-hidden vs col min-width |
 | fc51 | Unveil после FC: не снимать `is-table-booting` до `onComplete` (иначе пустота вместо «Запрос») |
 | fc52 | Gap ~488px при toggle столбцов: порог коррекции >480 мешал; zero left-hidden до замера; `--mon-fc-left-width` ≠ nudge |
+| fc53 | Toggle столбцов: убран `rebuildFixedColumns` (дыра 0.5–1с); мгновенный `enforceMonColumnWidths` до debounce |
 
 **Baseline tag: `fc51`** — production-ready для monitoring keywords (2026-08-21).
 **Prior baseline: `fc50` / `fc47`.

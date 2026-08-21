@@ -28,37 +28,44 @@
     }
 
     function appendModeRadios(container, i18n, initialMode) {
-        if (container.find('.mode').length > 0) {
-            return;
+        if (container.children('.mode').length === 0) {
+            var $wrap = $('<div />', { class: 'mode' });
+            var $ul = $('<ul />');
+            var settings = [
+                { id: 'mon-dr-mode-range', value: 'range', label: i18n.modeRange },
+                { id: 'mon-dr-mode-datesFind', value: 'datesFind', label: i18n.modeDatesFind },
+                { id: 'mon-dr-mode-dates', value: 'dates', label: i18n.modeDates },
+                { id: 'mon-dr-mode-randWeek', value: 'randWeek', label: i18n.modeRandWeek },
+                { id: 'mon-dr-mode-randMonth', value: 'randMonth', label: i18n.modeRandMonth },
+            ];
+
+            settings.forEach(function (item) {
+                var $radio = $('<input />', {
+                    class: 'form-check-input',
+                    id: item.id,
+                    type: 'radio',
+                    name: 'mode',
+                    value: item.value,
+                });
+                if ((initialMode || 'range') === item.value) {
+                    $radio.prop('checked', true);
+                }
+                var $label = $('<label />', { class: 'form-check-label', for: item.id }).text(item.label);
+                var $formCheck = $('<div />', { class: 'form-check' });
+                $ul.append($('<li />').html($formCheck.prepend($radio, $label)));
+            });
+
+            container.append($wrap.append($ul));
         }
 
-        var $wrap = $('<div />', { class: 'mode' });
-        var $ul = $('<ul />');
-        var settings = [
-            { id: 'mon-dr-mode-range', value: 'range', label: i18n.modeRange },
-            { id: 'mon-dr-mode-datesFind', value: 'datesFind', label: i18n.modeDatesFind },
-            { id: 'mon-dr-mode-dates', value: 'dates', label: i18n.modeDates },
-            { id: 'mon-dr-mode-randWeek', value: 'randWeek', label: i18n.modeRandWeek },
-            { id: 'mon-dr-mode-randMonth', value: 'randMonth', label: i18n.modeRandMonth },
-        ];
-
-        settings.forEach(function (item) {
-            var $radio = $('<input />', {
-                class: 'form-check-input',
-                id: item.id,
-                type: 'radio',
-                name: 'mode',
-                value: item.value,
-            });
-            if ((initialMode || 'range') === item.value) {
-                $radio.prop('checked', true);
-            }
-            var $label = $('<label />', { class: 'form-check-label', for: item.id }).text(item.label);
-            var $formCheck = $('<div />', { class: 'form-check' });
-            $ul.append($('<li />').html($formCheck.prepend($radio, $label)));
-        });
-
-        container.prepend($wrap.html($ul));
+        // [calendars | mode | presets | buttons]
+        container.append(
+            container.children('.drp-calendar.left'),
+            container.children('.drp-calendar.right'),
+            container.children('.mode'),
+            container.children('.ranges'),
+            container.children('.drp-buttons')
+        );
     }
 
     function collectVisibleDates(picker) {

@@ -1,5 +1,5 @@
 <span class="cabinet-mon-query-cell">
-<span class="query-string">
+<span class="query-string" title="{{ $key->query }}">
     {{ $key->query }}
 </span>
 

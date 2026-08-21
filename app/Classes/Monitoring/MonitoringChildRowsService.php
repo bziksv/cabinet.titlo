@@ -3,25 +3,21 @@
 namespace App\Classes\Monitoring;
 
 use App\Http\Controllers\MonitoringController;
-use App\Classes\Monitoring\Helper;
 use App\MonitoringKeywordPrice;
-use App\MonitoringPosition;
-use App\MonitoringSearchengine;
 use App\MonitoringProject;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Регионы и дни (child-rows): один запрос позиций вместо N×5, кэш HTML.
+ * Регионы и дни (child-rows): последние позиции по срезам месяцев + кэш HTML.
  */
 class MonitoringChildRowsService
 {
-    private const CACHE_TTL_SECONDS = 600;
-
-    /** Выше — грузим помесячно (5 запросов), иначе один запрос за 12 мес. */
-    private const SINGLE_QUERY_MAX_ROWS = 120000;
+    /** Дольше — меньше повторных тяжёлых сборок при скролле списка. */
+    private const CACHE_TTL_SECONDS = 1800;
 
     /** @var MonitoringController */
     private $metrics;
@@ -37,12 +33,43 @@ class MonitoringChildRowsService
         $groupKey = $groupId ? (string) $groupId : '0';
         $cacheKey = $this->cacheKey($projectId, $groupKey);
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($project, $groupId) {
-            $groups = $this->buildGroups($project, $groupId);
-            $projectId = $project->id;
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
 
-            return view('monitoring.partials._child_rows', compact('groups', 'projectId'))->render();
-        });
+        // Анти-штамп: hover/warm не должны параллельно собирать один проект.
+        $lockKey = 'mon.child_rows.lock.' . $projectId . '.' . $groupKey;
+        if (!Cache::add($lockKey, 1, 60)) {
+            $deadline = microtime(true) + 8.0;
+            while (microtime(true) < $deadline) {
+                usleep(120000);
+                $cached = Cache::get($cacheKey);
+                if (is_string($cached) && $cached !== '') {
+                    return $cached;
+                }
+                if (!Cache::has($lockKey)) {
+                    break;
+                }
+            }
+            $cached = Cache::get($cacheKey);
+            if (is_string($cached) && $cached !== '') {
+                return $cached;
+            }
+        }
+
+        try {
+            $groups = $this->buildGroups($project, $groupId);
+            $html = view('monitoring.partials._child_rows', [
+                'groups' => $groups,
+                'projectId' => $project->id,
+            ])->render();
+            Cache::put($cacheKey, $html, self::CACHE_TTL_SECONDS);
+
+            return $html;
+        } finally {
+            Cache::forget($lockKey);
+        }
     }
 
     /**
@@ -100,7 +127,7 @@ class MonitoringChildRowsService
     {
         $ver = (int) Cache::get('monitoring_child_rows_ver:' . $projectId, 0);
 
-        return sprintf('monitoring_child_rows:%d:%s:v%d:p8', $projectId, $groupKey, $ver);
+        return sprintf('monitoring_child_rows:%d:%s:v%d:p9', $projectId, $groupKey, $ver);
     }
 
     /**
@@ -126,12 +153,7 @@ class MonitoringChildRowsService
         }
 
         $pricesByEngine = $this->keywordPricesByEngine($engineIds, $keywordIds);
-
-        if ($this->shouldLoadPositionsInSingleQuery($project, $engineIds, $keywordIds)) {
-            $this->fillGroupsFromSingleQuery($engines, $engineIds, $keywordIds, $months, $pricesByEngine);
-        } else {
-            $this->fillGroupsByMonthQueries($engines, $engineIds, $keywordIds, $months, $pricesByEngine);
-        }
+        $this->fillGroupsByLatestMonthSnapshots($engines, $engineIds, $keywordIds, $months, $pricesByEngine);
 
         foreach ($engines as $engine) {
             $engine->data = $this->applyPeriodOverPeriodDeltas($engine->data);
@@ -298,65 +320,83 @@ class MonitoringChildRowsService
     }
 
     /**
-     * COUNT по monitoring_positions на удалённой БД — 2–5 с даже для малых проектов.
-     * Для типичных портфелей оцениваем объём без COUNT.
+     * По каждому срезу месяца — только последняя позиция ключа (JOIN MAX(id)),
+     * диапазон дат без YEAR()/MONTH() (иначе индекс не используется).
      */
-    private function shouldLoadPositionsInSingleQuery(MonitoringProject $project, array $engineIds, ?array $keywordIds): bool
-    {
-        $engineCount = count($engineIds);
-        if ($engineCount === 0) {
-            return true;
+    private function fillGroupsByLatestMonthSnapshots(
+        $engines,
+        array $engineIds,
+        ?array $keywordIds,
+        array $months,
+        array $pricesByEngine
+    ): void {
+        foreach ($months as $month) {
+            $target = Carbon::now()->subMonths((int) $month);
+            $start = $target->copy()->startOfMonth();
+            $end = $target->copy()->endOfMonth();
+
+            $byEngine = $this->latestPositionsInRange($engineIds, $keywordIds, $start, $end)
+                ->groupBy('monitoring_searchengine_id');
+
+            foreach ($engines as $engine) {
+                $monthPositions = $byEngine->get($engine->id);
+                if (!$monthPositions || $monthPositions->isEmpty()) {
+                    continue;
+                }
+                $prices = $pricesByEngine[$engine->id] ?? collect();
+                $this->pushMonthSnapshot($engine, $monthPositions, $prices, (int) $month);
+            }
         }
-
-        $keywordCount = $keywordIds !== null
-            ? count($keywordIds)
-            : (int) $project->keywords()->count();
-
-        if ($engineCount <= 12 && $keywordCount <= 8000) {
-            return true;
-        }
-
-        $query = MonitoringPosition::query()
-            ->whereIn('monitoring_searchengine_id', $engineIds)
-            ->whereNotNull('position');
-        $this->applySubtractionMonthsFilter($query, $this->metrics->getSubtractionMonths());
-
-        if ($keywordIds !== null) {
-            $query->whereIn('monitoring_keyword_id', $keywordIds);
-        }
-
-        return (int) $query->count() <= self::SINGLE_QUERY_MAX_ROWS;
-    }
-
-    private function positionsBaseQuery(array $engineIds, ?array $keywordIds)
-    {
-        $query = MonitoringPosition::query()
-            ->whereIn('monitoring_searchengine_id', $engineIds)
-            ->whereNotNull('position');
-
-        if ($keywordIds !== null) {
-            $query->whereIn('monitoring_keyword_id', $keywordIds);
-        }
-
-        return $query->select(['id', 'monitoring_searchengine_id', 'monitoring_keyword_id', 'position', 'created_at'])
-            ->orderByDesc('created_at');
     }
 
     /**
-     * Только месяцы среза (0/1/3/6/12), не весь год — меньше строк с удалённой БД.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param list<int> $engineIds
+     * @param list<int>|null $keywordIds
+     * @return Collection<int, object>
      */
-    private function applySubtractionMonthsFilter($query, array $months): void
-    {
-        $query->where(function ($outer) use ($months) {
-            foreach ($months as $subMonth) {
-                $target = Carbon::now()->subMonths($subMonth);
-                $outer->orWhere(function ($q) use ($target) {
-                    $q->whereYear('created_at', $target->year)
-                        ->whereMonth('created_at', $target->month);
-                });
+    private function latestPositionsInRange(
+        array $engineIds,
+        ?array $keywordIds,
+        Carbon $start,
+        Carbon $end
+    ): Collection {
+        if ($engineIds === []) {
+            return collect();
+        }
+
+        $latestIdsQuery = DB::table('monitoring_positions')
+            ->selectRaw('MAX(id) as id')
+            ->whereIn('monitoring_searchengine_id', $engineIds)
+            ->whereNotNull('position')
+            ->where('created_at', '>=', $start->toDateTimeString())
+            ->where('created_at', '<=', $end->toDateTimeString());
+
+        if ($keywordIds !== null) {
+            if ($keywordIds === []) {
+                return collect();
             }
+            $latestIdsQuery->whereIn('monitoring_keyword_id', $keywordIds);
+        }
+
+        $latestIdsQuery->groupBy('monitoring_keyword_id', 'monitoring_searchengine_id');
+
+        $rows = DB::table('monitoring_positions as p')
+            ->select([
+                'p.id',
+                'p.monitoring_searchengine_id',
+                'p.monitoring_keyword_id',
+                'p.position',
+                'p.created_at',
+            ])
+            ->joinSub($latestIdsQuery, 'latest', static function ($join) {
+                $join->on('p.id', '=', 'latest.id');
+            })
+            ->get();
+
+        return $rows->map(static function ($row) {
+            $row->created_at = $row->created_at ? Carbon::parse($row->created_at) : null;
+
+            return $row;
         });
     }
 
@@ -385,61 +425,6 @@ class MonitoringChildRowsService
         }
 
         return $out;
-    }
-
-    private function fillGroupsFromSingleQuery($engines, array $engineIds, ?array $keywordIds, array $months, array $pricesByEngine): void
-    {
-        $query = $this->positionsBaseQuery($engineIds, $keywordIds);
-        $this->applySubtractionMonthsFilter($query, $months);
-        $all = $query->get()->groupBy('monitoring_searchengine_id');
-
-        foreach ($engines as $engine) {
-            $positions = $all->get($engine->id, collect());
-            $prices = $pricesByEngine[$engine->id] ?? collect();
-            foreach ($months as $month) {
-                $monthPositions = $this->filterByMonth($positions, $month);
-                if ($monthPositions === null) {
-                    continue;
-                }
-                $this->pushMonthSnapshot($engine, $monthPositions, $prices, $month);
-            }
-        }
-    }
-
-    private function fillGroupsByMonthQueries($engines, array $engineIds, ?array $keywordIds, array $months, array $pricesByEngine): void
-    {
-        foreach ($months as $month) {
-            $target = Carbon::now()->subMonths($month);
-            $byEngine = $this->positionsBaseQuery($engineIds, $keywordIds)
-                ->whereYear('created_at', $target->year)
-                ->whereMonth('created_at', $target->month)
-                ->get()
-                ->groupBy('monitoring_searchengine_id');
-
-            foreach ($engines as $engine) {
-                $monthPositions = $byEngine->get($engine->id);
-                if (!$monthPositions || $monthPositions->isEmpty()) {
-                    continue;
-                }
-                $prices = $pricesByEngine[$engine->id] ?? collect();
-                $this->pushMonthSnapshot($engine, $monthPositions, $prices, $month);
-            }
-        }
-    }
-
-    /**
-     * @param \Illuminate\Support\Collection $positions
-     */
-    private function filterByMonth($positions, int $subMonth)
-    {
-        $target = Carbon::now()->subMonths($subMonth);
-        $filtered = $positions->filter(function ($row) use ($target) {
-            $at = $row->created_at;
-
-            return $at && (int) $at->year === (int) $target->year && (int) $at->month === (int) $target->month;
-        })->values();
-
-        return $filtered->isEmpty() ? null : $filtered;
     }
 
     /**

@@ -18,7 +18,21 @@ define('LARAVEL_START', microtime(true));
 |
 */
 $outageFlag = __DIR__ . '/../storage/app/outage/ENABLED';
-if (is_file($outageFlag)) {
+$outageSkipLocal = false;
+$envFile = __DIR__ . '/../.env';
+if (is_readable($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $envLine) {
+        $envLine = trim($envLine);
+        if ($envLine === '' || $envLine[0] === '#') {
+            continue;
+        }
+        if (strpos($envLine, 'APP_ENV=') === 0) {
+            $outageSkipLocal = (trim(substr($envLine, 8), " \t\"'") === 'local');
+            break;
+        }
+    }
+}
+if (!$outageSkipLocal && is_file($outageFlag)) {
     http_response_code(503);
     header('Content-Type: text/html; charset=UTF-8');
     header('Retry-After: 300');

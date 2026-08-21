@@ -8,9 +8,9 @@
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}?v={{ (@filemtime(public_path('plugins/daterangepicker/daterangepicker.css')) ?: time()) . '-drp2' }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc52' }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc61' }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-export.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-export.css')) ?: time() }}">
     @endslot
 
@@ -177,7 +177,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/fixedColumns.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc52' }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc61' }}"></script>
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
@@ -191,10 +191,7 @@
         <!-- Papa parse -->
         <script src="{{ asset('plugins/papaparse/papaparse.min.js') }}"></script>
 
-        <!-- Charts -->
-        <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
-        <script src="{{ asset('plugins/chart.js/3.9.1/plugins/chartjs-plugin-crosshair.js') }}"></script>
-        <script src="{{ asset('plugins/chart.js/3.9.1/plugins/chartjs-plugin-datalabels.js') }}"></script>
+        {{-- Chart.js (~230 KB): грузим лениво при первом заходе на «Обзор» — см. loadMonChartLibs() --}}
 
         <script>
             $(document).ready(function () {
@@ -1139,6 +1136,54 @@
                 return '';
             }
 
+            function monIsPositionColumn(name) {
+                name = String(name || '');
+                return name.indexOf('col_') === 0 || name.indexOf('engine_') === 0;
+            }
+
+            function monEscapeHtml(value) {
+                return String(value == null ? '' : value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            /**
+             * Ячейка позиции: бэк отдаёт {p,d?,t?} (или старый HTML / '-').
+             */
+            function monRenderPositionCell(data, type) {
+                if (data && typeof data === 'object' && !Array.isArray(data) && data.p != null) {
+                    if (type === 'sort' || type === 'type' || type === 'filter') {
+                        return Number(data.p) || 0;
+                    }
+                    var html = '<span data-position="' + Number(data.p) + '">' + Number(data.p);
+                    if (data.d != null && data.d !== 0 && data.d !== '0') {
+                        var diff = Number(data.d) || 0;
+                        html += '<sup class="text-sm">' + (diff > 0 ? '+' : '') + diff + '</sup>';
+                    }
+                    html += '</span>';
+                    if (data.t) {
+                        html += '<div class="badge badge-info">' + monEscapeHtml(data.t) + '</div>';
+                    }
+                    return html;
+                }
+                if (type === 'sort' || type === 'type' || type === 'filter') {
+                    if (data == null || data === '-' || data === '') {
+                        return 9999;
+                    }
+                    if (typeof data === 'string') {
+                        var m = data.match(/data-position="(\d+)"/);
+                        return m ? Number(m[1]) : 9999;
+                    }
+                    return Number(data) || 9999;
+                }
+                if (data == null || data === '') {
+                    return '-';
+                }
+                return data;
+            }
+
             function monIsMultiRegionView() {
                 if (REGION_ID && String(REGION_ID).length) {
                     return false;
@@ -1256,6 +1301,7 @@
                         'orderable': orderable,
                         'visible': monColumnVisible(i),
                         'className': monColumnClassName(i),
+                        'render': monIsPositionColumn(i) ? monRenderPositionCell : undefined,
                     });
                 });
 
@@ -2189,7 +2235,6 @@
             });
 
             range.on('show.daterangepicker', function (ev, picker) {
-                //do something, like clearing an input
                 let container = picker.container;
 
                 if (container.find('.mode').length === 0) {
@@ -2230,7 +2275,19 @@
                         ul.find('input[value="' + MODE + '"]').prop('checked', true);
                     }
 
-                    container.prepend(ranges.html(ul));
+                    container.append(ranges.append(ul));
+                }
+
+                // [calendars | mode | presets | buttons]
+                container.append(
+                    container.children('.drp-calendar.left'),
+                    container.children('.drp-calendar.right'),
+                    container.children('.mode'),
+                    container.children('.ranges'),
+                    container.children('.drp-buttons')
+                );
+                if (picker && typeof picker.move === 'function') {
+                    picker.move();
                 }
             });
 
@@ -2779,12 +2836,151 @@
                 topChartRef.update('none');
             }
 
+            /** Не бить /monitoring/charts на вкладке «Ключевые слова» — только на «Обзор». */
+            var chartsNetworkLoaded = false;
+            var chartsNetworkDirty = true;
+            var chartInstances = {};
+            var monChartInstancesReady = false;
+            var monChartLibsPromise = null;
+
+            function isMonOverviewView() {
+                var el = document.getElementById('cabinet-mon-project-root');
+                return !!(el && el.getAttribute('data-view') === 'overview');
+            }
+
+            function loadScriptOnce(src) {
+                return new Promise(function (resolve, reject) {
+                    var existing = document.querySelector('script[data-mon-chart-src="' + src + '"]');
+                    if (existing) {
+                        if (existing.getAttribute('data-mon-chart-loaded') === '1') {
+                            resolve();
+                            return;
+                        }
+                        existing.addEventListener('load', function () { resolve(); });
+                        existing.addEventListener('error', function () { reject(new Error('script ' + src)); });
+                        return;
+                    }
+                    var s = document.createElement('script');
+                    s.src = src;
+                    s.async = false;
+                    s.setAttribute('data-mon-chart-src', src);
+                    s.onload = function () {
+                        s.setAttribute('data-mon-chart-loaded', '1');
+                        resolve();
+                    };
+                    s.onerror = function () {
+                        reject(new Error('Failed to load ' + src));
+                    };
+                    document.head.appendChild(s);
+                });
+            }
+
+            function loadMonChartLibs() {
+                if (typeof window.Chart === 'function') {
+                    return Promise.resolve();
+                }
+                if (monChartLibsPromise) {
+                    return monChartLibsPromise;
+                }
+                var urls = [
+                    @json(asset('plugins/chart.js/3.9.1/chart.js')),
+                    @json(asset('plugins/chart.js/3.9.1/plugins/chartjs-plugin-crosshair.js')),
+                    @json(asset('plugins/chart.js/3.9.1/plugins/chartjs-plugin-datalabels.js')),
+                ];
+                monChartLibsPromise = urls.reduce(function (chain, url) {
+                    return chain.then(function () {
+                        return loadScriptOnce(url);
+                    });
+                }, Promise.resolve()).catch(function (err) {
+                    monChartLibsPromise = null;
+                    throw err;
+                });
+                return monChartLibsPromise;
+            }
+
+            function initMonChartInstances() {
+                if (monChartInstancesReady) {
+                    return;
+                }
+                if (typeof window.Chart !== 'function') {
+                    return;
+                }
+
+                $.each(charts, function (key, obj) {
+                    if (!obj || !obj.el) {
+                        return;
+                    }
+                    var chart = new Chart(obj.el, {
+                        type: obj.type,
+                        data: {},
+                        options: obj.options
+                    });
+
+                    if (obj.chart === 'top') {
+                        topChartRef = chart;
+                    }
+                    chartInstances[key] = chart;
+
+                    chartFilterPeriod.on('change.monChartInstance.' + key, function () {
+                        loadChartData(chart, obj, $(this).val());
+                    });
+                });
+
+                if (window.cabinetMonitoringShowCharts && $('.cabinet-mon-top-presets').length) {
+                    if ($('.cabinet-mon-project-charts[data-many-regions="1"]').length) {
+                        window.cabinetMonitoringShowCharts.setPreset('10');
+                    }
+                    window.cabinetMonitoringShowCharts.wirePresets($('.cabinet-mon-top-presets'), function () {
+                        if (!isMonOverviewView()) {
+                            chartsNetworkDirty = true;
+                            return;
+                        }
+                        if ($('#topPercentRegions').length && chartInstances.regions_top) {
+                            loadChartData(chartInstances.regions_top, charts.regions_top, chartFilterPeriod.val());
+                        } else if (topChartRawBase) {
+                            applyTopChartFromRaw();
+                        } else if (topChartRef && chartFilterPeriod.length) {
+                            loadChartData(topChartRef, { chart: 'top' }, chartFilterPeriod.val());
+                        }
+                    });
+                }
+
+                monChartInstancesReady = true;
+            }
+
             function reloadAllCharts() {
+                if (!isMonOverviewView()) {
+                    chartsNetworkDirty = true;
+                    return;
+                }
+                if (!monChartInstancesReady) {
+                    return;
+                }
+                chartsNetworkLoaded = true;
+                chartsNetworkDirty = false;
                 var range = chartFilterPeriod.val();
                 $.each(chartInstances, function (key, chart) {
                     loadChartData(chart, charts[key], range);
                 });
                 loadDistributionChart();
+            }
+
+            function ensureOverviewChartsLoaded() {
+                if (!isMonOverviewView()) {
+                    return;
+                }
+                loadMonChartLibs()
+                    .then(function () {
+                        initMonChartInstances();
+                        if (chartsNetworkLoaded && !chartsNetworkDirty) {
+                            return;
+                        }
+                        reloadAllCharts();
+                    })
+                    .catch(function (err) {
+                        console.error('monitoring chart libs', err);
+                        toastr.error(chartLoadErrorLabel);
+                    });
             }
 
             var distributionChartBase = null;
@@ -3020,42 +3216,6 @@
                     });
             }
 
-            var chartInstances = {};
-
-            $.each(charts, function (key, obj) {
-
-                let chart = new Chart(obj.el, {
-                    type: obj.type,
-                    data: {},
-                    options: obj.options
-                });
-
-                if (obj.chart === 'top') {
-                    topChartRef = chart;
-                }
-                chartInstances[key] = chart;
-
-                chartFilterPeriod.change(function () {
-                    loadChartData(chart, obj, $(this).val());
-                });
-            });
-
-            if (window.cabinetMonitoringShowCharts && $('.cabinet-mon-top-presets').length) {
-                if ($('.cabinet-mon-project-charts[data-many-regions="1"]').length) {
-                    window.cabinetMonitoringShowCharts.setPreset('10');
-                }
-                window.cabinetMonitoringShowCharts.wirePresets($('.cabinet-mon-top-presets'), function () {
-                    if ($('#topPercentRegions').length && chartInstances.regions_top) {
-                        loadChartData(chartInstances.regions_top, charts.regions_top, chartFilterPeriod.val());
-                    } else if (topChartRawBase) {
-                        applyTopChartFromRaw();
-                    } else if (topChartRef && chartFilterPeriod.length) {
-                        loadChartData(topChartRef, { chart: 'top' }, chartFilterPeriod.val());
-                    }
-                });
-            }
-
-
             $('.cabinet-mon-project-charts .nav-pills a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
                 var target = $(e.target).attr('href') || '';
                 var showPeriod = target === '#tab_1' || target === '#tab_2'
@@ -3063,17 +3223,39 @@
                 chartFilterPeriod.toggleClass('d-none', !showPeriod);
             });
 
+            chartFilterPeriod.on('change.monChartsDefer', function () {
+                if (!isMonOverviewView()) {
+                    chartsNetworkDirty = true;
+                }
+            });
+
+            (function wireOverviewChartsLazyLoad() {
+                var rootEl = document.getElementById('cabinet-mon-project-root');
+                if (!rootEl || rootEl._monChartsViewObserver) {
+                    return;
+                }
+                rootEl._monChartsViewObserver = new MutationObserver(function () {
+                    ensureOverviewChartsLoaded();
+                });
+                rootEl._monChartsViewObserver.observe(rootEl, {
+                    attributes: true,
+                    attributeFilter: ['data-view'],
+                });
+            })();
+
             if (window.cabinetMonitoringShowCompare) {
                 window.cabinetMonitoringShowCompare.init().then(function () {
                     window.cabinetMonitoringShowCompare.onChange(function () {
-                        reloadAllCharts();
+                        if (isMonOverviewView()) {
+                            reloadAllCharts();
+                        } else {
+                            chartsNetworkDirty = true;
+                        }
                     });
-                    chartFilterPeriod.trigger('change');
-                    loadDistributionChart();
+                    ensureOverviewChartsLoaded();
                 });
             } else {
-                chartFilterPeriod.trigger('change');
-                loadDistributionChart();
+                ensureOverviewChartsLoaded();
             }
         </script>
     @endslot

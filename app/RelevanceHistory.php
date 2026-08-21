@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\Concerns\UsesHeavyDatabaseConnection;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 
 class RelevanceHistory extends Model
 {
+    use UsesHeavyDatabaseConnection;
+
     protected $guarded = [];
 
     protected $table = 'relevance_history';

@@ -23,6 +23,7 @@ class MonitoringProjectSnapshotService
             $pd->save();
             $this->forgetListCacheForProjectUsers($project);
             MonitoringChildRowsService::forgetProjectCache((int) $project->id);
+            MonitoringTableResponseCache::bump((int) $project->id);
         } catch (\Throwable $e) {
             Log::warning('monitoring snapshot refresh failed', [
                 'project_id' => $project->id,

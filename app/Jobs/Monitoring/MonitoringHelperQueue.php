@@ -3,6 +3,7 @@
 namespace App\Jobs\Monitoring;
 
 use App\MonitoringHelper;
+use App\Support\HeavyDb;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -39,7 +40,7 @@ class MonitoringHelperQueue implements ShouldQueue
      */
     public function handle()
     {
-        $records = DB::table(DB::raw('search_indices use index(search_indices_query_index, search_indices_lr_index, search_indices_position_index)'))
+        $records = HeavyDb::table(DB::raw('search_indices use index(search_indices_query_index, search_indices_lr_index, search_indices_position_index)'))
             ->whereDate('search_indices.created_at', $this->date)
             ->where('search_indices.lr', $this->lr)
             ->whereIn('search_indices.query', $this->keywords)

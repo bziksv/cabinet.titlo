@@ -2,13 +2,29 @@
 
 namespace App;
 
+use App\Classes\Monitoring\MonitoringPositionDates;
+use App\Classes\Monitoring\MonitoringTableResponseCache;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 
 class MonitoringPosition extends Model
 {
     protected $fillable = ['monitoring_searchengine_id', 'position', 'url', 'target', 'created_at', 'updated_at'];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::created(static function (MonitoringPosition $position) {
+            $engineId = (int) $position->monitoring_searchengine_id;
+            if ($engineId < 1) {
+                return;
+            }
+            $date = $position->created_at ?: Carbon::now();
+            MonitoringPositionDates::remember($engineId, $date);
+            MonitoringTableResponseCache::bumpForEngine($engineId);
+        });
+    }
 
     public function engine()
     {

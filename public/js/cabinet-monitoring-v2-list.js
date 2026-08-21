@@ -80,9 +80,15 @@
     let faviconFillAfterRefresh = false;
     const faviconRefreshBusy = {};
     let childRowsPrefetchTimer = null;
-    const CHILD_ROWS_PREFETCH_MS = 120;
-    const CHILD_ROWS_WARM_FIRST = 6;
-    const CHILD_ROWS_WARM_STAGGER_MS = 280;
+    const CHILD_ROWS_PREFETCH_MS = 450;
+    /** Не греем пачку проектов при открытии списка — это регулярно убивало локальный MySQL. */
+    const CHILD_ROWS_WARM_FIRST = 0;
+    const CHILD_ROWS_WARM_STAGGER_MS = 800;
+    /** Одновременно только один child-rows fetch (остальные в очереди). */
+    const CHILD_ROWS_MAX_PARALLEL = 1;
+    let childRowsActiveFetches = 0;
+    const childRowsWaitQueue = [];
+
     const CHILD_ROWS_HTML_GEN = 'p8';
     const childRowsHtmlCache = {};
 
@@ -2319,15 +2325,34 @@
             return childRowsFetchPromises[key];
         }
         monV2DebugLine('info', 'child-rows.fetch', { project_id: key });
-        childRowsFetchPromises[key] = axios
-            .get(cfg.childRowsUrlTemplate.replace('__ID__', key))
-            .then(function (response) {
-                setChildRowsCachedHtml(key, response.data);
-                return response.data;
-            })
-            .finally(function () {
-                delete childRowsFetchPromises[key];
-            });
+
+        childRowsFetchPromises[key] = new Promise(function (resolve, reject) {
+            function run() {
+                childRowsActiveFetches += 1;
+                axios
+                    .get(cfg.childRowsUrlTemplate.replace('__ID__', key))
+                    .then(function (response) {
+                        setChildRowsCachedHtml(key, response.data);
+                        resolve(response.data);
+                    })
+                    .catch(reject)
+                    .finally(function () {
+                        childRowsActiveFetches = Math.max(0, childRowsActiveFetches - 1);
+                        delete childRowsFetchPromises[key];
+                        const next = childRowsWaitQueue.shift();
+                        if (next) {
+                            next();
+                        }
+                    });
+            }
+
+            if (childRowsActiveFetches < CHILD_ROWS_MAX_PARALLEL) {
+                run();
+            } else {
+                childRowsWaitQueue.push(run);
+            }
+        });
+
         return childRowsFetchPromises[key];
     }
 
@@ -2493,9 +2518,8 @@
         scheduleChildRowsPrefetch($(this).closest('tr'));
     });
 
-    $('#cabinet-mon-v2-projects tbody').on('mouseenter', 'tr', function () {
-        scheduleChildRowsPrefetch($(this));
-    });
+    // Не prefetch на hover всей строки — при движении мыши по списку это
+    // запускало десятки тяжёлых child-rows и клало MySQL.
 
     function wrapCardDetailTables($root) {
         $root.find('.card-body > table').each(function () {

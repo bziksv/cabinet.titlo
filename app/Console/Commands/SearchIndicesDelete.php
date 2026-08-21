@@ -27,6 +27,12 @@ class SearchIndicesDelete extends Command
      */
     public function handle()
     {
+        if (config('database.heavy_connection')) {
+            $this->error('Refusing: search_indices is bound to DB_HEAVY_CONNECTION (prod). Do not delete from local.');
+
+            return 1;
+        }
+
         $days = (int) ((new MonitoringSettings())->getValue('search_indices_days_delete') ?: 30);
         if ($days < 1) {
             $days = 30;

@@ -6,6 +6,7 @@ use App\Exceptions\MonitoringChangesDateCancelledException;
 use App\Jobs\Monitoring\MonitoringChangesDateQueue;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use App\Support\HeavyDb;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -31,7 +32,7 @@ class MonitoringCompetitor extends Model
         foreach ($days as $day) {
             foreach ($words as $keywords) {
                 $queries = array_column($keywords, 'query');
-                $results = DB::table(DB::raw('search_indices use index(search_indices_query_index, search_indices_lr_index, search_indices_position_index)'))
+                $results = HeavyDb::table(DB::raw('search_indices use index(search_indices_query_index, search_indices_lr_index, search_indices_position_index)'))
                     ->where('search_indices.lr', $day['engine']['lr'])
                     ->where('search_indices.position', '<=', 10)
                     ->whereDate('search_indices.created_at', $day['dateOnly'])
@@ -154,7 +155,7 @@ class MonitoringCompetitor extends Model
                     continue;
                 }
 
-                $results = DB::table(DB::raw('search_indices use index(search_indices_query_index, search_indices_lr_index, search_indices_position_index)'))
+                $results = HeavyDb::table(DB::raw('search_indices use index(search_indices_query_index, search_indices_lr_index, search_indices_position_index)'))
                     ->where('search_indices.lr', $day['engine']['lr'])
                     ->where('search_indices.position', '<=', 100)
                     ->whereDate('search_indices.created_at', $day['dateOnly'])
@@ -339,7 +340,7 @@ class MonitoringCompetitor extends Model
         if ($lastDate && $queries !== []) {
             $serpDepth = max(10, (int) config('cabinet-monitoring.competitors_positions_serp_depth', 100));
             $recordLimit = count($queries) * $serpDepth;
-            $records = DB::table(DB::raw('search_indices use index(search_indices_query_index, search_indices_lr_index, search_indices_position_index)'))
+            $records = HeavyDb::table(DB::raw('search_indices use index(search_indices_query_index, search_indices_lr_index, search_indices_position_index)'))
                 ->where('search_indices.lr', $lastDate['engine']['lr'])
                 ->whereDate('search_indices.created_at', $lastDate['dateOnly'])
                 ->whereIn('search_indices.query', $queries)

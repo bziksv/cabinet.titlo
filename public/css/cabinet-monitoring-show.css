@@ -824,7 +824,7 @@ button.cabinet-btn-busy:disabled {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-left: 0.3rem;
+    margin-left: 0;
     padding: 0.1rem 0.2rem;
     vertical-align: middle;
     font-size: 0.72rem;
@@ -849,9 +849,11 @@ button.cabinet-btn-busy:disabled {
     flex-shrink: 0;
 }
 
+/* Шапка «Запрос» — left, как тело. center давал сдвиг ~140px вправо на 380px-колонке
+   и выглядел как «поплыла шапка» после переключения столбцов. */
 .cabinet-mon-project-page .dataTables_scrollHead th.cabinet-mon-col-query,
 .cabinet-mon-project-page .DTFC_LeftHeadWrapper th.cabinet-mon-col-query {
-    text-align: center !important;
+    text-align: left !important;
     white-space: nowrap;
 }
 
@@ -859,7 +861,7 @@ button.cabinet-btn-busy:disabled {
 .cabinet-mon-project-page .DTFC_LeftHeadWrapper th.cabinet-mon-col-query > span {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 0.25rem;
     width: 100%;
 }
@@ -867,7 +869,35 @@ button.cabinet-btn-busy:disabled {
 .cabinet-mon-project-page .dataTables_scrollBody td.cabinet-mon-col-query,
 .cabinet-mon-project-page .DTFC_LeftBodyLiner td.cabinet-mon-col-query {
     text-align: left !important;
-    white-space: normal;
+    white-space: nowrap;
+    overflow: hidden !important;
+    word-break: normal;
+    word-wrap: normal;
+}
+
+.cabinet-mon-project-page .cabinet-mon-query-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.cabinet-mon-project-page #monitoringTable .query-string,
+.cabinet-mon-project-page .DTFC_LeftBodyLiner .query-string {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    word-break: normal;
+}
+
+.cabinet-mon-project-page .query-string + .cabinet-mon-query-target,
+.cabinet-mon-project-page .cabinet-mon-query-target {
+    flex: 0 0 auto;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .cabinet-mon-col-checkbox {
@@ -886,12 +916,6 @@ button.cabinet-btn-busy:disabled {
     width: 380px;
     min-width: 380px;
     max-width: 380px;
-}
-
-.cabinet-mon-project-page .cabinet-mon-query-cell {
-    display: block;
-    overflow: hidden;
-    max-width: 100%;
 }
 
 .cabinet-mon-project-page .cabinet-mon-col-url {
@@ -1039,6 +1063,26 @@ button.cabinet-btn-busy:disabled {
     max-width: none;
 }
 
+/*
+ * Left FC-слоты в scroll-таблице всегда 0.
+ * DataTables при скролле пишет style="width:46px" без !important — без этого правила
+ * снова дыра ~488px (margin-left FC + восстановленные ширины col).
+ */
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scroll > .dataTables_scrollHead table > colgroup > col.cabinet-mon-scroll-left-col,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scroll > .dataTables_scrollBody table > colgroup > col.cabinet-mon-scroll-left-col,
+.cabinet-mon-project-page #monitoringTable_wrapper[data-mon-fc-left="1"] .dataTables_scroll > .dataTables_scrollHead table > colgroup > col:nth-child(-n+1),
+.cabinet-mon-project-page #monitoringTable_wrapper[data-mon-fc-left="1"] .dataTables_scroll > .dataTables_scrollBody table > colgroup > col:nth-child(-n+1),
+.cabinet-mon-project-page #monitoringTable_wrapper[data-mon-fc-left="2"] .dataTables_scroll > .dataTables_scrollHead table > colgroup > col:nth-child(-n+2),
+.cabinet-mon-project-page #monitoringTable_wrapper[data-mon-fc-left="2"] .dataTables_scroll > .dataTables_scrollBody table > colgroup > col:nth-child(-n+2),
+.cabinet-mon-project-page #monitoringTable_wrapper[data-mon-fc-left="3"] .dataTables_scroll > .dataTables_scrollHead table > colgroup > col:nth-child(-n+3),
+.cabinet-mon-project-page #monitoringTable_wrapper[data-mon-fc-left="3"] .dataTables_scroll > .dataTables_scrollBody table > colgroup > col:nth-child(-n+3),
+.cabinet-mon-project-page #monitoringTable_wrapper[data-mon-fc-left="4"] .dataTables_scroll > .dataTables_scrollHead table > colgroup > col:nth-child(-n+4),
+.cabinet-mon-project-page #monitoringTable_wrapper[data-mon-fc-left="4"] .dataTables_scroll > .dataTables_scrollBody table > colgroup > col:nth-child(-n+4) {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+}
+
 .cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scroll-edge-col {
     border-left: 1px solid #dee2e6 !important;
     box-shadow: inset 0 -1px 0 var(--mon-proj-border);
@@ -1120,10 +1164,34 @@ button.cabinet-btn-busy:disabled {
 
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper table,
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner table {
-    table-layout: fixed;
+    table-layout: fixed !important;
+    width: var(--mon-fc-left-width, 488px) !important;
+    min-width: var(--mon-fc-left-width, 488px) !important;
+    max-width: var(--mon-fc-left-width, 488px) !important;
     margin-bottom: 0 !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.cabinet-mon-col-checkbox,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td.cabinet-mon-col-checkbox {
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.cabinet-mon-col-btn,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td.cabinet-mon-col-btn {
+    width: 62px !important;
+    min-width: 62px !important;
+    max-width: 62px !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.cabinet-mon-col-query,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td.cabinet-mon-col-query {
+    width: 380px !important;
+    min-width: 380px !important;
+    max-width: 380px !important;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th,
@@ -1350,11 +1418,6 @@ button.cabinet-btn-busy:disabled {
 
 .cabinet-mon-project-page .dataTables_scrollBody table.dataTable {
     margin-bottom: 0 !important;
-}
-
-.cabinet-mon-project-page #monitoringTable .query-string {
-    display: inline;
-    word-break: break-word;
 }
 
 .cabinet-mon-url-popover {
@@ -3093,31 +3156,44 @@ button.cabinet-btn-busy:disabled {
 }
 
 .cabinet-mon-project-page .daterangepicker .mode {
-    border-bottom: 1px solid #e2e8f0;
-    padding: 0.45rem 0.65rem 0.35rem;
+    box-sizing: border-box;
+    border-left: 1px solid #e2e8f0;
+    padding: 0.35rem 0;
 }
 
 .cabinet-mon-project-page .daterangepicker .mode ul {
     margin: 0;
     padding: 0;
     list-style: none;
+    width: 210px;
+}
+
+.cabinet-mon-project-page .daterangepicker .mode li {
+    margin: 0;
+    padding: 0.35rem 0.65rem;
 }
 
 .cabinet-mon-project-page .daterangepicker .mode li + li {
-    margin-top: 0.25rem;
+    border-top: 1px solid #f1f5f9;
 }
 
 .cabinet-mon-project-page .daterangepicker .mode .form-check {
     display: flex;
-    align-items: center;
-    gap: 0.35rem;
+    align-items: flex-start;
+    gap: 0.4rem;
     margin: 0;
-    min-height: 1.25rem;
+    min-height: 0;
+}
+
+.cabinet-mon-project-page .daterangepicker .mode .form-check-input {
+    margin-top: 0.15rem;
+    flex-shrink: 0;
 }
 
 .cabinet-mon-project-page .daterangepicker .mode .form-check-label {
     font-size: 0.8125rem;
-    line-height: 1.25;
+    line-height: 1.3;
+    white-space: normal;
 }
 
 .cabinet-mon-top100-page .select2-container--bootstrap4 {
