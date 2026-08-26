@@ -1,4 +1,4 @@
-<form action="/monitoring/{{ $project->id }}/export" method="GET">
+<form action="/monitoring/{{ $project->id }}/export" method="GET" class="cabinet-mon-export-modal-form">
     <div class="modal-header">
         <h4 class="modal-title">{{ __('Export') }}</h4>
         <button type="button" class="close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}">

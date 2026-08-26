@@ -10,6 +10,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-v2.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-v2.css')) ?: time() }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-export.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-export.css')) ?: time() }}">
     @endslot
 
     <div class="cabinet-mon-v2-page cabinet-mon-v2-page--shell" id="cabinet-mon-v2-root" data-ui-build="3.2">

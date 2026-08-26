@@ -2,6 +2,48 @@
     max-width: 52rem;
 }
 
+/* Экспорт в #cabinetMonKeywordsModal: форма оборачивает header/body/footer — flex + scroll на body. */
+.cabinet-mon-keyword-modal .modal-dialog.modal-dialog-scrollable {
+    max-height: calc(100vh - 1rem);
+    margin: 0.5rem auto;
+}
+
+.cabinet-mon-keyword-modal .modal-dialog.modal-dialog-scrollable.modal-dialog-centered {
+    align-items: flex-start;
+    min-height: calc(100% - 1rem);
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+.cabinet-mon-keyword-modal .modal-dialog.modal-dialog-scrollable .modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 1rem);
+    overflow: hidden;
+}
+
+.cabinet-mon-keyword-modal .modal-content > .cabinet-mon-export-modal-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.cabinet-mon-keyword-modal .cabinet-mon-export-modal-form .modal-header,
+.cabinet-mon-keyword-modal .cabinet-mon-export-modal-form .modal-footer {
+    flex-shrink: 0;
+}
+
+.cabinet-mon-keyword-modal .cabinet-mon-export-modal-form .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 .cabinet-mon-export-page__actions {
     display: flex;
     flex-wrap: wrap;

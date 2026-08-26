@@ -9,6 +9,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <!-- Tempusdominus Bootstrap 4 -->
         <link rel="stylesheet" href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-export.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-export.css')) ?: time() }}">
 
         <style>
             .table-card .card-body {
