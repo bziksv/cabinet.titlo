@@ -33,12 +33,25 @@ class AttributeExport
 
     protected function removeDynamicDays()
     {
-        $this->collection['data']->transform(function($item) {
-            foreach ($item as $col => $val) {
-                $item[$col] = preg_replace('/<sup(.*)sup>/', '', $val);
+        $this->collection['data']->transform(function ($item) {
+            $row = $item instanceof Collection ? $item->all() : (array) $item;
+
+            foreach ($row as $col => $val) {
+                // /table отдаёт positionCellPayload — динамика в ключе d, не в <sup>.
+                if (is_array($val) && array_key_exists('p', $val)) {
+                    unset($val['d']);
+                    $row[$col] = $val;
+                    continue;
+                }
+
+                if (!is_string($val)) {
+                    continue;
+                }
+
+                $row[$col] = preg_replace('/<sup[^>]*>.*?<\/sup>/su', '', $val) ?? $val;
             }
 
-            return $item;
+            return collect($row);
         });
     }
 
