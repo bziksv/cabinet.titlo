@@ -120,10 +120,15 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
                 continue;
             }
 
-            $target = trim(strip_tags($el['target']));
+            $target = (int) trim(strip_tags((string) $el['target']));
 
             foreach ($el as $fk => $field) {
-                if (preg_match('/data-position/', $field)) {
+                if (is_array($field) && array_key_exists('p', $field)) {
+                    $this->data['data'][$ek][$fk] = $this->exportCellFromPositionPayload($field, $target, $el, (string) $fk);
+                    continue;
+                }
+
+                if (is_string($field) && preg_match('/data-position/', $field)) {
                     $col = $this->formatPosition($field);
                     $col['color'] = null;
                     $position = (int) ($col[0] ?? 101);
@@ -138,14 +143,56 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
                             if ($target >= $prevPosition) {
                                 $col['color'] = $this->yellow;
                             }
+                        } elseif (isset($el[$ck]) && is_array($el[$ck]) && array_key_exists('p', $el[$ck])) {
+                            $prevPosition = (int) $el[$ck]['p'];
+                            if ($target >= $prevPosition) {
+                                $col['color'] = $this->yellow;
+                            }
                         }
                     }
                     $this->data['data'][$ek][$fk] = $col;
-                } else {
-                    $this->data['data'][$ek][$fk] = $this->plainCellText($fk, $field);
+                    continue;
+                }
+
+                $this->data['data'][$ek][$fk] = $this->plainCellText($fk, $field);
+            }
+        }
+    }
+
+    /**
+     * /table отдаёт positionCellPayload (массив), экспорт ждёт [position, diff?, color].
+     *
+     * @param array{p: int, d?: int, t?: string} $field
+     */
+    private function exportCellFromPositionPayload(array $field, int $target, $row, string $fk): array
+    {
+        $col = [(string) $field['p']];
+        if (!empty($field['d'])) {
+            $diff = (int) $field['d'];
+            $col[] = ($diff > 0 ? '+' : '') . $diff;
+        }
+        $col['color'] = null;
+        $position = (int) $field['p'];
+
+        if ($target >= $position) {
+            $col['color'] = $this->green;
+        } else {
+            $ck = 'col_' . (filter_var($fk, FILTER_SANITIZE_NUMBER_INT) + 1);
+            if (isset($row[$ck])) {
+                $prevPosition = null;
+                if (is_array($row[$ck]) && array_key_exists('p', $row[$ck])) {
+                    $prevPosition = (int) $row[$ck]['p'];
+                } elseif (is_string($row[$ck])) {
+                    $p = $this->formatPosition($row[$ck]);
+                    $prevPosition = (int) ($p[0] ?? 101);
+                }
+                if ($prevPosition !== null && $target >= $prevPosition) {
+                    $col['color'] = $this->yellow;
                 }
             }
         }
+
+        return $col;
     }
 
     /**
