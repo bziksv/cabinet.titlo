@@ -112,11 +112,77 @@ function formatHybridMetric(number) {
     return crop(value)
 }
 
+/**
+ * Ключ группы = форма с наибольшим TF-IDF среди словоформ (не словарная лемма).
+ * Цифры в родительской строке — по-прежнему из total (агрегат группы).
+ */
+function relabelUnigramByHeaviestSurface(unigramTable) {
+    if (!unigramTable || typeof unigramTable !== 'object') {
+        return {}
+    }
+
+    var out = {}
+    Object.keys(unigramTable).forEach(function (root) {
+        var wordForm = unigramTable[root]
+        if (!wordForm || typeof wordForm !== 'object') {
+            return
+        }
+
+        var bestWord = null
+        var bestScore = -Infinity
+        Object.keys(wordForm).forEach(function (word) {
+            if (word === 'total') {
+                return
+            }
+            var data = wordForm[word]
+            if (!data || typeof data !== 'object') {
+                return
+            }
+            var score = Number(
+                data.tfidfTop != null ? data.tfidfTop
+                    : (data.tf != null ? data.tf : data.score)
+            )
+            if (!isFinite(score)) {
+                score = 0
+            }
+            if (score > bestScore || (score === bestScore && bestWord !== null && word < bestWord)) {
+                bestScore = score
+                bestWord = word
+            }
+        })
+
+        var label = bestWord || root
+        if (!out[label]) {
+            out[label] = wordForm
+            return
+        }
+
+        Object.keys(wordForm).forEach(function (word) {
+            if (word === 'total') {
+                var existingTf = Number((out[label].total && out[label].total.tf) || 0)
+                var newTf = Number((wordForm.total && wordForm.total.tf) || 0)
+                if (!out[label].total || newTf > existingTf) {
+                    out[label].total = wordForm.total
+                }
+                return
+            }
+            if (!out[label][word]) {
+                out[label][word] = wordForm[word]
+            }
+        })
+    })
+
+    return out
+}
+
 function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPassages = false, onReady = null) {
     if (typeof searchPassages === 'function') {
         onReady = searchPassages
         searchPassages = false
     }
+
+    // Заголовок группы = словоформа с max TF-IDF (как Redbox), не словарная лемма.
+    unigramTable = relabelUnigramByHeaviestSurface(unigramTable || {})
 
     window.__raActionTips = Object.assign({}, window.__raActionTips || {}, {
         copy: (words && words.copy) || 'Копировать',
@@ -384,12 +450,42 @@ function hybridTipCell(value, order, tip, extraClass) {
     return "<td" + className + " data-order='" + order + "'" + titleAttr + ">" + value + "</td>"
 }
 
+/**
+ * Заголовок группы = реальная словоформа с max TF-IDF в группе.
+ * Словарная лемма (ключ бакета), которой нет среди форм, в UI не показывается.
+ */
+function heaviestSurfaceForm(wordWorm, fallbackKey) {
+    var bestWord = null
+    var bestScore = -Infinity
+    $.each(wordWorm || {}, function (word, data) {
+        if (word === 'total' || !data || typeof data !== 'object') {
+            return
+        }
+        var score = Number(
+            data.tfidfTop != null ? data.tfidfTop
+                : (data.tf != null ? data.tf : data.score)
+        )
+        if (!isFinite(score)) {
+            score = 0
+        }
+        if (score > bestScore || (score === bestScore && bestWord !== null && word < bestWord)) {
+            bestScore = score
+            bestWord = word
+        }
+    })
+    return bestWord || fallbackKey
+}
+
 function renderMainTr(key, wordWorm, searchPassages) {
     let links = ''
     $.each(wordWorm['total']['occurrences'], function (elem, value) {
         let url = new URL(elem)
         links += "<a href='" + elem + "' target='_blank'>" + url.host + "</a>(" + value + ")<br>"
     })
+
+    // Ключ в данных может быть леммой («инвалидный»), которой нет среди форм.
+    // В колонке «Слова» — форма с max TF-IDF («инвалидные»). Expand/игнор — по key в sessionStorage.
+    let displayWord = heaviestSurfaceForm(wordWorm, key)
 
     let metrics = hybridMetrics(wordWorm['total'])
     let className = wordWorm['total']['danger'] ? 'bg-warning-elem' : ''
@@ -419,7 +515,7 @@ function renderMainTr(key, wordWorm, searchPassages) {
         "   <td class='" + className + "' onclick='showWordWorms($(this))' data-target='" + key + "'" + tipAttr(tip.expand || 'Развернуть словоформы') + ">" +
         "      <i class='fa fa-plus'></i>" +
         "   </td>" +
-        "   <td>" + key + lockBlock + "</td>" +
+        "   <td>" + displayWord + lockBlock + "</td>" +
         hybridTipCell(
             metrics.tfidfTop,
             wordWorm['total']['tfidfTop'] ?? 0,

@@ -1906,86 +1906,191 @@ a.competitor-cloud:hover {
     text-align: center;
 }
 
-/* Колонка действий — компактные кнопки в ряд */
-#history_table_wrapper #history_table thead th:last-child,
+/* Колонка даты — узкая, дата и время столбиком */
+#history_table_wrapper #history_table thead th.ra-hist-date-th,
+#history_table_wrapper #history_table tbody td.ra-hist-date-cell,
+.list-children thead th.ra-hist-date-th,
+.list-children tbody td.ra-hist-date-cell {
+    width: 5.75rem !important;
+    min-width: 5.75rem !important;
+    max-width: 5.75rem !important;
+    white-space: normal !important;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    vertical-align: middle !important;
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+}
+
+.ra-hist-date {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.05rem;
+}
+
+.ra-hist-date__d {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ra-hist-date__t {
+    color: #64748b;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+#history_table_wrapper #history_table .ra-hist-date-filter,
+.list-children .ra-hist-date-filter {
+    width: 100% !important;
+    max-width: 5.5rem;
+    padding: 0.1rem 0.15rem;
+    font-size: 0.7rem;
+    line-height: 1.15;
+    margin: 0 0 0.15rem 0;
+    height: 1.55rem;
+}
+
+#history_table_wrapper #history_table .ra-hist-date-filter:last-child,
+.list-children .ra-hist-date-filter:last-child {
+    margin-bottom: 0;
+}
+
+/* Колонка действий — сразу после даты, компактные кнопки в ряд */
 #history_table_wrapper #history_table thead th.ra-hist-actions-th,
-#history_table_wrapper #history_table tbody td:last-child,
-#history_table_wrapper #history_table tbody td.ra-hist-actions-cell {
+#history_table_wrapper #history_table tbody td.ra-hist-actions-cell,
+.list-children thead th.ra-hist-actions-th,
+.list-children tbody td.ra-hist-actions-cell {
     width: 1% !important;
     min-width: 0 !important;
     max-width: none !important;
     white-space: nowrap !important;
     vertical-align: middle !important;
-    text-align: right !important;
+    text-align: left !important;
 }
 
-/* Пока идёт обработка — центрируем блок в ячейке */
-#history_table_wrapper #history_table tbody td:last-child:has(.ra-hist-processing),
 #history_table_wrapper #history_table tbody td.ra-hist-actions-cell:has(.ra-hist-processing),
-#history_table_wrapper #history_table [id^="history-state-"]:has(.ra-hist-processing) {
+#history_table_wrapper #history_table [id^="history-state-"]:has(.ra-hist-processing),
+.list-children tbody td.ra-hist-actions-cell:has(.ra-hist-processing) {
     text-align: center !important;
     white-space: normal !important;
 }
 
-#history_table_wrapper #history_table tbody td:last-child .ra-hist-actions,
-#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-actions {
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-actions,
+.list-children [id^="history-state-"] .ra-hist-actions {
     display: inline-flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
-    justify-content: flex-end !important;
-    gap: 0.35rem !important;
+    justify-content: flex-start !important;
+    gap: 0.25rem !important;
     width: auto !important;
     max-width: none !important;
 }
 
-#history_table_wrapper #history_table tbody td:last-child .btn,
-#history_table_wrapper #history_table [id^="history-state-"] .btn,
-#history_table_wrapper #history_table tbody td:last-child .ra-hist-act.btn,
-#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-act.btn {
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-act.btn,
+.list-children [id^="history-state-"] .ra-hist-act.btn {
     display: inline-flex !important;
-    flex-direction: column !important;
+    flex-direction: row !important;
     align-items: center !important;
     justify-content: center !important;
     width: auto !important;
     min-width: 0 !important;
-    max-width: none !important;
     margin: 0 !important;
-    padding: 0.375rem 0.75rem !important;
+    padding: 0.2rem 0.45rem !important;
     box-sizing: border-box;
-    white-space: normal !important;
-    word-break: keep-all !important;
-    overflow-wrap: normal !important;
+    white-space: nowrap !important;
     text-align: center;
-    writing-mode: horizontal-tb !important;
-    font-size: 1rem !important;
-    line-height: 1.25 !important;
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
     font-weight: 400 !important;
-    vertical-align: middle;
     height: auto !important;
 }
 
-#history_table_wrapper #history_table tbody td:last-child .btn + .btn,
-#history_table_wrapper #history_table tbody td:last-child .btn + a.btn,
-#history_table_wrapper #history_table [id^="history-state-"] .btn + .btn,
-#history_table_wrapper #history_table [id^="history-state-"] .btn + a.btn {
-    margin-top: 0 !important;
-    margin-left: 0 !important;
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-act--icon.btn,
+.list-children [id^="history-state-"] .ra-hist-act--icon.btn,
+.ra-hist-v2__td-actions .ra-hist-act--icon.btn,
+.ra-hist-actions .ra-hist-act--icon.btn,
+#list-history_wrapper .ra-list-expand-btn.btn {
+    width: 1.35rem !important;
+    min-width: 1.35rem !important;
+    max-width: 1.35rem !important;
+    height: 1.35rem !important;
+    min-height: 1.35rem !important;
+    max-height: 1.35rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 0.7rem !important;
+    line-height: 1 !important;
+    background: #fff !important;
+    border: 1px solid #94a3b8 !important;
+    border-radius: 0.25rem !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
 }
 
-/* Комментарий — компактный, без гигантского textarea */
-#history_table_wrapper #history_table textarea.history-comment {
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-act--icon.btn:hover,
+.list-children [id^="history-state-"] .ra-hist-act--icon.btn:hover,
+.ra-hist-v2__td-actions .ra-hist-act--icon.btn:hover,
+.ra-hist-actions .ra-hist-act--icon.btn:hover,
+#list-history_wrapper .ra-list-expand-btn.btn:hover {
+    background: #f1f5f9 !important;
+    border-color: #64748b !important;
+    color: #0f172a !important;
+}
+
+#history_table_wrapper #history_table [id^="history-state-"] .ra-hist-act--icon.btn .fa,
+.list-children [id^="history-state-"] .ra-hist-act--icon.btn .fa,
+.ra-hist-v2__td-actions .ra-hist-act--icon.btn .fa,
+.ra-hist-actions .ra-hist-act--icon.btn .fa,
+#list-history_wrapper .ra-list-expand-btn.btn .fa {
+    color: inherit;
+    opacity: 1;
+    font-size: 0.72rem !important;
+    line-height: 1 !important;
+    width: auto;
+    height: auto;
+}
+
+/* Комментарий — одна строка */
+#history_table_wrapper #history_table input.history-comment,
+#history_table_wrapper #history_table textarea.history-comment,
+.list-children input.history-comment,
+.list-children textarea.history-comment {
     display: block;
     width: 100%;
-    min-width: 9rem;
-    max-width: 13rem;
-    height: 4.25rem !important;
-    min-height: 4.25rem;
-    max-height: 8rem;
-    resize: vertical;
-    font-size: 0.875rem;
-    line-height: 1.35;
-    padding: 0.35rem 0.5rem;
+    min-width: 6rem;
+    max-width: 9rem;
+    height: 1.75rem !important;
+    min-height: 1.75rem !important;
+    max-height: 1.75rem !important;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    padding: 0.15rem 0.35rem;
+    resize: none;
+}
+
+/* Метрики: факт / рекоменд. вместо длинного текста */
+.ra-hist-metric {
+    display: inline-block;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+#history_table_wrapper #history_table,
+.list-children {
+    table-layout: auto;
+}
+
+#history_table_wrapper #history_table > :not(caption) > * > *,
+.list-children > :not(caption) > * > * {
+    padding: 0.3rem 0.4rem;
+    vertical-align: middle;
+}
+
+#history_table_wrapper #history_table tbody tr {
+    height: auto;
 }
 
 #list-history_wrapper {
@@ -2551,20 +2656,20 @@ table.dataTable thead th > .form-control.search-input + .form-control.search-inp
     font-weight: 600;
 }
 
-/* Действия в истории: Подробная | Повторить — компактно, в ряд */
+/* Действия в истории: Подробнее | Повторить — после даты, компактно */
 .ra-hist-actions-cell {
     width: 1%;
-    min-width: 11rem;
+    min-width: 8.5rem;
     vertical-align: middle !important;
-    text-align: right;
+    text-align: left;
     white-space: nowrap;
     overflow: visible;
 }
 
 .ra-hist-actions-th {
     width: 1%;
-    min-width: 11rem;
-    text-align: right;
+    min-width: 4.5rem;
+    text-align: left;
     white-space: nowrap;
     font-size: 0.78rem;
 }
@@ -2574,8 +2679,8 @@ table.dataTable thead th > .form-control.search-input + .form-control.search-inp
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    justify-content: flex-end;
-    gap: 0.35rem;
+    justify-content: flex-start;
+    gap: 0.25rem;
     height: auto;
     max-height: none;
 }
@@ -2587,23 +2692,825 @@ table.dataTable thead th > .form-control.search-input + .form-control.search-inp
     width: auto;
     height: auto !important;
     min-height: 0;
-    padding: 0.3rem 0.55rem;
+    padding: 0.2rem 0.45rem;
     line-height: 1.2;
-    font-size: 1rem;
-    white-space: normal;
+    font-size: 0.75rem;
+    white-space: nowrap;
     display: inline-flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
     text-align: center;
     vertical-align: middle;
 }
 
-.ra-hist-actions__err {
-    display: block;
-    max-width: 12rem;
+.ra-hist-actions .ra-hist-act--icon.btn {
+    width: 1.35rem;
+    min-width: 1.35rem;
+    height: 1.35rem !important;
+    min-height: 1.35rem !important;
+    padding: 0;
     font-size: 0.7rem;
+    background: #fff;
+    border: 1px solid #94a3b8;
+    color: #0f172a;
+}
+
+.ra-hist-actions__err {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 0.25rem;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* —— История проверок: V2 + переключатель —— */
+.ra-hist-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    margin: 0 0 0.75rem;
+}
+
+.ra-hist-head__title {
+    margin: 0 !important;
+}
+
+/* Классическая таблица «Последние проверки» скрыта — только компактный вид */
+.history #history_table_wrapper,
+.history #ra-hist-classic {
+    display: none !important;
+}
+
+.ra-hist-v2 {
+    margin-top: 0.5rem;
+}
+
+.ra-hist-v2__toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-bottom: 0.75rem;
+}
+
+.ra-hist-v2__toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.ra-hist-v2__toolbar-row--url {
+    align-items: stretch;
+}
+
+.ra-hist-v2__url-label {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 0 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.ra-hist-v2__url-search {
+    flex: 1 1 16rem;
+    min-width: 12rem;
+}
+
+.ra-hist-v2__search {
+    flex: 1 1 14rem;
+    min-width: 12rem;
+}
+
+.ra-hist-v2__date {
+    width: 9.5rem;
+    flex: 0 0 auto;
+}
+
+.ra-hist-v2__points-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex: 0 0 auto;
+    padding: 0.15rem 0.35rem;
+    border: 1px solid #d8dee8;
+    border-radius: 0.35rem;
+    background: #f8fafc;
+}
+
+.ra-hist-v2__points-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+    padding: 0 0.15rem;
+}
+
+.ra-hist-v2__points-filter input {
+    width: 4.25rem;
+    height: 1.65rem;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.8125rem;
+}
+
+.ra-hist-v2__exports {
+    display: flex;
+    gap: 0.35rem;
+    margin-left: auto;
+}
+
+.ra-hist-v2__list {
+    margin: 0;
+}
+
+.ra-hist-v2__scroll {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    background: #fff;
+}
+
+.ra-hist-v2__table {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+    table-layout: auto;
+    border: 0;
+}
+
+.ra-hist-v2__table thead th,
+.ra-hist-v2__table tbody td {
+    border: 1px solid #dee2e6;
+    padding: 0.35rem 0.5rem;
+    vertical-align: middle;
     line-height: 1.25;
-    text-align: right;
-    white-space: normal;
+}
+
+.ra-hist-v2__table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8f9fa;
+    color: #212529;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ra-hist-v2__table tbody td {
+    font-size: 0.8125rem;
+    background: #fff;
+}
+
+.ra-hist-v2__table tbody tr:nth-child(even) td {
+    background: #f8f9fa;
+}
+
+.ra-hist-v2__table tbody tr:hover td {
+    background: #eef2f7;
+}
+
+.ra-hist-v2__td-date {
+    white-space: nowrap;
+    width: 1%;
+}
+
+.ra-hist-v2__td-date .ra-hist-date {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.05rem;
+}
+
+.ra-hist-v2__td-date .ra-hist-date__d {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.ra-hist-v2__td-date .ra-hist-date__t {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.ra-hist-v2__td-actions {
+    white-space: nowrap;
+    width: 1%;
+}
+
+.ra-hist-v2__td-actions .ra-hist-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+}
+
+.ra-hist-v2__td-comment {
+    min-width: 6.5rem;
+    max-width: 9rem;
+}
+
+.ra-hist-v2__comment {
+    width: 100%;
+    max-width: 9rem;
+    height: 1.65rem !important;
+    font-size: 0.8125rem;
+    padding: 0.1rem 0.3rem;
+}
+
+.ra-hist-v2__td-phrase {
+    min-width: 8rem;
+    max-width: 14rem;
+}
+
+.ra-hist-v2__phrase-text {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.ra-hist-v2__copy {
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    padding: 0 0 0 0.25rem;
+    cursor: pointer;
+    line-height: 1;
+    vertical-align: baseline;
+}
+
+.ra-hist-v2__copy:hover {
+    color: #0f172a;
+}
+
+.ra-hist-v2__td-region {
+    white-space: nowrap;
+}
+
+.ra-hist-v2__td-url {
+    max-width: 12rem;
+}
+
+.ra-hist-v2__url {
+    display: inline-block;
+    max-width: 12rem;
+    font-size: 0.75rem;
+    color: #627d98;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+}
+
+.ra-hist-v2__url:hover {
+    text-decoration: underline;
+}
+
+.ra-hist-v2__td-pos {
+    white-space: nowrap;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.ra-hist-v2__pos {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.ra-hist-v2__pos--out {
+    color: #b45309;
+    font-weight: 500;
+    font-size: 0.75rem;
+}
+
+.ra-hist-v2__td-metric {
+    white-space: nowrap;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.ra-hist-v2__chip-sep {
+    opacity: 0.55;
+    margin: 0 0.05rem;
+}
+
+.ra-hist-v2__td-calc {
+    width: 1%;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.ra-hist-v2__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.ra-hist-v2__info {
+    font-size: 0.8125rem;
+    color: #64748b;
+}
+
+.ra-hist-v2__pager {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.ra-hist-v2__page {
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.45rem;
+    border: 1px solid #c5cdd8;
+    background: #fff;
+    border-radius: 0.35rem;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+
+.ra-hist-v2__page.is-active {
+    background: #627d98;
+    border-color: #627d98;
+    color: #fff;
+}
+
+.ra-hist-v2__empty {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: #64748b;
+    border: 1px dashed #cbd5e1;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+}
+
+@media (max-width: 767.98px) {
+    .ra-hist-v2__exports {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .ra-hist-v2__comment {
+        max-width: 100%;
+    }
+}
+
+/* —— Список фраз (list-history): стилистика V2 —— */
+body[data-ra-hist-view="v2"] #history-list-subject.ra-hist-list-title--v2,
+#history-list-subject.ra-hist-list-title--v2 {
+    font-size: 1.15rem;
+    font-weight: 650;
+    margin-bottom: 0.65rem;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 .list-history-table-scroll,
+#list-history_wrapper.ra-hist-list--v2 .list-history-table-scroll {
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    background: #fff;
+}
+
+body[data-ra-hist-view="v2"] #list-history.ra-hist-list--v2,
+#list-history.ra-hist-list--v2,
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 table.dataTable,
+#list-history_wrapper.ra-hist-list--v2 table.dataTable {
+    border-collapse: collapse !important;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 thead th,
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 tbody td,
+#list-history_wrapper.ra-hist-list--v2 thead th,
+#list-history_wrapper.ra-hist-list--v2 tbody td {
+    border: 1px solid #dee2e6 !important;
+    padding: 0.3rem 0.45rem !important;
+    vertical-align: middle !important;
+    font-size: 0.8125rem;
+    line-height: 1.25;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 thead th.table-header,
+#list-history_wrapper.ra-hist-list--v2 thead th.table-header {
+    background: #f8f9fa !important;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 0.35rem 0.45rem !important;
+}
+
+.ra-hist-list-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 0.55rem;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    background: #f8fafc;
+}
+
+.ra-hist-list-bar[hidden] {
+    display: none !important;
+}
+
+.ra-hist-list-bar__label {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.ra-hist-list-bar__url {
+    flex: 1 1 16rem;
+    min-width: 12rem;
+    height: 1.7rem !important;
+    font-size: 0.8125rem;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 thead tr.ra-hist-list-filters th,
+#list-history_wrapper.ra-hist-list--v2 thead tr.ra-hist-list-filters th,
+#list-history.ra-hist-list-table thead tr.ra-hist-list-filters th {
+    background: #fff !important;
+    padding: 0.28rem 0.3rem !important;
+    vertical-align: middle !important;
+}
+
+.ra-hist-list-minmax {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    min-height: 1.7rem;
+}
+
+.ra-hist-list-minmax input {
+    width: 3.6rem !important;
+    min-width: 0 !important;
+    max-width: 100%;
+    height: 1.7rem !important;
+    min-height: 1.7rem !important;
+    margin: 0 !important;
+    padding: 0.1rem 0.25rem !important;
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+    box-sizing: border-box !important;
+}
+
+.ra-hist-list-minmax--dates input {
+    width: 8.25rem !important;
+}
+
+.ra-hist-list-text {
+    width: 100% !important;
+    max-width: 9rem;
+    height: 1.7rem !important;
+    min-height: 1.7rem !important;
+    margin: 0 !important;
+    padding: 0.1rem 0.35rem !important;
+    font-size: 0.75rem !important;
+    box-sizing: border-box !important;
+}
+
+#list-history_wrapper thead tr.ra-hist-list-filters th > .form-control + .form-control,
+#list-history thead tr.ra-hist-list-filters th > .form-control + .form-control {
+    margin-top: 0 !important;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 thead tr.ra-hist-list-filters .form-control,
+#list-history_wrapper.ra-hist-list--v2 thead tr.ra-hist-list-filters .form-control,
+#list-history.ra-hist-list-table thead tr.ra-hist-list-filters .form-control {
+    height: 1.7rem !important;
+    min-height: 1.7rem !important;
+    margin: 0 !important;
+    padding: 0.1rem 0.3rem !important;
+    font-size: 0.75rem !important;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 tbody tr:nth-child(even) td,
+#list-history_wrapper.ra-hist-list--v2 tbody tr:nth-child(even) td {
+    background: #f8f9fa;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 tbody tr:hover td,
+#list-history_wrapper.ra-hist-list--v2 tbody tr:hover td {
+    background: #eef2f7;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 td.ra-hist-list-expand,
+#list-history_wrapper.ra-hist-list--v2 td.ra-hist-list-expand,
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 td.dt-control,
+#list-history_wrapper.ra-hist-list--v2 td.dt-control {
+    width: 2.5rem !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 .ra-list-expand-btn,
+#list-history_wrapper.ra-hist-list--v2 .ra-list-expand-btn {
+    width: 1.35rem !important;
+    min-width: 1.35rem !important;
+    height: 1.35rem !important;
+    min-height: 1.35rem !important;
+    padding: 0 !important;
+    background: #fff !important;
+    border: 1px solid #94a3b8 !important;
+    color: #0f172a !important;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 .ra-hist-date-cell .ra-hist-date,
+#list-history_wrapper.ra-hist-list--v2 .ra-hist-date-cell .ra-hist-date {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    font-size: 0.75rem;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 .ra-hist-list-url,
+#list-history_wrapper.ra-hist-list--v2 .ra-hist-list-url {
+    max-width: 14rem;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 .ra-hist-list-url a,
+#list-history_wrapper.ra-hist-list--v2 .ra-hist-list-url a {
+    color: #627d98;
+    text-decoration: none;
+    font-size: 0.75rem;
+}
+
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 .ra-hist-list-url a:hover,
+#list-history_wrapper.ra-hist-list--v2 .ra-hist-list-url a:hover {
+    text-decoration: underline;
+}
+
+/* В V2 у списка фраз — короче min-width таблицы */
+body[data-ra-hist-view="v2"] #list-history_wrapper.ra-hist-list--v2 .list-history-table-scroll > table.dataTable,
+#list-history_wrapper.ra-hist-list--v2 .list-history-table-scroll > table.dataTable {
+    min-width: 980px !important;
+}
+
+/* —— Главная таблица проектов: V2 —— */
+#main_history_table_wrapper.ra-hist-main--v2 {
+    padding-bottom: 0.5rem;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 > .row:first-child,
+#main_history_table_wrapper.ra-hist-main--v2 > .row:first-child {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin: 0 0 0.65rem !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 > .row:first-child > [class*="col-"],
+#main_history_table_wrapper.ra-hist-main--v2 > .row:first-child > [class*="col-"] {
+    flex: 1 1 auto;
+    max-width: none;
+    width: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_filter,
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_length,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_filter,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_length {
+    float: none !important;
+    margin: 0 !important;
+    text-align: left !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 > .row:first-child > [class*="col-"]:last-child,
+#main_history_table_wrapper.ra-hist-main--v2 > .row:first-child > [class*="col-"]:last-child {
+    margin-left: auto !important;
+    text-align: right !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_length,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_length {
+    text-align: right !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_filter > label,
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_length > label,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_filter > label,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_length > label {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 0.8125rem;
+    color: #475569;
+    white-space: nowrap;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_length select,
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_filter input,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_length select,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_filter input {
+    height: 1.85rem !important;
+    min-height: 1.85rem !important;
+    padding: 0.15rem 0.45rem !important;
+    font-size: 0.8125rem !important;
+    line-height: 1.25 !important;
+    border-radius: 0.3rem !important;
+    border-color: #cbd5e1 !important;
+    vertical-align: middle;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_filter input,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_filter input {
+    min-width: 14rem;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table.ra-hist-main--v2,
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 table.dataTable,
+#main_history_table.ra-hist-main--v2,
+#main_history_table_wrapper.ra-hist-main--v2 table.dataTable {
+    border-collapse: collapse !important;
+    font-size: 0.8125rem;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 table.dataTable thead th,
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 table.dataTable tbody td,
+#main_history_table_wrapper.ra-hist-main--v2 table.dataTable thead th,
+#main_history_table_wrapper.ra-hist-main--v2 table.dataTable tbody td {
+    padding: 0.35rem 0.5rem !important;
+    vertical-align: middle !important;
+    border: 1px solid #dee2e6 !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 table.dataTable thead th,
+#main_history_table_wrapper.ra-hist-main--v2 table.dataTable thead th {
+    background: #f8f9fa !important;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: #334155;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 table.dataTable tbody tr:nth-child(even) td,
+#main_history_table_wrapper.ra-hist-main--v2 table.dataTable tbody tr:nth-child(even) td {
+    background: #f8f9fa;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 table.dataTable tbody tr:hover td,
+#main_history_table_wrapper.ra-hist-main--v2 table.dataTable tbody tr:hover td {
+    background: #eef2f7;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-project-cell,
+#main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-project-cell {
+    gap: 0.45rem;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-project-name,
+#main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-project-name {
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-project-actions > .fa,
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-project-menu-btn,
+#main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-project-actions > .fa,
+#main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-project-menu-btn {
+    width: 1.35rem !important;
+    height: 1.35rem !important;
+    min-width: 1.35rem !important;
+    font-size: 0.75rem !important;
+    line-height: 1.35rem !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-count-sites,
+#main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-count-sites {
+    gap: 0.3rem;
+    font-variant-numeric: tabular-nums;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-count-sites .fa-repeat,
+#main_history_table_wrapper.ra-hist-main--v2 .cabinet-relevance-count-sites .fa-repeat {
+    font-size: 0.75rem;
+    opacity: 0.55;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .though-cell,
+#main_history_table_wrapper.ra-hist-main--v2 .though-cell {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .cabinet-ra-though-actions,
+#main_history_table_wrapper.ra-hist-main--v2 .cabinet-ra-though-actions {
+    gap: 0.25rem;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-btn,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-btn {
+    padding: 0.15rem 0.45rem !important;
+    font-size: 0.72rem !important;
+    line-height: 1.2 !important;
+    border-radius: 0.25rem !important;
+    font-weight: 600;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-help,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-help {
+    padding: 0.15rem 0.35rem !important;
+    line-height: 1 !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-help .fa-question-circle,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-help .fa-question-circle {
+    font-size: 0.8rem !important;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-done,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-done {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    line-height: 1.2;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-link,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-link {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #2563eb;
+    text-decoration: none;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-link:hover,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-link:hover {
+    text-decoration: underline;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-meta,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-meta {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-meta .ra-hist-date,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-though-meta .ra-hist-date {
+    display: inline-flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: baseline;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-date-cell .ra-hist-date,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-date-cell .ra-hist-date {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    font-size: 0.75rem;
+    line-height: 1.15;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-date-cell .ra-hist-date__d,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-date-cell .ra-hist-date__d {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .ra-hist-date-cell .ra-hist-date__t,
+#main_history_table_wrapper.ra-hist-main--v2 .ra-hist-date-cell .ra-hist-date__t {
+    color: #64748b;
+    font-size: 0.7rem;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_info,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_info {
+    padding-left: 0.15rem;
+    font-size: 0.8125rem;
+    color: #64748b;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .dataTables_paginate,
+#main_history_table_wrapper.ra-hist-main--v2 .dataTables_paginate {
+    font-size: 0.8125rem;
+}
+
+body[data-ra-hist-view="v2"] #main_history_table_wrapper.ra-hist-main--v2 .paginate_button.current,
+#main_history_table_wrapper.ra-hist-main--v2 .paginate_button.current {
+    background: #0f172a !important;
+    border-color: #0f172a !important;
+    color: #fff !important;
 }

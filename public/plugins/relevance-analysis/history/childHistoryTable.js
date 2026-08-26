@@ -9,8 +9,48 @@ function raPh(key, fallback) {
     return map[key] || fallback
 }
 
+/** Компактная дата для ячейки: 14.08.26 + время второй строкой */
+function raFormatHistoryDate(raw) {
+    var s = String(raw == null ? '' : raw).trim()
+    if (!s) {
+        return ''
+    }
+    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/)
+    if (iso) {
+        var day = iso[3] + '.' + iso[2] + '.' + iso[1].slice(2)
+        if (iso[4] != null) {
+            return '<span class="ra-hist-date"><span class="ra-hist-date__d">' + day +
+                '</span><span class="ra-hist-date__t">' + iso[4] + ':' + iso[5] + '</span></span>'
+        }
+        return '<span class="ra-hist-date"><span class="ra-hist-date__d">' + day + '</span></span>'
+    }
+    return s
+}
+
+function parseRaHistoryDate(raw) {
+    var s = String(raw == null ? '' : raw)
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    if (!s) {
+        return new Date(NaN)
+    }
+    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/)
+    if (iso) {
+        return new Date(+iso[1], +iso[2] - 1, +iso[3], +(iso[4] || 0), +(iso[5] || 0), +(iso[6] || 0))
+    }
+    var ru = s.match(/^(\d{2})\.(\d{2})\.(\d{2})(?:\s+(\d{2}):(\d{2}))?/)
+    if (ru) {
+        return new Date(2000 + (+ru[3]), +ru[2] - 1, +ru[1], +(ru[4] || 0), +(ru[5] || 0))
+    }
+    return new Date(s)
+}
+
+window.raFormatHistoryDate = raFormatHistoryDate
+window.parseRaHistoryDate = parseRaHistoryDate
+
 /**
- * Кнопки действий в истории: Подробная | Повторить (в ряд, текст, стиль кабинета).
+ * Кнопки действий в истории: иконки Подробнее | Повторить.
  * @param {number|string} id
  * @param {{detail?: boolean, repeat?: boolean, error?: boolean}} opts
  */
@@ -22,19 +62,22 @@ function raHistoryActionsHtml(id, opts) {
     var html = '<div class="ra-hist-actions">'
     if (showDetail) {
         html +=
-            '<a href="/show-history/' + id + '" target="_blank" rel="noopener" class="btn btn-secondary ra-hist-act ra-hist-act--detail">' +
-            'Подробная<br>информация' +
+            '<a href="/show-history/' + id + '" target="_blank" rel="noopener" ' +
+            'class="btn btn-secondary btn-sm ra-hist-act ra-hist-act--icon ra-hist-act--detail" ' +
+            'data-ra-tip="Подробнее" aria-label="Подробнее">' +
+            '<i class="fa fa-eye" aria-hidden="true"></i>' +
             '</a>'
     }
     if (showRepeat) {
         html +=
-            '<button type="button" class="btn btn-secondary ra-hist-act ra-hist-act--repeat get-history-info" data-order="' + id + '"' +
-            ' data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
-            'Повторить<br>анализ' +
+            '<button type="button" class="btn btn-secondary btn-sm ra-hist-act ra-hist-act--icon ra-hist-act--repeat get-history-info" ' +
+            'data-order="' + id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop" ' +
+            'data-ra-tip="Повторить" aria-label="Повторить">' +
+            '<i class="fa fa-repeat" aria-hidden="true"></i>' +
             '</button>'
     }
     if (showError) {
-        html += '<span class="ra-hist-actions__err text-muted">Ошибка — повторите или напишите в поддержку</span>'
+        html += '<span class="ra-hist-actions__err text-muted" data-ra-tip="Ошибка">!</span>'
     }
     html += '</div>'
     return html
@@ -149,7 +192,7 @@ function isIncludes(target, search, settings, tableId) {
 
 function isDateValid(target, settings, tableId, prefix) {
     if (settings.nTable.id === tableId) {
-        let date = new Date(target)
+        let date = (typeof parseRaHistoryDate === 'function' ? parseRaHistoryDate(target) : new Date(target))
         let dateMin = new Date($('#dateMin' + prefix).val() + ' 00:00:00')
         let dateMax = new Date($('#dateMax' + prefix).val() + ' 23:59:59')
         if (date >= dateMin && date <= dateMax) {
@@ -171,16 +214,25 @@ function scrollTo(elemPath) {
     })
 }
 
+function raSetHistoryStateHtml(id, html) {
+    $('#history-state-' + id + ', #history-state-v2-' + id).html(html);
+}
+
 function hideListHistory() {
     $('.list-children').dataTable().fnDestroy();
     $('#list-history').dataTable().fnDestroy();
     $('#history-list-subject').hide()
     $('#list-history').hide()
+    $('#ra-hist-list-bar').hide().attr('hidden', true)
 }
 
 function hideTableHistory() {
-    $("#history_table").dataTable().fnDestroy();
+    if ($.fn.DataTable && $.fn.DataTable.isDataTable('#history_table')) {
+        $("#history_table").dataTable().fnDestroy();
+    }
     $('.render').remove()
+    $('#ra-hist-v2-list').empty()
+    $('#ra-hist-v2').addClass('d-none')
     $('.history').hide()
 }
 
@@ -200,19 +252,32 @@ function format(data) {
         }
 
         let checked = value['calculate'] ? 'checked' : ''
+        let position = value['position']
+        if (position == 0 || position === '0') {
+            position = 'вне ТОП-100'
+        }
+        let avg = value['average_values'] || null
+        let metricCells = (typeof buildHistoryMetricCells === 'function')
+            ? buildHistoryMetricCells(value, avg)
+            : (
+                '<td>' + (value['points'] != null ? value['points'] : '') + '</td>' +
+                '<td>' + (value['coverage'] != null ? value['coverage'] : '') + '</td>' +
+                '<td>' + (value['coverage_tf'] != null ? value['coverage_tf'] : '') + '</td>' +
+                '<td>' + (value['width'] != null ? value['width'] : '') + '</td>' +
+                '<td>' + (value['density'] != null ? value['density'] : '') + '</td>'
+            )
         child +=
             '<tr>' +
-            '   <td>' + value['created_at'] + '</td>' +
-            '   <td> <textarea rows="3" data-target="' + value['id'] + '" class="history-comment form form-control">' + value['comment'] + '</textarea></td>' +
+            '   <td data-order="' + value['created_at'] + '" class="ra-hist-date-cell">' + raFormatHistoryDate(value['created_at']) + '</td>' +
+            '   <td id="history-state-' + value['id'] + '" class="ra-hist-actions-cell">' +
+            state +
+            '   </td>' +
+            '   <td><input type="text" data-target="' + value['id'] + '" class="history-comment form-control form-control-sm" value="' + String(value['comment'] || '').replace(/"/g, '&quot;') + '"></td>' +
             '   <td style="width: 150px;">' + value['phrase'] + '</td>' +
-            '   <td style="width: 150px;">' + (value['region_name'] || (value['region_name'] || getRegionName(value['region']))) + '</td>' +
+            '   <td style="width: 150px;">' + (value['region_name'] || getRegionName(value['region'])) + '</td>' +
             '   <td style="width: 150px;">' + value['main_link'] + '</td>' +
-            '   <td>' + value['position'] + '</td>' +
-            '   <td>' + value['points'] + '</td>' +
-            '   <td>' + value['coverage'] + '</td>' +
-            '   <td>' + value['coverage_tf'] + '</td>' +
-            '   <td>' + value['width'] + '</td>' +
-            '   <td>' + value['density'] + '</td>' +
+            '   <td>' + position + '</td>' +
+            metricCells +
             '   <td>' +
             "   <div class='d-flex justify-content-center'> " +
             "       <div class='__helper-link ui_tooltip_w'> " +
@@ -222,9 +287,6 @@ function format(data) {
             "           </div>" +
             "       </div>" +
             "   </div>" +
-            '   </td>' +
-            '   <td id="history-state-' + value['id'] + '" class="ra-hist-actions-cell">' +
-            state +
             '   </td>' +
             '</tr>'
 
@@ -248,31 +310,32 @@ function format(data) {
     let tableId = data.replace(' ', '-')
 
     return (
-        '<table class="table table-bordered table-hover dataTable dtr-inline list-children" id="' + tableId + '">' +
+        '<table class="table table-bordered table-hover dataTable dtr-inline list-children table-sm" id="' + tableId + '">' +
         '<thead>' +
         '<tr>' +
-        '     <th style="position: inherit" class="table-header">' +
-        '         <input class="w-100 form form-control" type="date" name="dateMin' + tableId + '"' +
+        '     <th style="position: inherit" class="table-header ra-hist-date-th">' +
+        '         <input class="form form-control form-control-sm ra-hist-date-filter" type="date" name="dateMin' + tableId + '"' +
         '                id="dateMin' + tableId + '"' +
         '                value="2022-03-01">' +
-        '         <input class="w-100 form form-control" type="date" name="dateMax' + tableId + '" id="dateMax' + tableId + '"' +
+        '         <input class="form form-control form-control-sm ra-hist-date-filter" type="date" name="dateMax' + tableId + '" id="dateMax' + tableId + '"' +
         '                value="' + date + '">' +
         '     </th>' +
+        '   <th class="ra-hist-actions-th"></th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="text"' +
-        '               name="projectComment' + tableId + '" id="projectComment' + tableId + '" placeholder="' + raPh('comment', 'комментарий') + '">' +
+        '               name="projectComment' + tableId + '" id="projectComment' + tableId + '" placeholder="' + raPh('comment', 'Комментарий') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="text"' +
-        '               name="phraseSearch' + tableId + '" id="phraseSearch' + tableId + '" placeholder="' + raPh('phrase', 'фраза') + '">' +
+        '               name="phraseSearch' + tableId + '" id="phraseSearch' + tableId + '" placeholder="' + raPh('phrase', 'Фраза') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="text"' +
-        '               name="regionSearch' + tableId + '" id="regionSearch' + tableId + '" placeholder="' + raPh('region', 'регион') + '">' +
+        '               name="regionSearch' + tableId + '" id="regionSearch' + tableId + '" placeholder="' + raPh('region', 'Регион') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="text"' +
-        '               name="mainPageSearch' + tableId + '" id="mainPageSearch' + tableId + '" placeholder="' + raPh('link', 'ссылка') + '">' +
+        '               name="mainPageSearch' + tableId + '" id="mainPageSearch' + tableId + '" placeholder="' + raPh('link', 'Ссылка') + '">' +
         '    </th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="number"' +
@@ -323,22 +386,21 @@ function format(data) {
         '          </div>' +
         '       </div>' +
         '   </th>' +
-        '   <th class="ra-hist-actions-th"></th>' +
         '   </tr>' +
         '      <tr>' +
-        '         <th class="table-header">Дата сканирования</th>' +
+        '         <th class="table-header">Дата</th>' +
+        '         <th class="table-header ra-hist-actions-th">Действия</th>' +
         '         <th class="table-header" style="max-width: 150px">Комментарий</th>' +
         '         <th class="table-header">Фраза</th>' +
         '         <th class="table-header">Регион</th>' +
-        '         <th class="table-header" style="max-width: 150px">Посадочная страница</th>' +
-        '         <th class="table-header">Позиция в топе</th>' +
+        '         <th class="table-header" style="max-width: 150px">URL</th>' +
+        '         <th class="table-header">Поз.</th>' +
         '         <th class="table-header">Баллы</th>' +
-        '         <th class="table-header">Охват важных слов</th>' +
-        '         <th class="table-header">Охват важных tf</th>' +
-        '         <th class="table-header">Ширина</th>' +
-        '         <th class="table-header">Плотность</th>' +
-        '         <th class="table-header">Учитывать в расчёте общего балла</th>' +
-        '         <th class="table-header ra-hist-actions-th">Действия</th>' +
+        '         <th class="table-header">Покр.</th>' +
+        '         <th class="table-header">TF</th>' +
+        '         <th class="table-header">Шир.</th>' +
+        '         <th class="table-header">Плотн.</th>' +
+        '         <th class="table-header">В балле</th>' +
         '   </tr>' +
         '</thead>' +
         child +
@@ -380,7 +442,7 @@ function repeatScan() {
                 }
 
                 if (response.code === 200) {
-                    $('#history-state-' + id).html(raHistoryProcessingHtml())
+                    raSetHistoryStateHtml(id, raHistoryProcessingHtml())
                     checkAnalyseProgress(id)
                 }
 
@@ -410,13 +472,13 @@ function checkAnalyseProgress(id) {
                     checkAnalyseProgress(id)
                 }, 10000)
             } else if (response.message === 'error') {
-                $('#history-state-' + id).html(
+                raSetHistoryStateHtml(id,
                     raHistoryActionsHtml(id, { detail: false, repeat: true, error: true })
                 );
             } else if (response.message === 'success') {
                 let newObject = response.newObject
                 if (!newObject || !newObject.id) {
-                    $('#history-state-' + id).html(raHistoryActionsHtml(id))
+                    raSetHistoryStateHtml(id, raHistoryActionsHtml(id))
                     getHistoryInfo()
                     return
                 }
@@ -430,7 +492,7 @@ function checkAnalyseProgress(id) {
                     return
                 }
 
-                $('#history-state-' + id).html(raHistoryActionsHtml(id))
+                raSetHistoryStateHtml(id, raHistoryActionsHtml(id))
 
                 // Та же запись (обновили in-place) — новую строку не добавляем.
                 if (String(newObject.id) === String(id)) {
@@ -467,11 +529,16 @@ function checkAnalyseProgress(id) {
                 let checked = newObject.calculate ? 'checked' : ''
 
                 let $tr = $('<tr class="render"></tr>')
-                $tr.append('<td>' + (newObject.last_check || '') + '</td>')
+                $tr.append('<td data-order="' + (newObject.last_check || '') + '" class="ra-hist-date-cell">' + raFormatHistoryDate(newObject.last_check || '') + '</td>')
                 $tr.append(
-                    '<td><textarea rows="3" data-target="' + newObject.id +
-                    '" class="history-comment form form-control">' + (newObject.comment || '') +
-                    '</textarea></td>'
+                    '<td id="history-state-' + newObject.id + '" class="ra-hist-actions-cell">' +
+                    raHistoryActionsHtml(newObject.id) +
+                    '</td>'
+                )
+                $tr.append(
+                    '<td><input type="text" data-target="' + newObject.id +
+                    '" class="history-comment form-control form-control-sm" value="' +
+                    String(newObject.comment || '').replace(/"/g, '&quot;') + '"></td>'
                 )
                 $tr.append('<td>' + phrase + '</td>')
                 $tr.append('<td>' + region + '</td>')
@@ -490,11 +557,6 @@ function checkAnalyseProgress(id) {
                     '    </div>' +
                     '  </div>' +
                     '</div></td>'
-                )
-                $tr.append(
-                    '<td id="history-state-' + newObject.id + '" class="ra-hist-actions-cell">' +
-                    raHistoryActionsHtml(newObject.id) +
-                    '</td>'
                 )
 
                 table.row.add($tr[0]).draw(false)
@@ -625,6 +687,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
 }
 
 function customHistoryFilters(tableID, table, prefix = '') {
+    // Колонки: 0 дата, 1 действия, 2 комментарий, 3 фраза, …
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let target = String(data[0]);
         return isDateValid(target, settings, tableID, prefix)
@@ -638,7 +701,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
 
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let phraseSearch = String($('#projectComment' + prefix).val()).toLowerCase();
-        let target = String(data[1]).toLowerCase();
+        let target = String(data[2]).toLowerCase();
         return isIncludes(target, phraseSearch, settings, tableID)
     });
     $('#projectComment' + prefix).keyup(function () {
@@ -647,7 +710,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
 
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let phraseSearch = String($('#phraseSearch' + prefix).val()).toLowerCase();
-        let target = String(data[2]).toLowerCase();
+        let target = String(data[3]).toLowerCase();
         return isIncludes(target, phraseSearch, settings, tableID)
     });
     $('#phraseSearch' + prefix).keyup(function () {
@@ -656,7 +719,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
 
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let regionSearch = String($('#regionSearch' + prefix).val()).toLowerCase();
-        let target = String(data[3]).toLowerCase();
+        let target = String(data[4]).toLowerCase();
         return isIncludes(target, regionSearch, settings, tableID)
     });
     $('#regionSearch' + prefix).keyup(function () {
@@ -665,7 +728,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
 
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let mainPageSearch = String($('#mainPageSearch' + prefix).val()).toLowerCase();
-        let target = String(data[4]).toLowerCase();
+        let target = String(data[5]).toLowerCase();
         return isIncludes(target, mainPageSearch, settings, tableID)
     });
     $('#mainPageSearch' + prefix).keyup(function () {
@@ -675,7 +738,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxPosition = parseFloat($('#maxPosition' + prefix).val());
         let minPosition = parseFloat($('#minPosition' + prefix).val());
-        let target = parseFloat(data[5]);
+        let target = parseFloat(data[6]);
         return isValidate(minPosition, maxPosition, target, settings, tableID)
     });
     $('#minPosition' + prefix + ', #maxPosition' + prefix).keyup(function () {
@@ -685,7 +748,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxPoints = parseFloat($('#maxPoints' + prefix).val());
         let minPoints = parseFloat($('#minPoints' + prefix).val());
-        let target = parseFloat(data[6]);
+        let target = parseFloat(data[7]);
         return isValidate(minPoints, maxPoints, target, settings, tableID)
     });
     $('#minPoints' + prefix + ', #maxPoints' + prefix).keyup(function () {
@@ -695,7 +758,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxCoverage = parseFloat($('#maxCoverage' + prefix).val());
         let minCoverage = parseFloat($('#minCoverage' + prefix).val());
-        let target = parseFloat(data[7]);
+        let target = parseFloat(data[8]);
         return isValidate(minCoverage, maxCoverage, target, settings, tableID)
     });
     $('#minCoverage' + prefix + ', #maxCoverage' + prefix).keyup(function () {
@@ -705,7 +768,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxCoverageTf = parseFloat($('#maxCoverageTf' + prefix).val());
         let minCoverageTf = parseFloat($('#minCoverageTf' + prefix).val());
-        let target = parseFloat(data[8]);
+        let target = parseFloat(data[9]);
         return isValidate(minCoverageTf, maxCoverageTf, target, settings, tableID)
     });
     $('#minCoverageTf' + prefix + ', #maxCoverageTf' + prefix).keyup(function () {
@@ -715,7 +778,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxWidth = parseFloat($('#maxWidth' + prefix).val());
         let minWidth = parseFloat($('#minWidth' + prefix).val());
-        let target = parseFloat(data[9]);
+        let target = parseFloat(data[10]);
         return isValidate(minWidth, maxWidth, target, settings, tableID)
     });
     $('#minWidth' + prefix + ', #maxWidth' + prefix).keyup(function () {
@@ -725,7 +788,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxDensity = parseFloat($('#maxDensity' + prefix).val());
         let minDensity = parseFloat($('#minDensity' + prefix).val());
-        let target = parseFloat(data[10]);
+        let target = parseFloat(data[11]);
         return isValidate(minDensity, maxDensity, target, settings, tableID)
     });
     $('#minDensity' + prefix + ', #maxDensity' + prefix).keyup(function () {
@@ -748,12 +811,14 @@ function getColor(result, ideal) {
 
     return 'rgba(220,53,69,0.5)';
 }
+window.getColor = getColor
 
 function getTextResult(result, ideal) {
     if (typeof window.relevanceHistoryGetTextResult === 'function') {
         return window.relevanceHistoryGetTextResult(result, ideal)
     }
-    return 'Посадочная страница получила <b>' + result + '</b>.<br> Рекомендованное значение <b>' + ideal + '.</b>'
+    var tip = 'Факт: ' + result + '. Рекомендуется: ' + ideal
+    return '<span class="ra-hist-metric" data-ra-tip="' + tip + '"><b>' + result + '</b> / ' + ideal + '</span>'
 }
 
 /**

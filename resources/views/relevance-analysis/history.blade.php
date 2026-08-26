@@ -518,14 +518,14 @@
                            class="table table-bordered table-striped table-hover dtr-inline no-footer dataTable mb-3">
                         <thead>
                         <tr>
-                            <th class="table-header">{{ __('Project name') }}</th>
-                            <th class="table-header">{{ __('Tags') }}</th>
-                            <th class="table-header" title="{{ __('Number of analyzed pages') }}">{{ __('Relevance stats col pages') }}</th>
-                            <th class="table-header" title="{{ __('Number of saved scans') }}">{{ __('Relevance stats col scans') }}</th>
-                            <th class="table-header" title="{{ __('Total score') }}">{{ __('Relevance stats col score') }}</th>
-                            <th class="table-header" title="{{ __('Avg position') }}">{{ __('Relevance stats col position') }}</th>
-                            <th class="table-header" title="{{ __('End-to-end analysis') }}">{{ __('Relevance stats col though') }}</th>
-                            <th class="table-header" title="{{ __('Last check') }}">{{ __('Relevance stats col last check') }}</th>
+                            <th class="table-header">Проект</th>
+                            <th class="table-header">Метки</th>
+                            <th class="table-header" data-ra-tip="{{ e(__('Number of analyzed pages')) }}">Стр.</th>
+                            <th class="table-header" data-ra-tip="{{ e(__('Number of saved scans')) }}">Скан.</th>
+                            <th class="table-header" data-ra-tip="{{ e(__('Total score')) }}">Балл</th>
+                            <th class="table-header" data-ra-tip="{{ e(__('Avg position')) }}">Поз.</th>
+                            <th class="table-header" data-ra-tip="{{ e(__('End-to-end analysis')) }}">Сквозной</th>
+                            <th class="table-header" data-ra-tip="{{ e(__('Last check')) }}">Проверка</th>
                         </tr>
                         </thead>
                         <tbody></tbody>
@@ -820,109 +820,111 @@
                         @endforeach
                     </div>
 
-                    <div style="display:none;" class="history">
+                    <div style="display:none;" class="history" data-ra-hist-view="v2">
                         <h3>{{ __("Recent checks") }}</h3>
-                        <table id="history_table" class="table table-bordered table-hover dataTable dtr-inline">
-                            <thead>
-                            @include('relevance-analysis.layouts.table-rows')
-                            </thead>
-                            <tbody id="historyTbody">
-                            </tbody>
-                        </table>
+                        <div id="ra-hist-classic" class="ra-hist-classic d-none" hidden aria-hidden="true">
+                            <table id="history_table" class="table table-bordered table-hover table-sm dataTable dtr-inline">
+                                <thead>
+                                @include('relevance-analysis.layouts.table-rows')
+                                </thead>
+                                <tbody id="historyTbody">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <h3 style="display: none" id="history-list-subject">{{ __('Scan history (list of phrases)') }}</h3>
 
-                    <table class="table table-bordered table-hover dtr-inline no-footer" id="list-history"
+                    <div id="ra-hist-list-bar" class="ra-hist-list-bar" style="display: none;" hidden>
+                        <label class="ra-hist-list-bar__label" for="mainPageSearchList">URL</label>
+                        <input class="form-control form-control-sm ra-hist-list-bar__url search-input" type="text"
+                               name="mainPageSearchList" id="mainPageSearchList"
+                               placeholder="Фильтр по посадочной странице (URL)" autocomplete="off">
+                    </div>
+
+                    <table class="table table-bordered table-hover table-sm dtr-inline no-footer ra-hist-list-table" id="list-history"
                            style="display: none">
                         <thead>
-                        <tr>
-                            <th style="position: inherit;"></th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control" type="date" name="dateMinList" id="dateMinList"
-                                       value="{{ Carbon\Carbon::parse('2022-03-01')->toDateString() }}">
-                                <input class="w-100 form form-control" type="date" name="dateMaxList" id="dateMaxList"
-                                       value="{{ Carbon\Carbon::now()->toDateString() }}">
+                        <tr class="ra-hist-list-filters">
+                            <th class="ra-hist-list-filters__expand"></th>
+                            <th>
+                                <div class="ra-hist-list-minmax ra-hist-list-minmax--dates">
+                                    <input class="form-control form-control-sm" type="date" name="dateMinList" id="dateMinList"
+                                           value="{{ Carbon\Carbon::parse('2022-03-01')->toDateString() }}" aria-label="Дата от">
+                                    <input class="form-control form-control-sm" type="date" name="dateMaxList" id="dateMaxList"
+                                           value="{{ Carbon\Carbon::now()->toDateString() }}" aria-label="Дата до">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="text"
+                            <th>
+                                <input class="form-control form-control-sm search-input ra-hist-list-text" type="text"
                                        name="phraseSearchList" id="phraseSearchList" placeholder="{{ __('phrase') }}">
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="text"
+                            <th>
+                                <input class="form-control form-control-sm search-input ra-hist-list-text" type="text"
                                        name="regionSearchList" id="regionSearchList" placeholder="{{ __('region') }}">
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="text"
-                                       name="mainPageSearchList" id="mainPageSearchList" placeholder="{{ __('link') }}">
+                            <th class="ra-hist-list-filters__url-placeholder"></th>
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minPositionList" id="minPositionList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxPositionList" id="maxPositionList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minPositionList" id="minPositionList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxPositionList" id="maxPositionList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minPointsList" id="minPointsList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxPointsList" id="maxPointsList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minPointsList" id="minPointsList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxPointsList" id="maxPointsList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minCoverageList" id="minCoverageList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxCoverageList" id="maxCoverageList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minCoverageList" id="minCoverageList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxCoverageList" id="maxCoverageList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minCoverageTfList" id="minCoverageTfList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxCoverageTfList" id="maxCoverageTfList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minCoverageTfList" id="minCoverageTfList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxCoverageTfList" id="maxCoverageTfList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number" name="minWidthList"
+                                           id="minWidthList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxWidthList" id="maxWidthList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number" name="minWidthList"
-                                       id="minWidthList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxWidthList" id="maxWidthList" placeholder="{{ __('max') }}">
-                            </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minDensityList" id="minDensityList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxDensityList" id="maxDensityList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minDensityList" id="minDensityList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxDensityList" id="maxDensityList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
                         </tr>
                         <tr>
-                            <th class="table-header" style="position: inherit;"></th>
-                            <th class="table-header" style="position: inherit;">{{ __('Date of last check') }}</th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Phrase') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Region') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Landing page') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Position in the top') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Scores') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Coverage of important words') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('TF coverage') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Width') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Density') }}
-                            </th>
+                            <th class="table-header"></th>
+                            <th class="table-header">Дата</th>
+                            <th class="table-header">Фраза</th>
+                            <th class="table-header">Регион</th>
+                            <th class="table-header">URL</th>
+                            <th class="table-header">Поз.</th>
+                            <th class="table-header">Баллы</th>
+                            <th class="table-header">Покр.</th>
+                            <th class="table-header">TF</th>
+                            <th class="table-header">Шир.</th>
+                            <th class="table-header">Плотн.</th>
                         </tr>
                         </thead>
                         <tbody id="list-history-body">
@@ -940,6 +942,7 @@
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}"></script>
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/relevance-analysis/history/childHistoryTable.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/history/childHistoryTable.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-ra-history-v2.js') }}?v={{ @filemtime(public_path('js/cabinet-ra-history-v2.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
@@ -987,6 +990,23 @@
                 to: "{{ __('to') }}",
                 of: "{{ __('of') }}",
                 entries: "{{ __('entries') }}"
+            };
+
+            /** Русские подписи DataTables (без английского Showing/entries) */
+            window.raDtRu = {
+                search: words.search + ':',
+                lengthMenu: words.show + ' _MENU_ ' + words.records,
+                emptyTable: words.noRecords,
+                zeroRecords: words.noRecords,
+                info: 'Показано с _START_ по _END_ из _TOTAL_ ' + words.entries,
+                infoEmpty: 'Нет записей',
+                infoFiltered: '(отфильтровано из _MAX_ ' + words.entries + ')',
+                paginate: {
+                    first: '«',
+                    last: '»',
+                    next: '»',
+                    previous: '«'
+                }
             };
 
             window.raFilterPh = {
@@ -1061,8 +1081,10 @@
                 {
                     name: 'count_sites',
                     data: function (row) {
+                        var n = Number(row.count_sites) || 0;
+                        var shown = n.toLocaleString('ru-RU');
                         return '<span class="cabinet-relevance-count-sites">' +
-                            '<span class="count-sites-' + row.id + '">' + row.count_sites + '</span>' +
+                            '<span class="count-sites-' + row.id + '">' + shown + '</span>' +
                             '<i class="fa fa-repeat"' +
                             '   data-bs-target="#repeatUniqueScan' + row.id + '"' +
                             '   data-bs-toggle="modal" data-bs-placement="top"' +
@@ -1073,7 +1095,10 @@
                 },
                 {
                     name: 'count_checks',
-                    data: 'count_checks',
+                    data: function (row) {
+                        var n = Number(row.count_checks) || 0;
+                        return n.toLocaleString('ru-RU');
+                    },
                 },
                 {
                     name: 'total_points',
@@ -1086,37 +1111,44 @@
                 {
                     name: 'though',
                     data: function (row) {
-                        if (row.though.id) {
-                            return '<div id="though' + row.id + '" class="mt-2 mb-2">' +
-                                '    <a href="/show-though/' + row.though.id + '" target="_blank">' +
-                                '        {{ __('Results of end-to-end analysis') }}' +
+                        if (row.though && row.though.id) {
+                            var when = row.though.updated_at || '';
+                            var whenHtml = (typeof window.raFormatHistoryDate === 'function')
+                                ? window.raFormatHistoryDate(when)
+                                : when;
+                            return '<div id="though' + row.id + '" class="ra-hist-though-done">' +
+                                '    <a class="ra-hist-though-link" href="/show-though/' + row.though.id + '" target="_blank" rel="noopener">' +
+                                '        Результаты' +
                                 '    </a>' +
-                                '    <div class="text-muted">' +
-                                '        {{ __('Last analysis') }} ' + '' + row.though.updated_at +
-                                '    </div>' +
-                                '</div>'
-                        } else {
-                            return '<div class="though-cell">' +
-                                '  <div class="cabinet-ra-though-actions">' +
-                                '    <button type="button" class="btn btn-sm btn-secondary"' +
-                                '            data-bs-target="#startThroughScan' + row.id + '"' +
-                                '            data-bs-toggle="modal"' +
-                                '            data-ra-tip="{{ e(__('Relevance end-to-end button tip')) }}">' +
-                                '        {{ __('End-to-end analysis') }}' +
-                                '    </button>' +
-                                '    <button type="button" class="btn btn-sm btn-secondary though-help-btn"' +
-                                '            data-ra-tip="{{ e(__('Relevance though analysis tip')) }}"' +
-                                '            aria-label="{{ e(__('Help')) }}">' +
-                                '        <i class="fa fa-question-circle" aria-hidden="true"></i>' +
-                                '    </button>' +
-                                '  </div>' +
-                                '</div>'
+                                '    <div class="ra-hist-though-meta">' + whenHtml + '</div>' +
+                                '</div>';
                         }
+                        return '<div class="though-cell">' +
+                            '  <div class="cabinet-ra-though-actions">' +
+                            '    <button type="button" class="btn btn-sm btn-secondary ra-hist-though-btn"' +
+                            '            data-bs-target="#startThroughScan' + row.id + '"' +
+                            '            data-bs-toggle="modal"' +
+                            '            data-ra-tip="{{ e(__('Relevance end-to-end button tip')) }}">' +
+                            '        Сквозной' +
+                            '    </button>' +
+                            '    <button type="button" class="btn btn-sm btn-secondary though-help-btn ra-hist-though-help"' +
+                            '            data-ra-tip="{{ e(__('Relevance though analysis tip')) }}"' +
+                            '            aria-label="{{ e(__('Help')) }}">' +
+                            '        <i class="fa fa-question-circle" aria-hidden="true"></i>' +
+                            '    </button>' +
+                            '  </div>' +
+                            '</div>';
                     },
                 },
                 {
                     name: 'last_check',
-                    data: 'last_check',
+                    data: function (row) {
+                        var raw = row.last_check || '';
+                        if (typeof window.raFormatHistoryDate === 'function') {
+                            return '<span class="ra-hist-date-cell">' + window.raFormatHistoryDate(raw) + '</span>';
+                        }
+                        return raw;
+                    },
                 },
             ];
 
@@ -1142,8 +1174,9 @@
                     lengthMenu: @json(__('show') . ' _MENU_ ' . __('records')),
                     emptyTable: @json(__('No records')),
                     zeroRecords: @json(__('No records')),
-                    info: @json(__('Showing') . ' ' . __('from') . ' _START_ ' . __('to') . ' _END_ ' . __('of') . ' _TOTAL_ ' . __('entries')),
-                    infoEmpty: @json(__('Showing') . ' ' . __('from') . ' 0 ' . __('to') . ' 0 ' . __('of') . ' 0 ' . __('entries')),
+                    info: 'Показано с _START_ по _END_ из _TOTAL_ {{ __('entries') }}',
+                    infoEmpty: 'Нет записей',
+                    infoFiltered: '(отфильтровано из _MAX_ {{ __('entries') }})',
                     paginate: {
                         first: "«",
                         last: "»",
@@ -1157,10 +1190,15 @@
                     "sLengthMenu": "{{ __('show') }} _MENU_ {{ __('records') }}",
                     "sEmptyTable": "{{ __('No records') }}",
                     "sZeroRecords": "{{ __('No records') }}",
-                    "sInfo": "{{ __('Showing') }} {{ __('from') }} _START_ {{ __('to') }} _END_ {{ __('of') }} _TOTAL_ {{ __('entries') }}",
-                    "sInfoEmpty": "{{ __('Showing') }} {{ __('from') }} 0 {{ __('to') }} 0 {{ __('of') }} 0 {{ __('entries') }}",
+                    "sInfo": "Показано с _START_ по _END_ из _TOTAL_ {{ __('entries') }}",
+                    "sInfoEmpty": "Нет записей",
+                    "sInfoFiltered": "(отфильтровано из _MAX_ {{ __('entries') }})",
                 },
                 drawCallback: function () {
+                    $('#main_history_table_processing').hide();
+                    if (typeof window.raHistoryV2 !== 'undefined' && window.raHistoryV2.applyView) {
+                        window.raHistoryV2.applyView();
+                    }
                     if (typeof window.initRelevanceActionTips === 'function') {
                         window.initRelevanceActionTips(document.getElementById('main_history_table_wrapper') || document);
                     }
@@ -1221,7 +1259,7 @@
                                         let dataOrderPosition = val.position
 
                                         if (val.position == 0) {
-                                            position = "{{ __('Did not get into the top 100') }}"
+                                            position = "вне ТОП-100"
                                             dataOrderPosition = 100
                                         }
 
@@ -1232,9 +1270,12 @@
                                         }
 
                                         let newRow = "<tr class='render'>" +
-                                            "   <td>" + val.last_check + "</td>" +
+                                            "   <td data-order='" + val.last_check + "' class='ra-hist-date-cell'>" + raFormatHistoryDate(val.last_check) + "</td>" +
+                                            "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
+                                            state +
+                                            "   </td>" +
                                             "   <td>" +
-                                            "      <textarea rows='3' data-target='" + val.id + "' class='history-comment form form-control'>" + (val.comment || '') + "</textarea>" +
+                                            "      <input type='text' data-target='" + val.id + "' class='history-comment form-control form-control-sm' value='" + String(val.comment || '').replace(/'/g, '&#39;') + "'>" +
                                             "   </td>" +
                                             "   <td>" + phrase + "</td>" +
                                             "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
@@ -1257,9 +1298,6 @@
                                                 "          </div>" +
                                                 "      </div>" +
                                                 "   </td>" +
-                                                "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
-                                                state +
-                                                "   </td>" +
                                                 "</tr>"
                                         } else {
                                             newRow += "   <td data-order='" + val.points + "' style='background: " + getColor(val.points, Math.round(val.average_values.points)) + "'>" + getTextResult(val.points, Math.round(val.average_values.points)) + "</td>" +
@@ -1276,9 +1314,6 @@
                                                 "              </div>" +
                                                 "          </div>" +
                                                 "      </div>" +
-                                                "   </td>" +
-                                                "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
-                                                state +
                                                 "   </td>" +
                                                 "</tr>"
                                         }
@@ -1297,29 +1332,24 @@
                                             "searching": true,
                                             "autoWidth": false,
                                             "scrollX": false,
-                                            language: {
-                                                paginate: {
-                                                    "first": "«",
-                                                    "last": "»",
-                                                    "next": "»",
-                                                    "previous": "«"
-                                                },
-                                            },
+                                            language: window.raDtRu,
                                             "columnDefs": [
                                                 {
                                                     type: "num",
-                                                    targets: [5, 6, 7, 8, 9, 10]
+                                                    targets: [6, 7, 8, 9, 10, 11]
                                                 },
                                                 {
                                                     orderable: false,
-                                                    targets: [1, 11, 12]
+                                                    targets: [1, 2, 12]
                                                 },
                                             ],
                                             "oLanguage": {
-                                                "sSearch": words.search + ":",
-                                                "sLengthMenu": words.show + " _MENU_ " + words.records,
-                                                "sEmptyTable": words.noRecords,
-                                                "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
+                                                "sSearch": window.raDtRu.search,
+                                                "sLengthMenu": window.raDtRu.lengthMenu,
+                                                "sEmptyTable": window.raDtRu.emptyTable,
+                                                "sInfo": window.raDtRu.info,
+                                                "sInfoEmpty": window.raDtRu.infoEmpty,
+                                                "sInfoFiltered": window.raDtRu.infoFiltered,
                                             },
                                             drawCallback: function () {
                                                 getHistoryInfo()
@@ -1343,7 +1373,7 @@
                                                     });
                                                 });
 
-                                                $('#history_table tbody td:nth-child(3), #history_table tbody td:nth-child(5)').each(function () {
+                                                $('#history_table tbody td:nth-child(4), #history_table tbody td:nth-child(6)').each(function () {
                                                     let cell = $(this);
                                                     let clipboard = new ClipboardJS(cell[0], {
                                                         text: function () {
@@ -1384,6 +1414,10 @@
                                         repeatScan()
 
                                         customHistoryFilters('history_table', historyTable)
+
+                                        if (typeof window.raHistoryV2 !== 'undefined' && window.raHistoryV2.render) {
+                                            window.raHistoryV2.render(response.stories || [], { storyId: storyId })
+                                        }
                                     });
                                 }
                             },
@@ -1418,6 +1452,7 @@
                                 } else {
                                     $('#history-list-subject').show()
                                     $('#list-history').show()
+                                    $('#ra-hist-list-bar').show().removeAttr('hidden')
 
                                     object = response.object
 
@@ -1425,20 +1460,34 @@
                                     $.each(response.object, function (key, value) {
                                         let position = value[0]['position']
                                         if (position == 0) {
-                                            position = 'Не попал в топ 100'
+                                            position = 'вне ТОП-100'
                                         }
+                                        let createdAt = value[0]['created_at']
+                                        let dateHtml = (typeof raFormatHistoryDate === 'function')
+                                            ? raFormatHistoryDate(createdAt)
+                                            : createdAt
+                                        let url = value[0]['main_link'] || ''
+                                        let urlShort = url.length > 48 ? (url.slice(0, 46) + '…') : url
+                                        let avg = value[0]['average_values'] || null
+                                        let metricCells = (typeof buildHistoryMetricCells === 'function')
+                                            ? buildHistoryMetricCells(value[0], avg)
+                                            : (
+                                                '<td>' + value[0]['points'] + '</td>' +
+                                                '<td>' + value[0]['coverage'] + '</td>' +
+                                                '<td>' + value[0]['coverage_tf'] + '</td>' +
+                                                '<td>' + value[0]['width'] + '</td>' +
+                                                '<td>' + value[0]['density'] + '</td>'
+                                            )
                                         html += '<tr class="render">' +
-                                            '   <td data-target="' + key + '" class="col-1" style="text-align: center; vertical-align: inherit; width: 50px"></td>' +
-                                            '   <td>' + value[0]['created_at'] + '</td>' +
+                                            '   <td data-target="' + key + '" class="col-1 ra-hist-list-expand"></td>' +
+                                            '   <td data-order="' + createdAt + '" class="ra-hist-date-cell">' + dateHtml + '</td>' +
                                             '   <td>' + key + '</td>' +
                                             '   <td>' + (value[0]['region_name'] || getRegionName(value[0]['region'])) + '</td>' +
-                                            '   <td>' + value[0]['main_link'] + '</td>' +
+                                            '   <td class="ra-hist-list-url" data-ra-tip="' + $('<div>').text(url).html() + '">' +
+                                            (url ? ('<a href="' + url + '" target="_blank" rel="noopener">' + $('<div>').text(urlShort).html() + '</a>') : '—') +
+                                            '</td>' +
                                             '   <td>' + position + '</td>' +
-                                            '   <td>' + value[0]['points'] + ' </td>' +
-                                            '   <td>' + value[0]['coverage'] + '</td>' +
-                                            '   <td>' + value[0]['coverage_tf'] + '</td>' +
-                                            '   <td>' + value[0]['width'] + '</td>' +
-                                            '   <td>' + value[0]['density'] + '</td>' +
+                                            metricCells +
                                             '</tr>'
                                     })
 
@@ -1449,7 +1498,11 @@
                                             width: '100%'
                                         })
 
-                                        $('#list-history-body > tr.render > td.col-1').append('<i class="fa fa-eye" data-ra-tip="{{ e(__('Relevance open details tip')) }}"></i>')
+                                        $('#list-history-body > tr.render > td.col-1').html(
+                                            '<button type="button" class="btn btn-secondary btn-sm ra-hist-act ra-hist-act--icon ra-list-expand-btn" ' +
+                                            'data-ra-tip="{{ e(__('Relevance open details tip')) }}" aria-label="{{ e(__('Relevance open details tip')) }}">' +
+                                            '<i class="fa fa-eye" aria-hidden="true"></i></button>'
+                                        )
                                         if (typeof window.initRelevanceActionTips === 'function') {
                                             window.initRelevanceActionTips(document.getElementById('list-history_wrapper') || document);
                                         }
@@ -1477,19 +1530,15 @@
                                             ],
                                             order: [[1, 'desc']],
                                             destroy: true,
-                                            language: {
-                                                paginate: {
-                                                    "first": "«",
-                                                    "last": "»",
-                                                    "next": "»",
-                                                    "previous": "«"
-                                                },
-                                            },
+                                            autoWidth: false,
+                                            language: window.raDtRu,
                                             "oLanguage": {
-                                                "sSearch": words.search + ":",
-                                                "sLengthMenu": words.show + " _MENU_ " + words.records,
-                                                "sEmptyTable": words.noRecords,
-                                                "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
+                                                "sSearch": window.raDtRu.search,
+                                                "sLengthMenu": window.raDtRu.lengthMenu,
+                                                "sEmptyTable": window.raDtRu.emptyTable,
+                                                "sInfo": window.raDtRu.info,
+                                                "sInfoEmpty": window.raDtRu.infoEmpty,
+                                                "sInfoFiltered": window.raDtRu.infoFiltered,
                                             }
                                         });
 
@@ -1504,6 +1553,13 @@
                                         scrollTo('#history-list-subject')
 
                                         customFiltersWithoutComment('list-history', listTable, 'List', 1)
+
+                                        if (typeof window.raHistoryV2 !== 'undefined' && window.raHistoryV2.applyView) {
+                                            window.raHistoryV2.applyView()
+                                        }
+                                        if (typeof window.initRelevanceActionTips === 'function') {
+                                            window.initRelevanceActionTips(document.getElementById('list-history_wrapper') || document);
+                                        }
 
                                         $('#list-history').unbind().on('click', 'td.dt-control', function () {
                                             let tr = $(this).closest('tr');
@@ -1520,18 +1576,20 @@
                                                 let table = $('#' + target).DataTable({
                                                     order: [[0, 'desc']],
                                                     destroy: true,
-                                                    language: {
-                                                        lengthMenu: "_MENU_",
-                                                        search: "_INPUT_",
-                                                        paginate: {
-                                                            "first": "«",
-                                                            "last": "»",
-                                                            "next": "»",
-                                                            "previous": "«"
-                                                        },
+                                                    language: window.raDtRu,
+                                                    "oLanguage": {
+                                                        "sSearch": window.raDtRu.search,
+                                                        "sLengthMenu": window.raDtRu.lengthMenu,
+                                                        "sEmptyTable": window.raDtRu.emptyTable,
+                                                        "sInfo": window.raDtRu.info,
+                                                        "sInfoEmpty": window.raDtRu.infoEmpty,
+                                                        "sInfoFiltered": window.raDtRu.infoFiltered,
                                                     },
                                                 })
                                                 customFilters(target, table, target)
+                                                if (typeof window.initRelevanceActionTips === 'function') {
+                                                    window.initRelevanceActionTips(document.getElementById(target) || document);
+                                                }
                                             }
                                         });
                                     })
@@ -1568,6 +1626,10 @@
             })
 
             $('#main_history_table').wrap('<div class="main-history-table-scroll"></div>')
+
+            if (typeof window.raHistoryV2 !== 'undefined' && window.raHistoryV2.applyView) {
+                window.raHistoryV2.applyView();
+            }
 
             search(historyTable, true, true)
 
@@ -2134,7 +2196,8 @@
             }
 
             function getTextResult(result, ideal) {
-                return "{{ __('The landing page received') }}" + ' <b>' + result + '</b>.<br> ' + '{{ __('Recommended value')}}' + ' <b>' + ideal + '.</b>';
+                var tip = @json(__('The landing page received')) + ' ' + result + '. ' + @json(__('Recommended value')) + ' ' + ideal + '.';
+                return '<span class="ra-hist-metric" data-ra-tip="' + $('<div/>').text(tip).html() + '"><b>' + result + '</b> / ' + ideal + '</span>';
             }
             window.relevanceHistoryGetTextResult = getTextResult;
         </script>

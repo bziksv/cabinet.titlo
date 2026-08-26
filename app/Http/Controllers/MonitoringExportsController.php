@@ -62,6 +62,9 @@ class MonitoringExportsController extends MonitoringKeywordsController
 
     public function download(Request $request, $id)
     {
+        @set_time_limit(300);
+        @ini_set('memory_limit', '768M');
+
         $date = implode(' - ', [
             Carbon::parse($request['startDate'])->locale('ru')->toDateString(),
             Carbon::parse($request['endDate'])->locale('ru')->toDateString()
@@ -69,6 +72,8 @@ class MonitoringExportsController extends MonitoringKeywordsController
 
         $params = collect([
             'length' => 0,
+            // Экспорт — полный снимок: lazy-чанки только для UI, иначе finance/mastered падает 500.
+            'lazy_positions' => false,
             'mode_range' => $request['mode'],
             'region_id' => $request['region'],
             'dates_range' => $date,

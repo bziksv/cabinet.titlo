@@ -1,11 +1,12 @@
 <tr>
-    <th>
-        <input class="w-100 form form-control" type="date" name="dateMin"
+    <th class="table-header ra-hist-date-th">
+        <input class="form form-control form-control-sm ra-hist-date-filter" type="date" name="dateMin"
                id="dateMin"
                value="{{ Carbon\Carbon::parse('2022-03-01')->toDateString() }}">
-        <input class="w-100 form form-control" type="date" name="dateMax" id="dateMax"
+        <input class="form form-control form-control-sm ra-hist-date-filter" type="date" name="dateMax" id="dateMax"
                value="{{ Carbon\Carbon::now()->toDateString() }}">
     </th>
+    <th class="ra-hist-actions-th"></th>
     <th>
         <input class="w-100 form form-control search-input" type="text"
                name="projectComment" id="projectComment" placeholder="{{ __('comment') }}">
@@ -74,42 +75,19 @@
         </div>
 
     </th>
-    <th></th>
 </tr>
 <tr>
-    <th class="table-header">{{ __('Date of last check') }}</th>
-    <th class="table-header">
-        {{ __('Comment') }}
-    </th>
-    <th class="table-header">
-        {{ __('Phrase') }}
-    </th>
-    <th class="table-header">
-        {{ __('Region') }}
-    </th>
-    <th class="table-header">
-        {{ __('Landing page') }}
-    </th>
-    <th class="table-header">
-        {{ __('Position in the top') }}
-    </th>
-    <th class="table-header">
-        {{ __('Scores') }}
-    </th>
-    <th class="table-header">
-        {{ __('Coverage of important words') }}
-    </th>
-    <th class="table-header">
-        {{ __('TF coverage') }}
-    </th>
-    <th class="table-header">
-        {{ __('Width') }}
-    </th>
-    <th class="table-header">
-        {{ __('Density') }}
-    </th>
-    <th class="table-header">
-        {{ __('Take into account when calculating the total score') }}
-    </th>
-    <th class="table-header"></th>
+    <th class="table-header">Дата</th>
+    <th class="table-header ra-hist-actions-th">Действия</th>
+    <th class="table-header">Комментарий</th>
+    <th class="table-header">Фраза</th>
+    <th class="table-header">Регион</th>
+    <th class="table-header">URL</th>
+    <th class="table-header">Поз.</th>
+    <th class="table-header">Баллы</th>
+    <th class="table-header">Покр.</th>
+    <th class="table-header">TF</th>
+    <th class="table-header">Шир.</th>
+    <th class="table-header">Плотн.</th>
+    <th class="table-header">В балле</th>
 </tr>

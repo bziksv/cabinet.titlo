@@ -231,6 +231,8 @@ class Relevance
         RelevanceProgress::editProgress(88, $this->request);
         $this->prepareClouds();
         $this->applyTableTfidfToUnigramTable();
+        // Заголовок группы — форма с max TF-IDF (после расчёта метрик), не словарная лемма.
+        $this->wordForms = self::relabelWordFormGroupsByHeaviestSurface($this->wordForms);
         $this->applyHybridTfCloudsFromUnigramTable();
         $this->applyHybridTfCompCloudsFromUnigramTable();
         $this->saveHistory($historyId);
@@ -300,6 +302,7 @@ class Relevance
         RelevanceProgress::editProgress(88, $this->request);
         $this->prepareMainPageClouds();
         $this->applyTableTfidfToUnigramTable();
+        $this->wordForms = self::relabelWordFormGroupsByHeaviestSurface($this->wordForms);
         $this->applyHybridTfCloudsFromUnigramTable();
         $this->applyHybridTfCompCloudsFromUnigramTable();
         $this->saveHistory($historyId);
@@ -467,8 +470,78 @@ class Relevance
         $myLink = self::wordFrequencyMap(strip_tags($this->mainPage['linkText'] ?? ''));
         $myPassages = self::wordFrequencyMap(strip_tags($this->mainPage['passages'] ?? ''));
 
+        $m = new Morphy();
+        $candidates = [];
+        foreach ($this->wordForms as $root => $wordForm) {
+            if (!is_array($wordForm)) {
+                continue;
+            }
+            foreach ($wordForm as $word => $form) {
+                if ($word === 'total' || !is_string($word)) {
+                    continue;
+                }
+                if (isset($candidates[$word])) {
+                    continue;
+                }
+                $forms = $m->baseForms($word);
+                $candidates[$word] = $forms !== [] ? $forms : [mb_strtolower($word, 'UTF-8')];
+            }
+            $rootKey = (string) $root;
+            if ($rootKey !== '' && !isset($candidates[$rootKey])) {
+                $forms = $m->baseForms($rootKey);
+                $candidates[$rootKey] = $forms !== [] ? $forms : [mb_strtolower($rootKey, 'UTF-8')];
+            }
+        }
+        foreach (array_keys($myText + $myLink + $myPassages) as $token) {
+            $token = (string) $token;
+            if ($token === '' || isset($candidates[$token])) {
+                continue;
+            }
+            $forms = $m->baseForms($token);
+            $candidates[$token] = $forms !== [] ? $forms : [mb_strtolower($token, 'UTF-8')];
+        }
+        $resolved = $candidates !== [] ? $m->resolveRootsFromCandidates($candidates) : [];
+
         foreach ($this->wordForms as $root => &$wordForm) {
             unset($wordForm['total']);
+
+            $groupLemmas = [];
+            foreach ($wordForm as $word => $form) {
+                if ($word === 'total' || !is_string($word)) {
+                    continue;
+                }
+                $groupLemmas[$resolved[$word] ?? mb_strtolower($word, 'UTF-8')] = true;
+            }
+            $groupLemmas[$resolved[(string) $root] ?? mb_strtolower((string) $root, 'UTF-8')] = true;
+
+            foreach ($resolved as $token => $lemma) {
+                if (!isset($groupLemmas[$lemma])) {
+                    continue;
+                }
+                if (isset($wordForm[$token]) && is_array($wordForm[$token])) {
+                    continue;
+                }
+                if (isset($myText[$token]) || isset($myLink[$token]) || isset($myPassages[$token])) {
+                    $wordForm[$token] = [
+                        'tf' => 0,
+                        'idf' => 0,
+                        'score' => 0,
+                        'countTopText' => 0,
+                        'countTopLink' => 0,
+                        'numberOccurrences' => 0,
+                        'reSpam' => 0,
+                        'avgInTotalCompetitors' => 0,
+                        'avgInLink' => 0,
+                        'avgInText' => 0,
+                        'avgInPassages' => 0,
+                        'repeatInLinkMainPage' => 0,
+                        'repeatInTextMainPage' => 0,
+                        'repeatInPassagesMainPage' => 0,
+                        'totalRepeatMainPage' => 0,
+                        'occurrences' => [],
+                    ];
+                }
+            }
 
             foreach ($wordForm as $word => &$form) {
                 if (!is_string($word) || !is_array($form)) {
@@ -1078,6 +1151,72 @@ class Relevance
     }
 
     /**
+     * Ключ группы = словоформа с наибольшим весом (как в Redbox), не словарная лемма.
+     * Группировка по лемме сохраняется; меняется только отображаемый ключ.
+     *
+     * @param array<string, array<string, mixed>> $wordForms
+     * @return array<string, array<string, mixed>>
+     */
+    public static function relabelWordFormGroupsByHeaviestSurface(array $wordForms): array
+    {
+        $out = [];
+
+        foreach ($wordForms as $root => $wordForm) {
+            if (!is_array($wordForm)) {
+                continue;
+            }
+
+            $bestWord = null;
+            $bestScore = -INF;
+
+            foreach ($wordForm as $word => $data) {
+                if ($word === 'total' || !is_string($word) || !is_array($data)) {
+                    continue;
+                }
+
+                $score = (float) ($data['tfidfTop'] ?? $data['tf'] ?? $data['score'] ?? 0);
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $bestWord = $word;
+                } elseif ($score === $bestScore && $bestWord !== null && strcmp($word, $bestWord) < 0) {
+                    $bestWord = $word;
+                }
+            }
+
+            $label = $bestWord !== null ? $bestWord : (string) $root;
+
+            if (!isset($out[$label])) {
+                $out[$label] = $wordForm;
+                continue;
+            }
+
+            foreach ($wordForm as $word => $data) {
+                if ($word === 'total') {
+                    if (!isset($out[$label]['total']) || !is_array($out[$label]['total'])) {
+                        $out[$label]['total'] = $data;
+                        continue;
+                    }
+                    if (!is_array($data)) {
+                        continue;
+                    }
+                    $existingTf = (float) ($out[$label]['total']['tf'] ?? 0);
+                    $newTf = (float) ($data['tf'] ?? 0);
+                    if ($newTf > $existingTf) {
+                        $out[$label]['total'] = $data;
+                    }
+                    continue;
+                }
+
+                if (!isset($out[$label][$word])) {
+                    $out[$label][$word] = $data;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Сливает группы словоформ по выбранной лемме (на случай расхождения bucket-ключей).
      *
      * @param array<string, array<string, int>> $wordWorms
@@ -1245,6 +1384,38 @@ class Relevance
         $myPassages = array_count_values($myPassages);
 
         $wordCount = count(explode(' ', $this->competitorsTextAndLinks));
+
+        // Формы с посадочной, которых нет у конкурентов, но лемма та же — тоже в группу
+        // (иначе «инвалидный» на вашей странице не попадает в расчёт при лейбле-лемме).
+        $m = new Morphy();
+        $mainTokens = array_unique(array_merge(
+            array_keys($myText),
+            array_keys($myLink),
+            array_keys($myPassages)
+        ));
+        $mainCandidates = [];
+        foreach ($mainTokens as $token) {
+            $token = (string) $token;
+            if ($token === '') {
+                continue;
+            }
+            $forms = $m->baseForms($token);
+            $mainCandidates[$token] = $forms !== [] ? $forms : [mb_strtolower($token, 'UTF-8')];
+        }
+        $mainResolved = $mainCandidates !== []
+            ? $m->resolveRootsFromCandidates($mainCandidates)
+            : [];
+
+        foreach ($this->wordForms as $root => $wordForm) {
+            foreach ($mainResolved as $token => $lemma) {
+                if ($lemma !== (string) $root) {
+                    continue;
+                }
+                if (!isset($this->wordForms[$root][$token])) {
+                    $this->wordForms[$root][$token] = 0;
+                }
+            }
+        }
 
         foreach ($this->wordForms as $root => $wordForm) {
             foreach ($wordForm as $word => $item) {
@@ -3506,6 +3677,9 @@ class Relevance
             HybridRelevanceMetrics::applyTableBm25ToWordStats($wordForm['total'], $corpusZones);
         }
         unset($wordForm);
+
+        // Как в Redbox: заголовок группы — форма с наибольшим TF/TF-IDF, не словарная лемма.
+        $data['unigram_table'] = self::relabelWordFormGroupsByHeaviestSurface($data['unigram_table']);
     }
 
     private function hybridCorpusStats(): array

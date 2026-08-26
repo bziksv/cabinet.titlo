@@ -50,9 +50,8 @@ class HistoryRelevanceController extends Controller
     {
         return [
             'relevanceTags',
-            'story' => function ($query) {
-                $query->select('id', 'project_relevance_history_id', 'last_check');
-            },
+            // last_check уже на project_relevance_history — не грузим story
+            // (hasOne+orderBy тянет ВСЕ проверки проекта и вешает DataTables на десятки секунд)
             'though' => function ($query) {
                 $query->select([
                     'id',
@@ -93,7 +92,7 @@ class HistoryRelevanceController extends Controller
                 'total_points' => $record->total_points,
                 'avg_position' => $record->avg_position,
                 'though' => $though,
-                'last_check' => ($record->story) ? $record->story->last_check : '',
+                'last_check' => $record->last_check ?: '',
             ];
 
             if ($owner) {
@@ -550,7 +549,9 @@ class HistoryRelevanceController extends Controller
 
     public function getHistoryInfoV2(Request $request): JsonResponse
     {
-        $projects = RelevanceHistory::where('project_relevance_history_id', $request->historyId)->latest('id')
+        $projects = RelevanceHistory::where('project_relevance_history_id', $request->historyId)
+            ->with(['results:id,project_id,average_values'])
+            ->latest('id')
             ->get([
                 'id',
                 'created_at',
@@ -565,11 +566,24 @@ class HistoryRelevanceController extends Controller
                 'density',
                 'phrase',
                 'state',
-                'comment'
+                'comment',
             ]);
+
+        if ($projects->isEmpty()) {
+            return response()->json([
+                'object' => [],
+            ]);
+        }
 
         foreach ($projects as $project) {
             $project['region_name'] = \App\Common::getRegionName((string) $project->region);
+            $avgRaw = $project->results ? ($project->results->average_values ?? null) : null;
+            if ($avgRaw !== null && $avgRaw !== '') {
+                $project['average_values'] = json_decode($avgRaw, true);
+            } else {
+                $project['average_values'] = null;
+            }
+            $project->unsetRelation('results');
         }
 
         $ownerId = $projects[0]->user_id;

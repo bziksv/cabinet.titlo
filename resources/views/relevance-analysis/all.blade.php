@@ -247,7 +247,7 @@
 
                     </div>
 
-                    <div style="display:none;" class="history">
+                    <div style="display:none;" class="history" data-ra-hist-view="v2">
                         <div class="modal fade" id="staticBackdrop" data-backdrop="static" tabindex="-1" role="dialog"
                              aria-labelledby="staticBackdropLabel" aria-hidden="true">
                             <div class="modal-dialog" role="document">
@@ -454,106 +454,107 @@
                             </div>
                         </div>
                         <h3>{{ __("Recent checks") }}</h3>
-                        <table id="history_table" class="table table-bordered table-hover dataTable dtr-inline">
-                            <thead>
-                            @include('relevance-analysis.layouts.table-rows')
-                            </thead>
-                            <tbody id="historyTbody">
-                            </tbody>
-                        </table>
+                        <div id="ra-hist-classic" class="ra-hist-classic d-none" hidden aria-hidden="true">
+                            <table id="history_table" class="table table-bordered table-hover table-sm dataTable dtr-inline">
+                                <thead>
+                                @include('relevance-analysis.layouts.table-rows')
+                                </thead>
+                                <tbody id="historyTbody">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <h3 style="display: none" id="history-list-subject">{{ __('Scan history (list of phrases)') }}</h3>
-                    <table class="table table-bordered table-hover dtr-inline no-footer" id="list-history"
+                    <div id="ra-hist-list-bar" class="ra-hist-list-bar" style="display: none;" hidden>
+                        <label class="ra-hist-list-bar__label" for="mainPageSearchList">URL</label>
+                        <input class="form-control form-control-sm ra-hist-list-bar__url search-input" type="text"
+                               name="mainPageSearchList" id="mainPageSearchList"
+                               placeholder="Фильтр по посадочной странице (URL)" autocomplete="off">
+                    </div>
+                    <table class="table table-bordered table-hover table-sm dtr-inline no-footer ra-hist-list-table" id="list-history"
                            style="display: none">
                         <thead>
-                        <tr>
-                            <th style="position: inherit;"></th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control" type="date" name="dateMinList" id="dateMinList"
-                                       value="{{ Carbon\Carbon::parse('2022-03-01')->toDateString() }}">
-                                <input class="w-100 form form-control" type="date" name="dateMaxList" id="dateMaxList"
-                                       value="{{ Carbon\Carbon::now()->toDateString() }}">
+                        <tr class="ra-hist-list-filters">
+                            <th class="ra-hist-list-filters__expand"></th>
+                            <th>
+                                <div class="ra-hist-list-minmax ra-hist-list-minmax--dates">
+                                    <input class="form-control form-control-sm" type="date" name="dateMinList" id="dateMinList"
+                                           value="{{ Carbon\Carbon::parse('2022-03-01')->toDateString() }}" aria-label="Дата от">
+                                    <input class="form-control form-control-sm" type="date" name="dateMaxList" id="dateMaxList"
+                                           value="{{ Carbon\Carbon::now()->toDateString() }}" aria-label="Дата до">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="text"
+                            <th>
+                                <input class="form-control form-control-sm search-input ra-hist-list-text" type="text"
                                        name="phraseSearchList" id="phraseSearchList" placeholder="{{ __('phrase') }}">
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="text"
+                            <th>
+                                <input class="form-control form-control-sm search-input ra-hist-list-text" type="text"
                                        name="regionSearchList" id="regionSearchList" placeholder="{{ __('region') }}">
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="text"
-                                       name="mainPageSearchList" id="mainPageSearchList" placeholder="{{ __('link') }}">
+                            <th class="ra-hist-list-filters__url-placeholder"></th>
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minPositionList" id="minPositionList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxPositionList" id="maxPositionList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minPositionList" id="minPositionList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxPositionList" id="maxPositionList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minPointsList" id="minPointsList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxPointsList" id="maxPointsList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minPointsList" id="minPointsList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxPointsList" id="maxPointsList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minCoverageList" id="minCoverageList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxCoverageList" id="maxCoverageList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minCoverageList" id="minCoverageList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxCoverageList" id="maxCoverageList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minCoverageTfList" id="minCoverageTfList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxCoverageTfList" id="maxCoverageTfList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minCoverageTfList" id="minCoverageTfList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxCoverageTfList" id="maxCoverageTfList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number" name="minWidthList"
+                                           id="minWidthList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxWidthList" id="maxWidthList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number" name="minWidthList"
-                                       id="minWidthList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxWidthList" id="maxWidthList" placeholder="{{ __('max') }}">
-                            </th>
-                            <th style="position: inherit;">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="minDensityList" id="minDensityList" placeholder="{{ __('min') }}">
-                                <input class="w-100 form form-control search-input" type="number"
-                                       name="maxDensityList" id="maxDensityList" placeholder="{{ __('max') }}">
+                            <th>
+                                <div class="ra-hist-list-minmax">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="minDensityList" id="minDensityList" placeholder="{{ __('min') }}">
+                                    <input class="form-control form-control-sm search-input" type="number"
+                                           name="maxDensityList" id="maxDensityList" placeholder="{{ __('max') }}">
+                                </div>
                             </th>
                         </tr>
                         <tr>
                             <th class="table-header" style="position: inherit;"></th>
-                            <th class="table-header" style="position: inherit;">{{ __('Date of last check') }}</th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Phrase') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Region') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Landing page') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Position in the top') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Scores') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Coverage of important words') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('TF coverage') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Width') }}
-                            </th>
-                            <th class="table-header" style="position: inherit;">
-                                {{ __('Density') }}
-                            </th>
+                            <th class="table-header" style="position: inherit;">Дата</th>
+                            <th class="table-header" style="position: inherit;">Фраза</th>
+                            <th class="table-header" style="position: inherit;">Регион</th>
+                            <th class="table-header" style="position: inherit;">URL</th>
+                            <th class="table-header" style="position: inherit;">Поз.</th>
+                            <th class="table-header" style="position: inherit;">Баллы</th>
+                            <th class="table-header" style="position: inherit;">Покр.</th>
+                            <th class="table-header" style="position: inherit;">TF</th>
+                            <th class="table-header" style="position: inherit;">Шир.</th>
+                            <th class="table-header" style="position: inherit;">Плотн.</th>
                         </tr>
                         </thead>
                         <tbody id="list-history-body">
@@ -576,6 +577,7 @@
 
         <script src="{{ asset('plugins/relevance-analysis/history/mainHistoryTable.js') }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/childHistoryTable.js') }}"></script>
+        <script src="{{ asset('js/cabinet-ra-history-v2.js') }}?v={{ @filemtime(public_path('js/cabinet-ra-history-v2.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
         <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
         <script>
@@ -591,6 +593,22 @@
                 to: "{{ __('to') }}",
                 of: "{{ __('of') }}",
                 entries: "{{ __('entries') }}"
+            };
+
+            window.raDtRu = {
+                search: words.search + ':',
+                lengthMenu: words.show + ' _MENU_ ' + words.records,
+                emptyTable: words.noRecords,
+                zeroRecords: words.noRecords,
+                info: 'Показано с _START_ по _END_ из _TOTAL_ ' + words.entries,
+                infoEmpty: 'Нет записей',
+                infoFiltered: '(отфильтровано из _MAX_ ' + words.entries + ')',
+                paginate: {
+                    first: '«',
+                    last: '»',
+                    next: '»',
+                    previous: '«'
+                }
             };
 
             window.raFilterPh = {
@@ -1071,9 +1089,12 @@
 
                                             if (val.average_values == null) {
                                                 newRow = "<tr class='render'>" +
-                                                    "   <td>" + val.last_check + "</td>" +
+                                                    "   <td data-order='" + val.last_check + "' class='ra-hist-date-cell'>" + raFormatHistoryDate(val.last_check) + "</td>" +
+                                                    "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
+                                                    state +
+                                                    "   </td>" +
                                                     "   <td>" +
-                                                    "      <textarea rows='3' data-target='" + val.id + "' class='history-comment form form-control'>" + val.comment + "</textarea>" +
+                                                    "      <input type='text' data-target='" + val.id + "' class='history-comment form-control form-control-sm' value='" + String(val.comment || '').replace(/'/g, '&#39;') + "'>" +
                                                     "   </td>" +
                                                     "   <td>" + phrase + "</td>" +
                                                     "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
@@ -1094,15 +1115,15 @@
                                                     "          </div>" +
                                                     "      </div>" +
                                                     "   </td>" +
-                                                    "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
-                                                    state +
-                                                    "   </td>" +
                                                     "</tr>"
                                             } else {
                                                 newRow = "<tr class='render'>" +
-                                                    "   <td>" + val.last_check + "</td>" +
+                                                    "   <td data-order='" + val.last_check + "' class='ra-hist-date-cell'>" + raFormatHistoryDate(val.last_check) + "</td>" +
+                                                    "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
+                                                    state +
+                                                    "   </td>" +
                                                     "   <td>" +
-                                                    "      <textarea rows='3' data-target='" + val.id + "' class='history-comment form form-control'>" + val.comment + "</textarea>" +
+                                                    "      <input type='text' data-target='" + val.id + "' class='history-comment form-control form-control-sm' value='" + String(val.comment || '').replace(/'/g, '&#39;') + "'>" +
                                                     "   </td>" +
                                                     "   <td>" + phrase + "</td>" +
                                                     "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
@@ -1122,9 +1143,6 @@
                                                     "              </div>" +
                                                     "          </div>" +
                                                     "      </div>" +
-                                                    "   </td>" +
-                                                    "   <td id='history-state-" + val.id + "' class='ra-hist-actions-cell'>" +
-                                                    state +
                                                     "   </td>" +
                                                     "</tr>"
                                             }
@@ -1154,7 +1172,9 @@
                                                     "sSearch": words.search + ":",
                                                     "sLengthMenu": words.show + " _MENU_ " + words.records,
                                                     "sEmptyTable": words.noRecords,
-                                                    "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
+                                                    "sInfo": window.raDtRu.info,
+                                                    "sInfoEmpty": window.raDtRu.infoEmpty,
+                                                    "sInfoFiltered": window.raDtRu.infoFiltered,
                                                 },
                                                 drawCallback: function () {
                                                     getHistoryInfo()
@@ -1200,6 +1220,10 @@
                                             repeatScan()
 
                                             customHistoryFilters('history_table', historyTable)
+
+                                            if (typeof window.raHistoryV2 !== 'undefined' && window.raHistoryV2.render) {
+                                                window.raHistoryV2.render(response.stories || [], { storyId: storyId })
+                                            }
                                         });
                                     }
                                 },
@@ -1234,6 +1258,7 @@
                                     } else {
                                         $('#history-list-subject').show()
                                         $('#list-history').show()
+                                        $('#ra-hist-list-bar').show().removeAttr('hidden')
                                         object = response.object
                                         $.each(response.object, function (key, value) {
                                             let position = value[0]['position']
@@ -1301,7 +1326,9 @@
                                                     "sSearch": words.search + ":",
                                                     "sLengthMenu": words.show + " _MENU_ " + words.records,
                                                     "sEmptyTable": words.noRecords,
-                                                    "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
+                                                    "sInfo": window.raDtRu.info,
+                                                    "sInfoEmpty": window.raDtRu.infoEmpty,
+                                                    "sInfoFiltered": window.raDtRu.infoFiltered,
                                                 }
                                             });
 
@@ -1327,15 +1354,14 @@
                                                     let table = $('#' + target).DataTable({
                                                         order: [[0, 'desc']],
                                                         destroy: true,
-                                                        language: {
-                                                            lengthMenu: "_MENU_",
-                                                            search: "_INPUT_",
-                                                            paginate: {
-                                                                "first": "«",
-                                                                "last": "»",
-                                                                "next": "»",
-                                                                "previous": "«"
-                                                            },
+                                                        language: window.raDtRu,
+                                                        "oLanguage": {
+                                                            "sSearch": window.raDtRu.search,
+                                                            "sLengthMenu": window.raDtRu.lengthMenu,
+                                                            "sEmptyTable": window.raDtRu.emptyTable,
+                                                            "sInfo": window.raDtRu.info,
+                                                            "sInfoEmpty": window.raDtRu.infoEmpty,
+                                                            "sInfoFiltered": window.raDtRu.infoFiltered,
                                                         },
                                                     })
                                                     customFilters(target, table, target)
@@ -1754,8 +1780,10 @@
             }
 
             function getTextResult(result, ideal) {
-                return "{{ __('The landing page received') }}" + ' <b>' + result + '</b>.<br> ' + ' {{ __('Recommended value')}}' + ' <b>' + ideal + '.</b>';
+                var tip = @json(__('The landing page received')) + ' ' + result + '. ' + @json(__('Recommended value')) + ' ' + ideal + '.';
+                return '<span class="ra-hist-metric" data-ra-tip="' + $('<div/>').text(tip).html() + '"><b>' + result + '</b> / ' + ideal + '</span>';
             }
+            window.relevanceHistoryGetTextResult = getTextResult;
 
             function getSelect(id) {
                 return '<select class="form-select rounded-0 region" id="region-filter-' + id + '">' +
