@@ -51,9 +51,14 @@ final class EseninHtmlHighlighter
         if ($domPlain === '') {
             return self::sanitizeHtml($html);
         }
+        if ($domPlain !== $plain) {
+            return EseninAnalyzer::renderHighlightedPlainHtml($plain, $marks, $block);
+        }
 
-        $map = $index['map'];
         foreach ($accepted as $mark) {
+            $index = EseninPlainIndexMap::fromDom($root);
+            $domPlain = (string) ($index['plain'] ?? '');
+            $map = $index['map'];
             EseninPlainIndexMap::wrapPlainRange(
                 $dom,
                 $root,

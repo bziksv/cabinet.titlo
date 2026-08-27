@@ -168,7 +168,7 @@ class TextAnalyzerController extends Controller
             flash()->overlay($pack['uniqueness_error'], __('Text uniqueness'))->warning();
         }
 
-        $eseninInput = (string) (($pack['source_html'] ?? '') !== '' ? $pack['source_html'] : ($pack['plain'] ?? ''));
+        $eseninInput = (string) ($pack['plain'] ?? '');
         if ($eseninInput === '' && ($request['type'] ?? '') === 'text') {
             $eseninInput = TextAnalyzer::normalizePlainForUniqueness((string) ($request['textarea'] ?? ''));
         }
@@ -254,7 +254,7 @@ class TextAnalyzerController extends Controller
 
         $pack = TextAnalyzerUniqueness::attach($payload, $response, $user);
         $response = $pack['response'];
-        $eseninInput = (string) (($pack['source_html'] ?? '') !== '' ? $pack['source_html'] : ($pack['plain'] ?? ''));
+        $eseninInput = (string) ($pack['plain'] ?? '');
         if ($eseninInput === '' && $type === 'text') {
             $eseninInput = TextAnalyzer::normalizePlainForUniqueness($payload['textarea']);
         }

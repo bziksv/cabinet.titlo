@@ -1714,6 +1714,206 @@
             initMarkTips(highlightEl);
         }
 
+        function findEseninMarkFromNode(node) {
+            while (node && node !== highlightEl) {
+                if (node.nodeType === 1 && node.classList && node.classList.contains('esenin-mark')) {
+                    return node;
+                }
+                node = node.parentNode;
+            }
+            return null;
+        }
+
+        function unwrapMarkElement(mark) {
+            if (!mark || !mark.parentNode) {
+                return null;
+            }
+            var icon = mark.querySelector('.esenin-mark__icon');
+            if (icon) {
+                icon.remove();
+            }
+            var parent = mark.parentNode;
+            var last = null;
+            while (mark.firstChild) {
+                last = mark.firstChild;
+                parent.insertBefore(last, mark);
+            }
+            parent.removeChild(mark);
+            return last;
+        }
+
+        function getTextOffsetInHighlight(root, targetNode, targetOffset) {
+            var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+                acceptNode: function (node) {
+                    if (node.parentElement && node.parentElement.classList.contains('esenin-mark__icon')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+            var total = 0;
+            var node;
+            while ((node = walker.nextNode())) {
+                if (node === targetNode) {
+                    return total + targetOffset;
+                }
+                total += (node.nodeValue || '').length;
+            }
+            return total;
+        }
+
+        function setTextOffsetInHighlight(root, offset) {
+            var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+            var total = 0;
+            var node;
+            while ((node = walker.nextNode())) {
+                if (node.parentElement && node.parentElement.classList.contains('esenin-mark__icon')) {
+                    continue;
+                }
+                var len = (node.nodeValue || '').length;
+                if (total + len >= offset) {
+                    var range = document.createRange();
+                    range.setStart(node, Math.max(0, offset - total));
+                    range.collapse(true);
+                    var sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    return;
+                }
+                total += len;
+            }
+            var endRange = document.createRange();
+            endRange.selectNodeContents(root);
+            endRange.collapse(false);
+            var endSel = window.getSelection();
+            endSel.removeAllRanges();
+            endSel.addRange(endRange);
+        }
+
+        function hideMarkTip() {
+            var tipEl = document.getElementById('cabinet-ta-mark-tip');
+            if (tipEl) {
+                tipEl.classList.remove('is-visible');
+            }
+        }
+
+        function unwrapMarksTouchingSelection() {
+            if (!highlightEl) {
+                return false;
+            }
+            var sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) {
+                return false;
+            }
+            var range = sel.getRangeAt(0);
+            var startNode = range.startContainer;
+            if (startNode.nodeType === 3) {
+                /* ok */
+            } else if (!highlightEl.contains(startNode) && startNode !== highlightEl) {
+                return false;
+            }
+
+            var marks = [];
+            var seen = {};
+            function addMark(mark) {
+                if (!mark || seen[mark]) {
+                    return;
+                }
+                seen[mark] = true;
+                marks.push(mark);
+            }
+
+            addMark(findEseninMarkFromNode(range.startContainer));
+            addMark(findEseninMarkFromNode(range.endContainer));
+
+            if (!range.collapsed) {
+                highlightEl.querySelectorAll('mark.esenin-mark').forEach(function (mark) {
+                    try {
+                        if (range.intersectsNode(mark)) {
+                            addMark(mark);
+                        }
+                    } catch (e) {
+                        /* ignore */
+                    }
+                });
+            }
+
+            if (range.collapsed && marks.length === 0) {
+                var container = range.startContainer;
+                var offset = range.startOffset;
+                if (container.nodeType === 1) {
+                    var before = container.childNodes[offset - 1];
+                    var after = container.childNodes[offset];
+                    if (before && before.nodeType === 1 && before.classList && before.classList.contains('esenin-mark')) {
+                        addMark(before);
+                    }
+                    if (after && after.nodeType === 1 && after.classList && after.classList.contains('esenin-mark')) {
+                        addMark(after);
+                    }
+                }
+            }
+
+            if (!marks.length) {
+                return false;
+            }
+
+            var caretOffset = getTextOffsetInHighlight(highlightEl, range.startContainer, range.startOffset);
+            marks.forEach(unwrapMarkElement);
+            highlightEl.querySelectorAll('.esenin-mark__icon').forEach(function (icon) {
+                if (!icon.closest('mark.esenin-mark')) {
+                    icon.remove();
+                }
+            });
+            setTextOffsetInHighlight(highlightEl, caretOffset);
+            hideMarkTip();
+            return true;
+        }
+
+        function shouldUnwrapMarksForKey(event) {
+            if (!event) {
+                return false;
+            }
+            if (event.type === 'beforeinput') {
+                var inputType = event.inputType || '';
+                if (inputType.indexOf('history') === 0) {
+                    return false;
+                }
+                return true;
+            }
+            if (event.type !== 'keydown') {
+                return false;
+            }
+            var key = event.key || '';
+            if (!key || key === 'Shift' || key === 'Control' || key === 'Alt' || key === 'Meta'
+                || key === 'CapsLock' || key === 'Escape' || key === 'Tab'
+                || key.indexOf('Arrow') === 0 || key === 'Home' || key === 'End'
+                || key === 'PageUp' || key === 'PageDown') {
+                return false;
+            }
+            if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+                var lower = key.toLowerCase();
+                return lower === 'v' || lower === 'x' || lower === 'backspace';
+            }
+            return true;
+        }
+
+        function prepareHighlightEdit(event) {
+            if (!shouldUnwrapMarksForKey(event)) {
+                return;
+            }
+            unwrapMarksTouchingSelection();
+        }
+
+        function hardenHighlightMarkIcons(container) {
+            if (!container) {
+                return;
+            }
+            container.querySelectorAll('.esenin-mark__icon').forEach(function (icon) {
+                icon.setAttribute('contenteditable', 'false');
+                icon.setAttribute('aria-hidden', 'true');
+            });
+        }
+
         buttons.forEach(function (btn) {
             btn.addEventListener('click', function () {
                 setTab(btn.getAttribute('data-combined-tab') || 'uniqueness');
@@ -1721,11 +1921,22 @@
         });
 
         if (highlightEl) {
+            highlightEl.addEventListener('beforeinput', prepareHighlightEdit);
+            highlightEl.addEventListener('keydown', prepareHighlightEdit, true);
+            highlightEl.addEventListener('paste', function () {
+                unwrapMarksTouchingSelection();
+            }, true);
             highlightEl.addEventListener('input', function () {
                 dirty = true;
                 syncTextarea();
             });
             highlightEl.addEventListener('blur', syncTextarea);
+            highlightEl.addEventListener('focus', function () {
+                setTimeout(function () {
+                    hardenHighlightMarkIcons(highlightEl);
+                    initMarkTips(highlightEl);
+                }, 0);
+            });
         }
 
         initMarkTips(highlightEl || root);
