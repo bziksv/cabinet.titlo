@@ -62,7 +62,7 @@ class SiteMonitoringPdfService
         $mpdf->SetCreator(TextAnalyzerPdfBranding::BRAND_SITE);
 
         $coverMeta = array_merge($meta, [
-            'cover_rev' => 'site-monitoring-1',
+            'cover_rev' => 'site-monitoring-2',
             'cover_kicker' => (string) __('Site monitoring report'),
             'cover_title' => (string) __('Monitored domains'),
             'cover_lead' => (string) __('Site monitoring report cover lead'),

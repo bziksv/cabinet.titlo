@@ -72,7 +72,7 @@ class TextAnalyzerPdfBranding
             'compare' => $hasCompare,
             'competitor' => $competitorLabel,
             'locale' => app()->getLocale(),
-            'cover_rev' => (string) ($meta['cover_rev'] ?? '16'),
+            'cover_rev' => (string) ($meta['cover_rev'] ?? '17'),
             'cover_kicker' => (string) ($meta['cover_kicker'] ?? ''),
             'cover_title' => (string) ($meta['cover_title'] ?? ''),
             'cover_lead' => (string) ($meta['cover_lead'] ?? ''),
@@ -1106,9 +1106,10 @@ class TextAnalyzerPdfBranding
         self::drawCoverText($im, $font, 16, $padL + 18, $labelY, $cMetaLabel, mb_strtoupper((string) __('Generated at')));
         self::drawCoverText($im, $fontBold, 24, $padL + 18, $labelY + 34, $cMetaValue, $payload['generated']);
         self::drawCoverText($im, $font, 16, $rightX + 18, $labelY, $cMetaLabel, mb_strtoupper((string) __('Source')));
+        $srcSize = 20;
         $srcY = $labelY + 34;
-        foreach (self::wrapCoverText($payload['source'], $font, 20, $rightW - 36) as $line) {
-            $srcY = self::drawCoverText($im, $font, 20, $rightX + 18, $srcY, $cMetaValueSm, $line) + 4;
+        foreach (self::wrapCoverText($payload['source'], $font, $srcSize, $rightW - 36) as $line) {
+            $srcY = self::drawCoverText($im, $font, $srcSize, $rightX + 18, $srcY + $srcSize, $cMetaValueSm, $line) + 6;
         }
 
         $y = $boxY + $boxH + 20;
@@ -1250,21 +1251,53 @@ class TextAnalyzerPdfBranding
         $lines = [];
         $line = '';
         foreach ($words as $word) {
-            $candidate = $line === '' ? $word : $line . ' ' . $word;
-            if (self::coverTextWidth($candidate, $font, $size) <= $maxWidth) {
-                $line = $candidate;
-                continue;
+            foreach (self::splitCoverToken($word, $font, $size, $maxWidth) as $token) {
+                $candidate = $line === '' ? $token : $line . ' ' . $token;
+                if (self::coverTextWidth($candidate, $font, $size) <= $maxWidth) {
+                    $line = $candidate;
+                    continue;
+                }
+                if ($line !== '') {
+                    $lines[] = $line;
+                }
+                $line = $token;
             }
-            if ($line !== '') {
-                $lines[] = $line;
-            }
-            $line = $word;
         }
         if ($line !== '') {
             $lines[] = $line;
         }
 
         return $lines;
+    }
+
+    /**
+     * URL и длинные токены без пробелов — режем по символам, чтобы не вылезали из блока «Источник».
+     *
+     * @return array<int, string>
+     */
+    protected static function splitCoverToken(string $token, ?string $font, int $size, int $maxWidth): array
+    {
+        if ($token === '' || self::coverTextWidth($token, $font, $size) <= $maxWidth) {
+            return [$token];
+        }
+
+        $parts = [];
+        $chunk = '';
+        $chars = preg_split('//u', $token, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        foreach ($chars as $char) {
+            $candidate = $chunk . $char;
+            if ($chunk !== '' && self::coverTextWidth($candidate, $font, $size) > $maxWidth) {
+                $parts[] = $chunk;
+                $chunk = $char;
+                continue;
+            }
+            $chunk = $candidate;
+        }
+        if ($chunk !== '') {
+            $parts[] = $chunk;
+        }
+
+        return $parts !== [] ? $parts : [$token];
     }
 
     protected static function savePng($im, string $path): void
