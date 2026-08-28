@@ -41,7 +41,6 @@
                             $hWords = $hp['words'] ?? ($hp['general']['countWordsAll'] ?? null);
                             $hEsenin = $hp['esenin_risk'] ?? null;
                             $hEseninLevel = $hp['esenin_level'] ?? '';
-                            $hUniqNd = !empty($hp['no_significant_matches']);
                             $hHadUniq = array_key_exists('had_uniqueness', $hp)
                                 ? (bool) $hp['had_uniqueness']
                                 : true;
@@ -54,10 +53,8 @@
                             <td class="text-nowrap">
                                 @if(! $hHadUniq)
                                     —
-                                @elseif($hUniqNd)
-                                    {{ __('Text analyzer uniqueness nd') }}
                                 @else
-                                    {{ number_format((float) $hUniqPct, 1, ',', ' ') }}%
+                                    {{ number_format((float) ($hUniqPct ?? 0), 1, ',', ' ') }}%
                                 @endif
                             </td>
                             <td class="text-nowrap">

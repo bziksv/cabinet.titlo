@@ -33,13 +33,15 @@
                                     class="cabinet-esenin-score-btn active"
                                     data-uniq-tab="overview"
                                     aria-pressed="true">
-                                <span class="cabinet-esenin-score-btn__title">{{ __('Text analyzer uniq nav overview') }}</span>
+                                <span class="cabinet-esenin-score-btn__title">
+                                    {{ __('Text analyzer uniq nav overview') }}
+                                    @include('text-analyse.partials.tip', [
+                                        'tip' => __('Text analyzer uniq tip uniqueness scores'),
+                                        'tipSide' => 'right',
+                                    ])
+                                </span>
                                 <span class="cabinet-esenin-score-btn__value">
-                                    @if(!empty($u['no_significant_matches']))
-                                        {{ __('Text analyzer uniqueness nd') }}
-                                    @else
-                                        {{ $u['uniqueness_pct'] ?? 0 }}%
-                                    @endif
+                                    {{ $u['uniqueness_pct'] ?? 0 }}%
                                     <span class="badge text-bg-{{ ($u['uniqueness_pct'] ?? 100) < 50 ? 'danger' : (($u['uniqueness_pct'] ?? 100) < 85 ? 'warning' : 'success') }} cabinet-esenin-score-btn__badge">
                                         {{ ($u['matched_pct'] ?? 0) }}%
                                     </span>
@@ -49,7 +51,13 @@
                                     class="cabinet-esenin-score-btn"
                                     data-uniq-tab="sources"
                                     aria-pressed="false">
-                                <span class="cabinet-esenin-score-btn__title">{{ __('Text analyzer uniq nav sources') }}</span>
+                                <span class="cabinet-esenin-score-btn__title">
+                                    {{ __('Text analyzer uniq nav sources') }}
+                                    @include('text-analyse.partials.tip', [
+                                        'tip' => __('Text analyzer uniq tip sources'),
+                                        'tipSide' => 'right',
+                                    ])
+                                </span>
                                 <span class="cabinet-esenin-score-btn__value">
                                     {{ (int) ($u['web_sources_count'] ?? count(array_filter($u['sources'] ?? [], static function ($s) { return empty($s['is_own']); }))) }}
                                     <span class="badge text-bg-secondary cabinet-esenin-score-btn__badge">{{ __('Text analyzer uniq sources short') }}</span>
@@ -59,7 +67,13 @@
                                     class="cabinet-esenin-score-btn"
                                     data-uniq-tab="matches"
                                     aria-pressed="false">
-                                <span class="cabinet-esenin-score-btn__title">{{ __('Text analyzer uniq nav matches') }}</span>
+                                <span class="cabinet-esenin-score-btn__title">
+                                    {{ __('Text analyzer uniq nav matches') }}
+                                    @include('text-analyse.partials.tip', [
+                                        'tip' => __('Text analyzer uniq tip matches'),
+                                        'tipSide' => 'right',
+                                    ])
+                                </span>
                                 <span class="cabinet-esenin-score-btn__value">
                                     {{ (int) ($u['shingles_matched'] ?? 0) }}
                                     <span class="badge text-bg-danger cabinet-esenin-score-btn__badge">/ {{ (int) ($u['shingles_total'] ?? 0) }}</span>
@@ -109,13 +123,7 @@
                                         <tbody>
                                         <tr>
                                             <td>{{ __('Text analyzer web uniqueness') }}</td>
-                                            <td class="text-end fw-semibold">
-                                                @if(!empty($u['no_significant_matches']))
-                                                    {{ __('Text analyzer uniqueness nd') }}
-                                                @else
-                                                    {{ $u['uniqueness_pct'] ?? 0 }}%
-                                                @endif
-                                            </td>
+                                            <td class="text-end fw-semibold">{{ $u['uniqueness_pct'] ?? 0 }}%</td>
                                         </tr>
                                         <tr>
                                             <td>{{ __('Text uniqueness matched title') }}</td>

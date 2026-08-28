@@ -1053,13 +1053,100 @@
     border-radius: 0.65rem;
     padding: 0.65rem 0.75rem;
     background: #fff;
+    overflow: visible;
+    position: relative;
 }
 
 .cabinet-text-analyzer-page .cabinet-ta-side-stat__title {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
     font-size: 0.85rem;
     color: var(--bs-secondary-color);
     margin-bottom: 0.15rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-esenin-score-btn__title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-esenin-score-nav,
+.cabinet-text-analyzer-page .cabinet-esenin-score-btn,
+.cabinet-text-analyzer-page .cabinet-ta-combined-right-uniq {
+    overflow: visible;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-tip.ui_tooltip_w {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    cursor: help;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-tip.ui_tooltip_w:hover,
+.cabinet-text-analyzer-page .cabinet-ta-tip.ui_tooltip_w:focus,
+.cabinet-text-analyzer-page .cabinet-ta-tip.ui_tooltip_w:focus-within {
+    color: #0d6efd;
+    outline: none;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-tip .fa {
+    font-size: 0.85rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-tip .ui_tooltip {
+    position: absolute;
+    display: none;
+    z-index: 1080;
+    width: min(18rem, calc(100vw - 2rem));
+    pointer-events: none;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-tip .ui_tooltip.__right {
+    left: 100%;
+    top: 50%;
+    padding-left: 0.4rem;
+    transform: translateY(-50%);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-tip .ui_tooltip.__left {
+    right: 100%;
+    top: 50%;
+    padding-right: 0.4rem;
+    transform: translateY(-50%);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-tip .ui_tooltip.__bottom {
+    left: 0;
+    top: 100%;
+    padding-top: 0.35rem;
+    transform: none;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-tip .ui_tooltip_content {
+    display: block;
+    padding: 0.55rem 0.7rem;
+    border-radius: 8px;
+    background: #111827;
+    color: #fff;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    line-height: 1.45;
+    text-align: left;
+    white-space: normal;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-tip.ui_tooltip_w:hover > .ui_tooltip,
+.cabinet-text-analyzer-page .cabinet-ta-tip.ui_tooltip_w:focus > .ui_tooltip,
+.cabinet-text-analyzer-page .cabinet-ta-tip.ui_tooltip_w:focus-within > .ui_tooltip {
+    display: block;
 }
 
 .cabinet-text-analyzer-page .cabinet-ta-side-stat__value {
@@ -1075,6 +1162,14 @@
 .cabinet-text-analyzer-page .cabinet-ta-combined-right-uniq {
     padding-top: 0.75rem;
     border-top: 1px solid rgba(0, 0, 0, 0.06);
+    overflow: visible;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-uniq-esenin .col-lg-3 > .card,
+.cabinet-text-analyzer-page .cabinet-ta-uniq-esenin .col-lg-3 > .card > .card-body,
+.cabinet-text-analyzer-page .cabinet-ta-uniqueness .col-lg-3 > .card,
+.cabinet-text-analyzer-page .cabinet-ta-uniqueness .col-lg-3 > .card > .card-body {
+    overflow: visible;
 }
 
 .cabinet-text-analyzer-page .cabinet-ta-save {

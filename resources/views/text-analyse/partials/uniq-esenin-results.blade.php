@@ -110,13 +110,15 @@
                                         class="cabinet-esenin-score-btn {{ $defaultTab === 'uniqueness' ? 'active' : '' }}"
                                         data-combined-tab="uniqueness"
                                         aria-pressed="{{ $defaultTab === 'uniqueness' ? 'true' : 'false' }}">
-                                    <span class="cabinet-esenin-score-btn__title">{{ __('Text analyzer uniq nav overview') }}</span>
+                                    <span class="cabinet-esenin-score-btn__title">
+                                        {{ __('Text analyzer uniq nav overview') }}
+                                        @include('text-analyse.partials.tip', [
+                                            'tip' => __('Text analyzer uniq tip uniqueness scores'),
+                                            'tipSide' => 'right',
+                                        ])
+                                    </span>
                                     <span class="cabinet-esenin-score-btn__value">
-                                        @if(!empty($u['no_significant_matches']))
-                                            {{ __('Text analyzer uniqueness nd') }}
-                                        @else
-                                            {{ $uniqPct }}%
-                                        @endif
+                                        {{ $uniqPct }}%
                                         <span class="badge text-bg-{{ $uniqBadge }} cabinet-esenin-score-btn__badge">
                                             {{ $u['matched_pct'] ?? 0 }}%
                                         </span>
@@ -216,13 +218,7 @@
                                             <tbody>
                                             <tr>
                                                 <td>{{ __('Text analyzer web uniqueness') }}</td>
-                                                <td class="text-end fw-semibold">
-                                                    @if(!empty($u['no_significant_matches']))
-                                                        {{ __('Text analyzer uniqueness nd') }}
-                                                    @else
-                                                        {{ $u['uniqueness_pct'] ?? 0 }}%
-                                                    @endif
-                                                </td>
+                                                <td class="text-end fw-semibold">{{ $u['uniqueness_pct'] ?? 0 }}%</td>
                                             </tr>
                                             <tr>
                                                 <td>{{ __('Text uniqueness matched title') }}</td>
@@ -241,14 +237,26 @@
 
                                         <div class="cabinet-ta-combined-right-uniq mb-3" data-combined-right-uniq>
                                             <div class="cabinet-ta-side-stat mb-2">
-                                                <div class="cabinet-ta-side-stat__title">{{ __('Text analyzer uniq nav sources') }}</div>
+                                                <div class="cabinet-ta-side-stat__title">
+                                                    {{ __('Text analyzer uniq nav sources') }}
+                                                    @include('text-analyse.partials.tip', [
+                                                        'tip' => __('Text analyzer uniq tip sources'),
+                                                        'tipSide' => 'left',
+                                                    ])
+                                                </div>
                                                 <div class="cabinet-ta-side-stat__value">
                                                     <span>{{ $webSourcesCount }}</span>
                                                     <span class="badge text-bg-secondary">{{ __('Text analyzer uniq sources short') }}</span>
                                                 </div>
                                             </div>
                                             <div class="cabinet-ta-side-stat mb-2">
-                                                <div class="cabinet-ta-side-stat__title">{{ __('Text analyzer uniq nav matches') }}</div>
+                                                <div class="cabinet-ta-side-stat__title">
+                                                    {{ __('Text analyzer uniq nav matches') }}
+                                                    @include('text-analyse.partials.tip', [
+                                                        'tip' => __('Text analyzer uniq tip matches'),
+                                                        'tipSide' => 'left',
+                                                    ])
+                                                </div>
                                                 <div class="cabinet-ta-side-stat__value">
                                                     <span>{{ (int) ($u['shingles_matched'] ?? 0) }}</span>
                                                     <span class="badge text-bg-danger">/ {{ (int) ($u['shingles_total'] ?? 0) }}</span>

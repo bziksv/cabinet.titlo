@@ -401,7 +401,7 @@ class TextUniquenessService
             'force_compare_urls' => $meta['force_compare_urls'] ?? [],
             'noise_dropped' => $noiseDropped,
             'web_sources_count' => $webSourcesCount,
-            // true = по зондам значимых копий нет → «100%» нельзя читать как Text.ru
+            // true = значимых копий по зондам нет (uniqueness_pct ≈ 100; предупреждение в UI)
             'no_significant_matches' => $noSignificant,
             'verdict' => $noSignificant ? 'no_significant_matches' : ($matchedPct >= 30 ? 'low_unique' : 'ok'),
             'text' => $text,

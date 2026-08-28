@@ -2782,9 +2782,6 @@
         }
         panel.classList.remove('d-none');
         var pct = u.uniqueness_pct != null ? u.uniqueness_pct + '%' : '—';
-        if (u.no_significant_matches) {
-            pct = 'н/д';
-        }
         var html = '<div class="card shadow-sm mb-3"><div class="card-header py-2"><h3 class="card-title h6 mb-0">Уникальность: '
             + escapeHtml(String(pct))
             + '</h3></div><div class="card-body">';
