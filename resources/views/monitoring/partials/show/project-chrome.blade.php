@@ -21,7 +21,7 @@
 
     <div class="cabinet-mon-project-chrome__head">
         <div class="cabinet-mon-project-chrome__identity">
-            <img src="{{ $faviconUrl }}" alt="" class="cabinet-mon-project-chrome__favicon" width="40" height="40" loading="lazy">
+            <img src="{{ $faviconUrl }}" alt="" class="cabinet-mon-project-chrome__favicon" width="40" height="40" loading="lazy" onerror="this.style.visibility='hidden'">
             <div>
                 <h1 class="cabinet-mon-project-chrome__title">{{ $project->name }}</h1>
                 <p class="cabinet-mon-project-chrome__meta mb-0">

@@ -91,18 +91,31 @@ class ProjectFaviconFetcher
             return null;
         }
 
+        // Не возвращаем первый попавшийся: у Kia и др. в HTML сначала 16×16 (~650 B
+        // после resize), а сервис отсекает всё < 1100 B — получается «пустой квадрат».
+        $best = null;
+        $bestLen = 0;
         foreach (($fast ? $this->collectFastCandidateUrls($host) : $this->collectCandidateUrls($host)) as $url) {
             $body = $this->fetchBody($url, $host);
             if ($body === null) {
                 continue;
             }
             $png = $this->normalizeToPng($body);
-            if ($png !== null && $this->isAcceptableFetchedPng($png)) {
-                return $png;
+            if ($png === null || !$this->isAcceptableFetchedPng($png)) {
+                continue;
+            }
+            $len = strlen($png);
+            if ($len > $bestLen) {
+                $best = $png;
+                $bestLen = $len;
+            }
+            // Достаточно плотная иконка — дальше агрегаторы не гоняем.
+            if ($bestLen >= 2500) {
+                break;
             }
         }
 
-        return null;
+        return $best;
     }
 
     /**
@@ -231,19 +244,31 @@ class ProjectFaviconFetcher
             }
 
             if (preg_match_all(
-                '#<link[^>]+rel\s*=\s*["\']?(?:shortcut\s+)?icon\b[^>]*>#i',
+                '#<link[^>]+rel\s*=\s*["\']?(?:shortcut\s+)?(?:apple-touch-icon(?:-precomposed)?|icon)\b[^>]*>#i',
                 $html,
                 $tags
             )) {
+                $sized = [];
                 foreach ($tags[0] as $tag) {
                     $href = $this->extractLinkHref($tag);
                     if ($href === null) {
                         continue;
                     }
                     $resolved = $this->resolveUrl($pageUrl, $href);
-                    if ($resolved !== null) {
-                        $found[] = $resolved;
+                    if ($resolved === null) {
+                        continue;
                     }
+                    $px = 0;
+                    if (preg_match('#\bsizes\s*=\s*["\']?(\d+)x(\d+)#i', $tag, $sm)) {
+                        $px = max((int) $sm[1], (int) $sm[2]);
+                    }
+                    $sized[] = ['url' => $resolved, 'px' => $px];
+                }
+                usort($sized, static function ($a, $b) {
+                    return $b['px'] <=> $a['px'];
+                });
+                foreach ($sized as $row) {
+                    $found[] = $row['url'];
                 }
             }
 
