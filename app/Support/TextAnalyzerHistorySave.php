@@ -25,13 +25,6 @@ class TextAnalyzerHistorySave
         if (! TextUniquenessLimits::canSaveHistory($user)) {
             return ['history_id' => null, 'warning' => null];
         }
-        if (! TextUniquenessLimits::canSaveAnother($user)) {
-            return [
-                'history_id' => null,
-                'warning' => TextUniquenessLimits::historyLimitMessage($user)
-                    ?: __('Text uniqueness history limit exhausted'),
-            ];
-        }
 
         $uniq = $response['uniqueness'] ?? null;
         $esenin = $response['esenin'] ?? null;
@@ -108,6 +101,8 @@ class TextAnalyzerHistorySave
             'cost' => (int) (($uniq['cost'] ?? 0) + ($esenin['cost'] ?? 0)),
         ]);
 
+        TextUniquenessLimits::pruneHistory($user);
+
         return ['history_id' => $history->id, 'warning' => null];
     }
 
@@ -126,13 +121,6 @@ class TextAnalyzerHistorySave
         }
         if (! TextUniquenessLimits::canSaveHistory($user)) {
             return ['history_id' => null, 'warning' => null];
-        }
-        if (! TextUniquenessLimits::canSaveAnother($user)) {
-            return [
-                'history_id' => null,
-                'warning' => TextUniquenessLimits::historyLimitMessage($user)
-                    ?: __('Text uniqueness history limit exhausted'),
-            ];
         }
         if (! empty($result['error'])) {
             return ['history_id' => null, 'warning' => null];
@@ -182,6 +170,8 @@ class TextAnalyzerHistorySave
             'uniqueness_pct' => 0,
             'cost' => (int) ($result['cost'] ?? 0),
         ]);
+
+        TextUniquenessLimits::pruneHistory($user);
 
         return ['history_id' => $history->id, 'warning' => null];
     }

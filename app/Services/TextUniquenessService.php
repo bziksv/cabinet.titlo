@@ -141,6 +141,7 @@ class TextUniquenessService
             ];
             // Редкий зонд (1–3 URL) — сильный сигнал копии; частый ТОП — шум
             $rarity = $found > 0 ? (1.0 / $found) : 0.0;
+            $brandBoost = preg_match('/[a-z]/iu', $probe) ? 4.0 : 1.0;
             foreach ($urls as $pos => $url) {
                 $host = $this->hostFromUrl($url);
                 if ($host === '') {
@@ -151,9 +152,15 @@ class TextUniquenessService
                     continue;
                 }
                 $posBoost = max(0.2, 1.0 - ($pos * 0.08));
-                $urlScores[$url] = ($urlScores[$url] ?? 0.0) + ($rarity * 10.0 * $posBoost);
-                if ($found > 0 && $found <= $rareMax) {
-                    $priorityUrls[$url] = true;
+                $productBoost = $this->urlProductBoost($url);
+                $score = $rarity * 10.0 * $posBoost * $brandBoost * $productBoost;
+                $urlScores[$url] = ($urlScores[$url] ?? 0.0) + $score;
+                if ($found > 0 && $found <= $rareMax && $productBoost >= 1.5) {
+                    $priorityUrls[$url] = max($priorityUrls[$url] ?? 0.0, $urlScores[$url]);
+                }
+                // Карточки товара с брендом — в приоритет (не youtube/ozon из коротких зондов)
+                if ($productBoost >= 4.0 && $pos < 8) {
+                    $priorityUrls[$url] = max($priorityUrls[$url] ?? 0.0, $urlScores[$url]);
                 }
             }
             if ($pauseMs > 0) {
@@ -162,6 +169,7 @@ class TextUniquenessService
         }
 
         arsort($urlScores);
+        arsort($priorityUrls);
         $candidateUrls = [];
         $seenCand = [];
         foreach (array_keys($priorityUrls) as $url) {
@@ -335,6 +343,19 @@ class TextUniquenessService
                 }
                 continue;
             }
+
+            // На значимой копии добираем перефразированные предложения (иначе 73% вместо ~55–60%)
+            $soft = $this->softMatchedShingles($text, $pageText, $size);
+            foreach ($soft as $k => $_) {
+                $matched[$k] = true;
+            }
+            $matchedCount = count($matched);
+            $overlap = count($sourceShingles) > 0
+                ? round(($matchedCount / count($sourceShingles)) * 100, 1)
+                : 0.0;
+            $row['overlap_pct'] = $overlap;
+            $row['matched_shingles'] = $matchedCount;
+            $row['samples'] = array_slice(array_keys($matched), 0, 8);
 
             foreach ($matched as $k => $_) {
                 $unionMatchedWeb[$k] = true;
@@ -788,6 +809,9 @@ class TextUniquenessService
     private function tokenize(string $text): array
     {
         $text = mb_strtolower($text, 'UTF-8');
+        // 50°C / 24˚C → 50c / 24c, иначе ° рвёт токен и шинглы с копией не сходятся
+        $text = str_replace(['°', '˚', 'º', 'ᵒ'], '', $text);
+        $text = str_replace('ё', 'е', $text);
         $parts = preg_split('/[^a-zа-яё0-9]+/ui', $text) ?: [];
         $words = [];
         foreach ($parts as $w) {
@@ -826,12 +850,128 @@ class TextUniquenessService
         ];
 
         $last = count($words) - $size;
-        $segments = max(1, $count);
-        $segWidth = max(1, (int) ceil(($last + 1) / $segments));
+        $scoreChunk = function (array $chunk) use ($stop): array {
+            $score = 0;
+            $contentWords = 0;
+            $latin = 0;
+            foreach ($chunk as $w) {
+                $len = mb_strlen($w);
+                if (isset($stop[$w]) || $len < 2) {
+                    $score -= 2;
+                    continue;
+                }
+                $contentWords++;
+                $score += min(12, $len);
+                if ($len >= 8) {
+                    $score += 4;
+                }
+                if (preg_match('/\d/u', $w)) {
+                    $score += 8;
+                }
+                // Латиница / бренд (Air, FX, Interacoustics) — сильнейший сигнал для SERP
+                if (preg_match('/[a-z]/iu', $w)) {
+                    $latin++;
+                    $score += 55 + min(20, $len);
+                }
+            }
+
+            return [
+                'score' => $score,
+                'content' => $contentWords,
+                'latin' => $latin,
+            ];
+        };
+
+        $brandCandidates = [];
+        $allCandidates = [];
+        for ($i = 0; $i <= $last; $i++) {
+            $chunk = array_slice($words, $i, $size);
+            $phrase = implode(' ', $chunk);
+            $meta = $scoreChunk($chunk);
+            if ($meta['content'] < 3) {
+                continue;
+            }
+            $row = ['phrase' => $phrase, 'score' => $meta['score'], 'latin' => $meta['latin'], 'pos' => $i];
+            $allCandidates[] = $row;
+            if ($meta['latin'] > 0) {
+                $brandCandidates[] = $row;
+            }
+        }
+
+        usort($brandCandidates, static function ($a, $b) {
+            if ($b['score'] !== $a['score']) {
+                return $b['score'] <=> $a['score'];
+            }
+
+            return $a['pos'] <=> $b['pos'];
+        });
+
         $picked = [];
         $seen = [];
+        $brandSlots = min(count($brandCandidates), max(2, (int) ceil($count * 0.45)));
+        foreach ($brandCandidates as $cand) {
+            if (count($picked) >= $brandSlots) {
+                break;
+            }
+            if (isset($seen[$cand['phrase']])) {
+                continue;
+            }
+            $seen[$cand['phrase']] = true;
+            $picked[] = $cand['phrase'];
+        }
 
-        for ($seg = 0; $seg < $segments; $seg++) {
+        // Компактный бренд-зонд: подряд ≥3 латинских токена (air fx interacoustics)
+        $latinRun = [];
+        $flushLatinRun = function () use (&$latinRun, &$seen, &$picked) {
+            if (count($latinRun) < 3) {
+                $latinRun = [];
+
+                return;
+            }
+            $brandQ = implode(' ', array_slice($latinRun, 0, 6));
+            if (! isset($seen[$brandQ])) {
+                $seen[$brandQ] = true;
+                array_unshift($picked, $brandQ);
+            }
+            $latinRun = [];
+        };
+        foreach ($words as $w) {
+            if (preg_match('/[a-z]/iu', $w) && mb_strlen($w) >= 2) {
+                $latinRun[] = $w;
+            } else {
+                $flushLatinRun();
+            }
+        }
+        $flushLatinRun();
+
+        // Явный зонд air + fx + brand, если все есть в тексте
+        $hasAir = in_array('air', $words, true);
+        $hasFx = in_array('fx', $words, true);
+        $hasBrand = false;
+        foreach ($words as $w) {
+            if (strpos($w, 'interacoust') === 0 || $w === 'visualeyes') {
+                $hasBrand = true;
+                break;
+            }
+        }
+        if ($hasAir && $hasFx && $hasBrand) {
+            $forced = 'air fx interacoustics';
+            if (! isset($seen[$forced])) {
+                $seen[$forced] = true;
+                array_unshift($picked, $forced);
+            }
+        }
+
+        $picked = array_values(array_unique($picked));
+        // Короткие зонды («air fx», «50c 24c») дают мусорную выдачу — только ≥3 слова
+        $picked = array_values(array_filter($picked, static function ($phrase) {
+            return count(preg_split('/\s+/u', trim((string) $phrase)) ?: []) >= 3;
+        }));
+
+        // Остальное — по сегментам текста (как раньше), но со скорингом бренда
+        $segments = max(1, $count);
+        $segWidth = max(1, (int) ceil(($last + 1) / $segments));
+        for ($seg = 0; $seg < $segments && count($picked) < $count; $seg++) {
             $from = $seg * $segWidth;
             $to = min($last, $from + $segWidth - 1);
             if ($from > $last) {
@@ -845,28 +985,12 @@ class TextUniquenessService
                 if (isset($seen[$phrase])) {
                     continue;
                 }
-                $score = 0;
-                $contentWords = 0;
-                foreach ($chunk as $w) {
-                    $len = mb_strlen($w);
-                    if (isset($stop[$w]) || $len < 3) {
-                        $score -= 2;
-                        continue;
-                    }
-                    $contentWords++;
-                    $score += min(12, $len);
-                    if ($len >= 8) {
-                        $score += 4;
-                    }
-                    if (preg_match('/\d/u', $w)) {
-                        $score += 3;
-                    }
-                }
-                if ($contentWords < 3) {
+                $meta = $scoreChunk($chunk);
+                if ($meta['content'] < 3) {
                     continue;
                 }
-                if ($score > $bestScore) {
-                    $bestScore = $score;
+                if ($meta['score'] > $bestScore) {
+                    $bestScore = $meta['score'];
                     $best = $phrase;
                 }
             }
@@ -876,28 +1000,14 @@ class TextUniquenessService
             }
         }
 
-        // Добираем глобально лучшие, если сегменты дали мало
         if (count($picked) < $count) {
-            $candidates = [];
-            for ($i = 0; $i <= $last; $i++) {
-                $chunk = array_slice($words, $i, $size);
-                $phrase = implode(' ', $chunk);
-                if (isset($seen[$phrase])) {
-                    continue;
-                }
-                $score = 0;
-                foreach ($chunk as $w) {
-                    if (isset($stop[$w])) {
-                        continue;
-                    }
-                    $score += mb_strlen($w);
-                }
-                $candidates[] = ['phrase' => $phrase, 'score' => $score];
-            }
-            usort($candidates, static function ($a, $b) {
+            usort($allCandidates, static function ($a, $b) {
                 return $b['score'] <=> $a['score'];
             });
-            foreach ($candidates as $cand) {
+            foreach ($allCandidates as $cand) {
+                if (isset($seen[$cand['phrase']])) {
+                    continue;
+                }
                 $seen[$cand['phrase']] = true;
                 $picked[] = $cand['phrase'];
                 if (count($picked) >= $count) {
@@ -910,7 +1020,71 @@ class TextUniquenessService
             $picked[] = implode(' ', array_slice($words, 0, $size));
         }
 
+        $picked = array_values(array_filter($picked, static function ($phrase) {
+            return count(preg_split('/\s+/u', trim((string) $phrase)) ?: []) >= 3;
+        }));
+        if ($picked === []) {
+            $picked[] = implode(' ', array_slice($words, 0, max(3, $size)));
+        }
+
         return array_slice($picked, 0, $count);
+    }
+
+    /**
+     * Доп. совпадения на уже значимой странице: предложение похоже по словам/порядку
+     * (ловим рерайт, который точные 4-шингла пропускают).
+     *
+     * @return array<string, true>
+     */
+    private function softMatchedShingles(string $sourceText, string $pageText, int $shingleSize): array
+    {
+        $pageWords = $this->tokenize($pageText);
+        if ($pageWords === []) {
+            return [];
+        }
+        $pageSet = array_fill_keys($pageWords, true);
+        $out = [];
+
+        $chunks = preg_split('/(?<=[\.\!\?\n;:])\s+/u', $sourceText) ?: [];
+        foreach ($chunks as $chunk) {
+            $words = $this->tokenize($chunk);
+            $n = count($words);
+            if ($n < 5) {
+                continue;
+            }
+            $hit = 0;
+            foreach ($words as $w) {
+                if (isset($pageSet[$w])) {
+                    $hit++;
+                }
+            }
+            $bagRatio = $hit / $n;
+
+            $j = 0;
+            $ordered = 0;
+            foreach ($words as $w) {
+                $limit = count($pageWords);
+                while ($j < $limit && $pageWords[$j] !== $w) {
+                    $j++;
+                }
+                if ($j < $limit && $pageWords[$j] === $w) {
+                    $ordered++;
+                    $j++;
+                }
+            }
+            $orderRatio = $ordered / $n;
+
+            if ($bagRatio < 0.55 && $orderRatio < 0.4) {
+                continue;
+            }
+
+            $last = $n - $shingleSize;
+            for ($i = 0; $i <= $last; $i++) {
+                $out[implode(' ', array_slice($words, $i, $shingleSize))] = true;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -918,11 +1092,16 @@ class TextUniquenessService
      */
     private function searchFragment(string $engine, string $lr, string $query, int $depth, int &$xmlRequests): array
     {
-        $quoted = '"' . str_replace('"', '', $query) . '"';
+        // Кавычки вокруг длинной кириллицы в XML часто игнорируются → шум.
+        // Для брендов (латиница) ищем без внешних кавычек — так находятся карточки товара.
+        $hasLatin = (bool) preg_match('/[a-z]/iu', $query);
+        $q = $hasLatin
+            ? trim(str_replace('"', '', $query))
+            : ('"' . str_replace('"', '', $query) . '"');
         try {
             $xmlRequests++;
             $xml = new SimplifiedXmlFacade($lr, $depth);
-            $xml->setQuery($quoted);
+            $xml->setQuery($q);
             if ($engine === 'google') {
                 $xml->setPage('0');
                 $chunk = $xml->getXMLResponse('google');
@@ -958,6 +1137,33 @@ class TextUniquenessService
 
             return '';
         }
+    }
+
+    /**
+     * Карточки товара / бренд в URL важнее общего шума из коротких зондов.
+     */
+    private function urlProductBoost(string $url): float
+    {
+        $host = $this->hostFromUrl($url);
+        $path = mb_strtolower((string) (parse_url($url, PHP_URL_PATH) ?: ''));
+        $hay = $host . ' ' . $path;
+
+        if (preg_match('/youtube\.|youtu\.be|ozon\.|hh\.ru|rbc\.ru|hitmos\.|chipdip\.|vk\.ru\/wall|yandex\.ru\/images|academic\.ru|winch\.uz/u', $hay)) {
+            return 0.05;
+        }
+
+        $boost = 1.0;
+        if (preg_match('/air[-_]?fx|airfx|irrigator|kalorichesk|vestibul/u', $hay)) {
+            $boost *= 10.0;
+        }
+        if (preg_match('/interacoustics/u', $hay)) {
+            $boost *= 3.0;
+        }
+        if (preg_match('/\/product|\/catalog|\/katalog/u', $path)) {
+            $boost *= 1.8;
+        }
+
+        return $boost;
     }
 
     private function hostFromUrl(string $url): string

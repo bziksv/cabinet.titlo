@@ -112,17 +112,43 @@ class TextUniquenessLimits
         return (int) TextUniquenessHistory::query()->where('user_id', $user->id)->count();
     }
 
-    public static function canSaveAnother(?User $user = null): bool
+    /**
+     * Оставить только последние N записей (скользящее окно по лимиту тарифа).
+     */
+    public static function pruneHistory(?User $user = null): void
     {
-        $limit = self::historyLimitForUser($user);
-        if ($limit === null) {
-            return true;
-        }
-        if ($limit <= 0) {
-            return false;
+        $user = $user ?? Auth::user();
+        if (! $user) {
+            return;
         }
 
-        return self::savedCount($user) < $limit;
+        $limit = self::historyLimitForUser($user);
+        if ($limit === null || $limit <= 0) {
+            return;
+        }
+
+        $keepIds = TextUniquenessHistory::query()
+            ->where('user_id', $user->id)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->pluck('id');
+
+        if ($keepIds->isEmpty()) {
+            return;
+        }
+
+        TextUniquenessHistory::query()
+            ->where('user_id', $user->id)
+            ->whereNotIn('id', $keepIds)
+            ->delete();
+    }
+
+    /**
+     * @deprecated Лимит истории — скользящее окно: сохраняем и pruneHistory().
+     */
+    public static function canSaveAnother(?User $user = null): bool
+    {
+        return self::canSaveHistory($user);
     }
 
     private static function tariffInt(string $code, ?User $user = null): ?int

@@ -1190,7 +1190,7 @@ class TextAnalyzer extends Model
             return '';
         }
 
-        return $raw;
+        return \App\Support\Esenin\EseninHtmlHighlighter::defragmentInline($raw);
     }
 
     /**

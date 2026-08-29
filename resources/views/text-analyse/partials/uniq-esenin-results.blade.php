@@ -56,9 +56,13 @@
         })));
         $defaultTab = $hasUniq ? 'uniqueness' : 'risk';
         if ($hasUniq) {
-            $activeHtml = $u['highlighted_html'] ?? nl2br(e($u['text'] ?? ''));
+            $activeHtml = \App\Support\Esenin\EseninHtmlHighlighter::defragmentInline(
+                (string) ($u['highlighted_html'] ?? nl2br(e($u['text'] ?? '')))
+            );
         } else {
-            $activeHtml = $highlights['risk'] ?? ($e['highlighted_html'] ?? nl2br(e($e['text'] ?? '')));
+            $activeHtml = \App\Support\Esenin\EseninHtmlHighlighter::defragmentInline(
+                (string) ($highlights['risk'] ?? ($e['highlighted_html'] ?? nl2br(e($e['text'] ?? ''))))
+            );
         }
         $plainText = (string) ($u['text'] ?? $e['text'] ?? '');
         $title = ($hasUniq || $hasUniqError) && ($hasEsenin || $hasEseninError)
@@ -85,14 +89,7 @@
                 <div class="alert alert-warning py-2 mb-3">{{ $e['message'] ?? __('Text analyzer esenin failed') }}</div>
             @endif
 
-            @if($hasUniq && !empty($u['no_significant_matches']))
-                <div class="alert alert-warning py-2 mb-3">
-                    {{ __('Text analyzer uniqueness no matches warning', [
-                        'probes' => (int) ($u['xml_requests'] ?? 0),
-                        'pages' => (int) ($u['pages_fetched'] ?? 0),
-                    ]) }}
-                </div>
-            @elseif($hasUniq && isset($u['own_match_pct']) && ($u['own_match_pct'] > 0 || !empty($u['own_url'])))
+            @if($hasUniq && isset($u['own_match_pct']) && ($u['own_match_pct'] > 0 || !empty($u['own_url'])))
                 <div class="alert alert-info py-2 mb-3">
                     {{ __('Text analyzer own match banner', [
                         'pct' => $u['own_match_pct'] ?? 0,
@@ -179,7 +176,7 @@
                         </div>
                         @if($hasUniq)
                             <script type="application/json" id="cabinet-ta-uniq-highlight">{!! json_encode([
-                                'html' => $u['highlighted_html'] ?? '',
+                                'html' => \App\Support\Esenin\EseninHtmlHighlighter::defragmentInline((string) ($u['highlighted_html'] ?? '')),
                                 'text' => $u['text'] ?? $plainText,
                                 'legend' => (string) __('Text analyzer uniqueness text legend'),
                                 'footer' => (string) __('Text analyzer uniqueness probes used', ['n' => (int) ($u['xml_requests'] ?? 0)])
@@ -188,7 +185,12 @@
                             ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) !!}</script>
                         @endif
                         @if($hasEsenin)
-                            <script type="application/json" id="cabinet-ta-esenin-highlights">{!! json_encode($highlights, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) !!}</script>
+                            <script type="application/json" id="cabinet-ta-esenin-highlights">{!! json_encode(
+                                array_map(static function ($html) {
+                                    return \App\Support\Esenin\EseninHtmlHighlighter::defragmentInline((string) $html);
+                                }, $highlights),
+                                JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE
+                            ) !!}</script>
                             <script type="application/json" id="cabinet-ta-esenin-meta">{!! json_encode([
                                 'legend' => (string) __('Text analyzer esenin text legend'),
                                 'fallback' => (string) ($e['highlighted_html'] ?? ''),

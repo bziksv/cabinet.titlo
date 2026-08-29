@@ -89,9 +89,6 @@
                     <div class="info-box-content">
                         <span class="info-box-text text-wrap">{{ __('Text uniqueness') }}</span>
                         <span class="info-box-number">{{ number_format($response['uniqueness']['uniqueness_pct'] ?? 0, 1, ',', ' ') }}%</span>
-                        @if(!empty($response['uniqueness']['no_significant_matches']))
-                            <span class="small text-muted">{{ __('Text analyzer uniqueness nd hint') }}</span>
-                        @endif
                     </div>
                 </div>
             </div>

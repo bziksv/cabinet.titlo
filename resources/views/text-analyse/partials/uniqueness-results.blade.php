@@ -10,14 +10,7 @@
             @if(!empty($u['error']))
                 <div class="alert alert-warning mb-0">{{ $u['message'] ?? __('Text uniqueness fetch failed') }}</div>
             @else
-                @if(!empty($u['no_significant_matches']))
-                    <div class="alert alert-warning py-2 mb-3">
-                        {{ __('Text analyzer uniqueness no matches warning', [
-                            'probes' => (int) ($u['xml_requests'] ?? 0),
-                            'pages' => (int) ($u['pages_fetched'] ?? 0),
-                        ]) }}
-                    </div>
-                @elseif(isset($u['own_match_pct']) && ($u['own_match_pct'] > 0 || !empty($u['own_url'])))
+                @if(isset($u['own_match_pct']) && ($u['own_match_pct'] > 0 || !empty($u['own_url'])))
                     <div class="alert alert-info py-2 mb-3">
                         {{ __('Text analyzer own match banner', [
                             'pct' => $u['own_match_pct'] ?? 0,

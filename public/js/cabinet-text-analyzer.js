@@ -1538,6 +1538,44 @@
             setTimeout(syncEstimate, 0);
         });
 
+        editor.on('contentDom', function () {
+            var editable = editor.editable();
+            if (!editable) {
+                return;
+            }
+            editable.attachListener(editable, 'keydown', function (evt) {
+                var domEvent = evt.data.$;
+                var key = evt.data.getKey();
+                var isSelectAll = (domEvent.ctrlKey || domEvent.metaKey) && (key === 65 || domEvent.keyCode === 65);
+                if (!isSelectAll) {
+                    return;
+                }
+                evt.stop();
+                try {
+                    editor.execCommand('selectAll');
+                } catch (e) {
+                    /* ignore */
+                }
+                return false;
+            }, null, null, 1);
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (!(e.ctrlKey || e.metaKey) || (e.key !== 'a' && e.keyCode !== 65)) {
+                return;
+            }
+            if (!editor.focusManager || !editor.focusManager.hasFocus) {
+                return;
+            }
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            try {
+                editor.execCommand('selectAll');
+            } catch (err) {
+                /* ignore */
+            }
+        }, true);
+
         $('#cabinet-ta-form').on('submit', function () {
             if (editor && editor.updateElement) {
                 editor.updateElement();

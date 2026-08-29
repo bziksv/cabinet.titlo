@@ -71,33 +71,29 @@ class TextUniquenessController extends Controller
         $historyWarning = null;
         $save = $request->boolean('save', false);
         if ($save && TextUniquenessLimits::canSaveHistory($user)) {
-            if (! TextUniquenessLimits::canSaveAnother($user)) {
-                $historyWarning = TextUniquenessLimits::historyLimitMessage($user)
-                    ?: __('Text uniqueness history limit exhausted');
-            } else {
-                $plain = TextUniquenessService::normalizePlain($params['text']);
-                $title = mb_substr($plain, 0, 60);
-                if (mb_strlen($plain) > 60) {
-                    $title .= '…';
-                }
-
-                $history = TextUniquenessHistory::query()->create([
-                    'user_id' => $user->id,
-                    'title' => $title !== '' ? $title : __('Text uniqueness'),
-                    'mode' => $result['mode'],
-                    'params' => [
-                        'mode' => $mode,
-                        'engine' => $params['engine'],
-                        'yandex_lr' => $params['yandex_lr'],
-                        'urls' => TextUniquenessService::normalizeUrlList($params['urls']),
-                        'chars' => $result['chars'] ?? mb_strlen($plain),
-                    ],
-                    'results' => $result,
-                    'uniqueness_pct' => $result['uniqueness_pct'] ?? 0,
-                    'cost' => $result['cost'],
-                ]);
-                $historyId = $history->id;
+            $plain = TextUniquenessService::normalizePlain($params['text']);
+            $title = mb_substr($plain, 0, 60);
+            if (mb_strlen($plain) > 60) {
+                $title .= '…';
             }
+
+            $history = TextUniquenessHistory::query()->create([
+                'user_id' => $user->id,
+                'title' => $title !== '' ? $title : __('Text uniqueness'),
+                'mode' => $result['mode'],
+                'params' => [
+                    'mode' => $mode,
+                    'engine' => $params['engine'],
+                    'yandex_lr' => $params['yandex_lr'],
+                    'urls' => TextUniquenessService::normalizeUrlList($params['urls']),
+                    'chars' => $result['chars'] ?? mb_strlen($plain),
+                ],
+                'results' => $result,
+                'uniqueness_pct' => $result['uniqueness_pct'] ?? 0,
+                'cost' => $result['cost'],
+            ]);
+            $historyId = $history->id;
+            TextUniquenessLimits::pruneHistory($user);
         }
 
         return response()->json([
