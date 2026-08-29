@@ -310,6 +310,14 @@ class MonitoringChartPositionSeries
             return null;
         }
 
+        // Раньше график читал якоря без прогрева — на проде после короткого
+        // диапазона в таблице оставались ~недели, а span в cache врал «год готов».
+        MonitoringPositionDates::datesForEngines(
+            $engineIds,
+            $start->toDateString(),
+            $end->toDateString()
+        );
+
         $dateExpr = $bucket === self::BUCKET_MONTH
             ? 'DATE_FORMAT(check_date, "%Y-%m")'
             : 'DATE(DATE_SUB(check_date, INTERVAL WEEKDAY(check_date) DAY))';
@@ -323,13 +331,28 @@ class MonitoringChartPositionSeries
             ->pluck('last_day');
 
         if ($rows->isEmpty()) {
-            // Таблица пуста для региона — пусть сработает полный scan / discover снаружи.
+            // Таблица пуста для региона — полный scan по created_at.
             return null;
         }
 
-        return $rows->map(static function ($d) {
+        $anchors = $rows->map(static function ($d) {
             return Carbon::parse($d)->toDateString();
         })->unique()->values()->all();
+
+        // Защита от дырявого прогрева: ~3 недели вместо ~52 при «365 + недели».
+        if ($bucket === self::BUCKET_WEEK) {
+            $expectedWeeks = max(1, (int) ceil(($start->diffInDays($end) + 1) / 7));
+            if (count($anchors) < max(3, (int) floor($expectedWeeks * 0.35))) {
+                return null;
+            }
+        } elseif ($bucket === self::BUCKET_MONTH) {
+            $expectedMonths = max(1, $start->copy()->startOfMonth()->diffInMonths($end->copy()->startOfMonth()) + 1);
+            if (count($anchors) < max(2, (int) floor($expectedMonths * 0.5))) {
+                return null;
+            }
+        }
+
+        return $anchors;
     }
 
     private static function hasEngineCreatedIndex(): bool

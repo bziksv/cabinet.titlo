@@ -70,8 +70,18 @@ class MonitoringPositionDates
         }
 
         if ($span === null) {
-            self::discoverEngineRangeLocked($engineId, $startDate, $endDate);
-            self::rememberCoverageSpan($engineId, $startDate, $endDate);
+            $discovered = self::discoverEngineRangeLocked($engineId, $startDate, $endDate);
+            if ($discovered) {
+                // Пустые дни в диапазоне — ок; помечаем запрошенный интервал.
+                self::rememberCoverageSpan($engineId, $startDate, $endDate);
+            } else {
+                // Лок: другой запрос ещё сканирует — не врём, что год уже прогрет.
+                $actual = self::coverageSpanFromTable($engineId);
+                if ($actual !== null) {
+                    self::rememberCoverageSpan($engineId, $actual['min'], $actual['max']);
+                }
+            }
+
             return;
         }
 
@@ -80,18 +90,45 @@ class MonitoringPositionDates
 
         if ($startDate < $minKnown) {
             $edgeEnd = Carbon::parse($minKnown)->subDay()->toDateString();
-            self::discoverEngineRangeLocked($engineId, $startDate, $edgeEnd);
-            $minKnown = $startDate;
+            if (self::discoverEngineRangeLocked($engineId, $startDate, $edgeEnd)) {
+                $minKnown = $startDate;
+            }
         }
 
         if ($endDate > $maxKnown) {
             $edgeStart = Carbon::parse($maxKnown)->addDay()->toDateString();
-            self::discoverEngineRangeLocked($engineId, $edgeStart, $endDate);
-            $maxKnown = $endDate;
+            if (self::discoverEngineRangeLocked($engineId, $edgeStart, $endDate)) {
+                $maxKnown = $endDate;
+            }
         }
 
         if ($minKnown !== $span['min'] || $maxKnown !== $span['max']) {
             self::rememberCoverageSpan($engineId, $minKnown, $maxKnown);
+        }
+    }
+
+    /**
+     * @return bool true — сканирование выполнено этим процессом
+     */
+    private static function discoverEngineRangeLocked(int $engineId, string $startDate, string $endDate): bool
+    {
+        $lockKey = 'mon.pos_dates.discover.' . $engineId . '.' . $startDate . '.' . $endDate;
+        if (! Cache::add($lockKey, 1, 90)) {
+            // Другой запрос уже сканирует — не ждём секундами в HTTP.
+            return false;
+        }
+
+        try {
+            self::discoverFromPositions(
+                [$engineId],
+                $startDate . ' 00:00:00',
+                $endDate . ' 23:59:59',
+                true
+            );
+
+            return true;
+        } finally {
+            Cache::forget($lockKey);
         }
     }
 
@@ -113,26 +150,6 @@ class MonitoringPositionDates
             'min' => Carbon::parse($row->min_d)->toDateString(),
             'max' => Carbon::parse($row->max_d)->toDateString(),
         ];
-    }
-
-    private static function discoverEngineRangeLocked(int $engineId, string $startDate, string $endDate): void
-    {
-        $lockKey = 'mon.pos_dates.discover.' . $engineId . '.' . $startDate . '.' . $endDate;
-        if (!Cache::add($lockKey, 1, 90)) {
-            // Другой запрос уже сканирует — не ждём секундами в HTTP /table.
-            return;
-        }
-
-        try {
-            self::discoverFromPositions(
-                [$engineId],
-                $startDate . ' 00:00:00',
-                $endDate . ' 23:59:59',
-                true
-            );
-        } finally {
-            Cache::forget($lockKey);
-        }
     }
 
     /**
@@ -162,8 +179,8 @@ class MonitoringPositionDates
 
     private static function coverageCacheKey(int $engineId): string
     {
-        // v2: сброс битых span после бага alreadyWarm (дыры внутри диапазона).
-        return 'mon.pos_dates.cov.v2.' . $engineId;
+        // v3: сброс span, которые помечали 365 дней «прогретыми» без реального discover (лок/частичный прогрев).
+        return 'mon.pos_dates.cov.v3.' . $engineId;
     }
 
     /**
