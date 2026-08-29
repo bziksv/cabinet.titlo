@@ -223,6 +223,7 @@ class TextAnalyzerController extends Controller
             'checkEsenin' => $request->input('checkEsenin', 0),
             'excludeOwnDomain' => (string) $request->input('excludeOwnDomain', ''),
             'batchLabel' => (string) $request->input('label', ''),
+            'taskName' => trim((string) $request->input('taskName', '')),
         ];
 
         if ($type === 'url') {

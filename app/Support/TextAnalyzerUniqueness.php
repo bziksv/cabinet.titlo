@@ -98,11 +98,16 @@ class TextAnalyzerUniqueness
      */
     public static function historyTitle(array $request, string $plain): string
     {
+        // Пакет: у каждого элемента свой label
+        if (! empty($request['batchLabel'])) {
+            return mb_substr((string) $request['batchLabel'], 0, 120);
+        }
+        $taskName = trim((string) ($request['taskName'] ?? $request['task_name'] ?? ''));
+        if ($taskName !== '') {
+            return mb_strlen($taskName) > 120 ? mb_substr($taskName, 0, 120) . '…' : $taskName;
+        }
         if (($request['type'] ?? '') === 'url' && ! empty($request['url'])) {
             return mb_substr((string) $request['url'], 0, 120);
-        }
-        if (($request['type'] ?? '') === 'batch' && ! empty($request['batchLabel'])) {
-            return mb_substr((string) $request['batchLabel'], 0, 120);
         }
         $title = mb_substr($plain, 0, 60);
         if (mb_strlen($plain) > 60) {

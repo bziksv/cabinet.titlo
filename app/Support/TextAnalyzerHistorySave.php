@@ -51,6 +51,10 @@ class TextAnalyzerHistorySave
         $chars = (int) ($general['textLength'] ?? ($uniq['chars'] ?? mb_strlen($plain)));
         $words = (int) ($general['countWordsAll'] ?? ($general['countWords'] ?? 0));
 
+        $taskName = trim((string) ($request['taskName'] ?? $request['task_name'] ?? ''));
+        if (mb_strlen($taskName) > 120) {
+            $taskName = mb_substr($taskName, 0, 120);
+        }
         $title = TextAnalyzerUniqueness::historyTitle($request, $plain);
 
         // Полный снимок анализатора + то, что реально включили галками.
@@ -74,6 +78,7 @@ class TextAnalyzerHistorySave
                 'type' => $request['type'] ?? 'text',
                 'url' => $request['url'] ?? null,
                 'competitorUrl' => $request['competitorUrl'] ?? null,
+                'task_name' => $taskName !== '' ? $taskName : null,
                 'chars' => $chars,
                 'words' => $words,
                 'uniqueness_pct' => $uniquenessPct,
@@ -236,11 +241,15 @@ class TextAnalyzerHistorySave
             'url' => $params['url'] ?? ($form['url'] ?? ''),
             'textarea' => $params['textarea'] ?? ($params['plain'] ?? ''),
             'competitorUrl' => $params['competitorUrl'] ?? ($form['competitorUrl'] ?? ''),
+            'taskName' => $params['task_name'] ?? ($form['taskName'] ?? ''),
             'saveUniqueness' => 1,
         ], $form);
 
         if (($request['textarea'] ?? '') === '' && ! empty($params['plain'])) {
             $request['textarea'] = $params['plain'];
+        }
+        if (trim((string) ($request['taskName'] ?? '')) === '' && ! empty($params['task_name'])) {
+            $request['taskName'] = $params['task_name'];
         }
 
         return $request;
@@ -269,6 +278,7 @@ class TextAnalyzerHistorySave
             'type' => $request['type'] ?? 'text',
             'url' => $request['url'] ?? null,
             'competitorUrl' => $request['competitorUrl'] ?? null,
+            'taskName' => $request['taskName'] ?? ($request['task_name'] ?? null),
             'compareCompetitor' => $request['compareCompetitor'] ?? null,
             'noIndex' => $request['noIndex'] ?? null,
             'hiddenText' => $request['hiddenText'] ?? null,

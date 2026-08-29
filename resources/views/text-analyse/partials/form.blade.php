@@ -57,6 +57,18 @@
             </li>
         </ul>
 
+        <div class="mb-3" id="cabinet-ta-task-name-wrap">
+            <label class="form-label fw-semibold mb-1" for="cabinet-ta-task-name">{{ __('Text analyzer task name label') }}</label>
+            <input type="text"
+                   name="taskName"
+                   id="cabinet-ta-task-name"
+                   class="form-control"
+                   maxlength="120"
+                   value="{{ (string) ($request['taskName'] ?? '') }}"
+                   placeholder="{{ __('Text analyzer task name placeholder') }}">
+            <p class="form-text mb-0 mt-1">{{ __('Text analyzer task name hint') }}</p>
+        </div>
+
         <div id="cabinet-ta-panel-text" class="cabinet-ta-panel {{ $mode !== 'text' ? 'd-none' : '' }}">
             <label class="form-label fw-semibold" for="cabinet-ta-textarea">{{ __('Your text') }}</label>
             <div class="cabinet-ta-editor-wrap" data-ta-editor-wrap>
