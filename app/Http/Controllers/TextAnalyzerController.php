@@ -619,11 +619,14 @@ class TextAnalyzerController extends Controller
             : __('Text Analysis');
 
         if (($request['type'] ?? '') !== 'url' && !empty($request['textarea'])) {
-            $preview = mb_substr(trim((string) $request['textarea']), 0, 180);
-            if (mb_strlen(trim((string) $request['textarea'])) > 180) {
+            // textarea часто HTML из CKEditor — на обложке PDF нужны plain-слова, не <p><em>…
+            $plain = TextAnalyzer::normalizePlainForUniqueness((string) $request['textarea']);
+            $plain = preg_replace('/\s+/u', ' ', trim($plain)) ?? '';
+            $preview = mb_substr($plain, 0, 220);
+            if (mb_strlen($plain) > 220) {
                 $preview .= '…';
             }
-            $sourceLabel = $preview;
+            $sourceLabel = $preview !== '' ? $preview : __('Text Analysis');
         }
 
         return [

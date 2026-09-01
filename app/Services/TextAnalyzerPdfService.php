@@ -75,9 +75,108 @@ class TextAnalyzerPdfService
             'cloudBothCompetitor' => $hasCompare
                 ? TextAnalyzerPdfBranding::cloudRowsForPdf($response['competitor']['clouds']['both'] ?? [])
                 : [],
+            'uniqueness' => self::uniquenessForPdf($response['uniqueness'] ?? null),
+            'esenin' => self::eseninForPdf($response['esenin'] ?? null),
             'yes' => __('Yes'),
             'no' => __('No'),
         ], TextAnalyzerPdfBranding::viewData());
+    }
+
+    /**
+     * @param mixed $uniq
+     * @return array<string, mixed>|null
+     */
+    private static function uniquenessForPdf($uniq): ?array
+    {
+        if (!is_array($uniq) || !empty($uniq['error'])) {
+            return null;
+        }
+        if (!array_key_exists('uniqueness_pct', $uniq)) {
+            return null;
+        }
+
+        $sources = [];
+        foreach (array_slice($uniq['sources'] ?? [], 0, 20) as $src) {
+            if (!is_array($src)) {
+                continue;
+            }
+            $sources[] = [
+                'url' => (string) ($src['url'] ?? ''),
+                'overlap_pct' => (int) ($src['overlap_pct'] ?? 0),
+                'matched_shingles' => (int) ($src['matched_shingles'] ?? 0),
+                'is_own' => !empty($src['is_own']),
+                'error' => !empty($src['error']),
+                'samples' => array_slice(array_values(array_filter(array_map('strval', $src['samples'] ?? []))), 0, 3),
+            ];
+        }
+
+        return [
+            'uniqueness_pct' => (int) ($uniq['uniqueness_pct'] ?? 0),
+            'matched_pct' => (int) ($uniq['matched_pct'] ?? 0),
+            'own_match_pct' => (int) ($uniq['own_match_pct'] ?? 0),
+            'xml_requests' => (int) ($uniq['xml_requests'] ?? 0),
+            'pages_fetched' => (int) ($uniq['pages_fetched'] ?? 0),
+            'shingles_matched' => (int) ($uniq['shingles_matched'] ?? 0),
+            'shingles_total' => (int) ($uniq['shingles_total'] ?? 0),
+            'sources' => $sources,
+            'matched_samples' => array_slice(array_values(array_filter(array_map('strval', $uniq['matched_samples'] ?? []))), 0, 24),
+        ];
+    }
+
+    /**
+     * @param mixed $esenin
+     * @return array<string, mixed>|null
+     */
+    private static function eseninForPdf($esenin): ?array
+    {
+        if (!is_array($esenin) || !empty($esenin['error'])) {
+            return null;
+        }
+        if (!array_key_exists('risk', $esenin)) {
+            return null;
+        }
+
+        $blockLabels = [
+            'risk' => (string) __('Text analyzer esenin risk'),
+            'frequency' => (string) __('Text analyzer esenin block repeats'),
+            'style' => (string) __('Text analyzer esenin block style'),
+            'keywords' => (string) __('Text analyzer esenin block queries'),
+            'formality' => (string) __('Text analyzer esenin water'),
+            'readability' => (string) __('Text analyzer esenin readability'),
+        ];
+
+        $blocks = [];
+        foreach ($esenin['blocks'] ?? [] as $code => $block) {
+            $score = (int) ($block['score'] ?? 0);
+            if ($score <= 0 && $code !== 'risk') {
+                continue;
+            }
+            $blocks[] = [
+                'code' => (string) $code,
+                'label' => $blockLabels[$code] ?? (string) $code,
+                'score' => $score,
+            ];
+        }
+
+        $details = [];
+        foreach (array_slice($esenin['details'] ?? [], 0, 30) as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $details[] = [
+                'label' => (string) ($row['label'] ?? ($row['block'] ?? '—')),
+                'sum' => (int) ($row['sum'] ?? ($row['local_sum'] ?? 0)),
+            ];
+        }
+
+        return [
+            'risk' => (int) ($esenin['risk'] ?? 0),
+            'level' => (string) ($esenin['level'] ?? ''),
+            'metrics' => is_array($esenin['metrics'] ?? null) ? $esenin['metrics'] : [],
+            'blocks' => $blocks,
+            'details' => $details,
+            'words' => (int) ($esenin['stats']['words'] ?? 0),
+        ];
     }
 
     public function renderBinary(array $response, array $request, array $meta): string
@@ -124,7 +223,15 @@ class TextAnalyzerPdfService
         );
 
         $icon = TextAnalyzerPdfBranding::logoIconPath();
-        $source = htmlspecialchars((string) ($meta['source_label'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $sourcePlain = (string) ($meta['source_label'] ?? '');
+        if ($sourcePlain !== '' && (strpos($sourcePlain, '<') !== false || strpos($sourcePlain, '&') !== false)) {
+            $sourcePlain = html_entity_decode(strip_tags($sourcePlain), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $sourcePlain = preg_replace('/\s+/u', ' ', trim($sourcePlain)) ?? '';
+        }
+        if (mb_strlen($sourcePlain) > 90) {
+            $sourcePlain = mb_substr($sourcePlain, 0, 87) . '…';
+        }
+        $source = htmlspecialchars($sourcePlain, ENT_QUOTES, 'UTF-8');
         $brand = htmlspecialchars(TextAnalyzerPdfBranding::BRAND_NAME, ENT_QUOTES, 'UTF-8');
         $version = htmlspecialchars((string) ($meta['version'] ?? ''), ENT_QUOTES, 'UTF-8');
 

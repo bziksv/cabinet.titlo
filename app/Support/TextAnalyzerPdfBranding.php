@@ -61,8 +61,13 @@ class TextAnalyzerPdfBranding
         self::ensureCoverAssets();
 
         $source = (string) ($meta['source_label'] ?? '');
-        if (mb_strlen($source) > 90) {
-            $source = mb_substr($source, 0, 87) . '…';
+        if ($source !== '' && (strpos($source, '<') !== false || strpos($source, '&') !== false)) {
+            $source = html_entity_decode(strip_tags($source), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $source = preg_replace('/\s+/u', ' ', trim($source)) ?? '';
+        }
+        // Плашка «Источник» шире/выше — больше текста до обрезки.
+        if (mb_strlen($source) > 220) {
+            $source = mb_substr($source, 0, 217) . '…';
         }
 
         $payload = [
@@ -72,7 +77,7 @@ class TextAnalyzerPdfBranding
             'compare' => $hasCompare,
             'competitor' => $competitorLabel,
             'locale' => app()->getLocale(),
-            'cover_rev' => (string) ($meta['cover_rev'] ?? '17'),
+            'cover_rev' => (string) ($meta['cover_rev'] ?? '19'),
             'cover_kicker' => (string) ($meta['cover_kicker'] ?? ''),
             'cover_title' => (string) ($meta['cover_title'] ?? ''),
             'cover_lead' => (string) ($meta['cover_lead'] ?? ''),
@@ -1073,7 +1078,7 @@ class TextAnalyzerPdfBranding
 
         $contentH = $logoH + $mmY(14)
             + $mmY(10) + 28 + $titleBlockH + 16 + count($leadLines) * 28
-            + $mmY(10) + 110
+            + $mmY(10) + 180
             + ($compareH > 0 ? 20 + $compareH : 0);
         $y = $zoneTop + (int) max(0, ($zoneBottom - $zoneTop - $contentH) / 2);
 
@@ -1091,11 +1096,22 @@ class TextAnalyzerPdfBranding
         $y += $mmY(8);
 
         $boxY = $y + 8;
-        $boxH = 110;
-        $leftW = (int) round($contentW * 0.34);
-        $gap = (int) round($contentW * 0.03);
+        // Дата короткая — узкая плашка; «Источник» шире и выше под 4–5 строк.
+        $leftW = (int) round($contentW * 0.28);
+        $gap = (int) round($contentW * 0.025);
         $rightW = $contentW - $leftW - $gap;
         $rightX = $padL + $leftW + $gap;
+        $srcSize = 20;
+        $srcLines = self::wrapCoverText($payload['source'], $font, $srcSize, $rightW - 36);
+        if (count($srcLines) > 5) {
+            $srcLines = array_slice($srcLines, 0, 5);
+            $last = (string) $srcLines[4];
+            if (mb_substr($last, -1) !== '…') {
+                $srcLines[4] = rtrim(mb_substr($last, 0, max(1, mb_strlen($last) - 1))) . '…';
+            }
+        }
+        $srcLineStep = $srcSize + 6;
+        $boxH = max(118, 28 + 16 + 12 + count($srcLines) * $srcLineStep + 18);
 
         imagefilledrectangle($im, $padL, $boxY, $padL + $leftW, $boxY + $boxH, $cBoxBg);
         imagefilledrectangle($im, $padL, $boxY, $padL + 8, $boxY + $boxH, $cBoxBorderBlue);
@@ -1106,9 +1122,8 @@ class TextAnalyzerPdfBranding
         self::drawCoverText($im, $font, 16, $padL + 18, $labelY, $cMetaLabel, mb_strtoupper((string) __('Generated at')));
         self::drawCoverText($im, $fontBold, 24, $padL + 18, $labelY + 34, $cMetaValue, $payload['generated']);
         self::drawCoverText($im, $font, 16, $rightX + 18, $labelY, $cMetaLabel, mb_strtoupper((string) __('Source')));
-        $srcSize = 20;
         $srcY = $labelY + 34;
-        foreach (self::wrapCoverText($payload['source'], $font, $srcSize, $rightW - 36) as $line) {
+        foreach ($srcLines as $line) {
             $srcY = self::drawCoverText($im, $font, $srcSize, $rightX + 18, $srcY + $srcSize, $cMetaValueSm, $line) + 6;
         }
 

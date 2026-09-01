@@ -82,6 +82,127 @@
     @endif
 </div>
 
+@if(!empty($uniqueness))
+<div class="sec">
+    <div class="sec-h">{{ __('Text uniqueness') }}</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:6pt 0;margin-bottom:10pt;">
+        <tr>
+            @foreach([
+                [__('Text analyzer web uniqueness'), ($uniqueness['uniqueness_pct'] ?? 0) . '%'],
+                [__('Text uniqueness matched title'), ($uniqueness['matched_pct'] ?? 0) . '%'],
+                [__('Text analyzer uniqueness probes used', ['n' => (int) ($uniqueness['xml_requests'] ?? 0)]), (int) ($uniqueness['pages_fetched'] ?? 0)],
+                [__('Text analyzer uniq nav matches'), ((int) ($uniqueness['shingles_matched'] ?? 0)) . ' / ' . ((int) ($uniqueness['shingles_total'] ?? 0))],
+            ] as $kpi)
+                <td width="25%" style="background:#ffffff;border:0.5pt solid #e2e8f0;border-top:2.5pt solid #059669;padding:11pt 9pt;">
+                    <div class="kpi-t">{{ $kpi[0] }}</div>
+                    <div class="kpi-v" style="color:#047857;">{{ $kpi[1] }}</div>
+                </td>
+            @endforeach
+        </tr>
+    </table>
+
+    @if(!empty($uniqueness['sources']))
+        <p class="sec-lead">{{ __('Text uniqueness sources title') }}</p>
+        <table class="tbl">
+            <thead>
+            <tr>
+                <th style="width:12%;">%</th>
+                <th>{{ __('Text uniqueness col url') }}</th>
+                <th class="r" style="width:14%;">Σ</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach($uniqueness['sources'] as $i => $src)
+                <tr class="{{ $i % 2 ? 'alt' : '' }}">
+                    <td class="r">
+                        {{ (int) ($src['overlap_pct'] ?? 0) }}%
+                        @if(!empty($src['is_own']))
+                            <div class="tag tag-main" style="margin-top:3pt;">{{ __('Text analyzer own source badge') }}</div>
+                        @endif
+                    </td>
+                    <td style="word-break:break-all;">
+                        @if(!empty($src['url']))
+                            {{ $src['url'] }}
+                        @else
+                            —
+                        @endif
+                        @if(!empty($src['error']))
+                            <div style="color:#b45309;font-size:7.5pt;">{{ __('Text analyzer page fetch failed') }}</div>
+                        @elseif(!empty($src['samples']))
+                            <div style="color:#64748b;font-size:7.5pt;margin-top:2pt;">{{ implode(' · ', $src['samples']) }}</div>
+                        @endif
+                    </td>
+                    <td class="r">{{ (int) ($src['matched_shingles'] ?? 0) }}</td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+    @else
+        <p class="sec-lead">{{ __('Text analyzer uniq no sources') }}</p>
+    @endif
+
+    @if(!empty($uniqueness['matched_samples']))
+        <p class="sec-lead" style="margin-top:8pt;">{{ __('Text uniqueness matched title') }}</p>
+        <p style="font-size:8pt;color:#334155;line-height:1.5;margin:0;">{{ implode(' · ', $uniqueness['matched_samples']) }}</p>
+    @endif
+</div>
+@endif
+
+@if(!empty($esenin))
+<div class="sec">
+    <div class="sec-h">{{ __('Esenin text check') }}</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:6pt 0;margin-bottom:10pt;">
+        <tr>
+            <td width="33%" style="background:#ffffff;border:0.5pt solid #e2e8f0;border-top:2.5pt solid #7c3aed;padding:11pt 9pt;">
+                <div class="kpi-t">{{ __('Esenin text check overall risk') }}</div>
+                <div class="kpi-v" style="color:#6d28d9;">{{ (int) ($esenin['risk'] ?? 0) }}@if(!empty($esenin['level'])) <span style="font-size:9pt;font-weight:normal;color:#64748b;">({{ $esenin['level'] }})</span>@endif</div>
+            </td>
+            @if(isset($esenin['metrics']['academic_nausea']))
+            <td width="33%" style="background:#ffffff;border:0.5pt solid #e2e8f0;border-top:2.5pt solid #7c3aed;padding:11pt 9pt;">
+                <div class="kpi-t">{{ __('Text analyzer esenin nausea') }}</div>
+                <div class="kpi-v" style="color:#6d28d9;">{{ $esenin['metrics']['academic_nausea'] }}</div>
+            </td>
+            @endif
+            @if(isset($esenin['metrics']['wateriness']))
+            <td width="34%" style="background:#ffffff;border:0.5pt solid #e2e8f0;border-top:2.5pt solid #7c3aed;padding:11pt 9pt;">
+                <div class="kpi-t">{{ __('Text analyzer esenin water') }}</div>
+                <div class="kpi-v" style="color:#6d28d9;">{{ $esenin['metrics']['wateriness'] }}</div>
+            </td>
+            @endif
+        </tr>
+    </table>
+
+    <table class="tbl">
+        <tbody>
+        @if(isset($esenin['metrics']['readability_index']))
+            <tr>
+                <td>{{ __('Text analyzer esenin readability') }}</td>
+                <td class="r">{{ $esenin['metrics']['readability_index'] }}</td>
+            </tr>
+        @endif
+        @if(isset($esenin['metrics']['informative_share']))
+            <tr class="alt">
+                <td>{{ __('Text analyzer esenin informative') }}</td>
+                <td class="r">{{ $esenin['metrics']['informative_share'] }}</td>
+            </tr>
+        @endif
+        @foreach($esenin['blocks'] as $i => $block)
+            <tr class="{{ $i % 2 ? 'alt' : '' }}">
+                <td>{{ $block['label'] }}</td>
+                <td class="r">{{ (int) $block['score'] }}</td>
+            </tr>
+        @endforeach
+        @foreach($esenin['details'] as $i => $row)
+            <tr class="{{ $i % 2 ? 'alt' : '' }}">
+                <td>{{ $row['label'] }}</td>
+                <td class="r">{{ (int) $row['sum'] }}</td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table>
+</div>
+@endif
+
 <div class="sec">
     <div class="sec-h">{{ __('Analysis settings') }}</div>
     <table class="tbl">
