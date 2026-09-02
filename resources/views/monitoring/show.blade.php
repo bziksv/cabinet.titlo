@@ -630,6 +630,13 @@
                         const picked = String($regionSelect.val() || '');
                         activeRegionIds = picked ? [picked] : [];
                     }
+
+                    // Частотность: limits_all уже с бэка (3×ключ×Яндекс). Не гоняем
+                    // monPositionsJobCount при пустых regionIds — получался 0 и disabled кнопка.
+                    if (!showRegionPicker && !showRegionsPicker && !showGoogleDepth) {
+                        return;
+                    }
+
                     const depth = monHasGoogleRegions(activeRegionIds)
                         ? (parseInt($depthSelect.val(), 10) || options.defaultGoogleDepth || 10)
                         : 10;
