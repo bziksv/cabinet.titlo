@@ -41,6 +41,7 @@
 
         @include('monitoring.keywords.modal.main')
         @include('monitoring-v2.partials.public-share-modal')
+        @include('monitoring-v2.partials.delete-projects-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
@@ -97,6 +98,13 @@
                     mastered: @json(__('Mastered')),
                     selectOne: @json(__('Select at least one project')),
                     confirmDelete: @json(__('Do you really want to delete?')),
+                    deleteProjectTitle: @json(__('Monitoring v2 delete project title')),
+                    deleteProjectsTitle: @json(__('Monitoring v2 delete projects title')),
+                    deleteProjectLead: @json(__('Monitoring v2 delete project lead')),
+                    deleteProjectsLead: @json(__('Monitoring v2 delete projects lead')),
+                    deleteProjectsListLabel: @json(__('Monitoring v2 delete projects list label')),
+                    deleteFailed: @json(__('Monitoring v2 delete failed')),
+                    deletePermanently: @json(__('Delete permanently')),
                     topTooltip: @json(__('Percentage of keys in the top')),
                     loadError: @json(__('Monitoring v2 regions load error')),
                     listLoadError: @json(__('Monitoring v2 list load error')),

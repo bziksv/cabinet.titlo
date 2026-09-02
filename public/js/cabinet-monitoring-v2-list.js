@@ -2714,19 +2714,136 @@
         refreshDashboard();
     }
 
+    let pendingDeleteIds = [];
+    const $deleteModal = $('#cabinetMonV2DeleteProjectsModal');
+    const $deleteList = $('#cabinetMonV2DeleteProjectsList');
+    const $deleteTitle = $('#cabinetMonV2DeleteProjectsModalLabel');
+    const $deleteLead = $('#cabinetMonV2DeleteProjectsLead');
+    const $deleteConfirmBtn = $('#cabinetMonV2DeleteProjectsConfirm');
+
+    function projectLabel(row) {
+        if (!row) {
+            return '';
+        }
+        const name = String(row.name || '').trim();
+        const url = String(row.url || '').trim();
+        if (name && url && name.toLowerCase() !== url.toLowerCase()) {
+            return { title: name, subtitle: url };
+        }
+        return { title: name || url || ('#' + row.id), subtitle: '' };
+    }
+
+    function hideDeleteModal() {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal && $deleteModal.length) {
+            const inst = bootstrap.Modal.getInstance($deleteModal[0]);
+            if (inst) {
+                inst.hide();
+                return;
+            }
+            bootstrap.Modal.getOrCreateInstance($deleteModal[0]).hide();
+            return;
+        }
+        $deleteModal.modal('hide');
+    }
+
+    function showDeleteModal() {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal && $deleteModal.length) {
+            bootstrap.Modal.getOrCreateInstance($deleteModal[0]).show();
+            return;
+        }
+        $deleteModal.modal('show');
+    }
+
+    function openDeleteProjectsModal(ids) {
+        pendingDeleteIds = ids.map(String);
+        const single = ids.length === 1;
+        $deleteTitle.text(
+            single
+                ? cfg.i18n.deleteProjectTitle || cfg.i18n.confirmDelete
+                : cfg.i18n.deleteProjectsTitle || cfg.i18n.confirmDelete
+        );
+        $deleteLead.text(
+            single
+                ? cfg.i18n.deleteProjectLead || cfg.i18n.confirmDelete
+                : cfg.i18n.deleteProjectsLead || cfg.i18n.confirmDelete
+        );
+        $deleteList.empty();
+        ids.forEach(function (id) {
+            const row = allRows.find(function (r) {
+                return String(r.id) === String(id);
+            });
+            const label = projectLabel(row);
+            const title = escHtml(label.title || ('#' + id));
+            const subtitle = label.subtitle
+                ? '<div class="small text-secondary text-truncate">' + escHtml(label.subtitle) + '</div>'
+                : '';
+            $deleteList.append(
+                '<li class="list-group-item px-0">' +
+                    '<div class="fw-semibold text-truncate">' +
+                    title +
+                    '</div>' +
+                    subtitle +
+                    '</li>'
+            );
+        });
+        $deleteConfirmBtn.prop('disabled', false);
+        showDeleteModal();
+    }
+
+    function performDeleteProjects(ids) {
+        if (!ids.length) {
+            return;
+        }
+        $deleteConfirmBtn.prop('disabled', true);
+        const tasks = ids.map(function (id) {
+            return axios
+                .delete('monitoring/' + id)
+                .then(function () {
+                    removeProjectFromList(id);
+                })
+                .catch(function () {
+                    toastr.error(cfg.i18n.deleteFailed || cfg.i18n.loadError);
+                });
+        });
+        Promise.all(tasks).finally(function () {
+            pendingDeleteIds = [];
+            $deleteConfirmBtn.prop('disabled', false);
+            hideDeleteModal();
+            updateSelectionBadge();
+        });
+    }
+
     function deleteProjects(ids) {
         if (!ids.length) {
             toastr.error(cfg.i18n.selectOne);
             return;
         }
-        if (!window.confirm(cfg.i18n.confirmDelete)) {
+        if (!$deleteModal.length) {
+            if (!window.confirm(cfg.i18n.confirmDelete)) {
+                return;
+            }
+            performDeleteProjects(ids);
             return;
         }
-        ids.forEach(function (id) {
-            axios.delete('monitoring/' + id);
-            removeProjectFromList(id);
-        });
+        openDeleteProjectsModal(ids);
     }
+
+    $deleteConfirmBtn.on('click', function () {
+        const ids = pendingDeleteIds.slice();
+        if (!ids.length) {
+            hideDeleteModal();
+            return;
+        }
+        performDeleteProjects(ids);
+    });
+
+    $deleteModal.on('hidden.bs.modal', function () {
+        if ($deleteConfirmBtn.prop('disabled')) {
+            return;
+        }
+        pendingDeleteIds = [];
+        $deleteList.empty();
+    });
 
     $('#cabinet-mon-v2-root').on('click', '.cabinet-mon-v2-delete-project', function (e) {
         e.preventDefault();
