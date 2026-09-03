@@ -12,15 +12,45 @@ use App\SiteAuditPage;
  * отличной от назначенной SEO-посадочной.
  *
  * Полный контур (Директ / объявления в SERP) — позже.
+ *
+ * Крупные краулы (десятки/сотни тысяч URL × тысячи запросов) режутся по дедлайну тика.
  */
 class SiteAuditAdCannibalizationProbe
 {
-    public function run(SiteAuditCrawl $crawl): void
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return bool true — нужен ещё тик на том же stage
+     */
+    public function run(SiteAuditCrawl $crawl, ?float $deadline = null, array &$meta = []): bool
     {
         $resolved = (new SiteAuditLandingResolver())->forCrawl($crawl);
         $byKeyword = is_array($resolved['by_keyword'] ?? null) ? $resolved['by_keyword'] : [];
         if ($byKeyword === []) {
-            return;
+            $meta = [];
+
+            return false;
+        }
+
+        $kwList = [];
+        foreach ($byKeyword as $kid => $info) {
+            $kwList[] = ['id' => (int) $kid, 'info' => $info];
+        }
+
+        $offset = max(0, (int) ($meta['kw_offset'] ?? 0));
+        $emitted = max(0, (int) ($meta['emitted'] ?? 0));
+        if ($offset === 0) {
+            SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', 'ad_cannibalization')
+                ->delete();
+            $emitted = 0;
+        }
+
+        $max = (int) config('site_audit.ad_cannibalization_max', 200);
+        if ($emitted >= $max || $offset >= count($kwList)) {
+            $meta = [];
+
+            return false;
         }
 
         $pages = SiteAuditPage::query()
@@ -34,28 +64,70 @@ class SiteAuditAdCannibalizationProbe
             ->get(['url', 'url_hash', 'title', 'h1', 'word_count']);
 
         if ($pages->count() < 2) {
-            return;
+            $meta = [];
+
+            return false;
         }
 
         $byHash = [];
         foreach ($pages as $page) {
-            $byHash[$page->url_hash] = $page;
+            $byHash[$page->url_hash] = true;
         }
 
-        $max = (int) config('site_audit.ad_cannibalization_max', 200);
-        $minTokenLen = max(3, (int) config('site_audit.cannibalization_min_token', 4));
-        $minHits = max(1, (int) config('site_audit.cannibalization_min_hits', 2));
         $thinWords = max(20, (int) config('site_audit.ad_cannibalization_thin_words',
             (int) config('site_audit.thin_words', 150)));
+        // Сначала узкий набор promo-страниц — не гоняем keywords × все 100k URL.
+        $adPages = [];
+        foreach ($pages as $page) {
+            $hint = self::adStyleHint($page, $thinWords);
+            if ($hint === null) {
+                continue;
+            }
+            $hay = mb_strtolower(trim((string) $page->title . ' ' . (string) $page->h1));
+            if ($hay === '') {
+                continue;
+            }
+            $adPages[] = [
+                'url' => (string) $page->url,
+                'url_hash' => (string) $page->url_hash,
+                'title' => $page->title,
+                'word_count' => (int) ($page->word_count ?? 0),
+                'hay' => $hay,
+                'hint' => $hint,
+            ];
+        }
+        unset($pages);
+
+        if ($adPages === []) {
+            $meta = [];
+
+            return false;
+        }
+
+        $minTokenLen = max(3, (int) config('site_audit.cannibalization_min_token', 4));
+        $minHits = max(1, (int) config('site_audit.cannibalization_min_hits', 2));
         $cfg = config('site_audit.findings.ad_cannibalization', []);
         $severity = $cfg['severity'] ?? 'warning';
-        $emitted = 0;
         $seen = [];
+        $safety = 5.0;
 
-        foreach ($byKeyword as $kid => $info) {
+        for ($i = $offset; $i < count($kwList); $i++) {
             if ($emitted >= $max) {
-                break;
+                $meta = [];
+
+                return false;
             }
+            if ($deadline !== null && microtime(true) >= ($deadline - $safety)) {
+                $meta = [
+                    'kw_offset' => $i,
+                    'emitted' => $emitted,
+                ];
+
+                return true;
+            }
+
+            $kid = $kwList[$i]['id'];
+            $info = $kwList[$i]['info'];
             $landingUrl = (string) ($info['url'] ?? '');
             $query = trim((string) ($info['query'] ?? ''));
             if ($landingUrl === '' || mb_strlen($query) < 4) {
@@ -72,24 +144,17 @@ class SiteAuditAdCannibalizationProbe
             }
             $queryNorm = mb_strtolower($query);
 
-            foreach ($pages as $page) {
+            foreach ($adPages as $page) {
                 if ($emitted >= $max) {
-                    break 2;
+                    $meta = [];
+
+                    return false;
                 }
-                if ($page->url_hash === $landingHash) {
+                if ($page['url_hash'] === $landingHash) {
                     continue;
                 }
 
-                $adHint = self::adStyleHint($page, $thinWords);
-                if ($adHint === null) {
-                    continue;
-                }
-
-                $hay = mb_strtolower(trim((string) $page->title . ' ' . (string) $page->h1));
-                if ($hay === '') {
-                    continue;
-                }
-
+                $hay = $page['hay'];
                 $hits = 0;
                 foreach ($tokens as $tok) {
                     if (mb_strpos($hay, $tok) !== false) {
@@ -101,7 +166,7 @@ class SiteAuditAdCannibalizationProbe
                     continue;
                 }
 
-                $key = $landingHash . '|' . $page->url_hash . '|' . md5($queryNorm);
+                $key = $landingHash . '|' . $page['url_hash'] . '|' . md5($queryNorm);
                 if (isset($seen[$key])) {
                     continue;
                 }
@@ -111,22 +176,26 @@ class SiteAuditAdCannibalizationProbe
                     'crawl_id' => $crawl->id,
                     'code' => 'ad_cannibalization',
                     'severity' => $severity,
-                    'url' => $page->url,
-                    'url_hash' => $page->url_hash,
+                    'url' => $page['url'],
+                    'url_hash' => $page['url_hash'],
                     'meta_json' => [
                         'query' => $query,
-                        'monitoring_keyword_id' => (int) $kid,
+                        'monitoring_keyword_id' => $kid,
                         'landing_url' => $landingUrl,
                         'hits' => $hits,
                         'full_match' => $fullMatch,
-                        'ad_hint' => $adHint,
-                        'competitor_title' => $page->title,
-                        'word_count' => (int) ($page->word_count ?? 0),
+                        'ad_hint' => $page['hint'],
+                        'competitor_title' => $page['title'],
+                        'word_count' => $page['word_count'],
                     ],
                 ]);
                 $emitted++;
             }
         }
+
+        $meta = [];
+
+        return false;
     }
 
     /**

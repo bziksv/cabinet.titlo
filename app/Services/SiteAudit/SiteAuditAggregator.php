@@ -326,11 +326,15 @@ class SiteAuditAggregator
                 $this->emitLandingNoInbound($crawl);
                 break;
             case 'cannibalization':
-                (new SiteAuditCannibalizationProbe())->run($crawl);
-                break;
+                $more = (new SiteAuditCannibalizationProbe())->run($crawl, $deadline, $meta);
+                $state['meta'] = $meta;
+
+                return $more;
             case 'ad_cannibalization':
-                (new SiteAuditAdCannibalizationProbe())->run($crawl);
-                break;
+                $more = (new SiteAuditAdCannibalizationProbe())->run($crawl, $deadline, $meta);
+                $state['meta'] = $meta;
+
+                return $more;
             case 'landing_query_match':
                 (new SiteAuditLandingQueryMatchProbe())->run($crawl);
                 break;
