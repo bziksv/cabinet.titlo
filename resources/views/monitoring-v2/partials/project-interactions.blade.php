@@ -116,13 +116,28 @@
             if (type === 'export-edit') {
                 axios.get(`/monitoring/${projectId}/export/edit`).then(function (response) {
                     modal.find('.modal-content').html(response.data);
-                    modal.find('select[name="mode"]').change(function () {
-                        if ($(this).val() === 'finance') {
+                    function syncExportRegionMode() {
+                        var allRegions = !String(modal.find('#cabinetMonExportRegion').val() || '');
+                        var $mode = modal.find('#cabinetMonExportMode');
+                        var $financeOpt = $mode.find('option[value="finance"]');
+                        if (allRegions) {
+                            if ($mode.val() === 'finance') {
+                                $mode.val('range');
+                            }
+                            $financeOpt.prop('disabled', true);
+                            modal.find('#finance').addClass('d-none');
+                        } else {
+                            $financeOpt.prop('disabled', false);
+                        }
+                        if ($mode.val() === 'finance') {
                             modal.find('#finance').removeClass('d-none');
                         } else {
                             modal.find('#finance').addClass('d-none');
                         }
-                    });
+                    }
+                    modal.find('select[name="mode"]').on('change', syncExportRegionMode);
+                    modal.find('#cabinetMonExportRegion').on('change', syncExportRegionMode);
+                    syncExportRegionMode();
                     modal.find('#startDatePicker, #endDatePicker').datetimepicker({
                         format: 'L',
                         locale: 'ru',

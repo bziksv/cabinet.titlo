@@ -49,6 +49,9 @@
             <div class="form-group">
                 <label for="cabinetMonExportRegion">{{ __('Region') }}</label>
                 <select class="form-select" name="region" id="cabinetMonExportRegion">
+                    @if($project->searchengines->count() > 1)
+                        <option value="">{{ __('Monitoring export all regions') }}</option>
+                    @endif
                     @foreach($project->searchengines as $searchengines)
                         @php
                             $locName = optional($searchengines->location)->name
@@ -57,6 +60,9 @@
                         <option value="{{ $searchengines->id }}">{{ $locName }} [{{ $searchengines->lr }}]</option>
                     @endforeach
                 </select>
+                @if($project->searchengines->count() > 1)
+                    <small class="form-text text-muted">{{ __('Monitoring export all regions hint') }}</small>
+                @endif
             </div>
         </div>
     </div>

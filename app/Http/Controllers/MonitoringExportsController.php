@@ -70,12 +70,25 @@ class MonitoringExportsController extends MonitoringKeywordsController
             Carbon::parse($request['endDate'])->locale('ru')->toDateString()
         ]);
 
+        // Пустой region = свод по всем ПС/регионам проекта (как таблица «Все поисковые системы»).
+        $regionId = $request->input('region');
+        if ($regionId === '' || $regionId === null || $regionId === 'all') {
+            $regionId = null;
+        }
+
+        $mode = (string) $request->input('mode', 'range');
+        if ($regionId === null && $mode === 'finance') {
+            // Финансовый отчёт только по одному региону (цены привязаны к ПС).
+            $mode = 'range';
+        }
+        $request->merge(['mode' => $mode]);
+
         $params = collect([
             'length' => 0,
             // Экспорт — полный снимок: lazy-чанки только для UI, иначе finance/mastered падает 500.
             'lazy_positions' => false,
-            'mode_range' => $request['mode'],
-            'region_id' => $request['region'],
+            'mode_range' => $mode,
+            'region_id' => $regionId,
             'dates_range' => $date,
             'columns' => [
                 self::GROUP_INDEX => [

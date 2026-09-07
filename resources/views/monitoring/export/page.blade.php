@@ -36,13 +36,29 @@
                     locale: 'ru'
                 });
 
-                $('#cabinetMonExportMode').on('change', function () {
-                    if ($(this).val() === 'finance') {
+                function syncExportRegionMode() {
+                    var allRegions = !String($('#cabinetMonExportRegion').val() || '');
+                    var $mode = $('#cabinetMonExportMode');
+                    var $financeOpt = $mode.find('option[value="finance"]');
+                    if (allRegions) {
+                        if ($mode.val() === 'finance') {
+                            $mode.val('range');
+                        }
+                        $financeOpt.prop('disabled', true);
+                        $('#finance').addClass('d-none');
+                    } else {
+                        $financeOpt.prop('disabled', false);
+                    }
+                    if ($mode.val() === 'finance') {
                         $('#finance').removeClass('d-none');
                     } else {
                         $('#finance').addClass('d-none');
                     }
-                });
+                }
+
+                $('#cabinetMonExportMode').on('change', syncExportRegionMode);
+                $('#cabinetMonExportRegion').on('change', syncExportRegionMode);
+                syncExportRegionMode();
 
                 var $groups = $('#cabinetMonExportGroups');
                 if ($groups.length && $.fn.select2) {

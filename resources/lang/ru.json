@@ -6614,5 +6614,7 @@
     "Monitoring v2 delete projects lead": "Выбранные проекты будут удалены безвозвратно вместе с историей позиций и настройками.",
     "Monitoring v2 delete project lead": "Проект будет удалён безвозвратно вместе с историей позиций и настройками.",
     "Monitoring v2 delete projects list label": "Будут удалены:",
-    "Monitoring v2 delete failed": "Не удалось удалить проект"
+    "Monitoring v2 delete failed": "Не удалось удалить проект",
+    "Monitoring export all regions": "Все регионы (сводный)",
+    "Monitoring export all regions hint": "В отчёте — колонка по каждому региону: позиция на конечную дату периода (как в таблице «Все поисковые системы»). Финансовый тип недоступен."
 }

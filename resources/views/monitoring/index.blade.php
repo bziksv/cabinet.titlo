@@ -638,12 +638,28 @@
                         let content = response.data;
                         modal.find('.modal-content').html(content);
 
-                        modal.find('select[name="mode"]').change(function(){
-                            if($(this).val() === 'finance')
-                                modal.find('#finance').removeClass('d-none');
-                            else
+                        function syncExportRegionMode() {
+                            var allRegions = !String(modal.find('#cabinetMonExportRegion').val() || '');
+                            var $mode = modal.find('#cabinetMonExportMode');
+                            var $financeOpt = $mode.find('option[value="finance"]');
+                            if (allRegions) {
+                                if ($mode.val() === 'finance') {
+                                    $mode.val('range');
+                                }
+                                $financeOpt.prop('disabled', true);
                                 modal.find('#finance').addClass('d-none');
-                        });
+                            } else {
+                                $financeOpt.prop('disabled', false);
+                            }
+                            if ($mode.val() === 'finance') {
+                                modal.find('#finance').removeClass('d-none');
+                            } else {
+                                modal.find('#finance').addClass('d-none');
+                            }
+                        }
+                        modal.find('select[name="mode"]').on('change', syncExportRegionMode);
+                        modal.find('#cabinetMonExportRegion').on('change', syncExportRegionMode);
+                        syncExportRegionMode();
 
                         //Date picker
                         modal.find('#startDatePicker, #endDatePicker').datetimepicker({
