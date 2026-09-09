@@ -1636,9 +1636,9 @@ button.cabinet-btn-busy:disabled {
 
 .cabinet-mon-project-table-panel__loader {
     position: absolute;
+    /* inset:0 + фиксированная высота панели при boot — спиннер всегда в кадре */
     inset: 0;
-    /* Выше DTFC_LeftWrapper (z-index: 12), иначе FC просвечивает до unveil */
-    z-index: 30;
+    z-index: 40;
     display: none;
     flex-direction: column;
     align-items: center;
@@ -1646,6 +1646,56 @@ button.cabinet-btn-busy:disabled {
     gap: 0.5rem;
     background: #fff;
     font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--mon-proj-muted);
+    pointer-events: none;
+}
+
+.cabinet-mon-project-table-panel.is-table-booting {
+    /* Явная высота: иначе % у absolute-лоадера не резолвится → белая «дыра» без спиннера */
+    height: min(70vh, 720px);
+    max-height: min(70vh, 720px);
+    overflow: hidden;
+}
+
+.cabinet-mon-project-page[data-view='keywords'] .cabinet-mon-project-table-panel.is-table-booting:not(.cabinet-mon-view-panel--collapsed) {
+    flex: 0 0 auto;
+}
+
+.cabinet-mon-project-table-panel__fill {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.55rem 0.85rem 0.65rem;
+    background: rgba(248, 250, 252, 0.97);
+    border-bottom: 1px solid var(--mon-proj-border);
+    backdrop-filter: blur(4px);
+}
+
+.cabinet-mon-project-table-panel__fill[hidden] {
+    display: none !important;
+}
+
+.cabinet-mon-project-table-panel__fill-track {
+    height: 4px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+
+.cabinet-mon-project-table-panel__fill-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: #2563eb;
+    transition: width 0.25s ease;
+}
+
+.cabinet-mon-project-table-panel__fill-label {
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--mon-proj-muted);
 }
@@ -1764,14 +1814,19 @@ button.cabinet-btn-busy:disabled {
     display: none !important;
 }
 
-.cabinet-mon-project-table-panel.is-table-booting .cabinet-mon-project-table-panel__loader {
-    display: flex;
-    z-index: 30;
+.cabinet-mon-project-table-panel.is-table-booting .cabinet-mon-project-table-panel__loader,
+.cabinet-mon-project-table-panel.is-table-covering .cabinet-mon-project-table-panel__loader {
+    display: flex !important;
+    z-index: 40;
 }
 
-/* Пока лоадер — не показывать «дыру» вместо колонки «Запрос» */
-.cabinet-mon-project-table-panel.is-table-booting #monitoringTable_wrapper {
-    visibility: hidden;
+/*
+ * Таблицу НЕ прячем visibility:hidden — иначе FC меряет криво и после unveil
+ * секундами видна только «Запрос» + белая дыра. Лоадер непрозрачный сверху.
+ */
+.cabinet-mon-project-table-panel.is-table-booting #monitoringTable_wrapper,
+.cabinet-mon-project-table-panel.is-table-covering #monitoringTable_wrapper {
+    pointer-events: none;
 }
 
 /* DataTables scrollX: не display:none — иначе ломается ширина колонок при возврате */

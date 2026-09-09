@@ -6616,5 +6616,8 @@
     "Monitoring v2 delete projects list label": "Будут удалены:",
     "Monitoring v2 delete failed": "Не удалось удалить проект",
     "Monitoring export all regions": "Все регионы (сводный)",
-    "Monitoring export all regions hint": "В отчёте — колонка по каждому региону: позиция на конечную дату периода (как в таблице «Все поисковые системы»). Финансовый тип недоступен."
+    "Monitoring export all regions hint": "В отчёте — колонка по каждому региону: позиция на конечную дату периода (как в таблице «Все поисковые системы»). Финансовый тип недоступен.",
+    "Monitoring show table positions loading": "Подгружаем позиции по датам…",
+    "Monitoring show table positions loading progress": "Подгружаем позиции: :done / :total",
+    "Monitoring show table drawing": "Рисуем таблицу…"
 }

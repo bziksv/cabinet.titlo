@@ -10,7 +10,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}?v={{ (@filemtime(public_path('plugins/daterangepicker/daterangepicker.css')) ?: time()) . '-drp2' }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc61' }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc64' }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-export.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-export.css')) ?: time() }}">
     @endslot
 
@@ -50,6 +50,12 @@
             <div class="cabinet-mon-project-table-panel card-table is-table-booting" id="cabinet-mon-show-table-host" data-mon-view-panel="keywords">
                 <div class="cabinet-mon-project-table-panel__loader" id="cabinetMonShowTableLoader">
                     @include('monitoring.partials.show.loader', ['label' => __('Monitoring show table loading')])
+                </div>
+                <div class="cabinet-mon-project-table-panel__fill" id="cabinetMonShowTableFill" hidden>
+                    <div class="cabinet-mon-project-table-panel__fill-track" aria-hidden="true">
+                        <div class="cabinet-mon-project-table-panel__fill-bar" id="cabinetMonShowTableFillBar"></div>
+                    </div>
+                    <span class="cabinet-mon-project-table-panel__fill-label" id="cabinetMonShowTableFillLabel">{{ __('Monitoring show table positions loading') }}</span>
                 </div>
                 <table class="table table-bordered text-center w-100 mb-0" id="monitoringTable"></table>
             </div>
@@ -1065,6 +1071,55 @@
                 }).length > 0;
             }
 
+            /** Таблица реально «нарисована»: не только FC «Запрос», но и scroll-поверхность. */
+            function monitoringTableSurfaceReady(api) {
+                var host = document.getElementById('cabinet-mon-show-table-host');
+                var wrapper = document.getElementById('monitoringTable_wrapper');
+                if (!host || !wrapper) {
+                    return false;
+                }
+                if (!monitoringTableHasBodyRows()) {
+                    return false;
+                }
+                var scrollHead = wrapper.querySelector('.dataTables_scrollHead');
+                var scrollBody = wrapper.querySelector('.dataTables_scrollBody');
+                if (!scrollHead || !scrollBody) {
+                    return monitoringTableHasBodyRows();
+                }
+                var headW = scrollHead.getBoundingClientRect().width;
+                var bodyW = scrollBody.getBoundingClientRect().width;
+                if (headW < 120 || bodyW < 120) {
+                    return false;
+                }
+                var left = wrapper.querySelector('.DTFC_LeftWrapper');
+                if (left) {
+                    var leftW = left.getBoundingClientRect().width;
+                    var hostW = host.getBoundingClientRect().width;
+                    // Классическая «дыра»: левый FC почти на всю ширину, справа пусто.
+                    if (hostW > 200 && leftW > hostW * 0.72) {
+                        return false;
+                    }
+                    if (bodyW < 80) {
+                        return false;
+                    }
+                }
+                var sample = wrapper.querySelector(
+                    '.dataTables_scrollBody tbody tr td, .DTFC_LeftBodyLiner tbody tr td'
+                );
+                if (sample && String(sample.textContent || '').replace(/\s+/g, '').length < 1) {
+                    return false;
+                }
+                try {
+                    if (api && api.page.info().recordsTotal > 0) {
+                        var n = api.rows({ page: 'current' }).nodes().length;
+                        if (n < 1) {
+                            return false;
+                        }
+                    }
+                } catch (e) {}
+                return true;
+            }
+
             function monitoringTableHasLoadedData(api) {
                 if (!api) {
                     return monitoringTableHasBodyRows();
@@ -1106,38 +1161,69 @@
                     return;
                 }
 
-                // Не снимаем is-table-booting до готовности FC — иначе «дыра» вместо «Запрос».
+                // Лоадер держим до surface-ready — иначе секундами «Запрос» + белая дыра.
                 monTableBoot.revealed = true;
                 monitoringTableHideProcessing();
+                $('#cabinet-mon-show-table-host')
+                    .addClass('is-table-covering')
+                    .addClass('is-table-booting');
+
+                var $loaderLabel = $('#cabinetMonShowTableLoader .cabinet-mon-loader__label');
+                if ($loaderLabel.length) {
+                    $loaderLabel.text(@json(__('Monitoring show table drawing')));
+                }
 
                 var unveiled = false;
-                var unveilTable = function () {
+                var unveilAttempts = 0;
+                var unveilTable = function (force) {
                     if (unveiled) {
                         return;
                     }
+                    unveilAttempts++;
+                    if (!force && !monitoringTableSurfaceReady(api)) {
+                        if (unveilAttempts < 200) {
+                            setTimeout(function () {
+                                unveilTable(false);
+                            }, 50);
+                            return;
+                        }
+                    }
                     unveiled = true;
-                    $('#cabinet-mon-show-table-host').removeClass('is-table-booting');
+                    $('#cabinet-mon-show-table-host')
+                        .removeClass('is-table-booting')
+                        .removeClass('is-table-covering');
                     $('#cabinetMonShowTableLoader').remove();
                     if (window.cabinetMonitoringShowChrome) {
                         window.cabinetMonitoringShowChrome.onTableReady(api, { skipRelayout: true });
                     }
                 };
 
-                // Страховка: не зависать на лоадере, если layout callback не пришёл.
-                setTimeout(unveilTable, 4000);
+                setTimeout(function () {
+                    unveilTable(true);
+                }, 45000);
 
-                requestAnimationFrame(function () {
+                // Сначала дать браузеру кадр с лоадером, потом тяжёлый layout под оверлеем.
+                setTimeout(function () {
                     try {
                         if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.finalizeMonTableLayout) {
                             window.cabinetMonitoringShowChrome.finalizeMonTableLayout(api, {
                                 force: true,
-                                rebuildFixedColumns: true,
-                                onComplete: unveilTable,
+                                rebuildFixedColumns: false,
+                                onComplete: function () {
+                                    // Ещё кадр на paint, затем поллинг surface-ready.
+                                    requestAnimationFrame(function () {
+                                        requestAnimationFrame(function () {
+                                            unveilTable(false);
+                                        });
+                                    });
+                                },
                             });
                             return;
                         }
                         if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutKeywordsTable) {
-                            window.cabinetMonitoringShowChrome.relayoutKeywordsTable(unveilTable, {
+                            window.cabinetMonitoringShowChrome.relayoutKeywordsTable(function () {
+                                unveilTable(false);
+                            }, {
                                 adjustColumns: true,
                             });
                             return;
@@ -1145,8 +1231,8 @@
                     } catch (layoutErr) {
                         console.error('monitoring table unveil layout failed', layoutErr);
                     }
-                    unveilTable();
-                });
+                    unveilTable(true);
+                }, 48);
             }
 
             function cabinetMonShowTableLoadError() {
@@ -1685,55 +1771,111 @@
                 monApplyPositionDecorations(api);
             }
 
+            function monShowPositionsFillProgress(done, total) {
+                var $fill = $('#cabinetMonShowTableFill');
+                if (!$fill.length || total < 1) {
+                    return;
+                }
+                var pct = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+                $fill.removeAttr('hidden');
+                $('#cabinetMonShowTableFillBar').css('width', pct + '%');
+                var tpl = @json(__('Monitoring show table positions loading progress'));
+                $('#cabinetMonShowTableFillLabel').text(
+                    String(tpl).replace(':done', String(done)).replace(':total', String(total))
+                );
+            }
+
+            function monHidePositionsFillProgress() {
+                var $fill = $('#cabinetMonShowTableFill');
+                if (!$fill.length) {
+                    return;
+                }
+                $fill.attr('hidden', 'hidden');
+                $('#cabinetMonShowTableFillBar').css('width', '0%');
+            }
+
             function monFillPositionChunks(api, payload) {
                 if (!api || !payload || !payload.lazy_positions) {
+                    monHidePositionsFillProgress();
                     return;
                 }
                 var chunks = (payload.position_chunks || []).slice();
                 var keywordIds = payload.keyword_ids || [];
                 if (!chunks.length || !keywordIds.length) {
+                    monHidePositionsFillProgress();
                     return;
                 }
                 var seq = ++monPosChunkSeq;
-                function next() {
+                var total = chunks.length;
+                var done = 0;
+                var queue = chunks.slice();
+                var active = 0;
+                var concurrency = Math.min(2, queue.length);
+                var finished = false;
+
+                monShowPositionsFillProgress(0, total);
+
+                function finalizeFill() {
+                    if (finished || seq !== monPosChunkSeq) {
+                        return;
+                    }
+                    finished = true;
+                    monHidePositionsFillProgress();
+                    monClearAllLazyPlaceholders(api, keywordIds);
+                    monRefreshDynamicsColumn(api, keywordIds);
+                    monRefreshAdjacentDiffs(api, keywordIds);
+                    monApplyPositionDecorations(api);
+                }
+
+                function pump() {
                     if (seq !== monPosChunkSeq) {
                         return;
                     }
-                    if (!chunks.length) {
-                        monClearAllLazyPlaceholders(api, keywordIds);
-                        monRefreshDynamicsColumn(api, keywordIds);
-                        monRefreshAdjacentDiffs(api, keywordIds);
-                        monApplyPositionDecorations(api);
-                        return;
+                    while (active < concurrency && queue.length) {
+                        (function (chunk) {
+                            active++;
+                            axios
+                                .post('/monitoring/' + PROJECT_ID + '/table/positions', {
+                                    region_id: REGION_ID,
+                                    dates_range: DATES,
+                                    mode_range: MODE,
+                                    keyword_ids: keywordIds,
+                                    from: chunk.from,
+                                    to: chunk.to,
+                                })
+                                .then(function (resp) {
+                                    if (seq !== monPosChunkSeq) {
+                                        return;
+                                    }
+                                    var data = resp.data || {};
+                                    monApplyPositionCells(
+                                        api,
+                                        keywordIds,
+                                        data.cells || {},
+                                        data.covered_cols || []
+                                    );
+                                })
+                                .catch(function (err) {
+                                    console.error('monitoring table positions chunk', err);
+                                })
+                                .then(function () {
+                                    active--;
+                                    if (seq !== monPosChunkSeq) {
+                                        return;
+                                    }
+                                    done++;
+                                    monShowPositionsFillProgress(done, total);
+                                    if (queue.length || active > 0) {
+                                        pump();
+                                    } else {
+                                        finalizeFill();
+                                    }
+                                });
+                        })(queue.shift());
                     }
-                    var chunk = chunks.shift();
-                    axios.post('/monitoring/' + PROJECT_ID + '/table/positions', {
-                        region_id: REGION_ID,
-                        dates_range: DATES,
-                        mode_range: MODE,
-                        keyword_ids: keywordIds,
-                        from: chunk.from,
-                        to: chunk.to,
-                    }).then(function (resp) {
-                        if (seq !== monPosChunkSeq) {
-                            return;
-                        }
-                        requestAnimationFrame(function () {
-                            if (seq !== monPosChunkSeq) {
-                                return;
-                            }
-                            var data = resp.data || {};
-                            monApplyPositionCells(api, keywordIds, data.cells || {}, data.covered_cols || []);
-                            next();
-                        });
-                    }).catch(function (err) {
-                        console.error('monitoring table positions chunk', err);
-                        if (seq === monPosChunkSeq) {
-                            next();
-                        }
-                    });
                 }
-                next();
+
+                pump();
             }
 
             toastr.options = {
@@ -1827,6 +1969,10 @@
                     return idx >= 0 ? idx + 1 : 3;
                 })();
 
+                var monPageLength = parseInt(PAGE_LENGTH, 10) || 100;
+                // FC на 500 строк × мультирегион в конструкторе блокирует UI на секунды без лоадера.
+                var monDeferFixedColumns = monPageLength > 100 || (tableRegions.length > 1 && monPageLength > 50);
+
                 let dTable;
                 try {
                 dTable = table.DataTable({
@@ -1836,15 +1982,17 @@
                     scrollX: true,
                     scrollY: '1020px',
                     scrollCollapse: false,
-                    fixedColumns: {
-                        leftColumns: monFixedLeftCols,
-                        heightMatch: 'auto',
-                    },
+                    fixedColumns: monDeferFixedColumns
+                        ? undefined
+                        : {
+                            leftColumns: monFixedLeftCols,
+                            heightMatch: 'auto',
+                        },
                     columnDefs: monColumnWidthTargets.concat([
                         { orderable: false, targets: '_all' },
                     ]),
                     lengthMenu: LENGTH_MENU,
-                    pageLength: parseInt(PAGE_LENGTH, 10) || 100,
+                    pageLength: monPageLength,
                     pagingType: "simple_numbers",
                     language: {
                         lengthMenu: "_MENU_",
@@ -1926,7 +2074,11 @@
                             window.cabinetMonitoringShowChrome.wireMonTableDataRefresh(api);
                         }
 
-                        if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.ensureFixedColumns) {
+                        if (
+                            !monDeferFixedColumns
+                            && window.cabinetMonitoringShowChrome
+                            && window.cabinetMonitoringShowChrome.ensureFixedColumns
+                        ) {
                             window.cabinetMonitoringShowChrome.ensureFixedColumns(api);
                         }
 
