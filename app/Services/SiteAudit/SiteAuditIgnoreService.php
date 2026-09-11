@@ -194,4 +194,93 @@ class SiteAuditIgnoreService
 
         return $map;
     }
+
+    /**
+     * Сколько findings по severity скрыты (игнор или «исправлено») — для истории проверок.
+     *
+     * @param  array<int>  $crawlIds
+     * @return array<int, array{critical:int,other:int,important:int,warning:int,info:int}>
+     */
+    public function hiddenBucketsByCrawlIds(array $crawlIds): array
+    {
+        $crawlIds = array_values(array_unique(array_filter(array_map('intval', $crawlIds))));
+        $empty = [
+            'critical' => 0,
+            'other' => 0,
+            'important' => 0,
+            'warning' => 0,
+            'info' => 0,
+        ];
+        if ($crawlIds === []) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($crawlIds as $id) {
+            $out[$id] = $empty;
+        }
+
+        $notesReady = (new SiteAuditFindingNoteService())->tableReady();
+
+        try {
+            $rows = SiteAuditFinding::query()
+                ->from('site_audit_findings as f')
+                ->join('site_audit_crawls as c', 'c.id', '=', 'f.crawl_id')
+                ->whereIn('f.crawl_id', $crawlIds)
+                ->where(function ($q) use ($notesReady) {
+                    $q->whereExists(function ($iq) {
+                        $iq->select(DB::raw(1))
+                            ->from('site_audit_ignores as sai')
+                            ->whereColumn('sai.code', 'f.code')
+                            ->whereColumn('sai.project_id', 'c.project_id')
+                            ->where(function ($w) {
+                                $w->where('sai.url_hash', '')
+                                    ->orWhereColumn('sai.url_hash', 'f.url_hash');
+                            });
+                    });
+                    if ($notesReady) {
+                        $q->orWhereExists(function ($nq) {
+                            $nq->select(DB::raw(1))
+                                ->from('site_audit_finding_notes as san')
+                                ->whereColumn('san.code', 'f.code')
+                                ->whereColumn('san.url_hash', 'f.url_hash')
+                                ->whereColumn('san.project_id', 'c.project_id')
+                                ->where('san.status', \App\SiteAuditFindingNote::STATUS_FIXED);
+                        });
+                    }
+                })
+                ->select('f.crawl_id', 'f.severity', DB::raw('COUNT(DISTINCT f.id) as c'))
+                ->groupBy('f.crawl_id', 'f.severity')
+                ->get();
+        } catch (\Throwable $e) {
+            return $out;
+        }
+
+        foreach ($rows as $row) {
+            $cid = (int) $row->crawl_id;
+            $sev = (string) $row->severity;
+            if (! isset($out[$cid][$sev])) {
+                continue;
+            }
+            $out[$cid][$sev] = (int) $row->c;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{critical:int,other:int,important:int,warning:int,info:int}
+     */
+    public function hiddenBucketsForCrawl(SiteAuditCrawl $crawl): array
+    {
+        $map = $this->hiddenBucketsByCrawlIds([(int) $crawl->id]);
+
+        return $map[(int) $crawl->id] ?? [
+            'critical' => 0,
+            'other' => 0,
+            'important' => 0,
+            'warning' => 0,
+            'info' => 0,
+        ];
+    }
 }

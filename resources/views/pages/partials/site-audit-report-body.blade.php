@@ -984,18 +984,13 @@
                                 ? \App\Services\SiteAudit\SiteAuditFindingPresenter::brokenUrlDisplay((string) $row->url)
                                 : ['display' => (string) $row->url, 'warn' => null];
                         @endphp
-                        <div class="cabinet-sa-url-block{{ !empty($urlDisp['warn']) ? ' cabinet-sa-url-block--warn' : '' }}">
-                            <a href="{{ $row->url }}" target="_blank" rel="noopener noreferrer" class="cabinet-sa-url-break">{{ $urlDisp['display'] }}</a>
-                            @if(!empty($urlDisp['warn']))
-                                <div class="cabinet-sa-url-block__warn" title="{{ $row->url }}">{{ $urlDisp['warn'] }}</div>
-                            @endif
-                            @if($isIgn)
-                                <span class="badge text-bg-light border ms-1">игнор</span>
-                            @endif
-                            @if($isFixed)
-                                <span class="badge text-bg-success ms-1">исправлено</span>
-                            @endif
-                        </div>
+                        @include('pages.partials.site-audit-url-with-copy', [
+                            'url' => (string) $row->url,
+                            'label' => $urlDisp['display'],
+                            'warn' => $urlDisp['warn'] ?? null,
+                            'isIgn' => $isIgn,
+                            'isFixed' => $isFixed,
+                        ])
                     </td>
                     @if(!empty($showSeverityCol))
                         <td class="cabinet-sa-sev-cell" data-sa-col="severity">
@@ -1186,6 +1181,7 @@
                                     @if(!$isFixed)
                                         <form method="POST" action="{{ route('pages.site-audit.note', $crawl->id) }}" class="cabinet-sa-act-form">
                                             @csrf
+                                            <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <input type="hidden" name="comment" value="{{ $noteComment }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--fixed">
@@ -1200,6 +1196,7 @@
                                     @else
                                         <form method="POST" action="{{ route('pages.site-audit.note', $crawl->id) }}" class="cabinet-sa-act-form">
                                             @csrf
+                                            <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <input type="hidden" name="comment" value="{{ $noteComment }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--open">
@@ -1217,6 +1214,7 @@
                                     @if($isIgn)
                                         <form method="POST" action="{{ route('pages.site-audit.ignore.restore', $crawl->id) }}" class="cabinet-sa-act-form">
                                             @csrf
+                                            <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--restore">
                                                 <button type="submit" class="cabinet-sa-act__main">
@@ -1230,6 +1228,7 @@
                                     @else
                                         <form method="POST" action="{{ route('pages.site-audit.ignore', $crawl->id) }}" class="cabinet-sa-act-form">
                                             @csrf
+                                            <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--ignore">
                                                 <button type="submit" class="cabinet-sa-act__main">
@@ -1247,6 +1246,7 @@
                                     <div class="cabinet-sa-note-panel">
                                         <form method="POST" action="{{ route('pages.site-audit.note', $crawl->id) }}" class="cabinet-sa-note-form">
                                             @csrf
+                                            <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <textarea name="comment" rows="2" class="form-control form-control-sm"
                                                       placeholder="Текст заметки…">{{ $noteComment }}</textarea>

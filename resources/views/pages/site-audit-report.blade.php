@@ -98,6 +98,7 @@
                     @if(!empty($codeWideIgnored))
                         <form method="POST" action="{{ route('pages.site-audit.ignore.restore', $crawl->id) }}" class="d-inline">
                             @csrf
+                            <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
                             <input type="hidden" name="scope" value="code">
                             <input type="hidden" name="code" value="{{ $code }}">
                             <button type="submit" class="btn btn-sm btn-outline-success">Вернуть все страницы в группе</button>
@@ -109,6 +110,7 @@
                               data-cabinet-confirm-ok="Игнорировать"
                               data-cabinet-confirm-danger="1">
                             @csrf
+                            <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
                             <input type="hidden" name="scope" value="code">
                             <input type="hidden" name="code" value="{{ $code }}">
                             <button type="submit" class="btn btn-sm btn-outline-secondary">Игнор всех страниц в группе</button>
@@ -229,6 +231,7 @@
         @include('partials.cabinet-confirm-modal')
         @include('pages.partials.site-audit-tree-nav-js')
         @include('pages.partials.site-audit-crawl-live-js')
+        <script src="{{ asset('js/cabinet-site-audit-copy-url.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-copy-url.js')) ?: time() }}" defer></script>
         @if(($code ?? '') === 'index_count_mismatch')
             <script src="{{ asset('js/cabinet-site-audit-index-extra.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-index-extra.js')) ?: time() }}" defer></script>
         @endif

@@ -230,7 +230,7 @@
                 ])
 
                 <div class="cabinet-sa-layout">
-                    <aside class="cabinet-sa-tree" data-sa-tree>
+                    <aside class="cabinet-sa-tree" data-sa-tree data-crawl-id="{{ (int) $crawl->id }}">
                         <div class="px-3 py-2 border-bottom fw-semibold small">Все замечания</div>
                         @include('pages.partials.site-audit-tree-controls')
                         @foreach($bucketLabels as $sev => $label)
@@ -264,7 +264,7 @@
                 ])
 
                 <div class="cabinet-sa-layout">
-                    <aside class="cabinet-sa-tree" data-sa-tree>
+                    <aside class="cabinet-sa-tree" data-sa-tree data-crawl-id="{{ (int) $crawl->id }}">
                         <div class="px-3 py-2 border-bottom fw-semibold small">Тех. аудит</div>
                         @include('pages.partials.site-audit-tree-controls')
                         @foreach($bucketLabels as $sev => $label)
@@ -298,7 +298,7 @@
                 ])
 
                 <div class="cabinet-sa-layout">
-                    <aside class="cabinet-sa-tree" data-sa-tree>
+                    <aside class="cabinet-sa-tree" data-sa-tree data-crawl-id="{{ (int) $crawl->id }}">
                         <div class="px-3 py-2 border-bottom fw-semibold small">SEO-аудит</div>
                         @include('pages.partials.site-audit-tree-controls')
                         @foreach($bucketLabels as $sev => $label)

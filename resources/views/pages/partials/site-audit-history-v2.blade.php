@@ -47,11 +47,11 @@
                 <th class="cabinet-sa-ht-progress">Прогресс</th>
                 <th class="cabinet-sa-ht-when">Начало</th>
                 <th class="cabinet-sa-ht-when">Конец</th>
-                <th class="cabinet-sa-ht-num is-critical" title="Грубые ошибки — чинить первыми">Грубые</th>
-                <th class="cabinet-sa-ht-num is-other" title="Прочие ошибки">Прочие</th>
-                <th class="cabinet-sa-ht-num is-important" title="Важные замечания">Важн.</th>
-                <th class="cabinet-sa-ht-num is-warning" title="Предупреждения">Пред.</th>
-                <th class="cabinet-sa-ht-num is-info" title="Информация">Инфо</th>
+                <th class="cabinet-sa-ht-num is-critical" title="Грубые: всего / осталось / скрыто">Грубые</th>
+                <th class="cabinet-sa-ht-num is-other" title="Прочие: всего / осталось / скрыто">Прочие</th>
+                <th class="cabinet-sa-ht-num is-important" title="Важные: всего / осталось / скрыто">Важные</th>
+                <th class="cabinet-sa-ht-num is-warning" title="Предупреждения: всего / осталось / скрыто">Предупреждения</th>
+                <th class="cabinet-sa-ht-num is-info" title="Инфо: всего / осталось / скрыто">Инфо</th>
                 <th class="cabinet-sa-ht-actions" scope="col"><span class="visually-hidden">Действия</span></th>
             </tr>
             </thead>
@@ -118,6 +118,12 @@
                     $important = (int) ($b['important'] ?? 0);
                     $warn = (int) ($b['warning'] ?? 0);
                     $info = (int) ($b['info'] ?? 0);
+                    $hid = ($crawlHiddenBuckets ?? [])[$c->id] ?? [];
+                    $hidCrit = (int) ($hid['critical'] ?? 0);
+                    $hidOther = (int) ($hid['other'] ?? 0);
+                    $hidImportant = (int) ($hid['important'] ?? 0);
+                    $hidWarn = (int) ($hid['warning'] ?? 0);
+                    $hidInfo = (int) ($hid['info'] ?? 0);
                     $canAssignTeam = $isCrawlOwner && !empty($teamAccessReady) && $project;
                 @endphp
                 <tr data-crawl-id="{{ $c->id }}"
@@ -200,11 +206,11 @@
                             @endif
                         @endif
                     </td>
-                    <td class="cabinet-sa-ht-num {{ $crit > 0 ? 'is-critical' : 'is-zero' }}" data-sa-bucket="critical" title="Грубые: {{ $crit }}">{{ number_format($crit, 0, '', ' ') }}</td>
-                    <td class="cabinet-sa-ht-num {{ $other > 0 ? 'is-other' : 'is-zero' }}" data-sa-bucket="other" title="Прочие: {{ $other }}">{{ number_format($other, 0, '', ' ') }}</td>
-                    <td class="cabinet-sa-ht-num {{ $important > 0 ? 'is-important' : 'is-zero' }}" data-sa-bucket="important" title="Важные замечания: {{ $important }}">{{ number_format($important, 0, '', ' ') }}</td>
-                    <td class="cabinet-sa-ht-num {{ $warn > 0 ? 'is-warning' : 'is-zero' }}" data-sa-bucket="warning" title="Предупреждения: {{ $warn }}">{{ number_format($warn, 0, '', ' ') }}</td>
-                    <td class="cabinet-sa-ht-num {{ $info > 0 ? 'is-info' : 'is-zero' }}" data-sa-bucket="info" title="Инфо: {{ $info }}">{{ number_format($info, 0, '', ' ') }}</td>
+                    @include('pages.partials.site-audit-history-bucket-cell', ['sev' => 'critical', 'label' => 'Грубые', 'total' => $crit, 'hidden' => $hidCrit])
+                    @include('pages.partials.site-audit-history-bucket-cell', ['sev' => 'other', 'label' => 'Прочие', 'total' => $other, 'hidden' => $hidOther])
+                    @include('pages.partials.site-audit-history-bucket-cell', ['sev' => 'important', 'label' => 'Важные замечания', 'total' => $important, 'hidden' => $hidImportant])
+                    @include('pages.partials.site-audit-history-bucket-cell', ['sev' => 'warning', 'label' => 'Предупреждения', 'total' => $warn, 'hidden' => $hidWarn])
+                    @include('pages.partials.site-audit-history-bucket-cell', ['sev' => 'info', 'label' => 'Инфо', 'total' => $info, 'hidden' => $hidInfo])
                     <td class="cabinet-sa-ht-actions">
                         <span class="cabinet-sa-row-actions">
                             <a class="btn btn-sm btn-primary" href="{{ route('pages.site-audit.crawl.show', $c->id) }}">Сводка</a>

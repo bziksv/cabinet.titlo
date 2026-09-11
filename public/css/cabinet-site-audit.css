@@ -2745,11 +2745,86 @@ label.cabinet-sa-act__main {
   min-width: 0;
 }
 
+.cabinet-sa-url-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cabinet-sa-url-line .cabinet-sa-url-break {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cabinet-sa-url-copy {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  margin-top: 0.05rem;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.35rem;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.cabinet-sa-url-copy:hover,
+.cabinet-sa-url-copy:focus-visible {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  outline: none;
+}
+
+.cabinet-sa-url-copy.is-copied {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.cabinet-sa-url-copy .fa {
+  font-size: 0.72rem;
+}
+
+.cabinet-sa-url-copy__tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 0.28rem 0.45rem;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 20;
+}
+
+.cabinet-sa-url-copy:hover > .cabinet-sa-url-copy__tip,
+.cabinet-sa-url-copy:focus-visible > .cabinet-sa-url-copy__tip,
+.cabinet-sa-url-copy.is-copied > .cabinet-sa-url-copy__tip {
+  opacity: 1;
+}
+
 .cabinet-sa-url-block > .cabinet-sa-status-pill {
   flex: 0 0 auto;
 }
 
-.cabinet-sa-url-block--warn > a {
+.cabinet-sa-url-block--warn .cabinet-sa-url-line > a,
+.cabinet-sa-url-block--warn .cabinet-sa-url-line > .cabinet-sa-url-break {
   color: #9a3412;
 }
 
@@ -7170,7 +7245,7 @@ html.sa-tour-active body {
 .cabinet-sa-history-table thead th:nth-child(8),
 .cabinet-sa-history-table thead th:nth-child(9),
 .cabinet-sa-history-table thead th:nth-child(10),
-.cabinet-sa-history-table thead th:nth-child(11) { width: 4.25rem; } /* грубые…инфо (5 шт.) */
+.cabinet-sa-history-table thead th:nth-child(11) { width: 6.25rem; } /* грубые…инфо (5 шт.) */
 .cabinet-sa-history-table thead th:nth-child(12) { width: 10.5rem; min-width: 10.5rem; } /* действия */
 
 .cabinet-sa-history-table tbody td.cabinet-sa-ht-actions {
@@ -7345,11 +7420,67 @@ html.sa-tour-active body {
   font-weight: 700;
   font-size: 0.8rem;
   white-space: nowrap;
-  width: 4.75rem;
-  max-width: 4.75rem;
-  padding-left: 0.15rem !important;
-  padding-right: 0.25rem !important;
+  width: 5.75rem;
+  max-width: 7.25rem;
+  padding-left: 0.2rem !important;
+  padding-right: 0.3rem !important;
   color: #0f172a;
+  vertical-align: top;
+  line-height: 1.15;
+}
+
+.cabinet-sa-ht-num.has-split {
+  white-space: normal;
+  min-width: 6.5rem;
+}
+
+.cabinet-sa-ht-num__v {
+  display: block;
+}
+
+.cabinet-sa-ht-num__trio {
+  display: block;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.cabinet-sa-ht-num__t {
+  font-weight: 700;
+}
+
+.cabinet-sa-ht-num__open {
+  font-weight: 700;
+}
+
+.cabinet-sa-ht-num__hid {
+  font-weight: 600;
+  opacity: 0.78;
+}
+
+.cabinet-sa-ht-num__sep {
+  margin: 0 0.12em;
+  font-weight: 500;
+  color: #94a3b8;
+  opacity: 0.95;
+}
+
+.cabinet-sa-ht-num__legend {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #94a3b8;
+  line-height: 1.1;
+}
+
+.cabinet-sa-ht-num.is-critical .cabinet-sa-ht-num__legend,
+.cabinet-sa-ht-num.is-other .cabinet-sa-ht-num__legend,
+.cabinet-sa-ht-num.is-important .cabinet-sa-ht-num__legend,
+.cabinet-sa-ht-num.is-warning .cabinet-sa-ht-num__legend,
+.cabinet-sa-ht-num.is-info .cabinet-sa-ht-num__legend {
+  color: inherit;
+  opacity: 0.55;
 }
 
 .cabinet-sa-history-table thead th.cabinet-sa-ht-num {
@@ -7357,7 +7488,9 @@ html.sa-tour-active body {
   font-weight: 700;
   text-transform: none;
   letter-spacing: 0;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  white-space: normal;
 }
 
 .cabinet-sa-ht-num.is-zero {

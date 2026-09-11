@@ -137,6 +137,8 @@ class SiteAuditController extends Controller
                 ->fragment('sa-history');
 
             $crawlSizes = SiteAuditCrawlStorage::payloadBytesByCrawlIds($crawls->pluck('id')->all());
+            $crawlHiddenBuckets = (new SiteAuditIgnoreService())
+                ->hiddenBucketsByCrawlIds($crawls->pluck('id')->all());
 
             if ($isDemo) {
                 $schedules = collect();
@@ -155,6 +157,7 @@ class SiteAuditController extends Controller
         } else {
             $schedules = collect();
             $crawlSizes = [];
+            $crawlHiddenBuckets = [];
             $historyDomain = '';
             $crawls = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20);
         }
@@ -169,6 +172,7 @@ class SiteAuditController extends Controller
             'projects' => $projects,
             'crawls' => $crawls,
             'crawlSizes' => $crawlSizes,
+            'crawlHiddenBuckets' => $crawlHiddenBuckets ?? [],
             'historyDomain' => $historyDomain ?? '',
             'schedules' => $schedules,
             'canSchedule' => $canSchedule,
@@ -1676,6 +1680,7 @@ class SiteAuditController extends Controller
             'pages_total' => (int) $crawl->pages_total,
             'pages_unchanged' => (int) (($crawl->progress_json['pages_unchanged'] ?? 0)),
             'buckets' => $buckets,
+            'buckets_hidden' => (new SiteAuditIgnoreService())->hiddenBucketsForCrawl($crawl),
             'counts' => $counts,
             'error' => $crawl->error,
             'finished' => $crawl->isFinished(),
@@ -2087,9 +2092,12 @@ class SiteAuditController extends Controller
             return response()->json(['ok' => true, 'code' => $code]);
         }
 
-        return redirect()
-            ->route('pages.site-audit.report.show', [$crawl->id, $code])
-            ->with('status', 'Находка добавлена в игнор (для следующих проверок тоже)');
+        return $this->redirectAfterFindingAction(
+            $request,
+            (int) $crawl->id,
+            $code,
+            'Находка добавлена в игнор (для следующих проверок тоже)'
+        );
     }
 
     public function restoreIgnore(Request $request, int $id)
@@ -2126,9 +2134,13 @@ class SiteAuditController extends Controller
             return response()->json(['ok' => true, 'code' => $code]);
         }
 
-        return redirect()
-            ->to(route('pages.site-audit.report.show', [$crawl->id, $code]) . '?ignored=1')
-            ->with('status', 'Игнор снят');
+        return $this->redirectAfterFindingAction(
+            $request,
+            (int) $crawl->id,
+            $code,
+            'Игнор снят',
+            ['ignored' => 1]
+        );
     }
 
     public function saveFindingNote(Request $request, int $id)
@@ -2167,9 +2179,12 @@ class SiteAuditController extends Controller
             ? 'Помечено как исправлено'
             : 'Комментарий сохранён';
 
-        return redirect()
-            ->route('pages.site-audit.report.show', [$crawl->id, $finding->code])
-            ->with('status', $msg);
+        return $this->redirectAfterFindingAction(
+            $request,
+            (int) $crawl->id,
+            $finding->code,
+            $msg
+        );
     }
 
     public function clearFindingNote(Request $request, int $id)
@@ -2198,9 +2213,80 @@ class SiteAuditController extends Controller
             return response()->json(['ok' => true, 'code' => $finding->code]);
         }
 
-        return redirect()
-            ->to(route('pages.site-audit.report.show', [$crawl->id, $finding->code]) . '?fixed=1')
-            ->with('status', 'Статус/комментарий сброшен');
+        return $this->redirectAfterFindingAction(
+            $request,
+            (int) $crawl->id,
+            $finding->code,
+            'Статус/комментарий сброшен',
+            ['fixed' => 1]
+        );
+    }
+
+    /**
+     * Вернуться на тот же отчёт с фильтрами (URL / ignored / fixed / sort…),
+     * а не на «голый» report.show без query.
+     *
+     * @param  array<string,scalar>  $fallbackQuery
+     */
+    private function redirectAfterFindingAction(
+        Request $request,
+        int $crawlId,
+        string $code,
+        string $flash,
+        array $fallbackQuery = []
+    ) {
+        $expectedPath = parse_url(
+            route('pages.site-audit.report.show', [$crawlId, $code]),
+            PHP_URL_PATH
+        );
+        $candidates = [
+            (string) $request->input('return_url', ''),
+            (string) $request->headers->get('referer', ''),
+        ];
+        foreach ($candidates as $candidate) {
+            $candidate = trim($candidate);
+            if ($candidate === '' || ! $this->isSafeReportReturnUrl($candidate, $expectedPath, $request)) {
+                continue;
+            }
+
+            return redirect()->to($candidate)->with('status', $flash);
+        }
+
+        $url = route('pages.site-audit.report.show', [$crawlId, $code]);
+        if ($fallbackQuery !== []) {
+            $url .= '?' . http_build_query($fallbackQuery);
+        }
+
+        return redirect()->to($url)->with('status', $flash);
+    }
+
+    private function isSafeReportReturnUrl(string $url, $expectedPath, Request $request): bool
+    {
+        if (! is_string($expectedPath) || $expectedPath === '') {
+            return false;
+        }
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['path'])) {
+            return false;
+        }
+        if ((string) $parts['path'] !== (string) $expectedPath) {
+            return false;
+        }
+        if (! empty($parts['host'])) {
+            $host = strtolower((string) $parts['host']);
+            $allowed = [
+                strtolower((string) $request->getHost()),
+            ];
+            $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+            if (is_string($appHost) && $appHost !== '') {
+                $allowed[] = strtolower($appHost);
+            }
+            if (! in_array($host, $allowed, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function ignoreJsonOrRedirect(Request $request, int $status, string $error)

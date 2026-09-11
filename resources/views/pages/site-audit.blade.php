@@ -379,6 +379,10 @@
                             warning: 'Предупреждения',
                             info: 'Инфо'
                         };
+                        var fmtNum = function (n) {
+                            return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                        };
+                        var hiddenBuckets = j.buckets_hidden || {};
                         ['critical', 'other', 'important', 'warning', 'info'].forEach(function (k) {
                             var cell = row.querySelector('[data-sa-bucket="' + k + '"]');
                             if (cell && typeof j.buckets[k] !== 'undefined') {
@@ -387,10 +391,42 @@
                                     cell.textContent = j.buckets[k];
                                     return;
                                 }
-                                cell.textContent = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                                var hid = parseInt(hiddenBuckets[k], 10);
+                                if (isNaN(hid)) {
+                                    hid = parseInt(cell.getAttribute('data-sa-bucket-hidden') || '0', 10) || 0;
+                                }
+                                if (hid < 0) {
+                                    hid = 0;
+                                }
+                                if (hid > n) {
+                                    hid = n;
+                                }
+                                var open = Math.max(0, n - hid);
+                                var tip = (sevTitle[k] || k) + ': ' + fmtNum(n);
+                                var html;
+                                if (hid > 0) {
+                                    tip = (sevTitle[k] || k) + ': всего ' + fmtNum(n)
+                                        + ' · осталось ' + fmtNum(open)
+                                        + ' · скрыто ' + fmtNum(hid)
+                                        + ' (игнор или исправлено)';
+                                    html = '<span class="cabinet-sa-ht-num__trio" aria-label="' + tip.replace(/"/g, '&quot;') + '">'
+                                        + '<span class="cabinet-sa-ht-num__t">' + fmtNum(n) + '</span>'
+                                        + '<span class="cabinet-sa-ht-num__sep" aria-hidden="true">/</span>'
+                                        + '<span class="cabinet-sa-ht-num__open">' + fmtNum(open) + '</span>'
+                                        + '<span class="cabinet-sa-ht-num__sep" aria-hidden="true">/</span>'
+                                        + '<span class="cabinet-sa-ht-num__hid">' + fmtNum(hid) + '</span>'
+                                        + '</span>'
+                                        + '<span class="cabinet-sa-ht-num__legend" aria-hidden="true">все / ост. / скр.</span>';
+                                    cell.classList.add('has-split');
+                                } else {
+                                    html = '<span class="cabinet-sa-ht-num__v">' + fmtNum(n) + '</span>';
+                                    cell.classList.remove('has-split');
+                                }
+                                cell.innerHTML = html;
+                                cell.setAttribute('data-sa-bucket-hidden', String(hid));
                                 cell.classList.remove('is-critical', 'is-other', 'is-important', 'is-warning', 'is-info', 'is-zero');
                                 cell.classList.add(n > 0 ? sevClass[k] : 'is-zero');
-                                cell.title = (sevTitle[k] || k) + ': ' + n;
+                                cell.title = tip;
                             }
                         });
                     }

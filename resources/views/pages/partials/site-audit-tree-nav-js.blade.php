@@ -12,6 +12,8 @@
         flipMap[RU.charAt(i)] = EN.charAt(i);
     }
 
+    var PRESET_KEYS = { all: 1, hot: 1, critical: 1, other: 1, important: 1, warning: 1, info: 1 };
+
     function flipLayout(s) {
         var out = '';
         for (var i = 0; i < s.length; i++) {
@@ -29,10 +31,42 @@
         return t.indexOf(a) !== -1 || (b && t.indexOf(b) !== -1);
     }
 
+    function crawlKey(tree) {
+        var id = tree.getAttribute('data-crawl-id') || '';
+        if (!id) {
+            var m = String(window.location.pathname || '').match(/\/site-audit\/crawl\/(\d+)/);
+            id = m ? m[1] : '';
+        }
+        return id ? ('sa-tree-preset:' + id) : '';
+    }
+
+    function readStoredPreset(tree) {
+        var key = crawlKey(tree);
+        if (!key) return null;
+        try {
+            var v = sessionStorage.getItem(key);
+            return v && PRESET_KEYS[v] ? v : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function writeStoredPreset(tree, preset) {
+        var key = crawlKey(tree);
+        if (!key || !PRESET_KEYS[preset]) return;
+        try {
+            sessionStorage.setItem(key, preset);
+        } catch (e) {}
+    }
+
+    function currentPreset(tree) {
+        var activePreset = tree.querySelector('.cabinet-sa-tree-preset.is-active');
+        return activePreset ? activePreset.getAttribute('data-preset') : 'all';
+    }
+
     function applyTree(tree) {
         var searchEl = tree.querySelector('.cabinet-sa-tree-search');
-        var activePreset = tree.querySelector('.cabinet-sa-tree-preset.is-active');
-        var preset = activePreset ? activePreset.getAttribute('data-preset') : 'all';
+        var preset = currentPreset(tree) || 'all';
         var q = searchEl ? String(searchEl.value || '').trim() : '';
         var items = tree.querySelectorAll('.cabinet-sa-tree__item');
         var groups = tree.querySelectorAll('.cabinet-sa-tree__group');
@@ -58,6 +92,27 @@
         });
     }
 
+    function setPreset(tree, preset, persist) {
+        var btn = tree.querySelector('.cabinet-sa-tree-preset[data-preset="' + preset + '"]');
+        if (!btn) return;
+        tree.querySelectorAll('.cabinet-sa-tree-preset').forEach(function (b) {
+            b.classList.toggle('is-active', b === btn);
+        });
+        if (persist !== false) {
+            writeStoredPreset(tree, preset);
+        }
+        applyTree(tree);
+    }
+
+    function restorePreset(tree) {
+        var stored = readStoredPreset(tree);
+        if (stored && stored !== currentPreset(tree)) {
+            setPreset(tree, stored, false);
+            return;
+        }
+        applyTree(tree);
+    }
+
     function bindTree(tree) {
         if (tree.getAttribute('data-sa-bound') === '1') return;
         tree.setAttribute('data-sa-bound', '1');
@@ -69,23 +124,18 @@
 
         tree.querySelectorAll('.cabinet-sa-tree-preset').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                tree.querySelectorAll('.cabinet-sa-tree-preset').forEach(function (b) {
-                    b.classList.toggle('is-active', b === btn);
-                });
-                applyTree(tree);
+                setPreset(tree, btn.getAttribute('data-preset') || 'all', true);
             });
         });
 
-        applyTree(tree);
-    }
-
-    function setPreset(tree, preset) {
-        var btn = tree.querySelector('.cabinet-sa-tree-preset[data-preset="' + preset + '"]');
-        if (!btn) return;
-        tree.querySelectorAll('.cabinet-sa-tree-preset').forEach(function (b) {
-            b.classList.toggle('is-active', b === btn);
+        // Перед уходом в отчёт — ещё раз зафиксировать активный пресет.
+        tree.querySelectorAll('a.cabinet-sa-tree__item').forEach(function (link) {
+            link.addEventListener('click', function () {
+                writeStoredPreset(tree, currentPreset(tree) || 'all');
+            });
         });
-        applyTree(tree);
+
+        restorePreset(tree);
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -99,7 +149,7 @@
                 var preset = bucket.getAttribute('data-sa-bucket-preset');
                 var pane = bucket.closest('.tab-pane') || document;
                 var tree = pane.querySelector('[data-sa-tree]');
-                if (tree && preset) setPreset(tree, preset);
+                if (tree && preset) setPreset(tree, preset, true);
             };
             bucket.addEventListener('click', go);
             bucket.addEventListener('keydown', function (e) {

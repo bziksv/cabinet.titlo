@@ -1,5 +1,5 @@
 {{-- Дерево отчётов по приоритетам. Ожидает: $tree, $bucketLabels, $crawl, $activeCode, $treeTitle, $showGroup? --}}
-<aside class="cabinet-sa-tree" data-sa-tree>
+<aside class="cabinet-sa-tree" data-sa-tree data-crawl-id="{{ (int) $crawl->id }}">
     <div class="px-3 py-2 border-bottom fw-semibold small">{{ $treeTitle ?? 'Отчёты' }}</div>
     @include('pages.partials.site-audit-tree-controls')
     @foreach(($bucketLabels ?? []) as $sev => $label)
