@@ -35,13 +35,17 @@ class SeoReportGeneratorService
     /** @var SeoReportWebmasterCollector */
     private $webmasterCollector;
 
+    /** @var SeoReportGscCollector */
+    private $gscCollector;
+
     public function __construct(
         YandexMetrikaService $metrika,
         SeoReportPositionsCollector $positionsCollector,
         SeoReportInsightsBuilder $insights,
         SeoReportTitloModulesCollector $titloModules,
         SeoReportExternalAdsCollector $externalAds,
-        SeoReportWebmasterCollector $webmasterCollector
+        SeoReportWebmasterCollector $webmasterCollector,
+        SeoReportGscCollector $gscCollector
     ) {
         $this->metrika = $metrika;
         $this->positionsCollector = $positionsCollector;
@@ -49,6 +53,7 @@ class SeoReportGeneratorService
         $this->titloModules = $titloModules;
         $this->externalAds = $externalAds;
         $this->webmasterCollector = $webmasterCollector;
+        $this->gscCollector = $gscCollector;
     }
 
     /**
@@ -305,36 +310,22 @@ class SeoReportGeneratorService
                 }
 
                 if ($source === 'gsc') {
-                    $settings = $project->reportSettings();
-                    $importKey = $source . '_import';
-                    $import = is_array($settings[$importKey] ?? null) ? $settings[$importKey] : null;
-                    $hasProperty = trim((string) ($settings['gsc_property'] ?? '')) !== '';
-                    if ($import && (!empty($import['queries']) || !empty($import['pages']) || !empty($import['kpis']))) {
-                        $sourcesTried++;
+                    $sourcesTried++;
+                    $gsc = $this->gscCollector->collect($project, $report);
+                    $snapshot['progress']['gsc'] = $gsc['progress'];
+                    if (!empty($gsc['ok']) && is_array($gsc['data'] ?? null)) {
                         $sourcesOk++;
-                        $snapshot[$key] = [
-                            'source' => 'import',
-                            'property' => $settings['gsc_property'] ?? null,
-                            'imported_at' => $import['imported_at'] ?? null,
-                            'kpis' => $import['kpis'] ?? [],
-                            'queries' => $import['queries'] ?? [],
-                            'pages' => $import['pages'] ?? [],
-                            'note' => null,
-                        ];
-                        $snapshot['progress'][$source] = 'ok';
+                        $snapshot[$key] = $gsc['data'];
                         $sectionStates[$key] = [
                             'enabled' => true,
-                            'source_status' => SeoReportSectionRegistry::SOURCE_STATUS_OK,
-                            'message' => null,
+                            'source_status' => $gsc['status'],
+                            'message' => $gsc['message'] ?? null,
                         ];
                     } else {
-                        $snapshot['progress'][$source] = 'skip';
                         $sectionStates[$key] = [
                             'enabled' => true,
-                            'source_status' => SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED,
-                            'message' => $hasProperty
-                                ? __('Connect Google Search Console OAuth')
-                                : __('Google Search Console is not connected'),
+                            'source_status' => $gsc['status'] ?? SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED,
+                            'message' => $gsc['message'] ?? __('Google Search Console is not connected'),
                         ];
                     }
                     continue;

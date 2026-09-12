@@ -327,6 +327,91 @@ class GoogleSearchConsoleService
         return $ok;
     }
 
+    /**
+     * Search Analytics query (KPI / queries / pages).
+     *
+     * @param list<string> $dimensions e.g. [] | ['query'] | ['page']
+     * @return array{ok:bool,rows?:list<array<string,mixed>>,message?:string,need_reauth?:bool}
+     */
+    public function fetchSearchAnalytics(
+        int $userId,
+        string $propertyId,
+        string $startDate,
+        string $endDate,
+        array $dimensions = [],
+        int $rowLimit = 25
+    ): array {
+        $propertyId = trim($propertyId);
+        $startDate = trim($startDate);
+        $endDate = trim($endDate);
+        if ($propertyId === '' || $startDate === '' || $endDate === '') {
+            return ['ok' => false, 'message' => __('Invalid GSC property')];
+        }
+
+        $accessToken = $this->validAccessToken($userId);
+        if ($accessToken === null) {
+            return [
+                'ok' => false,
+                'need_reauth' => true,
+                'message' => __('Connect Google Search Console first'),
+            ];
+        }
+
+        $dims = [];
+        foreach ($dimensions as $dim) {
+            $dim = trim((string) $dim);
+            if ($dim !== '') {
+                $dims[] = $dim;
+            }
+        }
+
+        $payload = [
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'rowLimit' => max(1, min(25000, $rowLimit)),
+        ];
+        if ($dims !== []) {
+            $payload['dimensions'] = $dims;
+        }
+
+        $path = 'sites/' . rawurlencode($propertyId) . '/searchAnalytics/query';
+        $client = $this->httpClient();
+        $response = $client->post($path, [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $accessToken,
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ],
+            'json' => $payload,
+            'http_errors' => false,
+        ]);
+
+        $status = $response->getStatusCode();
+        $raw = (string) $response->getBody();
+        if ($status >= 400) {
+            Log::warning('gsc searchAnalytics http error', [
+                'user_id' => $userId,
+                'property' => $propertyId,
+                'status' => $status,
+                'body' => mb_substr($raw, 0, 400),
+            ]);
+            $needReauth = $status === 401 || $status === 403;
+
+            return [
+                'ok' => false,
+                'need_reauth' => $needReauth,
+                'message' => $needReauth
+                    ? __('Google Search Console scope missing reconnect')
+                    : __('Could not load GSC search analytics'),
+            ];
+        }
+
+        $body = json_decode($raw, true);
+        $rows = is_array($body['rows'] ?? null) ? $body['rows'] : [];
+
+        return ['ok' => true, 'rows' => $rows];
+    }
+
     public function domainFromPropertyId(string $propertyId): string
     {
         $propertyId = trim($propertyId);

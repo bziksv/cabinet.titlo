@@ -103,22 +103,26 @@ class SiteAuditDuplicateGrouper
                     'label' => self::labelFor($code, $meta),
                     'severity' => (string) ($row->severity ?? 'other'),
                     'urls' => [],
+                    'finding_ids' => [],
                     'hint' => null,
                     'likely_template' => false,
+                    '_urls' => [],
                 ];
             }
 
-            $buckets[$hash]['urls'][] = [
-                'url' => (string) $row->url,
-                'severity' => (string) ($row->severity ?? 'other'),
-            ];
-
-            if ($buckets[$hash]['size'] < count($buckets[$hash]['urls'])) {
-                $buckets[$hash]['size'] = count($buckets[$hash]['urls']);
+            $prevSize = (int) $buckets[$hash]['size'];
+            self::appendUrlToBucket(
+                $buckets[$hash],
+                $row,
+                (string) ($row->url ?? ''),
+                (string) ($row->severity ?? 'other')
+            );
+            if ($prevSize > (int) $buckets[$hash]['size']) {
+                $buckets[$hash]['size'] = $prevSize;
             }
         }
 
-        return self::sortGroups(array_values($buckets));
+        return self::finalizeBuckets($buckets, 0, false);
     }
 
     /**
@@ -156,31 +160,22 @@ class SiteAuditDuplicateGrouper
                     'label' => self::labelFor('text_in_noindex', $meta),
                     'severity' => (string) ($row->severity ?? 'warning'),
                     'urls' => [],
+                    'finding_ids' => [],
                     'hint' => 'Одинаковый блок noindex на многих URL — правьте шаблон (шапка/подвал), не каждую страницу.',
                     'likely_template' => false,
                     '_urls' => [],
                 ];
             }
 
-            $url = (string) ($row->url ?? '');
-            if ($url !== '' && ! isset($buckets[$hash]['_urls'][$url])) {
-                $buckets[$hash]['_urls'][$url] = true;
-                $buckets[$hash]['urls'][] = [
-                    'url' => $url,
-                    'severity' => (string) ($row->severity ?? 'warning'),
-                ];
-                $buckets[$hash]['size'] = count($buckets[$hash]['urls']);
-            }
+            self::appendUrlToBucket(
+                $buckets[$hash],
+                $row,
+                (string) ($row->url ?? ''),
+                (string) ($row->severity ?? 'warning')
+            );
         }
 
-        $groups = [];
-        foreach ($buckets as $bucket) {
-            unset($bucket['_urls']);
-            $bucket['likely_template'] = self::isLikelyTemplate($bucket['size'], $pageTotal);
-            $groups[] = $bucket;
-        }
-
-        return self::sortGroups($groups);
+        return self::finalizeBuckets($buckets, $pageTotal);
     }
 
     /**
@@ -230,31 +225,18 @@ class SiteAuditDuplicateGrouper
                         'label' => self::clipLabel($msg, 140),
                         'severity' => $severity,
                         'urls' => [],
+                        'finding_ids' => [],
                         'hint' => SiteAuditFindingHelp::htmlErrorHint($msg),
                         'likely_template' => false,
                         '_urls' => [],
                     ];
                 }
 
-                if (! isset($buckets[$sig]['_urls'][$url])) {
-                    $buckets[$sig]['_urls'][$url] = true;
-                    $buckets[$sig]['urls'][] = [
-                        'url' => $url,
-                        'severity' => $severity,
-                    ];
-                    $buckets[$sig]['size'] = count($buckets[$sig]['urls']);
-                }
+                self::appendUrlToBucket($buckets[$sig], $row, $url, $severity);
             }
         }
 
-        $groups = [];
-        foreach ($buckets as $bucket) {
-            unset($bucket['_urls']);
-            $bucket['likely_template'] = self::isLikelyTemplate($bucket['size'], $pageTotal);
-            $groups[] = $bucket;
-        }
-
-        return self::sortGroups($groups);
+        return self::finalizeBuckets($buckets, $pageTotal);
     }
 
     /**
@@ -285,6 +267,7 @@ class SiteAuditDuplicateGrouper
                         'label' => 'Форма без деталей в сэмпле',
                         'severity' => $severity,
                         'urls' => [],
+                        'finding_ids' => [],
                         'hint' => 'В finding нет samples — смотрите режим «По страницам».',
                         'likely_template' => false,
                         'href' => '',
@@ -292,14 +275,7 @@ class SiteAuditDuplicateGrouper
                         '_urls' => [],
                     ];
                 }
-                if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {
-                    $buckets[$sig]['_urls'][$pageUrl] = true;
-                    $buckets[$sig]['urls'][] = [
-                        'url' => $pageUrl,
-                        'severity' => $severity,
-                    ];
-                    $buckets[$sig]['size'] = count($buckets[$sig]['urls']);
-                }
+                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity);
                 continue;
             }
 
@@ -321,6 +297,7 @@ class SiteAuditDuplicateGrouper
                         'label' => $form['label'],
                         'severity' => $severity,
                         'urls' => [],
+                        'finding_ids' => [],
                         'hint' => 'Одинаковая форма на многих URL — чаще всего общий блок (шапка, подвал, попап). Правьте шаблон один раз.',
                         'likely_template' => false,
                         'href' => $form['action'],
@@ -333,25 +310,11 @@ class SiteAuditDuplicateGrouper
                     ];
                 }
 
-                if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {
-                    $buckets[$sig]['_urls'][$pageUrl] = true;
-                    $buckets[$sig]['urls'][] = [
-                        'url' => $pageUrl,
-                        'severity' => $severity,
-                    ];
-                    $buckets[$sig]['size'] = count($buckets[$sig]['urls']);
-                }
+                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity);
             }
         }
 
-        $groups = [];
-        foreach ($buckets as $bucket) {
-            unset($bucket['_urls']);
-            $bucket['likely_template'] = self::isLikelyTemplate($bucket['size'], $pageTotal);
-            $groups[] = $bucket;
-        }
-
-        return self::sortGroups($groups);
+        return self::finalizeBuckets($buckets, $pageTotal);
     }
 
     /**
@@ -457,6 +420,7 @@ class SiteAuditDuplicateGrouper
                         'label' => 'Без списка целей в сэмпле',
                         'severity' => $severity,
                         'urls' => [],
+                        'finding_ids' => [],
                         'hint' => 'В finding нет samples — смотрите режим «По страницам».',
                         'likely_template' => false,
                         'href' => '',
@@ -464,14 +428,7 @@ class SiteAuditDuplicateGrouper
                         '_urls' => [],
                     ];
                 }
-                if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {
-                    $buckets[$sig]['_urls'][$pageUrl] = true;
-                    $buckets[$sig]['urls'][] = [
-                        'url' => $pageUrl,
-                        'severity' => $severity,
-                    ];
-                    $buckets[$sig]['size'] = count($buckets[$sig]['urls']);
-                }
+                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity);
                 continue;
             }
 
@@ -531,6 +488,7 @@ class SiteAuditDuplicateGrouper
                         'label' => $label,
                         'severity' => $severity,
                         'urls' => [],
+                        'finding_ids' => [],
                         'hint' => $hint,
                         'likely_template' => false,
                         'href' => $target,
@@ -548,25 +506,11 @@ class SiteAuditDuplicateGrouper
                     }
                 }
 
-                if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {
-                    $buckets[$sig]['_urls'][$pageUrl] = true;
-                    $buckets[$sig]['urls'][] = [
-                        'url' => $pageUrl,
-                        'severity' => $severity,
-                    ];
-                    $buckets[$sig]['size'] = count($buckets[$sig]['urls']);
-                }
+                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity);
             }
         }
 
-        $groups = [];
-        foreach ($buckets as $bucket) {
-            unset($bucket['_urls']);
-            $bucket['likely_template'] = self::isLikelyTemplate($bucket['size'], $pageTotal);
-            $groups[] = $bucket;
-        }
-
-        return self::sortGroups($groups);
+        return self::finalizeBuckets($buckets, $pageTotal);
     }
 
     public static function normalizeOutboundSignature(string $url): string
@@ -654,6 +598,51 @@ class SiteAuditDuplicateGrouper
             'label' => (string) ($top['label'] ?? ''),
             'pct' => $pct,
         ];
+    }
+
+    /**
+     * @param  array<string,mixed>  $bucket
+     * @param  object|array  $row
+     */
+    private static function appendUrlToBucket(array &$bucket, $row, string $url, string $severity): void
+    {
+        if ($url === '' || isset($bucket['_urls'][$url])) {
+            return;
+        }
+        $bucket['_urls'][$url] = true;
+        $fid = (int) (is_object($row) ? ($row->id ?? 0) : ($row['id'] ?? 0));
+        $entry = [
+            'url' => $url,
+            'severity' => $severity,
+        ];
+        if ($fid > 0) {
+            $entry['id'] = $fid;
+            if (! isset($bucket['finding_ids']) || ! is_array($bucket['finding_ids'])) {
+                $bucket['finding_ids'] = [];
+            }
+            $bucket['finding_ids'][$fid] = $fid;
+        }
+        $bucket['urls'][] = $entry;
+        $bucket['size'] = count($bucket['urls']);
+    }
+
+    /**
+     * @param  array<string,array<string,mixed>>  $buckets
+     * @return list<array<string,mixed>>
+     */
+    private static function finalizeBuckets(array $buckets, int $pageTotal, bool $computeTemplate = true): array
+    {
+        $groups = [];
+        foreach ($buckets as $bucket) {
+            unset($bucket['_urls']);
+            $bucket['finding_ids'] = array_values($bucket['finding_ids'] ?? []);
+            if ($computeTemplate) {
+                $bucket['likely_template'] = self::isLikelyTemplate((int) ($bucket['size'] ?? 0), $pageTotal);
+            }
+            $groups[] = $bucket;
+        }
+
+        return self::sortGroups($groups);
     }
 
     private static function isLikelyTemplate(int $size, int $pageTotal): bool

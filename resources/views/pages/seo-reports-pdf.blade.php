@@ -569,7 +569,7 @@
             <div class="meta">Из SEO-чеклиста</div>
             <ul>
                 @foreach($workDoneItems as $item)
-                    <li>{{ $item['title'] ?? '—' }}@if(!empty($item['done_at'])) — {{ \Carbon\Carbon::parse($item['done_at'])->format('d.m.Y') }}@endif</li>
+                    <li>{{ $item['title'] ?? '—' }}</li>
                 @endforeach
             </ul>
         @endif
@@ -587,7 +587,7 @@
             <div class="meta">Из SEO-чеклиста</div>
             <ul>
                 @foreach($workPlanItems as $item)
-                    <li>{{ $item['title'] ?? '—' }}@if(!empty($item['due_at'])) — {{ \Carbon\Carbon::parse($item['due_at'])->format('d.m.Y') }}@endif</li>
+                    <li>{{ $item['title'] ?? '—' }}</li>
                 @endforeach
             </ul>
         @endif

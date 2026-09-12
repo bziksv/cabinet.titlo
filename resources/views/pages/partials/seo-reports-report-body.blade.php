@@ -1550,6 +1550,11 @@
                 @endif
             @elseif(in_array($key, ['gsc', 'webmaster'], true) && is_array($snapshot[$key] ?? null))
                 @php $sc = $snapshot[$key]; @endphp
+                @if($key === 'gsc')
+                    <p class="cabinet-sr-traffic-scope-note">{{ __('GSC report data note') }}</p>
+                @elseif($key === 'webmaster')
+                    <p class="cabinet-sr-traffic-scope-note">{{ __('Webmaster report data note') }}</p>
+                @endif
                 @if(!empty($sc['note']))
                     <p class="small text-secondary">{{ $sc['note'] }}</p>
                 @endif
@@ -1984,12 +1989,7 @@
                     <h3 class="h6">{{ __('From SEO checklist') }}</h3>
                     <ul class="cabinet-sr-bullets">
                         @foreach($workDoneItems as $item)
-                            <li>
-                                {{ $item['title'] ?? '—' }}
-                                @if(!empty($item['done_at']))
-                                    <span class="text-secondary small">· {{ \Carbon\Carbon::parse($item['done_at'])->format('d.m.Y') }}</span>
-                                @endif
-                            </li>
+                            <li>{{ $item['title'] ?? '—' }}</li>
                         @endforeach
                     </ul>
                 @endif
@@ -2013,15 +2013,7 @@
                     <h3 class="h6">{{ __('From SEO checklist') }}</h3>
                     <ul class="cabinet-sr-bullets">
                         @foreach($workPlanItems as $item)
-                            <li>
-                                {{ $item['title'] ?? '—' }}
-                                @if(!empty($item['due_at']))
-                                    <span class="text-secondary small {{ !empty($item['overdue']) ? 'text-danger' : '' }}">
-                                        · {{ \Carbon\Carbon::parse($item['due_at'])->format('d.m.Y') }}
-                                        @if(!empty($item['overdue'])) — {{ __('Overdue') }}@endif
-                                    </span>
-                                @endif
-                            </li>
+                            <li>{{ $item['title'] ?? '—' }}</li>
                         @endforeach
                     </ul>
                 @endif
@@ -2140,7 +2132,7 @@
                 @if($topIssues !== [])
                     <h3 class="h6 mt-3">{{ __('Top issues to fix') }}</h3>
                     <div class="table-responsive">
-                        <table class="cabinet-sr-data-table">
+                        <table class="cabinet-sr-data-table cabinet-sr-audit-top-issues">
                             <thead>
                             <tr>
                                 <th>{{ __('Issue') }}</th>
@@ -2154,7 +2146,7 @@
                                     <td>
                                         <div class="fw-semibold">{{ $issue['title'] ?? $issue['code'] ?? '—' }}</div>
                                         @if(!empty($issue['what']))
-                                            <div class="small text-secondary">{{ $issue['what'] }}</div>
+                                            <div class="small text-secondary cabinet-sr-audit-top-issues__what">{{ $issue['what'] }}</div>
                                         @endif
                                     </td>
                                     <td>
@@ -2237,12 +2229,6 @@
                         <div class="small text-secondary mt-1">{{ __('Relevance checks tip') }}</div>
                     </div>
                 </div>
-                @if(!empty($rel['last_check']))
-                    <p class="small text-secondary mt-2 mb-0">
-                        {{ __('Last check') }}:
-                        {{ \Carbon\Carbon::parse($rel['last_check'])->format('d.m.Y H:i') }}
-                    </p>
-                @endif
                 @if(!empty($rel['open_url']) && !$isPublic)
                     <p class="small mt-2 mb-0"><a href="{{ $rel['open_url'] }}">{{ __('Open source project') }}</a></p>
                 @endif
@@ -2251,8 +2237,11 @@
                 <div class="cabinet-sr-kpi-grid">
                     <div class="cabinet-sr-kpi"><div class="cabinet-sr-kpi__label">{{ __('Uptime') }}</div><div class="cabinet-sr-kpi__value">{{ ($u['uptime_percent'] ?? null) !== null ? $fmtNum($u['uptime_percent'], 2) . '%' : '—' }}</div></div>
                     <div class="cabinet-sr-kpi"><div class="cabinet-sr-kpi__label">{{ __('Incidents') }}</div><div class="cabinet-sr-kpi__value">{{ !empty($u['broken']) ? __('Yes') : __('No') }}</div></div>
-                    <div class="cabinet-sr-kpi"><div class="cabinet-sr-kpi__label">{{ __('Domain days left') }}</div><div class="cabinet-sr-kpi__value">{{ ($u['domain_days_left'] ?? null) !== null ? (int)$u['domain_days_left'] : '—' }}</div></div>
+                    <div class="cabinet-sr-kpi"><div class="cabinet-sr-kpi__label">{{ __('Domain days left') }}</div><div class="cabinet-sr-kpi__value">{{ ($u['domain_days_left'] ?? null) !== null ? number_format((int) $u['domain_days_left'], 0, '', ' ') : '—' }}</div></div>
                 </div>
+                @if(!empty($u['domain_registration']))
+                    <p class="small text-secondary mt-2 mb-0" style="white-space: pre-line">{{ $u['domain_registration'] }}</p>
+                @endif
                 @if(!empty($u['open_url']) && !$isPublic)
                     <p class="small mt-2 mb-0"><a href="{{ $u['open_url'] }}">{{ __('Open source project') }}</a></p>
                 @endif

@@ -45,6 +45,13 @@
         @endforeach
     </div>
     <div class="cabinet-sa-crawl-pages-toolbar__end">
+        @include('pages.partials.site-audit-report-bulk-page', [
+            'pageFindingIds' => $pageFindingIds ?? [],
+            'crawl' => $crawl,
+            'code' => $code ?? '',
+            'canNote' => $canNote ?? false,
+            'canIgnore' => $canIgnore ?? false,
+        ])
         <details class="cabinet-sa-crawl-pages-cols">
             <summary class="btn btn-sm btn-outline-secondary">Столбцы</summary>
             <div class="cabinet-sa-crawl-pages-cols__panel" data-sa-cols-order-list>

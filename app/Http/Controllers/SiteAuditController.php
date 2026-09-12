@@ -168,7 +168,7 @@ class SiteAuditController extends Controller
             SiteAuditLimits::touchDowngradeState($user);
         }
 
-        return view('pages.site-audit', [
+        $viewData = [
             'projects' => $projects,
             'crawls' => $crawls,
             'crawlSizes' => $crawlSizes,
@@ -193,7 +193,23 @@ class SiteAuditController extends Controller
             'teamAccessReady' => $teamAccessReady,
             'teamCandidates' => $teamCandidates,
             'teamRoleLabels' => $teamRoleLabels,
-        ]);
+        ];
+
+        // AJAX-поиск/пагинация истории — только блок #sa-history, без полной страницы.
+        if ((string) $request->input('partial') === 'history') {
+            $saPageUi = (int) config('cabinet-site-audit.page_ui', 2);
+            if (! in_array($saPageUi, [1, 2], true)) {
+                $saPageUi = 2;
+            }
+            $saUiOverride = (int) $request->query('sa_ui', 0);
+            if (in_array($saUiOverride, [1, 2], true)) {
+                $saPageUi = $saUiOverride;
+            }
+
+            return view('pages.partials.site-audit-history-v' . $saPageUi, $viewData);
+        }
+
+        return view('pages.site-audit', $viewData);
     }
 
     public function assignProjectTeam(Request $request, int $id): RedirectResponse
@@ -2141,6 +2157,152 @@ class SiteAuditController extends Controller
             'Игнор снят',
             ['ignored' => 1]
         );
+    }
+
+    /**
+     * Игнор всех находок с текущей страницы списка (пагинация).
+     */
+    public function bulkIgnoreFindings(Request $request, int $id)
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return $this->ignoreJsonOrRedirect($request, 403, 'demo');
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        $ids = $this->bulkFindingIdsFromRequest($request);
+        if ($ids === []) {
+            return $this->ignoreJsonOrRedirect($request, 422, 'empty');
+        }
+
+        $findings = SiteAuditFinding::query()
+            ->where('crawl_id', $crawl->id)
+            ->whereIn('id', $ids)
+            ->get();
+        if ($findings->isEmpty()) {
+            return $this->ignoreJsonOrRedirect($request, 404, 'not_found');
+        }
+
+        $svc = new SiteAuditIgnoreService();
+        $projectId = (int) $crawl->project_id;
+        $userId = (int) Auth::id();
+        $code = (string) ($findings->first()->code ?? $request->input('code', ''));
+        $n = 0;
+        foreach ($findings as $finding) {
+            $svc->ignoreFinding($finding, $projectId, $userId, null);
+            $n++;
+            if ($code === '') {
+                $code = (string) $finding->code;
+            }
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'code' => $code, 'count' => $n]);
+        }
+
+        return $this->redirectAfterFindingAction(
+            $request,
+            (int) $crawl->id,
+            $code !== '' ? $code : (string) $request->input('code', ''),
+            'В игнор: ' . number_format($n, 0, '', ' ')
+                . ($request->input('bulk_scope') === 'group' ? ' в блоке' : ' на странице')
+        );
+    }
+
+    /**
+     * «Исправлено» для всех находок с текущей страницы списка.
+     */
+    public function bulkMarkFixedFindings(Request $request, int $id)
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return $this->ignoreJsonOrRedirect($request, 403, 'demo');
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        $ids = $this->bulkFindingIdsFromRequest($request);
+        if ($ids === []) {
+            return $this->ignoreJsonOrRedirect($request, 422, 'empty');
+        }
+
+        $findings = SiteAuditFinding::query()
+            ->where('crawl_id', $crawl->id)
+            ->whereIn('id', $ids)
+            ->get();
+        if ($findings->isEmpty()) {
+            return $this->ignoreJsonOrRedirect($request, 404, 'not_found');
+        }
+
+        $noteSvc = new SiteAuditFindingNoteService();
+        $projectId = (int) $crawl->project_id;
+        $userId = (int) Auth::id();
+        $code = (string) ($findings->first()->code ?? $request->input('code', ''));
+        $n = 0;
+        foreach ($findings as $finding) {
+            $urlHash = (string) ($finding->url_hash ?: '');
+            $existingComment = null;
+            if ($urlHash !== '') {
+                $existing = SiteAuditFindingNote::query()
+                    ->where('project_id', $projectId)
+                    ->where('code', $finding->code)
+                    ->where('url_hash', $urlHash)
+                    ->first();
+                if ($existing && is_string($existing->comment) && $existing->comment !== '') {
+                    $existingComment = $existing->comment;
+                }
+            }
+            $noteSvc->upsertForFinding(
+                $finding,
+                $projectId,
+                $userId,
+                SiteAuditFindingNote::STATUS_FIXED,
+                $existingComment
+            );
+            $n++;
+            if ($code === '') {
+                $code = (string) $finding->code;
+            }
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'code' => $code, 'count' => $n]);
+        }
+
+        return $this->redirectAfterFindingAction(
+            $request,
+            (int) $crawl->id,
+            $code !== '' ? $code : (string) $request->input('code', ''),
+            'Исправлено: ' . number_format($n, 0, '', ' ')
+                . ($request->input('bulk_scope') === 'group' ? ' в блоке' : ' на странице')
+        );
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function bulkFindingIdsFromRequest(Request $request): array
+    {
+        $ids = [];
+        $csv = trim((string) $request->input('finding_ids_csv', ''));
+        if ($csv !== '') {
+            foreach (preg_split('/\s*,\s*/', $csv) ?: [] as $v) {
+                $id = (int) $v;
+                if ($id > 0) {
+                    $ids[$id] = $id;
+                }
+            }
+        }
+        $raw = $request->input('finding_ids', []);
+        if (is_array($raw)) {
+            foreach ($raw as $v) {
+                $id = (int) $v;
+                if ($id > 0) {
+                    $ids[$id] = $id;
+                }
+            }
+        }
+        $ids = array_values($ids);
+
+        // Группы (сквозные HTML-ошибки) могут быть на тысячи URL; страница списка — обычно ≤50.
+        return array_slice($ids, 0, 10000);
     }
 
     public function saveFindingNote(Request $request, int $id)

@@ -3362,6 +3362,29 @@
     white-space: normal;
 }
 
+.cabinet-sr-audit-top-issues td:first-child {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 0; /* allow flexing in table layout */
+    width: 70%;
+    vertical-align: top;
+}
+
+.cabinet-sr-audit-top-issues__what {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.35;
+    margin-top: 0.15rem;
+}
+
+.cabinet-sr-audit-top-issues td:nth-child(2),
+.cabinet-sr-audit-top-issues td:nth-child(3) {
+    vertical-align: top;
+    white-space: nowrap;
+}
+
 .cabinet-sr-url {
     word-break: break-all;
     max-width: 28rem;

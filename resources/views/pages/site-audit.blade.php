@@ -561,37 +561,163 @@
                     historyTable.querySelectorAll('[data-crawl-id][data-finished="0"]').forEach(pollRow);
                 }
 
-                document.querySelectorAll('form[data-sa-cancel-crawl]').forEach(function (form) {
-                    form.addEventListener('submit', function (e) {
-                        e.preventDefault();
-                        var row = form.closest('tr');
-                        var btn = form.querySelector('button');
-                        if (btn) btn.disabled = true;
-                        fetch(form.action, {
-                            method: 'POST',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'X-CSRF-TOKEN': token
-                            },
-                            body: new FormData(form)
-                        }).then(function (r) {
-                            return r.json().then(function (j) { return { ok: r.ok, j: j }; });
-                        }).then(function (x) {
-                            if (!x.ok) {
+                function bindCancelForms(root) {
+                    (root || document).querySelectorAll('form[data-sa-cancel-crawl]').forEach(function (form) {
+                        if (form.getAttribute('data-sa-cancel-bound') === '1') return;
+                        form.setAttribute('data-sa-cancel-bound', '1');
+                        form.addEventListener('submit', function (e) {
+                            e.preventDefault();
+                            var row = form.closest('tr');
+                            var btn = form.querySelector('button');
+                            if (btn) btn.disabled = true;
+                            fetch(form.action, {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'X-CSRF-TOKEN': token
+                                },
+                                body: new FormData(form)
+                            }).then(function (r) {
+                                return r.json().then(function (j) { return { ok: r.ok, j: j }; });
+                            }).then(function (x) {
+                                if (!x.ok) {
+                                    if (btn) btn.disabled = false;
+                                    alert((x.j && x.j.message) ? x.j.message : 'Не удалось остановить');
+                                    return;
+                                }
+                                if (row) {
+                                    updateRow(row, x.j);
+                                }
+                            }).catch(function (err) {
                                 if (btn) btn.disabled = false;
-                                alert((x.j && x.j.message) ? x.j.message : 'Не удалось остановить');
-                                return;
-                            }
-                            if (row) {
-                                updateRow(row, x.j);
-                            }
-                        }).catch(function (err) {
-                            if (btn) btn.disabled = false;
-                            alert(String(err));
+                                alert(String(err));
+                            });
                         });
                     });
-                });
+                }
+                bindCancelForms(document);
+
+                var historyIndexUrl = '{{ route('pages.site-audit') }}';
+                var historyLoadSeq = 0;
+
+                function historyPublicUrl(domain, page) {
+                    var u = new URL(historyIndexUrl, window.location.origin);
+                    domain = String(domain || '').trim();
+                    if (domain) u.searchParams.set('domain', domain);
+                    page = parseInt(page, 10) || 1;
+                    if (page > 1) u.searchParams.set('page', String(page));
+                    return u.pathname + u.search + '#sa-history';
+                }
+
+                function historyFetchUrl(domain, page) {
+                    var u = new URL(historyIndexUrl, window.location.origin);
+                    domain = String(domain || '').trim();
+                    if (domain) u.searchParams.set('domain', domain);
+                    page = parseInt(page, 10) || 1;
+                    if (page > 1) u.searchParams.set('page', String(page));
+                    u.searchParams.set('partial', 'history');
+                    return u.toString();
+                }
+
+                function afterHistoryReplace(focusSearch) {
+                    historyTable = document.getElementById('sa-history-table');
+                    Object.keys(pollTimers).forEach(function (id) {
+                        clearTimeout(pollTimers[id]);
+                        delete pollTimers[id];
+                    });
+                    bindCancelForms(document.getElementById('sa-history'));
+                    pollActiveRows();
+                    if (typeof window.cabinetSaInitHistoryTips === 'function') {
+                        window.cabinetSaInitHistoryTips(historyTable);
+                    }
+                    if (focusSearch) {
+                        var inp = document.getElementById('sa-history-domain');
+                        if (inp) {
+                            inp.focus();
+                            try {
+                                var len = inp.value.length;
+                                inp.setSelectionRange(len, len);
+                            } catch (e) {}
+                        }
+                    }
+                }
+
+                function loadHistoryPartial(opts) {
+                    opts = opts || {};
+                    var domain = opts.domain != null
+                        ? String(opts.domain)
+                        : String((document.getElementById('sa-history-domain') || {}).value || '');
+                    domain = domain.trim();
+                    var page = opts.page || 1;
+                    var seq = ++historyLoadSeq;
+                    var section = document.getElementById('sa-history');
+                    if (section) section.classList.add('is-loading');
+
+                    fetch(historyFetchUrl(domain, page), {
+                        headers: {
+                            'Accept': 'text/html',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    }).then(function (r) {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.text();
+                    }).then(function (html) {
+                        if (seq !== historyLoadSeq) return;
+                        var wrap = document.createElement('div');
+                        wrap.innerHTML = String(html || '').trim();
+                        var next = wrap.querySelector('#sa-history') || wrap.firstElementChild;
+                        var cur = document.getElementById('sa-history');
+                        if (!cur || !next) throw new Error('empty history');
+                        cur.replaceWith(next);
+                        if (window.history && window.history.replaceState) {
+                            window.history.replaceState(null, '', historyPublicUrl(domain, page));
+                        }
+                        afterHistoryReplace(opts.focusSearch !== false);
+                    }).catch(function () {
+                        if (seq !== historyLoadSeq) return;
+                        window.location = historyPublicUrl(domain, page);
+                    }).then(function () {
+                        var s = document.getElementById('sa-history');
+                        if (s) s.classList.remove('is-loading');
+                    });
+                }
+
+                if (pageRoot) {
+                    pageRoot.addEventListener('submit', function (e) {
+                        var form = e.target;
+                        if (!form || !form.matches || !form.matches('[data-sa-history-ajax]')) return;
+                        e.preventDefault();
+                        loadHistoryPartial({ page: 1, focusSearch: true });
+                    });
+                    pageRoot.addEventListener('click', function (e) {
+                        var clearBtn = e.target && e.target.closest
+                            ? e.target.closest('[data-sa-history-clear]')
+                            : null;
+                        if (clearBtn) {
+                            e.preventDefault();
+                            var inp = document.getElementById('sa-history-domain');
+                            if (inp) inp.value = '';
+                            loadHistoryPartial({ domain: '', page: 1, focusSearch: true });
+                            return;
+                        }
+                        var pagerLink = e.target && e.target.closest
+                            ? e.target.closest('#sa-history .cabinet-sa-history__pager a, #sa-history .pagination a')
+                            : null;
+                        if (!pagerLink) return;
+                        e.preventDefault();
+                        try {
+                            var href = pagerLink.getAttribute('href') || '';
+                            var u = new URL(href, window.location.origin);
+                            var domain = u.searchParams.get('domain') || '';
+                            var page = parseInt(u.searchParams.get('page') || '1', 10) || 1;
+                            loadHistoryPartial({ domain: domain, page: page, focusSearch: false });
+                        } catch (err) {
+                            window.location = pagerLink.href;
+                        }
+                    });
+                }
 
                 if (startBtn) {
                     startBtn.addEventListener('click', function () {

@@ -177,12 +177,38 @@
             danger: danger,
             onConfirm: function () {
                 // Пока уходит POST — не даём жать повторно.
+                // Иконки / кнопки в ряду действий истории нельзя затирать текстом
+                // («Запуск…» раздувает квадрат и наезжает на «Сводку»).
                 if (submitter) {
                     submitter.disabled = true;
-                    if (!submitter.getAttribute('data-original-label')) {
-                        submitter.setAttribute('data-original-label', submitter.textContent || '');
+                    submitter.setAttribute('aria-busy', 'true');
+                    var inRowActions = !!submitter.closest('.cabinet-sa-row-actions, .cabinet-sa-actions');
+                    var isIconBtn = inRowActions
+                        || submitter.classList.contains('cabinet-sa-icon-btn')
+                        || !!submitter.querySelector('.bi, .fa, [class*="icon"]');
+                    if (isIconBtn) {
+                        submitter.classList.add('is-busy');
+                        // Иконку не трогаем — только disabled + лёгкий CSS busy.
+                    } else {
+                        if (!submitter.getAttribute('data-original-label')) {
+                            submitter.setAttribute('data-original-label', submitter.textContent || '');
+                        }
+                        var busy = '…';
+                        if (okLabel === 'Удалить') {
+                            busy = 'Удаление…';
+                        } else if (okLabel === 'Остановить') {
+                            busy = 'Остановка…';
+                        } else if (okLabel === 'Возобновить') {
+                            busy = 'Возобновление…';
+                        } else if (okLabel === 'Повторить') {
+                            busy = 'Повтор…';
+                        } else if (okLabel === 'Пометить' || okLabel === 'В игнор') {
+                            busy = '…';
+                        } else if (/запуст/i.test(okLabel || '')) {
+                            busy = 'Запуск…';
+                        }
+                        submitter.textContent = busy;
                     }
-                    submitter.textContent = 'Запуск…';
                 }
                 submitForm(form);
             }

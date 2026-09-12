@@ -11,6 +11,7 @@ use App\Services\SiteAudit\SiteAuditFindingPresenter;
 use App\SiteAuditCrawl;
 use App\SiteAuditFinding;
 use App\SiteAuditProject;
+use App\Support\DomainInformationDisplay;
 use App\Support\HomeUserSites;
 use Carbon\Carbon;
 use Throwable;
@@ -358,11 +359,17 @@ class SeoReportTitloModulesCollector
         }
 
         $daysLeft = null;
-        if ($domainInfo && method_exists($domainInfo, 'daysUntilExpiry')) {
+        $registrationSummary = null;
+        if ($domainInfo) {
             try {
-                $daysLeft = $domainInfo->daysUntilExpiry();
+                $daysLeft = DomainInformationDisplay::daysUntilExpiry($domainInfo);
+                $registrationSummary = DomainInformationDisplay::registrationBlock($domainInfo);
+                if ($registrationSummary === '—' || trim((string) $registrationSummary) === '') {
+                    $registrationSummary = null;
+                }
             } catch (Throwable $e) {
                 $daysLeft = null;
+                $registrationSummary = null;
             }
         }
 
@@ -376,6 +383,7 @@ class SeoReportTitloModulesCollector
                 'broken' => !empty($monitor->broken),
                 'last_check' => $monitor->last_check ? (string) $monitor->last_check : null,
                 'domain_days_left' => $daysLeft,
+                'domain_registration' => $registrationSummary,
                 'open_url' => route('site.monitoring'),
             ],
         ];

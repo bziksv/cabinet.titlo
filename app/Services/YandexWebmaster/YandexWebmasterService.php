@@ -476,6 +476,167 @@ class YandexWebmasterService
     }
 
     /**
+     * Сводка по всем поисковым запросам за период (клики / показы / позиция по дням).
+     *
+     * @return array{
+     *   ok:bool,
+     *   kpis?:array{clicks:?int,impressions:?int,ctr:?float,position:?float},
+     *   message?:string
+     * }
+     */
+    public function getSearchQueriesHistoryAll(
+        int $userId,
+        string $hostId,
+        string $dateFrom,
+        string $dateTo
+    ): array {
+        $dateFrom = trim($dateFrom);
+        $dateTo = trim($dateTo);
+        if ($dateFrom === '' || $dateTo === '') {
+            return ['ok' => false, 'message' => __('Yandex Webmaster API error')];
+        }
+
+        $payload = $this->apiGet($userId, $hostId, 'search-queries/all/history', [
+            'query_indicator' => ['TOTAL_SHOWS', 'TOTAL_CLICKS', 'AVG_SHOW_POSITION'],
+            'device_type_indicator' => 'ALL',
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+        ]);
+        if (!$payload['ok']) {
+            return $payload;
+        }
+
+        $indicators = is_array($payload['body']['indicators'] ?? null)
+            ? $payload['body']['indicators']
+            : [];
+        $showsSeries = is_array($indicators['TOTAL_SHOWS'] ?? null) ? $indicators['TOTAL_SHOWS'] : [];
+        $clicksSeries = is_array($indicators['TOTAL_CLICKS'] ?? null) ? $indicators['TOTAL_CLICKS'] : [];
+        $posSeries = is_array($indicators['AVG_SHOW_POSITION'] ?? null) ? $indicators['AVG_SHOW_POSITION'] : [];
+
+        $impressions = 0.0;
+        foreach ($showsSeries as $row) {
+            if (is_array($row)) {
+                $impressions += (float) ($row['value'] ?? 0);
+            }
+        }
+        $clicks = 0.0;
+        foreach ($clicksSeries as $row) {
+            if (is_array($row)) {
+                $clicks += (float) ($row['value'] ?? 0);
+            }
+        }
+
+        $posWeight = 0.0;
+        $posSum = 0.0;
+        $showsByDate = [];
+        foreach ($showsSeries as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $d = substr((string) ($row['date'] ?? ''), 0, 10);
+            if ($d !== '') {
+                $showsByDate[$d] = (float) ($row['value'] ?? 0);
+            }
+        }
+        foreach ($posSeries as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $d = substr((string) ($row['date'] ?? ''), 0, 10);
+            $pos = (float) ($row['value'] ?? 0);
+            $w = $showsByDate[$d] ?? 1.0;
+            if ($w <= 0) {
+                $w = 1.0;
+            }
+            $posSum += $pos * $w;
+            $posWeight += $w;
+        }
+
+        if ($impressions <= 0 && $clicks <= 0 && $posWeight <= 0) {
+            return [
+                'ok' => true,
+                'kpis' => [
+                    'clicks' => 0,
+                    'impressions' => 0,
+                    'ctr' => 0,
+                    'position' => null,
+                ],
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'kpis' => [
+                'clicks' => (int) round($clicks),
+                'impressions' => (int) round($impressions),
+                'ctr' => $impressions > 0 ? round(($clicks / $impressions) * 100, 2) : 0,
+                'position' => $posWeight > 0 ? round($posSum / $posWeight, 1) : null,
+            ],
+        ];
+    }
+
+    /**
+     * Топ популярных поисковых запросов за период.
+     *
+     * @return array{ok:bool,queries?:list<array{name:string,clicks:int,impressions:int,ctr:?float,position:?float}>,message?:string}
+     */
+    public function getSearchQueriesPopular(
+        int $userId,
+        string $hostId,
+        string $dateFrom,
+        string $dateTo,
+        int $limit = 25,
+        string $orderBy = 'TOTAL_CLICKS'
+    ): array {
+        $dateFrom = trim($dateFrom);
+        $dateTo = trim($dateTo);
+        if ($dateFrom === '' || $dateTo === '') {
+            return ['ok' => false, 'message' => __('Yandex Webmaster API error')];
+        }
+
+        $orderBy = $orderBy === 'TOTAL_SHOWS' ? 'TOTAL_SHOWS' : 'TOTAL_CLICKS';
+        $limit = max(1, min(500, $limit));
+
+        $payload = $this->apiGet($userId, $hostId, 'search-queries/popular', [
+            'order_by' => $orderBy,
+            'query_indicator' => ['TOTAL_SHOWS', 'TOTAL_CLICKS', 'AVG_SHOW_POSITION'],
+            'device_type_indicator' => 'ALL',
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'offset' => 0,
+            'limit' => $limit,
+        ]);
+        if (!$payload['ok']) {
+            return $payload;
+        }
+
+        $rows = is_array($payload['body']['queries'] ?? null) ? $payload['body']['queries'] : [];
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $name = trim((string) ($row['query_text'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $ind = is_array($row['indicators'] ?? null) ? $row['indicators'] : [];
+            $impressions = (float) ($ind['TOTAL_SHOWS'] ?? 0);
+            $clicks = (float) ($ind['TOTAL_CLICKS'] ?? 0);
+            $position = isset($ind['AVG_SHOW_POSITION']) ? (float) $ind['AVG_SHOW_POSITION'] : null;
+            $out[] = [
+                'name' => $name,
+                'clicks' => (int) round($clicks),
+                'impressions' => (int) round($impressions),
+                'ctr' => $impressions > 0 ? round(($clicks / $impressions) * 100, 2) : null,
+                'position' => $position !== null ? round($position, 1) : null,
+            ];
+        }
+
+        return ['ok' => true, 'queries' => $out];
+    }
+
+    /**
      * Актуальная оценка числа страниц в поиске (search-urls/in-search/history).
      *
      * @return array{ok:bool,count?:?int,date?:?string,message?:string}
@@ -627,7 +788,7 @@ class YandexWebmasterService
     }
 
     /**
-     * @param array<string,scalar> $query
+     * @param array<string,scalar|list<scalar>> $query
      * @return array{ok:bool,body?:array<string,mixed>,message?:string}
      */
     private function apiGet(int $userId, string $hostId, string $path, array $query = [], ?int $timeout = null): array
@@ -643,14 +804,20 @@ class YandexWebmasterService
             return ['ok' => false, 'message' => __('Connect Yandex Webmaster first')];
         }
 
+        // Яндекс ждёт повтор query_indicator=…&query_indicator=…, не query_indicator[0]=…
+        $queryString = $this->buildQueryString($query);
+
         try {
             $client = $this->httpClient($timeout);
-            $response = $client->get('v4/user/' . $yandexUserId . '/hosts/' . rawurlencode($hostId) . '/' . ltrim($path, '/'), [
+            $uri = 'v4/user/' . $yandexUserId . '/hosts/' . rawurlencode($hostId) . '/' . ltrim($path, '/');
+            if ($queryString !== '') {
+                $uri .= '?' . $queryString;
+            }
+            $response = $client->get($uri, [
                 'headers' => [
                     'Authorization' => 'OAuth ' . $accessToken,
                     'Accept' => 'application/json',
                 ],
-                'query' => $query,
                 'http_errors' => false,
             ]);
         } catch (Throwable $e) {
@@ -684,6 +851,31 @@ class YandexWebmasterService
             'ok' => true,
             'body' => is_array($body) ? $body : [],
         ];
+    }
+
+    /**
+     * @param array<string,scalar|list<scalar>> $query
+     */
+    private function buildQueryString(array $query): string
+    {
+        $parts = [];
+        foreach ($query as $key => $value) {
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    if ($item === null || $item === '') {
+                        continue;
+                    }
+                    $parts[] = rawurlencode((string) $key) . '=' . rawurlencode((string) $item);
+                }
+                continue;
+            }
+            if ($value === null || $value === '') {
+                continue;
+            }
+            $parts[] = rawurlencode((string) $key) . '=' . rawurlencode((string) $value);
+        }
+
+        return implode('&', $parts);
     }
 
     private function httpClient(?int $timeout = null): Client

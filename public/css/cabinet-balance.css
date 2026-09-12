@@ -25,7 +25,7 @@
     justify-content: center;
     min-height: 70px;
     line-height: 1.35;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .cabinet-balance-page .cabinet-balance-stats .info-box-text {
@@ -52,6 +52,13 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.cabinet-balance-page .cabinet-balance-stats .cabinet-balance-breakdown {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.35;
 }
 
 .cabinet-balance-page .card-header .card-title .badge {

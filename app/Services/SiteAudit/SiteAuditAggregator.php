@@ -2735,18 +2735,32 @@ class SiteAuditAggregator
 
     private function notifyOwner(SiteAuditCrawl $crawl): void
     {
+        $user = \App\User::query()->find($crawl->user_id);
+        if (! $user) {
+            return;
+        }
+
+        // Почта — в default-очередь с отложенными ретраями (SMTP 550/timeout).
+        // Telegram — сразу и отдельно, чтобы почта его не глушила.
         try {
-            $user = \App\User::query()->find($crawl->user_id);
-            if (! $user) {
-                return;
-            }
-            if ($user->email) {
-                $user->notify(new \App\Notifications\SiteAuditCrawlCompletedNotification($crawl));
-            }
             \App\Notifications\SiteAuditCrawlCompletedNotification::sendTelegram($user, $crawl);
         } catch (\Throwable $e) {
-            Log::warning('SiteAudit notify failed: ' . $e->getMessage(), [
+            Log::warning('SiteAudit telegram notify failed: ' . $e->getMessage(), [
                 'crawl_id' => $crawl->id,
+                'user_id' => $user->id,
+            ]);
+        }
+
+        if (! $user->email) {
+            return;
+        }
+
+        try {
+            \App\Jobs\SiteAudit\SendSiteAuditCrawlCompletedMailJob::dispatch((int) $crawl->id);
+        } catch (\Throwable $e) {
+            Log::warning('SiteAudit email notify enqueue failed: ' . $e->getMessage(), [
+                'crawl_id' => $crawl->id,
+                'user_id' => $user->id,
             ]);
         }
     }

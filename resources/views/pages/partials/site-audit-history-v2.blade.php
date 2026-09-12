@@ -13,15 +13,16 @@
                 @endif
             </p>
         </div>
-        <form method="GET" action="{{ route('pages.site-audit') }}#sa-history" class="cabinet-sa-history__search" id="sa-history-search">
+        <form method="GET" action="{{ route('pages.site-audit') }}#sa-history" class="cabinet-sa-history__search" id="sa-history-search" data-sa-history-ajax>
             <label class="visually-hidden" for="sa-history-domain">Поиск по домену</label>
             <input type="search" class="form-control form-control-sm" id="sa-history-domain" name="domain"
                    value="{{ $historyDomain ?? '' }}"
                    placeholder="Домен…"
-                   autocomplete="off">
+                   autocomplete="off"
+                   data-sa-history-domain>
             <button type="submit" class="btn btn-sm btn-outline-secondary">Найти</button>
             @if(!empty($historyDomain))
-                <a href="{{ route('pages.site-audit') }}#sa-history" class="btn btn-sm btn-link text-secondary px-1">×</a>
+                <a href="{{ route('pages.site-audit') }}#sa-history" class="btn btn-sm btn-link text-secondary px-1" data-sa-history-clear title="Сбросить">×</a>
             @endif
         </form>
     </header>

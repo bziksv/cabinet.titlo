@@ -224,6 +224,8 @@
     "GSC short": "GSC",
     "GSC synced": "GSC connected",
     "GSC synced short": "GSC",
+    "GSC report data note": "Data from Google Search Console: organic Google Search (clicks are visits from results; impressions are how often the site or query appeared). Numbers in Yandex Metrica may differ — different methodology.",
+    "Webmaster report data note": "Data from Yandex Webmaster: organic Yandex Search (clicks and impressions in results). Numbers in Yandex Metrica may differ — different methodology.",
     "Go to": "Go to",
     "Go to Analyzer": "Go to Analyzer",
     "Go to Clustering": "Go to Clustering",
@@ -881,5 +883,9 @@
     "rule agree link two": "\/rules\/en\/user_yes.pdf",
     "tasks": "tasks",
     "unexpected": "unexpected",
-    "Цифры": "Numbers"
+    "Цифры": "Numbers",
+    "Total balance": "Total balance",
+    "Personal": "Personal",
+    "Could not load GSC search analytics": "Could not load Google Search Console analytics",
+    "No GSC data for period": "No Google Search Console data for this period"
 }

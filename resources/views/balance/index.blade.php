@@ -9,7 +9,14 @@
 
     @php
         $user = Auth::user();
-        $balanceFormatted = number_format((float) $user->balance, 0, '.', ' ');
+        $companiesCollection = isset($companies) ? collect($companies) : collect();
+        $personalBalance = (int) round((float) $user->balance);
+        $companiesBalance = (int) $companiesCollection->sum(function ($company) {
+            return (int) round((float) ($company->balance ?? 0));
+        });
+        $totalBalance = $personalBalance + $companiesBalance;
+        $balanceFormatted = number_format($totalBalance, 0, '', ' ');
+        $personalBalanceFormatted = number_format($personalBalance, 0, '', ' ');
     @endphp
 
     <div class="cabinet-balance-page">
@@ -20,9 +27,14 @@
                         <i class="bi bi-wallet2"></i>
                     </span>
                     <div class="info-box-content">
-                        <span class="info-box-text">{{ __('Your balance') }}</span>
+                        <span class="info-box-text">{{ __('Total balance') }}</span>
                         <span class="info-box-number">{{ $balanceFormatted }} ₽</span>
-                        <span class="info-box-meta invisible" aria-hidden="true">&nbsp;</span>
+                        <span class="info-box-meta text-secondary cabinet-balance-breakdown">
+                            {{ __('Personal') }}: {{ $personalBalanceFormatted }} ₽
+                            @foreach($companiesCollection as $companyItem)
+                                <br>{{ $companyItem->name }}: {{ number_format((int) round((float) $companyItem->balance), 0, '', ' ') }} ₽
+                            @endforeach
+                        </span>
                     </div>
                 </div>
             </div>

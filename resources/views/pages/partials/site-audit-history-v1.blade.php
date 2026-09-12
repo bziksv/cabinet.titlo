@@ -2,16 +2,17 @@
             <div class="card-header py-2 px-3">
                 <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">
                     <h2 class="h6 mb-0 fw-semibold">История проверок</h2>
-                    <form method="GET" action="{{ route('pages.site-audit') }}#sa-history" class="d-flex align-items-center gap-2 ms-auto" id="sa-history-search">
+                    <form method="GET" action="{{ route('pages.site-audit') }}#sa-history" class="d-flex align-items-center gap-2 ms-auto" id="sa-history-search" data-sa-history-ajax>
                         <label class="visually-hidden" for="sa-history-domain">Поиск по домену</label>
                         <input type="search" class="form-control form-control-sm" id="sa-history-domain" name="domain"
                                value="{{ $historyDomain ?? '' }}"
                                placeholder="Поиск по домену…"
                                style="min-width:11rem;max-width:16rem"
-                               autocomplete="off">
+                               autocomplete="off"
+                               data-sa-history-domain>
                         <button type="submit" class="btn btn-sm btn-outline-secondary">Найти</button>
                         @if(!empty($historyDomain))
-                            <a href="{{ route('pages.site-audit') }}#sa-history" class="btn btn-sm btn-link text-secondary px-1">Сбросить</a>
+                            <a href="{{ route('pages.site-audit') }}#sa-history" class="btn btn-sm btn-link text-secondary px-1" data-sa-history-clear>Сбросить</a>
                         @endif
                     </form>
                 </div>

@@ -7,10 +7,11 @@ use App\SeoReports\SeoReportMetricRegistry;
 use App\SeoReports\SeoReportProject;
 use App\SeoReports\SeoReportSectionRegistry;
 use App\Services\YandexWebmaster\YandexWebmasterService;
+use Carbon\Carbon;
 
 /**
- * Сбор блока Яндекс.Вебмастер: диагностика, дубли мета, отфильтрованные/малополезные.
- * KPI / топ запросов / страниц пока из import CSV (отдельный OAuth search queries API позже).
+ * Сбор блока Яндекс.Вебмастер: диагностика, дубли мета, отфильтрованные,
+ * KPI / топ запросов через Search Queries API (+ CSV как fallback).
  */
 class SeoReportWebmasterCollector
 {
@@ -107,9 +108,13 @@ class SeoReportWebmasterCollector
         ];
 
         $userId = (int) $project->user_id;
-        $needApi = SeoReportMetricRegistry::enabled($settings, 'webmaster', 'diagnostics')
-            || SeoReportMetricRegistry::enabled($settings, 'webmaster', 'meta_duplicates')
-            || SeoReportMetricRegistry::enabled($settings, 'webmaster', 'filtered_pages');
+        $needDiag = SeoReportMetricRegistry::enabled($settings, 'webmaster', 'diagnostics')
+            || SeoReportMetricRegistry::enabled($settings, 'webmaster', 'meta_duplicates');
+        $needFiltered = SeoReportMetricRegistry::enabled($settings, 'webmaster', 'filtered_pages');
+        $needKpis = SeoReportMetricRegistry::enabled($settings, 'webmaster', 'kpis');
+        $needQueries = SeoReportMetricRegistry::enabled($settings, 'webmaster', 'queries');
+        $needSearchApi = $needKpis || $needQueries;
+        $needApi = $needDiag || $needFiltered || $needSearchApi;
 
         if ($hostId === '') {
             if ($this->importHasSearchData($import)) {
@@ -127,6 +132,7 @@ class SeoReportWebmasterCollector
         if ($needApi && !$this->webmaster->isConnected($userId)) {
             if ($this->importHasSearchData($import)) {
                 $base['note'] = __('Connect Yandex Webmaster OAuth');
+
                 return $this->ok($base, 'import');
             }
 
@@ -138,11 +144,18 @@ class SeoReportWebmasterCollector
             ];
         }
 
+        $date1 = optional($report->period_from)->format('Y-m-d');
+        $date2 = optional($report->period_to)->format('Y-m-d');
+        if (!$date1 || !$date2) {
+            $date2 = Carbon::now()->subDay()->format('Y-m-d');
+            $date1 = Carbon::now()->subDays(28)->format('Y-m-d');
+        }
+
         $apiErrors = [];
-        if ($needApi) {
-            if (SeoReportMetricRegistry::enabled($settings, 'webmaster', 'diagnostics')
-                || SeoReportMetricRegistry::enabled($settings, 'webmaster', 'meta_duplicates')
-            ) {
+        $fromApiSearch = false;
+
+        if ($needApi && $this->webmaster->isConnected($userId)) {
+            if ($needDiag) {
                 $diag = $this->webmaster->getDiagnostics($userId, $hostId);
                 if (!empty($diag['ok'])) {
                     $parsed = $this->parseDiagnostics(is_array($diag['problems'] ?? null) ? $diag['problems'] : []);
@@ -153,14 +166,34 @@ class SeoReportWebmasterCollector
                 }
             }
 
-            if (SeoReportMetricRegistry::enabled($settings, 'webmaster', 'filtered_pages')) {
-                $samples = $this->webmaster->getSearchUrlEventSamples($userId, $hostId, 800);
+            if ($needFiltered) {
+                $samples = $this->webmaster->getSearchUrlEventSamples($userId, $hostId, 100);
                 if (!empty($samples['ok'])) {
                     $base['filtered_pages'] = $this->parseExcludedSamples(
                         is_array($samples['samples'] ?? null) ? $samples['samples'] : []
                     );
                 } else {
                     $apiErrors[] = (string) ($samples['message'] ?? __('Yandex Webmaster API error'));
+                }
+            }
+
+            if ($needKpis) {
+                $hist = $this->webmaster->getSearchQueriesHistoryAll($userId, $hostId, $date1, $date2);
+                if (!empty($hist['ok']) && is_array($hist['kpis'] ?? null)) {
+                    $base['kpis'] = $hist['kpis'];
+                    $fromApiSearch = true;
+                } else {
+                    $apiErrors[] = (string) ($hist['message'] ?? __('Yandex Webmaster API error'));
+                }
+            }
+
+            if ($needQueries) {
+                $popular = $this->webmaster->getSearchQueriesPopular($userId, $hostId, $date1, $date2, 25);
+                if (!empty($popular['ok']) && is_array($popular['queries'] ?? null)) {
+                    $base['queries'] = $popular['queries'];
+                    $fromApiSearch = true;
+                } else {
+                    $apiErrors[] = (string) ($popular['message'] ?? __('Yandex Webmaster API error'));
                 }
             }
         }
@@ -170,8 +203,9 @@ class SeoReportWebmasterCollector
         $hasMeta = !empty($base['meta_duplicates']);
         $hasFiltered = !empty($base['filtered_pages']['summary'])
             || !empty($base['filtered_pages']['low_quality']);
+        $hasSearch = $this->hasSearchKpis($base) || !empty($base['queries']) || !empty($base['pages']);
 
-        if (!$hasImport && !$hasDiag && !$hasMeta && !$hasFiltered) {
+        if (!$hasImport && !$hasDiag && !$hasMeta && !$hasFiltered && !$hasSearch) {
             if ($apiErrors) {
                 return [
                     'ok' => false,
@@ -191,11 +225,13 @@ class SeoReportWebmasterCollector
 
         if ($apiErrors) {
             $base['note'] = implode('; ', array_unique($apiErrors));
-        } elseif (!$hasImport && ($hasDiag || $hasMeta || $hasFiltered)) {
-            $base['note'] = __('Webmaster diagnostics loaded; search queries KPI via CSV later');
         }
 
-        return $this->ok($base, $hasImport ? 'import+api' : 'api');
+        $source = $fromApiSearch && $hasImport
+            ? 'api+import'
+            : ($fromApiSearch ? 'api' : ($hasImport ? 'import+api' : 'api'));
+
+        return $this->ok($base, $source);
     }
 
     /**
@@ -224,6 +260,21 @@ class SeoReportWebmasterCollector
     }
 
     /**
+     * @param array<string,mixed> $base
+     */
+    private function hasSearchKpis(array $base): bool
+    {
+        $kpis = is_array($base['kpis'] ?? null) ? $base['kpis'] : [];
+        foreach (['clicks', 'impressions', 'ctr', 'position'] as $key) {
+            if (isset($kpis[$key]) && $kpis[$key] !== null && $kpis[$key] !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param array<string,array{severity:string,state:string,last_state_update:?string}> $problems
      * @return array{diagnostics:list<array<string,mixed>>,meta_duplicates:list<array<string,mixed>>}
      */
@@ -237,31 +288,21 @@ class SeoReportWebmasterCollector
                 continue;
             }
             $severity = strtoupper((string) ($row['severity'] ?? ''));
+            $label = self::PROBLEM_LABELS[$code] ?? $code;
             $item = [
                 'code' => (string) $code,
-                'label' => self::PROBLEM_LABELS[$code] ?? (string) $code,
-                'severity' => $severity,
-                'state' => $state !== '' ? $state : 'PRESENT',
-                'last_state_update' => $row['last_state_update'] ?? null,
+                'label' => $label,
+                'severity' => $severity !== '' ? $severity : 'POSSIBLE_PROBLEM',
+                'updated_at' => $row['last_state_update'] ?? null,
             ];
             if (in_array((string) $code, self::META_PROBLEM_CODES, true)) {
                 $meta[] = $item;
-            }
-            // В «общие ошибки» — FATAL / CRITICAL / POSSIBLE_PROBLEM (не рекомендации)
-            if (in_array($severity, ['FATAL', 'CRITICAL', 'POSSIBLE_PROBLEM'], true)) {
+            } else {
                 $diagnostics[] = $item;
             }
         }
 
-        usort($diagnostics, static function ($a, $b) {
-            $order = ['FATAL' => 0, 'CRITICAL' => 1, 'POSSIBLE_PROBLEM' => 2];
-            return ($order[$a['severity']] ?? 9) <=> ($order[$b['severity']] ?? 9);
-        });
-
-        return [
-            'diagnostics' => $diagnostics,
-            'meta_duplicates' => $meta,
-        ];
+        return ['diagnostics' => $diagnostics, 'meta_duplicates' => $meta];
     }
 
     /**
@@ -272,45 +313,45 @@ class SeoReportWebmasterCollector
     {
         $counts = [];
         $lowQuality = [];
-        $excluded = [];
+        $normalized = [];
         foreach ($samples as $row) {
-            $event = strtoupper((string) ($row['event'] ?? ''));
-            if ($event !== 'REMOVED_FROM_SEARCH') {
+            if (!is_array($row)) {
                 continue;
             }
-            $status = strtoupper((string) ($row['excluded_url_status'] ?? 'OTHER'));
+            $status = strtoupper(trim((string) ($row['excluded_url_status'] ?? '')));
             if ($status === '') {
-                $status = 'OTHER';
+                continue;
             }
             $counts[$status] = ($counts[$status] ?? 0) + 1;
             $item = [
                 'url' => (string) ($row['url'] ?? ''),
                 'title' => (string) ($row['title'] ?? ''),
                 'status' => $status,
-                'status_label' => self::EXCLUDED_STATUS_LABELS[$status] ?? $status,
+                'label' => self::EXCLUDED_STATUS_LABELS[$status] ?? $status,
                 'event_date' => $row['event_date'] ?? null,
-                'target_url' => $row['target_url'] ?? null,
             ];
-            $excluded[] = $item;
-            if ($status === 'LOW_QUALITY' && count($lowQuality) < 40) {
+            $normalized[] = $item;
+            if ($status === 'LOW_QUALITY' && count($lowQuality) < 25) {
                 $lowQuality[] = $item;
             }
         }
 
-        arsort($counts);
         $summary = [];
         foreach ($counts as $status => $count) {
             $summary[] = [
                 'status' => $status,
                 'label' => self::EXCLUDED_STATUS_LABELS[$status] ?? $status,
-                'count' => (int) $count,
+                'count' => $count,
             ];
         }
+        usort($summary, static function ($a, $b) {
+            return ($b['count'] ?? 0) <=> ($a['count'] ?? 0);
+        });
 
         return [
             'summary' => $summary,
             'low_quality' => $lowQuality,
-            'samples' => array_slice($excluded, 0, 60),
+            'samples' => array_slice($normalized, 0, 50),
         ];
     }
 }

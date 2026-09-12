@@ -628,30 +628,42 @@
 
 @if(!empty($canNote))
     <div class="cabinet-sa-note-legend{{ ($code ?? '') === 'index_count_mismatch' ? ' cabinet-sa-note-legend--compact' : '' }}" role="note">
-        <div class="cabinet-sa-note-legend__title">Действия со строкой</div>
+        <div class="cabinet-sa-note-legend__title">
+            @if(($viewMode ?? '') === 'groups')
+                Действия с блоком
+            @else
+                Действия со строкой
+            @endif
+        </div>
         <div class="cabinet-sa-note-legend__items">
-            <div class="cabinet-sa-note-legend__item">
-                <span class="cabinet-sa-note-legend__chip cabinet-sa-note-legend__chip--note">
-                    <i class="fa fa-comment" aria-hidden="true"></i> Заметка
-                </span>
-                <span class="cabinet-sa-note-legend__desc">свой комментарий</span>
-            </div>
+            @if(($viewMode ?? '') !== 'groups')
+                <div class="cabinet-sa-note-legend__item">
+                    <span class="cabinet-sa-note-legend__chip cabinet-sa-note-legend__chip--note">
+                        <i class="fa fa-comment" aria-hidden="true"></i> Заметка
+                    </span>
+                    <span class="cabinet-sa-note-legend__desc">свой комментарий</span>
+                </div>
+            @endif
             <div class="cabinet-sa-note-legend__item">
                 <span class="cabinet-sa-note-legend__chip cabinet-sa-note-legend__chip--fixed">
                     <i class="fa fa-check" aria-hidden="true"></i> Исправлено
                 </span>
-                <span class="cabinet-sa-note-legend__desc">починили — уходит из счётчиков</span>
+                <span class="cabinet-sa-note-legend__desc">{{ ($viewMode ?? '') === 'groups' ? 'весь блок сразу — кнопки на карточке' : 'починили — уходит из счётчиков' }}</span>
             </div>
             <div class="cabinet-sa-note-legend__item">
                 <span class="cabinet-sa-note-legend__chip cabinet-sa-note-legend__chip--ignore">
                     <i class="fa fa-ban" aria-hidden="true"></i> Игнор
                 </span>
-                <span class="cabinet-sa-note-legend__desc">не ошибка / ложное срабатывание</span>
+                <span class="cabinet-sa-note-legend__desc">{{ ($viewMode ?? '') === 'groups' ? 'весь блок сразу — кнопки на карточке' : 'не ошибка / ложное срабатывание' }}</span>
             </div>
         </div>
         @if(($code ?? '') !== 'index_count_mismatch')
             <div class="cabinet-sa-note-legend__foot">
-                Пометки помнятся для этого сайта (тот же тип + тот же URL), пока сами не снимете.
+                @if(($viewMode ?? '') === 'groups')
+                    Кнопки «Исправлено · блок» / «Игнор · блок» на карточке помечают все URL группы (не только видимые 10), пока сами не снимете.
+                @else
+                    Пометки помнятся для этого сайта (тот же тип + тот же URL), пока сами не снимете.
+                @endif
             </div>
         @endif
     </div>
@@ -663,18 +675,27 @@
             @php $tone = $gi % 6; @endphp
             <div class="cabinet-sa-dup-group cabinet-sa-dup-group--t{{ $tone }}{{ !empty($group['likely_template']) ? ' cabinet-sa-dup-group--template' : '' }}">
                 <div class="cabinet-sa-dup-group__head">
-                    <div class="cabinet-sa-dup-group__meta">
-                        <span class="cabinet-sa-dup-group__count">{{ number_format((int) $group['size'], 0, '', ' ') }} стр.</span>
-                        @if(!empty($group['status']))
-                            @php $gStatus = (int) $group['status']; @endphp
-                            <span class="cabinet-sa-status-pill {{ $gStatus >= 500 ? 'cabinet-sa-status-pill--5xx' : ($gStatus >= 400 ? 'cabinet-sa-status-pill--4xx' : '') }}">{{ $gStatus }}</span>
-                        @endif
-                        @if(!empty($isLinkInvertedReport) && (($group['scope'] ?? '') === 'external' || ($group['scope'] ?? '') === 'internal'))
-                            <span class="cabinet-sa-dup-group__scope cabinet-sa-dup-group__scope--{{ $group['scope'] }}">{{ ($group['scope'] ?? '') === 'internal' ? 'внутренняя' : 'внешняя' }}</span>
-                        @endif
-                        @if(!empty($group['likely_template']))
-                            <span class="cabinet-sa-dup-group__badge">{{ (!empty($isCrawlImagesReport) || !empty($isImagesWithoutAltReport) || !empty($isLinkInvertedReport) || !empty($isInsecureFormReport)) ? 'общий блок' : 'сквозной' }}</span>
-                        @endif
+                    <div class="cabinet-sa-dup-group__top">
+                        <div class="cabinet-sa-dup-group__meta">
+                            <span class="cabinet-sa-dup-group__count">{{ number_format((int) $group['size'], 0, '', ' ') }} стр.</span>
+                            @if(!empty($group['status']))
+                                @php $gStatus = (int) $group['status']; @endphp
+                                <span class="cabinet-sa-status-pill {{ $gStatus >= 500 ? 'cabinet-sa-status-pill--5xx' : ($gStatus >= 400 ? 'cabinet-sa-status-pill--4xx' : '') }}">{{ $gStatus }}</span>
+                            @endif
+                            @if(!empty($isLinkInvertedReport) && (($group['scope'] ?? '') === 'external' || ($group['scope'] ?? '') === 'internal'))
+                                <span class="cabinet-sa-dup-group__scope cabinet-sa-dup-group__scope--{{ $group['scope'] }}">{{ ($group['scope'] ?? '') === 'internal' ? 'внутренняя' : 'внешняя' }}</span>
+                            @endif
+                            @if(!empty($group['likely_template']))
+                                <span class="cabinet-sa-dup-group__badge">{{ (!empty($isCrawlImagesReport) || !empty($isImagesWithoutAltReport) || !empty($isLinkInvertedReport) || !empty($isInsecureFormReport)) ? 'общий блок' : 'сквозной' }}</span>
+                            @endif
+                        </div>
+                        @include('pages.partials.site-audit-report-bulk-group', [
+                            'group' => $group,
+                            'crawl' => $crawl,
+                            'code' => $code,
+                            'canNote' => $canNote ?? false,
+                            'canIgnore' => $canIgnore ?? false,
+                        ])
                     </div>
                     <div class="cabinet-sa-dup-group__label">
                         @if(!empty($isInsecureFormReport))
@@ -898,8 +919,25 @@
                 $pageColMeta[$col['key']] = $col;
             }
         }
+        $pageFindingIds = [];
+        if ($showActions && ($viewMode ?? 'list') !== 'groups') {
+            foreach (($rows ?? []) as $bulkRow) {
+                $fid = (int) ($bulkRow->id ?? 0);
+                if ($fid > 0) {
+                    $pageFindingIds[$fid] = $fid;
+                }
+            }
+            $pageFindingIds = array_values($pageFindingIds);
+        }
     @endphp
-    @include('pages.partials.site-audit-report-cols-toolbar', ['reportColKeys' => $reportColKeys])
+    @include('pages.partials.site-audit-report-cols-toolbar', [
+        'reportColKeys' => $reportColKeys,
+        'pageFindingIds' => $pageFindingIds,
+        'crawl' => $crawl,
+        'code' => $code,
+        'canNote' => $canNote ?? false,
+        'canIgnore' => $canIgnore ?? false,
+    ])
     <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isRedirectReport ? ' cabinet-sa-table-wrap--redirect' : '' }}{{ $isImageCardReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}{{ !empty($isIndexMismatchReport) ? ' cabinet-sa-table-wrap--index-mismatch' : '' }}{{ $isCannibalReport ? ' cabinet-sa-table-wrap--cannibal' : '' }}">
         <table class="table table-sm table-hover mb-0 cabinet-sa-findings-table"
                data-sa-report-table
