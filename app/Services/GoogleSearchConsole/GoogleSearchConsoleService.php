@@ -57,8 +57,8 @@ class GoogleSearchConsoleService
             'redirect_uri' => $this->redirectUri(),
             'scope' => config('cabinet-google-search-console.scope'),
             'access_type' => 'offline',
-            'prompt' => 'consent',
-            'include_granted_scopes' => 'true',
+            // Всегда запрашиваем полный набор прав (не инкрементальный OAuth).
+            'prompt' => 'consent select_account',
             'state' => $state,
         ]);
 
@@ -148,6 +148,16 @@ class GoogleSearchConsoleService
             ]);
         }
 
+        if (!$this->tokenHasWebmasterScope($userId)) {
+            $this->disconnect($userId);
+            Log::warning('gsc token missing webmasters scope', ['user_id' => $userId]);
+
+            return [
+                'ok' => false,
+                'message' => __('Google Search Console scope missing reconnect'),
+            ];
+        }
+
         return ['ok' => true];
     }
 
@@ -160,13 +170,25 @@ class GoogleSearchConsoleService
     }
 
     /**
-     * @return array<int, array{id:string,url:string,unicode_url:string,verified:bool,domain:string}>
+     * @return array{ok:bool,properties?:array<int, array{id:string,url:string,unicode_url:string,verified:bool,domain:string}>,need_reauth?:bool,message?:string}
      */
-    public function listProperties(int $userId): array
+    public function fetchProperties(int $userId): array
     {
         $accessToken = $this->validAccessToken($userId);
         if ($accessToken === null) {
-            return [];
+            return [
+                'ok' => false,
+                'need_reauth' => true,
+                'message' => __('Connect Google Search Console first'),
+            ];
+        }
+
+        if (!$this->tokenHasWebmasterScope($userId, $accessToken)) {
+            return [
+                'ok' => false,
+                'need_reauth' => true,
+                'message' => __('Google Search Console scope missing reconnect'),
+            ];
         }
 
         $client = $this->httpClient();
@@ -178,17 +200,26 @@ class GoogleSearchConsoleService
             'http_errors' => false,
         ]);
 
-        if ($response->getStatusCode() >= 400) {
+        $status = $response->getStatusCode();
+        $raw = (string) $response->getBody();
+        if ($status >= 400) {
             Log::warning('gsc sites list http error', [
                 'user_id' => $userId,
-                'status' => $response->getStatusCode(),
-                'body' => mb_substr((string) $response->getBody(), 0, 400),
+                'status' => $status,
+                'body' => mb_substr($raw, 0, 400),
             ]);
+            $needReauth = $status === 401 || $status === 403;
 
-            return [];
+            return [
+                'ok' => false,
+                'need_reauth' => $needReauth,
+                'message' => $needReauth
+                    ? __('Google Search Console scope missing reconnect')
+                    : __('Could not load GSC properties'),
+            ];
         }
 
-        $body = json_decode((string) $response->getBody(), true);
+        $body = json_decode($raw, true);
         $rows = is_array($body['siteEntry'] ?? null) ? $body['siteEntry'] : [];
         $out = [];
         foreach ($rows as $row) {
@@ -211,7 +242,19 @@ class GoogleSearchConsoleService
             ];
         }
 
-        return $out;
+        return ['ok' => true, 'properties' => $out];
+    }
+
+    /**
+     * @return array<int, array{id:string,url:string,unicode_url:string,verified:bool,domain:string}>
+     */
+    public function listProperties(int $userId): array
+    {
+        $result = $this->fetchProperties($userId);
+
+        return !empty($result['ok']) && is_array($result['properties'] ?? null)
+            ? $result['properties']
+            : [];
     }
 
     /**
@@ -295,6 +338,40 @@ class GoogleSearchConsoleService
         }
 
         return HomeUserSites::normalizeDomain($propertyId);
+    }
+
+    private function tokenHasWebmasterScope(int $userId, ?string $accessToken = null): bool
+    {
+        $accessToken = $accessToken !== null && $accessToken !== ''
+            ? $accessToken
+            : $this->validAccessToken($userId);
+        if ($accessToken === null || $accessToken === '') {
+            return false;
+        }
+
+        try {
+            $client = new Client([
+                'timeout' => (int) config('cabinet-google-search-console.timeout', 20),
+                'http_errors' => false,
+            ]);
+            $response = $client->get('https://oauth2.googleapis.com/tokeninfo', [
+                'query' => ['access_token' => $accessToken],
+            ]);
+            if ($response->getStatusCode() >= 400) {
+                return false;
+            }
+            $body = json_decode((string) $response->getBody(), true);
+            $scope = ' ' . (string) ($body['scope'] ?? '') . ' ';
+
+            return strpos($scope, 'webmasters') !== false;
+        } catch (Throwable $e) {
+            Log::warning('gsc tokeninfo failed', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function resolveGoogleEmail(int $userId): ?string

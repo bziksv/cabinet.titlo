@@ -6664,5 +6664,6 @@
     "Show sites with module gaps": "Показать сайты без модулей",
     "Show sites with Metrika": "Показать сайты с Метрикой",
     "Show sites with Webmaster": "Показать сайты с Вебмастером",
-    "Show sites without Webmaster": "Показать сайты без Вебмастера"
+    "Show sites without Webmaster": "Показать сайты без Вебмастера",
+    "Google Search Console scope missing reconnect": "Нет доступа к Search Console. В Google Cloud добавьте scope webmasters.readonly, затем отключите и снова подключите GSC — на экране Google должны быть права на Search Console."
 }

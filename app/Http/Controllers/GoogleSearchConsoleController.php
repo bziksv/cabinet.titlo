@@ -104,7 +104,7 @@ class GoogleSearchConsoleController extends Controller
         }
 
         try {
-            $properties = $this->gsc->listProperties($userId);
+            $result = $this->gsc->fetchProperties($userId);
         } catch (\Throwable $e) {
             report($e);
 
@@ -113,6 +113,16 @@ class GoogleSearchConsoleController extends Controller
                 'message' => __('Could not load GSC properties'),
             ], 502);
         }
+
+        if (empty($result['ok'])) {
+            return response()->json([
+                'ok' => false,
+                'need_auth' => !empty($result['need_reauth']),
+                'message' => $result['message'] ?? __('Could not load GSC properties'),
+            ], !empty($result['need_reauth']) ? 401 : 502);
+        }
+
+        $properties = $result['properties'] ?? [];
 
         return response()->json([
             'ok' => true,

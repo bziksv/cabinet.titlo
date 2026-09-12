@@ -810,5 +810,6 @@
     "Show sites with GSC": "Show sites with GSC",
     "Show sites without GSC": "Show sites without GSC",
     "GSC synced": "GSC connected",
-    "GSC not synced": "GSC not connected"
+    "GSC not synced": "GSC not connected",
+    "Google Search Console scope missing reconnect": "Search Console access is missing. Add webmasters.readonly scope in Google Cloud, then reconnect GSC and grant Search Console permission."
 }
