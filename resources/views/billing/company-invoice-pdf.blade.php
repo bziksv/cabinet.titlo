@@ -75,8 +75,8 @@
             </table>
         </td>
         @if(!empty($paymentQrSrc))
-            <td style="width: 90px; text-align: center; vertical-align: middle; padding: 4px;">
-                <img src="{{ $paymentQrSrc }}" alt="QR" width="80" height="80" style="width: 80px; height: 80px;">
+            <td style="width: 120px; text-align: center; vertical-align: middle; padding: 4px;">
+                <img src="{{ $paymentQrSrc }}" alt="QR" width="110" height="110" style="width: 110px; height: 110px;">
             </td>
         @endif
     </tr>

@@ -41,7 +41,7 @@ class CompanyInvoicePdfService
         $paymentQrSrc = null;
         if ($kind === 'invoice') {
             $purpose = 'Оплата по счёту № ' . $invoice->number . ' от ' . $this->russianDate($issuedAt) . ' Без НДС.';
-            $paymentQrSrc = app(RussianPaymentQrService::class)->dataUri($seller, $amount, $purpose, 180);
+            $paymentQrSrc = app(RussianPaymentQrService::class)->dataUri($seller, $amount, $purpose, 260);
         }
 
         return [
