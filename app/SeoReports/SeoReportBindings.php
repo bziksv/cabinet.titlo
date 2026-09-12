@@ -2,6 +2,7 @@
 
 namespace App\SeoReports;
 
+use App\GoogleSearchConsoleDomainProperty;
 use App\MonitoringProject;
 use App\Support\HomeUserSites;
 use App\YandexMetrikaDomainCounter;
@@ -50,6 +51,28 @@ class SeoReportBindings
             ->value('host_id'));
 
         return $hostId !== '' ? $hostId : null;
+    }
+
+    /**
+     * property_id Google Search Console (sc-domain:… или URL-префикс) из привязки на главной.
+     */
+    public static function resolveGscProperty(int $userId, string $domain): ?string
+    {
+        if ($userId < 1 || !GoogleSearchConsoleDomainProperty::tableReady()) {
+            return null;
+        }
+
+        $domain = HomeUserSites::normalizeDomain($domain);
+        if ($domain === '') {
+            return null;
+        }
+
+        $propertyId = trim((string) GoogleSearchConsoleDomainProperty::query()
+            ->where('user_id', $userId)
+            ->where('domain', $domain)
+            ->value('property_id'));
+
+        return $propertyId !== '' ? $propertyId : null;
     }
 
     public static function resolveMonitoringProjectId(int $userId, string $domain): ?int
@@ -133,6 +156,14 @@ class SeoReportBindings
         return YandexWebmasterDomainHost::forUser($userId);
     }
 
+    /**
+     * @return Collection<int, GoogleSearchConsoleDomainProperty>
+     */
+    public static function gscBindingsForUser(int $userId): Collection
+    {
+        return GoogleSearchConsoleDomainProperty::forUser($userId);
+    }
+
     public static function applyAutoBindings(SeoReportProject $project): void
     {
         $userId = (int) $project->user_id;
@@ -153,13 +184,25 @@ class SeoReportBindings
         }
 
         $settings = is_array($project->settings_json) ? $project->settings_json : [];
+        $changed = false;
         $currentHost = trim((string) ($settings['webmaster_host'] ?? ''));
         if ($currentHost === '') {
             $hostId = self::resolveWebmasterHost($userId, $domain);
             if ($hostId) {
                 $settings['webmaster_host'] = $hostId;
-                $project->settings_json = $settings;
+                $changed = true;
             }
+        }
+        $currentGsc = trim((string) ($settings['gsc_property'] ?? ''));
+        if ($currentGsc === '') {
+            $propertyId = self::resolveGscProperty($userId, $domain);
+            if ($propertyId) {
+                $settings['gsc_property'] = $propertyId;
+                $changed = true;
+            }
+        }
+        if ($changed) {
+            $project->settings_json = $settings;
         }
     }
 
@@ -213,6 +256,61 @@ class SeoReportBindings
                     return;
                 }
                 $settings['webmaster_host'] = null;
+                $project->settings_json = $settings;
+                $project->save();
+            });
+    }
+
+    /**
+     * После привязки на главной / в настройках — проставить gsc_property в SEO-проектах с тем же доменом.
+     */
+    public static function syncGscPropertyToProjects(int $userId, string $domain, string $propertyId): void
+    {
+        $domain = HomeUserSites::normalizeDomain($domain);
+        $propertyId = trim($propertyId);
+        if ($userId < 1 || $domain === '' || $propertyId === '') {
+            return;
+        }
+
+        SeoReportProject::query()
+            ->where('user_id', $userId)
+            ->where('domain', $domain)
+            ->orderBy('id')
+            ->limit(100)
+            ->get()
+            ->each(static function (SeoReportProject $project) use ($propertyId) {
+                $settings = is_array($project->settings_json) ? $project->settings_json : [];
+                if (trim((string) ($settings['gsc_property'] ?? '')) === $propertyId) {
+                    return;
+                }
+                $settings['gsc_property'] = $propertyId;
+                $project->settings_json = $settings;
+                $project->save();
+            });
+    }
+
+    /**
+     * После отвязки на главной / в настройках — очистить gsc_property у SEO-проектов домена.
+     */
+    public static function clearGscPropertyFromProjects(int $userId, string $domain): void
+    {
+        $domain = HomeUserSites::normalizeDomain($domain);
+        if ($userId < 1 || $domain === '') {
+            return;
+        }
+
+        SeoReportProject::query()
+            ->where('user_id', $userId)
+            ->where('domain', $domain)
+            ->orderBy('id')
+            ->limit(100)
+            ->get()
+            ->each(static function (SeoReportProject $project) {
+                $settings = is_array($project->settings_json) ? $project->settings_json : [];
+                if (trim((string) ($settings['gsc_property'] ?? '')) === '') {
+                    return;
+                }
+                $settings['gsc_property'] = null;
                 $project->settings_json = $settings;
                 $project->save();
             });

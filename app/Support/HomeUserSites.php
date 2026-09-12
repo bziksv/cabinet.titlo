@@ -10,6 +10,7 @@ use App\EseninTextCheckSession;
 use App\HomeUserArchivedSite;
 use App\IndexCheckHistory;
 use App\HomeUserSitesPreference;
+use App\GoogleSearchConsoleDomainProperty;
 use App\YandexMetrikaDomainCounter;
 use App\YandexWebmasterDomainHost;
 use App\MonitoringProject;
@@ -74,6 +75,14 @@ class HomeUserSites
                 'title' => __('Yandex Webmaster'),
                 'short' => __('Webmaster short'),
                 'create_url' => '#webmaster',
+                'kind' => 'integration',
+                'supports_sync' => true,
+            ],
+            [
+                'key' => 'google-search-console',
+                'title' => __('Google Search Console'),
+                'short' => __('GSC short'),
+                'create_url' => '#gsc',
                 'kind' => 'integration',
                 'supports_sync' => true,
             ],
@@ -312,6 +321,7 @@ class HomeUserSites
             self::collectEsenin($userId, $add);
             self::collectYandexMetrika($userId, $add);
             self::collectYandexWebmaster($userId, $add);
+            self::collectGoogleSearchConsole($userId, $add);
         } catch (Throwable $e) {
             report($e);
         }
@@ -465,6 +475,9 @@ class HomeUserSites
                     'host_id' => $present && isset($info['host_id'])
                         ? (string) $info['host_id']
                         : null,
+                    'property_id' => $present && isset($info['property_id'])
+                        ? (string) $info['property_id']
+                        : null,
                 ];
             }
             $site['matrix'] = $matrix;
@@ -604,6 +617,33 @@ class HomeUserSites
                 $row->updated_at ?: $row->created_at,
                 $label,
                 ['host_id' => (string) $row->host_id]
+            );
+        });
+    }
+
+    /**
+     * Привязки доменов к property Google Search Console.
+     *
+     * @param callable(string,string,string,mixed,string):void $add
+     */
+    private static function collectGoogleSearchConsole(int $userId, callable $add): void
+    {
+        if ($userId < 1 || !GoogleSearchConsoleDomainProperty::tableReady()) {
+            return;
+        }
+
+        GoogleSearchConsoleDomainProperty::forUser($userId)->each(static function ($row) use ($add) {
+            $label = trim((string) $row->property_url);
+            if ($label === '') {
+                $label = (string) $row->property_id;
+            }
+            $add(
+                (string) $row->domain,
+                'google-search-console',
+                '#gsc',
+                $row->updated_at ?: $row->created_at,
+                $label,
+                ['property_id' => (string) $row->property_id]
             );
         });
     }

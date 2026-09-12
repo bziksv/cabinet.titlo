@@ -25,6 +25,7 @@ use App\Services\SeoReports\SeoReportExportService;
 use App\Services\SeoReports\SeoReportExternalAdsCollector;
 use App\Services\SeoReports\SeoReportPresetDemoFactory;
 use App\Services\SeoReports\SeoReportTemplateService;
+use App\Services\GoogleSearchConsole\GoogleSearchConsoleService;
 use App\Services\YandexMetrika\YandexMetrikaService;
 use App\Services\YandexWebmaster\YandexWebmasterService;
 use App\Support\HomeUserSites;
@@ -52,14 +53,19 @@ class SeoReportsController extends Controller
     /** @var YandexWebmasterService */
     private $webmaster;
 
+    /** @var GoogleSearchConsoleService */
+    private $gsc;
+
     public function __construct(
         SeoReportExportService $export,
         YandexMetrikaService $metrika,
-        YandexWebmasterService $webmaster
+        YandexWebmasterService $webmaster,
+        GoogleSearchConsoleService $gsc
     ) {
         $this->export = $export;
         $this->metrika = $metrika;
         $this->webmaster = $webmaster;
+        $this->gsc = $gsc;
     }
 
     /**
@@ -129,12 +135,17 @@ class SeoReportsController extends Controller
         foreach (SeoReportBindings::webmasterBindingsForUser($userId) as $binding) {
             $webmasterByDomain[(string) $binding->domain] = $binding;
         }
+        $gscByDomain = [];
+        foreach (SeoReportBindings::gscBindingsForUser($userId) as $binding) {
+            $gscByDomain[(string) $binding->domain] = $binding;
+        }
 
         $domainHints = [];
         foreach ($availableDomains as $domain) {
             $metrikaId = SeoReportBindings::resolveMetrikaCounterId($userId, $domain);
             $monitoringId = SeoReportBindings::resolveMonitoringProjectId($userId, $domain);
             $webmasterId = SeoReportBindings::resolveWebmasterHost($userId, $domain);
+            $gscId = SeoReportBindings::resolveGscProperty($userId, $domain);
             $metrikaLabel = '';
             if ($metrikaId) {
                 $binding = $metrikaByDomain[$domain] ?? null;
@@ -162,6 +173,18 @@ class SeoReportsController extends Controller
                     $webmasterLabel = $domain . ' · ' . $webmasterId;
                 }
             }
+            $gscLabel = '';
+            if ($gscId) {
+                $gscBinding = $gscByDomain[$domain] ?? null;
+                if ($gscBinding) {
+                    $propUrl = trim((string) ($gscBinding->property_url ?? ''));
+                    $gscLabel = $propUrl !== ''
+                        ? ((string) $gscBinding->domain) . ' · ' . $propUrl
+                        : ((string) $gscBinding->domain) . ' · ' . $gscId;
+                } else {
+                    $gscLabel = $domain . ' · ' . $gscId;
+                }
+            }
             $domainHints[$domain] = [
                 'metrika' => $metrikaId,
                 'metrika_label' => $metrikaLabel,
@@ -169,6 +192,8 @@ class SeoReportsController extends Controller
                 'monitoring_label' => $monitoringLabel,
                 'webmaster' => $webmasterId,
                 'webmaster_label' => $webmasterLabel,
+                'gsc' => $gscId,
+                'gsc_label' => $gscLabel,
             ];
         }
 
@@ -223,6 +248,9 @@ class SeoReportsController extends Controller
             'webmasterBindings' => SeoReportBindings::webmasterBindingsForUser($userId),
             'webmasterConfigured' => $this->webmaster->isConfigured(),
             'webmasterConnected' => $this->webmaster->isConnected($userId),
+            'gscBindings' => SeoReportBindings::gscBindingsForUser($userId),
+            'gscConfigured' => $this->gsc->isConfigured(),
+            'gscConnected' => $this->gsc->isConnected($userId),
         ]);
     }
 
@@ -438,6 +466,12 @@ class SeoReportsController extends Controller
             $settings['webmaster_host'] = $webmasterHost;
             $project->settings_json = $settings;
         }
+        $gscProperty = trim((string) $request->input('gsc_property', ''));
+        if ($gscProperty !== '') {
+            $settings = is_array($project->settings_json) ? $project->settings_json : [];
+            $settings['gsc_property'] = $gscProperty;
+            $project->settings_json = $settings;
+        }
         $project->save();
 
         return redirect()
@@ -574,6 +608,9 @@ class SeoReportsController extends Controller
             'webmasterBindings' => SeoReportBindings::webmasterBindingsForUser($userId),
             'webmasterConfigured' => $this->webmaster->isConfigured(),
             'webmasterConnected' => $this->webmaster->isConnected($userId),
+            'gscBindings' => SeoReportBindings::gscBindingsForUser($userId),
+            'gscConfigured' => $this->gsc->isConfigured(),
+            'gscConnected' => $this->gsc->isConnected($userId),
             'monitoringOptions' => SeoReportBindings::monitoringOptionsForUser($userId),
             'metrikaGoals' => $goals,
             'selectedGoalIds' => isset($settings['metrika_goal_ids']) && is_array($settings['metrika_goal_ids'])
@@ -600,8 +637,8 @@ class SeoReportsController extends Controller
         $settings['metrika_goal_ids'] = is_array($goalIds)
             ? array_values(array_filter(array_map('intval', $goalIds)))
             : [];
-        // GSC пока в разработке: не принимаем ввод, сохраняем уже записанное значение.
         $settings['webmaster_host'] = trim((string) $request->input('webmaster_host', '')) ?: null;
+        $settings['gsc_property'] = trim((string) $request->input('gsc_property', '')) ?: null;
         $settings['auto_email'] = $request->boolean('auto_email');
         $settings['auto_email_to'] = trim((string) $request->input('auto_email_to', '')) ?: null;
         $settings['auto_email_message'] = trim((string) $request->input('auto_email_message', '')) ?: null;
@@ -1745,6 +1782,12 @@ class SeoReportsController extends Controller
                     (string) $project->domain
                 ) ?: '');
             }
+            if ($property === '' && $source === 'gsc') {
+                $property = (string) (SeoReportBindings::resolveGscProperty(
+                    (int) $project->user_id,
+                    (string) $project->domain
+                ) ?: '');
+            }
             if ($property !== '') {
                 return SeoReportSectionRegistry::SOURCE_STATUS_OK;
             }
@@ -1864,7 +1907,7 @@ class SeoReportsController extends Controller
         }
 
         // Ещё не готовые интеграции — не притворяемся, что «не подключено» можно починить сейчас.
-        if (in_array($source, ['gsc', 'direct', 'google_ads', 'vk_ads', 'vk_smm', 'calls'], true)) {
+        if (in_array($source, ['direct', 'google_ads', 'vk_ads', 'vk_smm', 'calls'], true)) {
             return [
                 'kind' => 'dev',
                 'label' => __('In development'),
@@ -1895,6 +1938,16 @@ class SeoReportsController extends Controller
         if ($source === 'webmaster') {
             $settings = is_array($project->settings_json) ? $project->settings_json : [];
             $has = trim((string) ($settings['webmaster_host'] ?? '')) !== '';
+
+            return [
+                'kind' => 'link',
+                'label' => $has ? __('Change') : __('Connect'),
+                'url' => $settingsUrl(4),
+            ];
+        }
+        if ($source === 'gsc') {
+            $settings = is_array($project->settings_json) ? $project->settings_json : [];
+            $has = trim((string) ($settings['gsc_property'] ?? '')) !== '';
 
             return [
                 'kind' => 'link',

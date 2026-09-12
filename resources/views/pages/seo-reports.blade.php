@@ -92,6 +92,7 @@
                         $hasMetrika = (int) ($project->metrika_counter_id ?? 0) > 0;
                         $hasMonitoring = (int) ($project->monitoring_project_id ?? 0) > 0;
                         $hasWm = trim((string) ($projSettings['webmaster_host'] ?? '')) !== '';
+                        $hasGsc = trim((string) ($projSettings['gsc_property'] ?? '')) !== '';
                         $reportsCount = (int) $project->reports_count;
                         $title = trim((string) ($project->title ?? ''));
                     @endphp
@@ -132,6 +133,10 @@
                             <li class="is-{{ $hasWm ? 'on' : 'off' }}">
                                 <i class="bi bi-{{ $hasWm ? 'check-circle-fill' : 'circle' }}" aria-hidden="true"></i>
                                 {{ __('Webmaster') }}
+                            </li>
+                            <li class="is-{{ $hasGsc ? 'on' : 'off' }}">
+                                <i class="bi bi-{{ $hasGsc ? 'check-circle-fill' : 'circle' }}" aria-hidden="true"></i>
+                                GSC
                             </li>
                         </ul>
                         <div class="cabinet-sr-project__actions">
@@ -200,7 +205,9 @@
                                             data-monitoring="{{ $domainHints[$domain]['monitoring'] ?? '' }}"
                                             data-monitoring-label="{{ $domainHints[$domain]['monitoring_label'] ?? '' }}"
                                             data-webmaster="{{ $domainHints[$domain]['webmaster'] ?? '' }}"
-                                            data-webmaster-label="{{ $domainHints[$domain]['webmaster_label'] ?? '' }}">
+                                            data-webmaster-label="{{ $domainHints[$domain]['webmaster_label'] ?? '' }}"
+                                            data-gsc="{{ $domainHints[$domain]['gsc'] ?? '' }}"
+                                            data-gsc-label="{{ $domainHints[$domain]['gsc_label'] ?? '' }}">
                                         {{ $domain }}
                                     </option>
                                 @endforeach
@@ -248,6 +255,43 @@
                                 </button>
                             </div>
                             <div class="form-text">{{ __('Metrika connect from create hint') }}</div>
+                        </div>
+
+                        <div class="mb-2"
+                             data-sr-gsc
+                             data-gsc-configured="{{ !empty($gscConfigured) ? '1' : '0' }}"
+                             data-gsc-connected="{{ !empty($gscConnected) ? '1' : '0' }}"
+                             data-gsc-connect-url="{{ route('google-search-console.connect') }}"
+                             data-gsc-binding-url="{{ route('google-search-console.binding') }}"
+                             data-gsc-properties-url="{{ route('google-search-console.properties') }}"
+                             data-gsc-bind-url="{{ route('google-search-console.bind') }}"
+                             data-gsc-unbind-url="{{ route('google-search-console.unbind') }}"
+                             data-gsc-return="{{ route('pages.seo-reports') }}">
+                            <label class="form-label" for="cabinetSrGsc">{{ __('Google Search Console') }}</label>
+                            <div class="d-flex flex-wrap gap-2 align-items-start mb-1">
+                                <div class="flex-grow-1" style="min-width: 12rem;">
+                                    <select class="form-select form-select-sm"
+                                            name="gsc_property"
+                                            id="cabinetSrGsc"
+                                            data-sr-wizard-select2
+                                            data-sr-gsc-select
+                                            data-placeholder="{{ __('Not connected') }}">
+                                        <option value=""></option>
+                                        @foreach(($gscBindings ?? collect()) as $binding)
+                                            <option value="{{ $binding->property_id }}"
+                                                    data-domain="{{ $binding->domain }}">
+                                                {{ $binding->domain }}
+                                                @if($binding->property_url) · {{ $binding->property_url }}@endif
+                                                · {{ $binding->property_id }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-outline-primary btn-sm" data-sr-gsc-open>
+                                    {{ __('Connect or change GSC') }}
+                                </button>
+                            </div>
+                            <div class="form-text">{{ __('GSC connect from create hint') }}</div>
                         </div>
 
                         <div class="mb-2"
@@ -377,6 +421,7 @@
 
     @include('pages.partials.seo-reports-metrika-modal')
     @include('pages.partials.seo-reports-webmaster-modal')
+    @include('pages.partials.seo-reports-gsc-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
@@ -424,6 +469,7 @@
                 var domainSelect = form.querySelector('[data-sr-domain]');
                 var metrikaSelect = form.querySelector('[data-sr-metrika-select]');
                 var webmasterSelect = form.querySelector('[data-sr-webmaster-select]');
+                var gscSelect = form.querySelector('[data-sr-gsc-select]');
                 var monitoringSelect = form.querySelector('[data-sr-monitoring-select]');
                 var btnPrev = form.querySelector('[data-sr-prev]');
                 var btnNext = form.querySelector('[data-sr-next]');
@@ -467,6 +513,7 @@
                     var m = opt ? (opt.getAttribute('data-metrika') || '') : '';
                     var mon = opt ? (opt.getAttribute('data-monitoring') || '') : '';
                     var wm = opt ? (opt.getAttribute('data-webmaster') || '') : '';
+                    var gsc = opt ? (opt.getAttribute('data-gsc') || '') : '';
                     setSelectValue(monitoringSelect, mon);
                     if (metrikaSelect) {
                         if (m) {
@@ -482,9 +529,20 @@
                             setSelectValue(webmasterSelect, '');
                         }
                     }
+                    if (gscSelect) {
+                        if (gsc) {
+                            setSelectValue(gscSelect, gsc);
+                        } else if (!gscSelect.value) {
+                            setSelectValue(gscSelect, '');
+                        }
+                    }
                     var wmBox = form.querySelector('[data-sr-webmaster]');
                     if (wmBox) {
                         wmBox.setAttribute('data-domain', domainSelect.value || '');
+                    }
+                    var gscBox = form.querySelector('[data-sr-gsc]');
+                    if (gscBox) {
+                        gscBox.setAttribute('data-domain', domainSelect.value || '');
                     }
                 }
 
@@ -503,12 +561,13 @@
                 var restoreCreateState = null;
                 try {
                     var bootParams = new URLSearchParams(window.location.search);
-                    if (bootParams.get('sr_create') === '1' || bootParams.get('metrika_picker') === '1' || bootParams.get('webmaster_picker') === '1') {
+                    if (bootParams.get('sr_create') === '1' || bootParams.get('metrika_picker') === '1' || bootParams.get('webmaster_picker') === '1' || bootParams.get('gsc_picker') === '1') {
                         restoreCreateState = {
-                            domain: bootParams.get('domain') || bootParams.get('metrika_domain') || bootParams.get('webmaster_domain') || '',
+                            domain: bootParams.get('domain') || bootParams.get('metrika_domain') || bootParams.get('webmaster_domain') || bootParams.get('gsc_domain') || '',
                             picker: bootParams.get('metrika_picker') === '1',
                             webmasterPicker: bootParams.get('webmaster_picker') === '1',
-                            create: bootParams.get('sr_create') === '1' || bootParams.get('metrika_picker') === '1' || bootParams.get('webmaster_picker') === '1',
+                            gscPicker: bootParams.get('gsc_picker') === '1',
+                            create: bootParams.get('sr_create') === '1' || bootParams.get('metrika_picker') === '1' || bootParams.get('webmaster_picker') === '1' || bootParams.get('gsc_picker') === '1',
                         };
                     }
                 } catch (e) {}
@@ -896,6 +955,8 @@
                                 params.delete('metrika_domain');
                                 params.delete('webmaster_picker');
                                 params.delete('webmaster_domain');
+                                params.delete('gsc_picker');
+                                params.delete('gsc_domain');
                                 params.delete('domain');
                                 var q = params.toString();
                                 window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
@@ -1170,6 +1231,279 @@
 
                     try {
                         if (restoreCreateState && restoreCreateState.webmasterPicker) {
+                            setTimeout(function () {
+                                openForDomain(restoreCreateState.domain || (domainSelect ? domainSelect.value : ''));
+                            }, 450);
+                        }
+                    } catch (e) {}
+                })();
+
+                (function initGscPicker() {
+                    var box = form.querySelector('[data-sr-gsc]');
+                    var modalEl = document.getElementById('cabinet-sr-gsc-modal');
+                    if (!box || !modalEl) return;
+
+                    var csrfEl = document.querySelector('meta[name="csrf-token"]');
+                    var csrfToken = csrfEl ? csrfEl.getAttribute('content') : '';
+                    var currentDomain = '';
+                    var allProperties = [];
+                    var selectedPropertyId = '';
+                    var listEl = modalEl.querySelector('[data-gsc-list]');
+                    var loadingEl = modalEl.querySelector('[data-gsc-loading]');
+                    var errorEl = modalEl.querySelector('[data-gsc-error]');
+                    var authEl = modalEl.querySelector('[data-gsc-auth]');
+                    var authLink = modalEl.querySelector('[data-gsc-auth-link]');
+                    var domainLabel = modalEl.querySelector('[data-gsc-domain-label]');
+                    var currentEl = modalEl.querySelector('[data-gsc-current]');
+                    var unbindBtn = modalEl.querySelector('[data-gsc-unbind]');
+                    var searchWrap = modalEl.querySelector('[data-gsc-search-wrap]');
+                    var searchInput = modalEl.querySelector('[data-gsc-search]');
+
+                    function showModal() {
+                        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            elevateNestedModal(modalEl);
+                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                            return;
+                        }
+                        if (typeof $ !== 'undefined' && $.fn.modal) {
+                            elevateNestedModal(modalEl);
+                            $(modalEl).modal('show');
+                        }
+                    }
+
+                    function connectUrl(domain) {
+                        var base = box.getAttribute('data-gsc-connect-url') || '';
+                        var ret = box.getAttribute('data-gsc-return') || location.href;
+                        try {
+                            var u = new URL(ret, window.location.origin);
+                            u.searchParams.set('sr_create', '1');
+                            u.searchParams.set('gsc_picker', '1');
+                            if (domain) {
+                                u.searchParams.set('domain', domain);
+                                u.searchParams.set('gsc_domain', domain);
+                            }
+                            ret = u.pathname + u.search;
+                        } catch (e) {}
+                        return base + (base.indexOf('?') === -1 ? '?' : '&') +
+                            'domain=' + encodeURIComponent(domain || '') +
+                            '&return=' + encodeURIComponent(ret);
+                    }
+
+                    function setError(msg) {
+                        if (!errorEl) return;
+                        errorEl.textContent = msg || '';
+                        errorEl.classList.toggle('d-none', !msg);
+                    }
+
+                    function setLoading(on) {
+                        if (loadingEl) loadingEl.classList.toggle('d-none', !on);
+                    }
+
+                    function setSearchVisible(on) {
+                        if (searchWrap) searchWrap.classList.toggle('d-none', !on);
+                        if (!on && searchInput) searchInput.value = '';
+                    }
+
+                    function filterProperties(hosts, query) {
+                        var q = String(query || '').trim().toLowerCase();
+                        if (!q) return hosts.slice();
+                        return hosts.filter(function (h) {
+                            var url = String(h.unicode_url || h.url || '').toLowerCase();
+                            var id = String(h.id || '').toLowerCase();
+                            var domain = String(h.domain || '').toLowerCase();
+                            return url.indexOf(q) !== -1 || id.indexOf(q) !== -1 || domain.indexOf(q) !== -1;
+                        });
+                    }
+
+                    function renderProperties(hosts, selectedId) {
+                        if (!listEl) return;
+                        listEl.innerHTML = '';
+                        if (!hosts.length) {
+                            listEl.innerHTML = '<div class="list-group-item text-secondary small">' +
+                                (allProperties.length
+                                    ? @json(__('No hosts match the search'))
+                                    : @json(__('No GSC properties found'))) + '</div>';
+                            return;
+                        }
+                        hosts.forEach(function (h) {
+                            var btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2';
+                            btn.setAttribute('data-gsc-property-id', String(h.id));
+                            if (selectedId && String(selectedId) === String(h.id)) {
+                                btn.classList.add('active');
+                            }
+                            var title = String(h.unicode_url || h.url || h.id || '').replace(/</g, '&lt;');
+                            var meta = String(h.id || '').replace(/</g, '&lt;');
+                            if (h.verified) {
+                                meta += ' · ' + @json(__('GSC property verified'));
+                            }
+                            btn.innerHTML =
+                                '<span class="text-start">' +
+                                '<strong>' + title + '</strong>' +
+                                '<br><span class="small opacity-75">' + meta + '</span></span>';
+                            btn.addEventListener('click', function () {
+                                bindProperty(String(h.id));
+                            });
+                            listEl.appendChild(btn);
+                        });
+                    }
+
+                    function applyPropertyFilter() {
+                        renderProperties(
+                            filterProperties(allProperties, searchInput ? searchInput.value : ''),
+                            selectedPropertyId
+                        );
+                    }
+
+                    function openForDomain(domain) {
+                        currentDomain = domain || (domainSelect ? domainSelect.value : '') || '';
+                        if (!currentDomain) {
+                            step = 1;
+                            render();
+                            if (typeof window.jQuery !== 'undefined' && window.jQuery(domainSelect).data('select2')) {
+                                window.jQuery(domainSelect).select2('open');
+                            }
+                            return;
+                        }
+                        allProperties = [];
+                        selectedPropertyId = '';
+                        if (domainLabel) domainLabel.textContent = currentDomain || '—';
+                        if (authEl) authEl.classList.add('d-none');
+                        if (listEl) listEl.innerHTML = '';
+                        setSearchVisible(false);
+                        if (currentEl) {
+                            currentEl.classList.add('d-none');
+                            currentEl.textContent = '';
+                        }
+                        if (unbindBtn) unbindBtn.classList.add('d-none');
+                        setError('');
+                        setLoading(true);
+                        if (authLink) authLink.href = connectUrl(currentDomain);
+                        showModal();
+
+                        if (box.getAttribute('data-gsc-configured') !== '1') {
+                            setLoading(false);
+                            setError(@json(__('Google Search Console is not configured')));
+                            return;
+                        }
+
+                        var bindingUrl = box.getAttribute('data-gsc-binding-url') +
+                            '?domain=' + encodeURIComponent(currentDomain);
+                        fetch(bindingUrl, {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (binding) {
+                                if (binding && binding.connected === false) {
+                                    setLoading(false);
+                                    if (authEl) authEl.classList.remove('d-none');
+                                    return null;
+                                }
+                                if (binding && binding.host_id) {
+                                    selectedPropertyId = String(binding.host_id);
+                                    if (currentEl) {
+                                        currentEl.textContent = (binding.host_url || binding.host_id) +
+                                            (binding.verified ? (' · ' + @json(__('GSC property verified'))) : '');
+                                        currentEl.classList.remove('d-none');
+                                    }
+                                    if (unbindBtn) unbindBtn.classList.remove('d-none');
+                                }
+                                return fetch(box.getAttribute('data-gsc-properties-url'), {
+                                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                                    credentials: 'same-origin',
+                                });
+                            })
+                            .then(function (r) {
+                                if (!r) return null;
+                                return r.json();
+                            })
+                            .then(function (data) {
+                                if (!data) return;
+                                setLoading(false);
+                                allProperties = Array.isArray(data.hosts) ? data.hosts : [];
+                                setSearchVisible(allProperties.length > 8);
+                                applyPropertyFilter();
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not load GSC properties')));
+                            });
+                    }
+
+                    function bindProperty(hostId) {
+                        setError('');
+                        setLoading(true);
+                        fetch(box.getAttribute('data-gsc-bind-url'), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ domain: currentDomain, property_id: hostId }),
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (data) {
+                                if (!data || !data.ok) throw new Error((data && data.message) || 'bind');
+                                var ret = box.getAttribute('data-gsc-return') || location.pathname;
+                                try {
+                                    var u = new URL(ret, window.location.origin);
+                                    u.searchParams.set('sr_create', '1');
+                                    if (currentDomain) u.searchParams.set('domain', currentDomain);
+                                    ret = u.pathname + u.search;
+                                } catch (e) {}
+                                window.location.href = ret;
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not bind GSC property')));
+                            });
+                    }
+
+                    if (unbindBtn) {
+                        unbindBtn.addEventListener('click', function () {
+                            if (!currentDomain) return;
+                            setLoading(true);
+                            fetch(box.getAttribute('data-gsc-unbind-url'), {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                credentials: 'same-origin',
+                                body: JSON.stringify({ domain: currentDomain }),
+                            })
+                                .then(function (r) { return r.json(); })
+                                .then(function (data) {
+                                    if (!data || !data.ok) throw new Error('unbind');
+                                    window.location.reload();
+                                })
+                                .catch(function () {
+                                    setLoading(false);
+                                    setError(@json(__('Could not unbind GSC property')));
+                                });
+                        });
+                    }
+
+                    if (searchInput) {
+                        searchInput.addEventListener('input', applyPropertyFilter);
+                    }
+
+                    var openBtn = box.querySelector('[data-sr-gsc-open]');
+                    if (openBtn) {
+                        openBtn.addEventListener('click', function () {
+                            openForDomain(domainSelect ? domainSelect.value : '');
+                        });
+                    }
+
+                    try {
+                        if (restoreCreateState && restoreCreateState.gscPicker) {
                             setTimeout(function () {
                                 openForDomain(restoreCreateState.domain || (domainSelect ? domainSelect.value : ''));
                             }, 450);

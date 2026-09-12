@@ -265,6 +265,7 @@
                 var moduleFilter = null;
                 var metrikaFilter = null;
                 var webmasterFilter = null;
+                var gscFilter = null;
                 var sitesPage = 1;
                 var sitesSortKey = 'domain';
                 var sitesSortDir = 'asc';
@@ -386,7 +387,14 @@
                         } else if (webmasterFilter === 'off') {
                             matchWebmaster = !webmasterSynced;
                         }
-                        var match = matchQ && matchModule && matchMetrika && matchWebmaster;
+                        var gscSynced = row.getAttribute('data-gsc-synced') === '1';
+                        var matchGsc = true;
+                        if (gscFilter === 'on') {
+                            matchGsc = gscSynced;
+                        } else if (gscFilter === 'off') {
+                            matchGsc = !gscSynced;
+                        }
+                        var match = matchQ && matchModule && matchMetrika && matchWebmaster && matchGsc;
                         row.setAttribute('data-sites-match', match ? '1' : '0');
                         row.classList.add('is-hidden');
                         if (match) {
@@ -418,7 +426,7 @@
                         }
                     });
 
-                    var filtered = q !== '' || moduleFilter || metrikaFilter || webmasterFilter;
+                    var filtered = q !== '' || moduleFilter || metrikaFilter || webmasterFilter || gscFilter;
                     var empty = document.getElementById('cabinet-home-sites-filter-empty');
                     var wrap = panel.querySelector('.cabinet-home-sites-table-wrap');
                     var panelEmpty = panel.querySelector('.cabinet-home-sites-empty');
@@ -502,7 +510,8 @@
                     [
                         ['data-sites-filter-module', moduleFilter],
                         ['data-sites-filter-metrika', metrikaFilter],
-                        ['data-sites-filter-webmaster', webmasterFilter]
+                        ['data-sites-filter-webmaster', webmasterFilter],
+                        ['data-sites-filter-gsc', gscFilter]
                     ].forEach(function (pair) {
                         var attr = pair[0];
                         var value = pair[1];
@@ -528,6 +537,7 @@
                 bindLegendFilter('data-sites-filter-module', function () { return moduleFilter; }, function (v) { moduleFilter = v; });
                 bindLegendFilter('data-sites-filter-metrika', function () { return metrikaFilter; }, function (v) { metrikaFilter = v; });
                 bindLegendFilter('data-sites-filter-webmaster', function () { return webmasterFilter; }, function (v) { webmasterFilter = v; });
+                bindLegendFilter('data-sites-filter-gsc', function () { return gscFilter; }, function (v) { gscFilter = v; });
 
                 if (pagerPrevBtn) {
                     pagerPrevBtn.addEventListener('click', function () {
@@ -1714,6 +1724,315 @@
                         if (window.history && window.history.replaceState) {
                             params.delete('webmaster_picker');
                             params.delete('webmaster_domain');
+                            var q = params.toString();
+                            window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
+                        }
+                    }
+                } catch (e) {}
+            })();
+
+            // Google Search Console: клик по кружку → OAuth / выбор property
+            (function initGscPicker() {
+                var root = document.getElementById('cabinet-home-sites');
+                var modalEl = document.getElementById('cabinet-gsc-modal');
+                if (!root || !modalEl) {
+                    return;
+                }
+                var csrfEl = document.querySelector('meta[name="csrf-token"]');
+                var csrfToken = csrfEl ? csrfEl.getAttribute('content') : '';
+                var currentDomain = '';
+                var allProperties = [];
+                var selectedPropertyId = '';
+                var listEl = modalEl.querySelector('[data-gsc-list]');
+                var loadingEl = modalEl.querySelector('[data-gsc-loading]');
+                var errorEl = modalEl.querySelector('[data-gsc-error]');
+                var authEl = modalEl.querySelector('[data-gsc-auth]');
+                var authLink = modalEl.querySelector('[data-gsc-auth-link]');
+                var domainLabel = modalEl.querySelector('[data-gsc-domain-label]');
+                var currentEl = modalEl.querySelector('[data-gsc-current]');
+                var unbindBtn = modalEl.querySelector('[data-gsc-unbind]');
+                var searchWrap = modalEl.querySelector('[data-gsc-search-wrap]');
+                var searchInput = modalEl.querySelector('[data-gsc-search]');
+
+                function showModal() {
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                        return;
+                    }
+                    if (typeof $ !== 'undefined' && $.fn.modal) {
+                        $(modalEl).modal('show');
+                    }
+                }
+
+                function connectUrl(domain) {
+                    var base = root.getAttribute('data-gsc-connect-url') || '';
+                    var ret = root.getAttribute('data-gsc-return') || location.href;
+                    return base + (base.indexOf('?') === -1 ? '?' : '&') +
+                        'domain=' + encodeURIComponent(domain || '') +
+                        '&return=' + encodeURIComponent(ret);
+                }
+
+                function setError(msg) {
+                    if (!errorEl) return;
+                    errorEl.textContent = msg || '';
+                    errorEl.classList.toggle('d-none', !msg);
+                }
+
+                function setLoading(on) {
+                    if (loadingEl) loadingEl.classList.toggle('d-none', !on);
+                }
+
+                function setSearchVisible(on) {
+                    if (searchWrap) searchWrap.classList.toggle('d-none', !on);
+                    if (!on && searchInput) searchInput.value = '';
+                }
+
+                function filterProperties(hosts, query) {
+                    var q = String(query || '').trim().toLowerCase();
+                    if (!q) return hosts.slice();
+                    return hosts.filter(function (h) {
+                        var url = String(h.unicode_url || h.url || '').toLowerCase();
+                        var id = String(h.id || '').toLowerCase();
+                        var domain = String(h.domain || '').toLowerCase();
+                        return url.indexOf(q) !== -1 || id.indexOf(q) !== -1 || domain.indexOf(q) !== -1;
+                    });
+                }
+
+                function renderProperties(hosts, selectedId) {
+                    if (!listEl) return;
+                    listEl.innerHTML = '';
+                    if (!hosts.length) {
+                        listEl.innerHTML = '<div class="list-group-item text-secondary small">' +
+                            (allProperties.length
+                                ? @json(__('No hosts match the search'))
+                                : @json(__('No GSC properties found'))) + '</div>';
+                        return;
+                    }
+                    hosts.forEach(function (h) {
+                        var btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2';
+                        btn.setAttribute('data-gsc-property-id', String(h.id));
+                        if (selectedId && String(selectedId) === String(h.id)) {
+                            btn.classList.add('active');
+                        }
+                        var title = String(h.unicode_url || h.url || h.id || '').replace(/</g, '&lt;');
+                        var meta = String(h.id || '').replace(/</g, '&lt;');
+                        if (h.verified) {
+                            meta += ' · ' + @json(__('GSC property verified'));
+                        }
+                        btn.innerHTML =
+                            '<span class="text-start">' +
+                            '<strong>' + title + '</strong>' +
+                            '<br><span class="small opacity-75">' + meta + '</span></span>' +
+                            '<span class="cabinet-metrika-counter-status flex-shrink-0 align-self-center">' +
+                            (selectedId && String(selectedId) === String(h.id)
+                                ? '<span class="badge text-bg-light text-dark border">' + @json(__('Selected')) + '</span>'
+                                : '') +
+                            '</span>';
+                        btn.addEventListener('click', function () {
+                            bindProperty(h.id, btn);
+                        });
+                        listEl.appendChild(btn);
+                    });
+                }
+
+                function applyPropertyFilter() {
+                    renderProperties(
+                        filterProperties(allProperties, searchInput ? searchInput.value : ''),
+                        selectedPropertyId
+                    );
+                }
+
+                function setBindingBusy(busy, activeBtn) {
+                    if (searchInput) {
+                        searchInput.disabled = !!busy;
+                    }
+                    if (unbindBtn) {
+                        unbindBtn.disabled = !!busy;
+                    }
+                    if (!listEl) return;
+                    listEl.querySelectorAll('button[data-gsc-property-id]').forEach(function (btn) {
+                        var isActive = busy && activeBtn && btn === activeBtn;
+                        btn.disabled = !!busy && !isActive;
+                        btn.classList.toggle('cabinet-metrika-counter--dimmed', !!busy && !isActive);
+                        btn.setAttribute('aria-busy', isActive ? 'true' : 'false');
+                        if (!busy) {
+                            btn.classList.remove('cabinet-metrika-counter--binding', 'cabinet-metrika-counter--dimmed');
+                            btn.removeAttribute('aria-busy');
+                            var status = btn.querySelector('.cabinet-metrika-counter-status');
+                            if (status && status.getAttribute('data-binding') === '1') {
+                                status.removeAttribute('data-binding');
+                                status.innerHTML = String(btn.getAttribute('data-gsc-property-id')) === String(selectedPropertyId)
+                                    ? '<span class="badge text-bg-light text-dark border">' + @json(__('Selected')) + '</span>'
+                                    : '';
+                            }
+                        }
+                    });
+                    if (busy && activeBtn) {
+                        activeBtn.classList.add('cabinet-metrika-counter--binding');
+                        activeBtn.classList.remove('active');
+                        var statusEl = activeBtn.querySelector('.cabinet-metrika-counter-status');
+                        if (statusEl) {
+                            statusEl.setAttribute('data-binding', '1');
+                            statusEl.innerHTML =
+                                '<span class="cabinet-metrika-binding-label">' +
+                                '<span class="cabinet-metrika-spinner" aria-hidden="true"></span>' +
+                                @json(__('Linking Webmaster host')) +
+                                '…</span>';
+                        }
+                    }
+                    if (typeof window.__cabinetHomeSitesFloatUpdate === 'function') {
+                        window.__cabinetHomeSitesFloatUpdate();
+                    }
+                }
+
+                function openForDomain(domain) {
+                    currentDomain = domain || '';
+                    allProperties = [];
+                    selectedPropertyId = '';
+                    if (domainLabel) domainLabel.textContent = currentDomain || '—';
+                    if (authEl) authEl.classList.add('d-none');
+                    if (listEl) listEl.innerHTML = '';
+                    setSearchVisible(false);
+                    if (currentEl) {
+                        currentEl.classList.add('d-none');
+                        currentEl.textContent = '';
+                    }
+                    if (unbindBtn) unbindBtn.classList.add('d-none');
+                    setError('');
+                    setLoading(true);
+                    if (authLink) authLink.href = connectUrl(currentDomain);
+                    showModal();
+
+                    var bindingUrl = root.getAttribute('data-gsc-binding-url') +
+                        '?domain=' + encodeURIComponent(currentDomain);
+                    fetch(bindingUrl, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (info) {
+                            if (!info || !info.ok) {
+                                throw new Error('binding');
+                            }
+                            if (!info.configured) {
+                                setLoading(false);
+                                setError(@json(__('Google Search Console is not configured')));
+                                return null;
+                            }
+                            if (!info.connected) {
+                                setLoading(false);
+                                if (authEl) authEl.classList.remove('d-none');
+                                return null;
+                            }
+                            if (info.binding && currentEl) {
+                                currentEl.textContent = @json(__('Current GSC property')) + ': ' +
+                                    (info.binding.property_url || info.binding.property_id || info.binding.host_url || info.binding.host_id);
+                                currentEl.classList.remove('d-none');
+                                if (unbindBtn) unbindBtn.classList.remove('d-none');
+                            }
+                            return fetch(root.getAttribute('data-gsc-properties-url'), {
+                                headers: { 'Accept': 'application/json' },
+                                credentials: 'same-origin',
+                            }).then(function (r) {
+                                return r.json().then(function (data) {
+                                    return { status: r.status, data: data, selected: info.binding && (info.binding.property_id || info.binding.host_id) };
+                                });
+                            });
+                        })
+                        .then(function (result) {
+                            setLoading(false);
+                            if (!result) return;
+                            if (result.status === 401 || (result.data && result.data.need_auth)) {
+                                if (authEl) authEl.classList.remove('d-none');
+                                return;
+                            }
+                            if (!result.data || !result.data.ok) {
+                                setError((result.data && result.data.message) || @json(__('Could not load GSC properties')));
+                                return;
+                            }
+                            allProperties = result.data.properties || result.data.hosts || [];
+                            selectedPropertyId = result.selected || '';
+                            setSearchVisible(allProperties.length > 0);
+                            applyPropertyFilter();
+                        })
+                        .catch(function () {
+                            setLoading(false);
+                            setError(@json(__('Could not load GSC properties')));
+                        });
+                }
+
+                function bindProperty(hostId, btn) {
+                    setError('');
+                    setBindingBusy(true, btn || null);
+                    fetch(root.getAttribute('data-gsc-bind-url'), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ domain: currentDomain, property_id: hostId }),
+                    })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (!data || !data.ok) {
+                                throw new Error((data && data.message) || 'bind');
+                            }
+                            window.location.reload();
+                        })
+                        .catch(function () {
+                            setBindingBusy(false);
+                            setError(@json(__('Could not bind GSC property')));
+                        });
+                }
+
+                if (unbindBtn) {
+                    unbindBtn.addEventListener('click', function () {
+                        if (!currentDomain) return;
+                        setLoading(true);
+                        fetch(root.getAttribute('data-gsc-unbind-url'), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ domain: currentDomain }),
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (data) {
+                                if (!data || !data.ok) throw new Error('unbind');
+                                window.location.reload();
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not unbind GSC property')));
+                            });
+                    });
+                }
+
+                if (searchInput) {
+                    searchInput.addEventListener('input', applyPropertyFilter);
+                }
+
+                root.addEventListener('click', function (event) {
+                    var btn = event.target.closest('[data-cabinet-gsc-dot]');
+                    if (!btn) return;
+                    event.preventDefault();
+                    openForDomain(btn.getAttribute('data-domain') || '');
+                });
+
+                try {
+                    var params = new URLSearchParams(window.location.search);
+                    if (params.get('gsc_picker') === '1') {
+                        var d = params.get('gsc_domain') || '';
+                        openForDomain(d);
+                        if (window.history && window.history.replaceState) {
+                            params.delete('gsc_picker');
+                            params.delete('gsc_domain');
                             var q = params.toString();
                             window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
                         }

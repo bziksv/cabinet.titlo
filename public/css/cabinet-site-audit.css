@@ -435,10 +435,12 @@
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 1rem;
+  overflow: visible;
 }
 
 .cabinet-sa-launch__inner {
   padding: 1.15rem 1.2rem 1.25rem;
+  overflow: visible;
 }
 
 .cabinet-sa-launch__head {
@@ -666,7 +668,8 @@
   border-radius: 0.85rem;
   background: #f8fafc;
   margin-bottom: 0.75rem;
-  overflow: hidden;
+  /* Не overflow:hidden — иначе cabinet-sa-tip («?» у Потоки/Скорость) обрезается */
+  overflow: visible;
 }
 
 .cabinet-sa-section__summary {
@@ -677,6 +680,11 @@
   cursor: pointer;
   list-style: none;
   user-select: none;
+  border-radius: 0.85rem;
+}
+
+.cabinet-sa-section[open] > .cabinet-sa-section__summary {
+  border-radius: 0.85rem 0.85rem 0 0;
 }
 
 .cabinet-sa-section__summary::-webkit-details-marker {
@@ -733,6 +741,17 @@
   border-top: 1px solid #e2e8f0;
   background: #fff;
   padding-top: 0.95rem;
+  overflow: visible;
+  border-radius: 0 0 0.85rem 0.85rem;
+}
+
+.cabinet-sa-section__body .cabinet-sa-field {
+  position: relative;
+}
+
+.cabinet-sa-section__body .cabinet-sa-field:has(.cabinet-sa-tip:hover),
+.cabinet-sa-section__body .cabinet-sa-field:has(.cabinet-sa-tip:focus-within) {
+  z-index: 40;
 }
 
 .cabinet-sa-presets {

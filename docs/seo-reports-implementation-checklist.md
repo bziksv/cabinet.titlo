@@ -182,7 +182,7 @@
 ## F2. Поиск: GSC, Вебмастер, конверсии сайта
 
 ### 2.1. Google Search Console
-- [x] 2.1.1. OAuth / подключение property — property + CSV import (OAuth later)
+- [x] 2.1.1. OAuth / подключение property — OAuth + привязка property (главная + SEO-отчёты)
 - [x] 2.1.2. KPI: клики, показы, CTR, ср. позиция (+compare)
 - [x] 2.1.3. Топ запросов (таблица)
 - [x] 2.1.4. Топ страниц GSC (опционально)

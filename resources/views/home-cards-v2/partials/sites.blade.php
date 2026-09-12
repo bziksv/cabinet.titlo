@@ -53,7 +53,14 @@
          data-webmaster-binding-url="{{ route('yandex-webmaster.binding') }}"
          data-webmaster-bind-url="{{ route('yandex-webmaster.bind') }}"
          data-webmaster-unbind-url="{{ route('yandex-webmaster.unbind') }}"
-         data-webmaster-return="{{ url()->current() }}">
+         data-webmaster-return="{{ url()->current() }}"
+         data-gsc-connect-url="{{ route('google-search-console.connect') }}"
+         data-gsc-status-url="{{ route('google-search-console.status') }}"
+         data-gsc-properties-url="{{ route('google-search-console.properties') }}"
+         data-gsc-binding-url="{{ route('google-search-console.binding') }}"
+         data-gsc-bind-url="{{ route('google-search-console.bind') }}"
+         data-gsc-unbind-url="{{ route('google-search-console.unbind') }}"
+         data-gsc-return="{{ url()->current() }}">
     <div class="cabinet-home-sites__head">
         <button type="button"
                 class="cabinet-home-sites__toggle"
@@ -148,6 +155,22 @@
                             title="{{ __('Show sites without Webmaster') }}">
                         <span class="cabinet-home-sites-dot cabinet-home-sites-dot--sync-off" aria-hidden="true"></span>
                         {{ __('Webmaster not synced short') }}
+                    </button>
+                    <button type="button"
+                            class="cabinet-home-sites-legend__item cabinet-home-sites-legend__filter"
+                            data-sites-filter-gsc="on"
+                            aria-pressed="false"
+                            title="{{ __('Show sites with GSC') }}">
+                        <span class="cabinet-home-sites-dot cabinet-home-sites-dot--sync-on" aria-hidden="true"></span>
+                        {{ __('GSC synced short') }}
+                    </button>
+                    <button type="button"
+                            class="cabinet-home-sites-legend__item cabinet-home-sites-legend__filter"
+                            data-sites-filter-gsc="off"
+                            aria-pressed="false"
+                            title="{{ __('Show sites without GSC') }}">
+                        <span class="cabinet-home-sites-dot cabinet-home-sites-dot--sync-off" aria-hidden="true"></span>
+                        {{ __('GSC not synced short') }}
                     </button>
                 </div>
                 <div class="cabinet-home-sites-toolbar__controls">
@@ -310,6 +333,7 @@
                                         @php
                                             $metrikaSynced = false;
                                             $webmasterSynced = false;
+                                            $gscSynced = false;
                                             $modSort = [];
                                             foreach (($site['matrix'] ?? []) as $matrixCell) {
                                                 $mk = (string) ($matrixCell['key'] ?? '');
@@ -327,6 +351,9 @@
                                                 if ($mk === 'yandex-webmaster') {
                                                     $webmasterSynced = !empty($matrixCell['synced']);
                                                 }
+                                                if ($mk === 'google-search-console') {
+                                                    $gscSynced = !empty($matrixCell['synced']);
+                                                }
                                             }
                                             $visits = $site['visits'] ?? null;
                                             $vToday = is_array($visits) && array_key_exists('today', $visits) ? $visits['today'] : null;
@@ -340,6 +367,7 @@
                                             data-cabinet-site-mode="{{ $panel['mode'] }}"
                                             data-metrika-synced="{{ $metrikaSynced ? '1' : '0' }}"
                                             data-webmaster-synced="{{ $webmasterSynced ? '1' : '0' }}"
+                                            data-gsc-synced="{{ $gscSynced ? '1' : '0' }}"
                                             data-sort-domain="{{ $site['domain'] }}"
                                             data-sort-visits_today="{{ $vToday === null ? '' : $vToday }}"
                                             data-sort-visits_yesterday="{{ $vYesterday === null ? '' : $vYesterday }}"
@@ -397,6 +425,10 @@
                                                             $statusText = !empty($cell['synced'])
                                                                 ? __('Webmaster synced')
                                                                 : __('Webmaster not synced');
+                                                        } elseif (($cell['key'] ?? '') === 'google-search-console') {
+                                                            $statusText = !empty($cell['synced'])
+                                                                ? __('GSC synced')
+                                                                : __('GSC not synced');
                                                         } else {
                                                             $statusText = !empty($cell['synced'])
                                                                 ? __('Metrika synced')
@@ -434,6 +466,16 @@
                                                                 data-cabinet-webmaster-dot
                                                                 data-domain="{{ $site['domain'] }}"
                                                                 data-host-id="{{ $cell['host_id'] ?? '' }}"
+                                                                data-synced="{{ !empty($cell['synced']) ? '1' : '0' }}"
+                                                                title="{{ $cell['title'] }} — {{ $statusText }}{{ $cell['label'] !== '' ? (': '.$cell['label']) : '' }}">
+                                                            <span class="visually-hidden">{{ $cell['short'] }}</span>
+                                                        </button>
+                                                    @elseif(($cell['key'] ?? '') === 'google-search-console')
+                                                        <button type="button"
+                                                                class="cabinet-home-sites-dot {{ $dotClass }}"
+                                                                data-cabinet-gsc-dot
+                                                                data-domain="{{ $site['domain'] }}"
+                                                                data-property-id="{{ $cell['property_id'] ?? '' }}"
                                                                 data-synced="{{ !empty($cell['synced']) ? '1' : '0' }}"
                                                                 title="{{ $cell['title'] }} — {{ $statusText }}{{ $cell['label'] !== '' ? (': '.$cell['label']) : '' }}">
                                                             <span class="visually-hidden">{{ $cell['short'] }}</span>
@@ -619,6 +661,47 @@
                 <div class="modal-footer justify-content-between">
                     <button type="button" class="btn btn-outline-danger btn-sm d-none" data-webmaster-unbind>
                         {{ __('Unbind Webmaster host') }}
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="cabinet-gsc-modal" tabindex="-1" aria-labelledby="cabinet-gsc-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cabinet-gsc-modal-title">{{ __('Google Search Console') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-secondary mb-2">
+                        {{ __('Choose GSC property for domain') }}:
+                        <strong data-gsc-domain-label>—</strong>
+                    </p>
+                    <div data-gsc-current class="alert alert-light border py-2 px-3 small d-none mb-3"></div>
+                    <div data-gsc-loading class="text-secondary small py-3 d-none">{{ __('Loading GSC properties') }}…</div>
+                    <div data-gsc-error class="alert alert-danger py-2 px-3 small d-none"></div>
+                    <div data-gsc-auth class="text-center py-3 d-none">
+                        <p class="mb-3">{{ __('Connect Google Search Console to pick a property') }}</p>
+                        <a href="#" class="btn btn-primary" data-gsc-auth-link>
+                            <i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>
+                            {{ __('Authorize Google Search Console') }}
+                        </a>
+                    </div>
+                    <div data-gsc-search-wrap class="mb-2 d-none">
+                        <input type="search"
+                               class="form-control form-control-sm"
+                               data-gsc-search
+                               placeholder="{{ __('Search by site or property ID') }}"
+                               autocomplete="off">
+                    </div>
+                    <div class="list-group list-group-flush border rounded" data-gsc-list style="max-height: 22rem; overflow: auto;"></div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-outline-danger btn-sm d-none" data-gsc-unbind>
+                        {{ __('Unbind GSC property') }}
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>

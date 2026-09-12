@@ -129,6 +129,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/yandex-webmaster/unbind', 'YandexWebmasterController@unbind')->name('yandex-webmaster.unbind');
     Route::post('/yandex-webmaster/disconnect', 'YandexWebmasterController@disconnect')->name('yandex-webmaster.disconnect');
 
+    Route::get('/google-search-console/connect', 'GoogleSearchConsoleController@connect')->name('google-search-console.connect');
+    Route::get('/google-search-console/callback', 'GoogleSearchConsoleController@callback')->name('google-search-console.callback');
+    Route::get('/google-search-console/status', 'GoogleSearchConsoleController@status')->name('google-search-console.status');
+    Route::get('/google-search-console/properties', 'GoogleSearchConsoleController@properties')->name('google-search-console.properties');
+    Route::get('/google-search-console/binding', 'GoogleSearchConsoleController@binding')->name('google-search-console.binding');
+    Route::post('/google-search-console/bind', 'GoogleSearchConsoleController@bind')->name('google-search-console.bind');
+    Route::post('/google-search-console/unbind', 'GoogleSearchConsoleController@unbind')->name('google-search-console.unbind');
+    Route::post('/google-search-console/disconnect', 'GoogleSearchConsoleController@disconnect')->name('google-search-console.disconnect');
+
     Route::resource('main-projects', 'MainProjectsController');
     Route::get('/main-projects/statistics/{project}', 'MainProjectsController@statistics')->name('main-projects.statistics');
     Route::get('/get-click-actions/{id}', 'MainProjectsController@actions');

@@ -14,14 +14,14 @@
         $hasMetrika = (int) ($project->metrika_counter_id ?? 0) > 0;
         $hasMonitoring = (int) ($project->monitoring_project_id ?? 0) > 0;
         $hasWm = trim((string) ($settings['webmaster_host'] ?? '')) !== '';
+        $hasGsc = trim((string) ($settings['gsc_property'] ?? '')) !== '';
         $hasEmail = !empty($settings['auto_email']) || trim((string) ($settings['auto_email_to'] ?? '')) !== '';
 
         $stepKinds = [
             1 => trim((string) ($project->title ?? '')) !== '' ? 'done' : 'needed',
             2 => $hasTemplate ? 'done' : 'needed',
             3 => ($hasMetrika || $hasMonitoring) ? 'done' : 'optional',
-            // GSC пока в разработке — статус шага только по Я.Вебмастеру
-            4 => $hasWm ? 'done' : 'optional',
+            4 => ($hasWm || $hasGsc) ? 'done' : 'optional',
             // Реклама / SMM / звонки — пока в разработке
             5 => 'dev',
             6 => $hasEmail ? 'done' : 'optional',
@@ -45,11 +45,6 @@
             }
         }
         $devModules = [
-            [
-                'title' => 'Google Search Console',
-                'hint' => __('GSC property in development hint'),
-                'step' => 4,
-            ],
             [
                 'title' => 'Яндекс.Директ',
                 'hint' => __('Yandex Direct in development hint'),
@@ -254,16 +249,47 @@
                     <span class="cabinet-sr-step__status is-{{ $stepKinds[4] }}">{{ $stepLabels[$stepKinds[4]] }}</span>
                 </summary>
                 <div class="cabinet-sr-step__body">
-                    <div class="mb-2">
-                        <label class="form-label">
-                            Google Search Console property
-                            <span class="badge bg-secondary ms-1">{{ __('In development') }}</span>
-                        </label>
-                        <input type="text" class="form-control form-control-sm" disabled
-                               value="{{ $settings['gsc_property'] ?? '' }}"
-                               placeholder="sc-domain:example.com"
-                               aria-disabled="true">
-                        <div class="form-text">{{ __('GSC property in development hint') }}</div>
+                    <div class="mb-2"
+                         data-sr-gsc
+                         data-domain="{{ $project->domain }}"
+                         data-gsc-configured="{{ !empty($gscConfigured) ? '1' : '0' }}"
+                         data-gsc-connected="{{ !empty($gscConnected) ? '1' : '0' }}"
+                         data-gsc-connect-url="{{ route('google-search-console.connect') }}"
+                         data-gsc-binding-url="{{ route('google-search-console.binding') }}"
+                         data-gsc-properties-url="{{ route('google-search-console.properties') }}"
+                         data-gsc-bind-url="{{ route('google-search-console.bind') }}"
+                         data-gsc-unbind-url="{{ route('google-search-console.unbind') }}"
+                         data-gsc-return="{{ route('pages.seo-reports.settings', ['id' => $project->id]) }}">
+                        <label class="form-label">{{ __('Google Search Console property') }}</label>
+                        @php
+                            $selectedGsc = old('gsc_property', $settings['gsc_property'] ?? '');
+                            $gscBindingsList = $gscBindings ?? collect();
+                            $selectedGscInList = $gscBindingsList->contains(static function ($b) use ($selectedGsc) {
+                                return (string) $b->property_id === (string) $selectedGsc;
+                            });
+                        @endphp
+                        <div class="d-flex flex-wrap gap-2 align-items-start mb-1">
+                            <div class="flex-grow-1" style="min-width: 12rem;">
+                                <select class="form-select form-select-sm" name="gsc_property" data-sr-select2 data-sr-gsc-select>
+                                    <option value="">{{ __('Not connected') }}</option>
+                                    @if($selectedGsc !== '' && !$selectedGscInList)
+                                        <option value="{{ $selectedGsc }}" selected>{{ $selectedGsc }}</option>
+                                    @endif
+                                    @foreach($gscBindingsList as $binding)
+                                        <option value="{{ $binding->property_id }}"
+                                            @if((string) $selectedGsc === (string) $binding->property_id) selected @endif>
+                                            {{ $binding->domain }}
+                                            @if($binding->property_url) · {{ $binding->property_url }}@endif
+                                            · {{ $binding->property_id }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-sr-gsc-open>
+                                {{ __('Connect or change GSC') }}
+                            </button>
+                        </div>
+                        <div class="form-text">{{ __('GSC property connect from settings hint') }}</div>
                     </div>
                     <div class="mb-3"
                          data-sr-webmaster
@@ -414,6 +440,7 @@
 
     @include('pages.partials.seo-reports-metrika-modal')
     @include('pages.partials.seo-reports-webmaster-modal')
+    @include('pages.partials.seo-reports-gsc-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
@@ -992,6 +1019,276 @@
                             if (window.history && window.history.replaceState) {
                                 params.delete('webmaster_picker');
                                 params.delete('webmaster_domain');
+                                var q = params.toString();
+                                window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
+                            }
+                        }
+                    } catch (e) {}
+                })();
+
+                (function initGscPicker() {
+                    var box = document.querySelector('[data-sr-gsc]');
+                    var modalEl = document.getElementById('cabinet-sr-gsc-modal');
+                    if (!box || !modalEl) return;
+
+                    var csrfEl = document.querySelector('meta[name="csrf-token"]');
+                    var csrfToken = csrfEl ? csrfEl.getAttribute('content') : '';
+                    var currentDomain = box.getAttribute('data-domain') || '';
+                    var allProperties = [];
+                    var selectedPropertyId = '';
+                    var listEl = modalEl.querySelector('[data-gsc-list]');
+                    var loadingEl = modalEl.querySelector('[data-gsc-loading]');
+                    var errorEl = modalEl.querySelector('[data-gsc-error]');
+                    var authEl = modalEl.querySelector('[data-gsc-auth]');
+                    var authLink = modalEl.querySelector('[data-gsc-auth-link]');
+                    var domainLabel = modalEl.querySelector('[data-gsc-domain-label]');
+                    var currentEl = modalEl.querySelector('[data-gsc-current]');
+                    var unbindBtn = modalEl.querySelector('[data-gsc-unbind]');
+                    var searchWrap = modalEl.querySelector('[data-gsc-search-wrap]');
+                    var searchInput = modalEl.querySelector('[data-gsc-search]');
+
+                    function showModal() {
+                        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                            return;
+                        }
+                        if (typeof $ !== 'undefined' && $.fn.modal) {
+                            $(modalEl).modal('show');
+                        }
+                    }
+
+                    function connectUrl(domain) {
+                        var base = box.getAttribute('data-gsc-connect-url') || '';
+                        var ret = box.getAttribute('data-gsc-return') || location.href;
+                        return base + (base.indexOf('?') === -1 ? '?' : '&') +
+                            'domain=' + encodeURIComponent(domain || '') +
+                            '&return=' + encodeURIComponent(ret);
+                    }
+
+                    function setError(msg) {
+                        if (!errorEl) return;
+                        errorEl.textContent = msg || '';
+                        errorEl.classList.toggle('d-none', !msg);
+                    }
+
+                    function setLoading(on) {
+                        if (loadingEl) loadingEl.classList.toggle('d-none', !on);
+                    }
+
+                    function setSearchVisible(on) {
+                        if (searchWrap) searchWrap.classList.toggle('d-none', !on);
+                        if (!on && searchInput) searchInput.value = '';
+                    }
+
+                    function filterProperties(hosts, query) {
+                        var q = String(query || '').trim().toLowerCase();
+                        if (!q) return hosts.slice();
+                        return hosts.filter(function (h) {
+                            var url = String(h.unicode_url || h.url || '').toLowerCase();
+                            var id = String(h.id || '').toLowerCase();
+                            var domain = String(h.domain || '').toLowerCase();
+                            return url.indexOf(q) !== -1 || id.indexOf(q) !== -1 || domain.indexOf(q) !== -1;
+                        });
+                    }
+
+                    function renderProperties(hosts, selectedId) {
+                        if (!listEl) return;
+                        listEl.innerHTML = '';
+                        if (!hosts.length) {
+                            listEl.innerHTML = '<div class="list-group-item text-secondary small">' +
+                                (allProperties.length
+                                    ? @json(__('No hosts match the search'))
+                                    : @json(__('No GSC properties found'))) + '</div>';
+                            return;
+                        }
+                        hosts.forEach(function (h) {
+                            var btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2';
+                            btn.setAttribute('data-gsc-property-id', String(h.id));
+                            if (selectedId && String(selectedId) === String(h.id)) {
+                                btn.classList.add('active');
+                            }
+                            var title = String(h.unicode_url || h.url || h.id || '').replace(/</g, '&lt;');
+                            var meta = String(h.id || '').replace(/</g, '&lt;');
+                            if (h.verified) {
+                                meta += ' · ' + @json(__('GSC property verified'));
+                            }
+                            btn.innerHTML =
+                                '<span class="text-start">' +
+                                '<strong>' + title + '</strong>' +
+                                '<br><span class="small opacity-75">' + meta + '</span></span>' +
+                                '<span class="flex-shrink-0 align-self-center">' +
+                                (selectedId && String(selectedId) === String(h.id)
+                                    ? '<span class="badge text-bg-light text-dark border">' + @json(__('Selected')) + '</span>'
+                                    : '') +
+                                '</span>';
+                            btn.addEventListener('click', function () {
+                                bindProperty(h.id);
+                            });
+                            listEl.appendChild(btn);
+                        });
+                    }
+
+                    function applyPropertyFilter() {
+                        renderProperties(
+                            filterProperties(allProperties, searchInput ? searchInput.value : ''),
+                            selectedPropertyId
+                        );
+                    }
+
+                    function openForDomain(domain) {
+                        currentDomain = domain || box.getAttribute('data-domain') || '';
+                        allProperties = [];
+                        selectedPropertyId = '';
+                        if (domainLabel) domainLabel.textContent = currentDomain || '—';
+                        if (authEl) authEl.classList.add('d-none');
+                        if (listEl) listEl.innerHTML = '';
+                        setSearchVisible(false);
+                        if (currentEl) {
+                            currentEl.classList.add('d-none');
+                            currentEl.textContent = '';
+                        }
+                        if (unbindBtn) unbindBtn.classList.add('d-none');
+                        setError('');
+                        setLoading(true);
+                        if (authLink) authLink.href = connectUrl(currentDomain);
+                        openStep(4);
+                        showModal();
+
+                        if (box.getAttribute('data-gsc-configured') !== '1') {
+                            setLoading(false);
+                            setError(@json(__('Google Search Console is not configured')));
+                            return;
+                        }
+
+                        var bindingUrl = box.getAttribute('data-gsc-binding-url') +
+                            '?domain=' + encodeURIComponent(currentDomain);
+                        fetch(bindingUrl, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                            .then(function (r) { return r.json(); })
+                            .then(function (info) {
+                                if (!info || !info.ok) {
+                                    throw new Error('binding');
+                                }
+                                if (!info.configured) {
+                                    setLoading(false);
+                                    setError(@json(__('Google Search Console is not configured')));
+                                    return null;
+                                }
+                                if (!info.connected) {
+                                    setLoading(false);
+                                    if (authEl) authEl.classList.remove('d-none');
+                                    return null;
+                                }
+                                if (info.binding && currentEl) {
+                                    currentEl.textContent = @json(__('Current GSC property')) + ': ' +
+                                        (info.binding.property_url || info.binding.property_id || info.binding.host_url || info.binding.host_id);
+                                    currentEl.classList.remove('d-none');
+                                    if (unbindBtn) unbindBtn.classList.remove('d-none');
+                                }
+                                return fetch(box.getAttribute('data-gsc-properties-url'), {
+                                    headers: { 'Accept': 'application/json' },
+                                    credentials: 'same-origin',
+                                }).then(function (r) {
+                                    return r.json().then(function (data) {
+                                        return { status: r.status, data: data, selected: info.binding && (info.binding.property_id || info.binding.host_id) };
+                                    });
+                                });
+                            })
+                            .then(function (result) {
+                                setLoading(false);
+                                if (!result) return;
+                                if (result.status === 401 || (result.data && result.data.need_auth)) {
+                                    if (authEl) authEl.classList.remove('d-none');
+                                    return;
+                                }
+                                if (!result.data || !result.data.ok) {
+                                    setError((result.data && result.data.message) || @json(__('Could not load GSC properties')));
+                                    return;
+                                }
+                                allProperties = result.data.properties || result.data.hosts || [];
+                                selectedPropertyId = result.selected || '';
+                                setSearchVisible(allProperties.length > 0);
+                                applyPropertyFilter();
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not load GSC properties')));
+                            });
+                    }
+
+                    function bindProperty(hostId) {
+                        setError('');
+                        setLoading(true);
+                        fetch(box.getAttribute('data-gsc-bind-url'), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ domain: currentDomain, property_id: hostId }),
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (data) {
+                                if (!data || !data.ok) {
+                                    throw new Error((data && data.message) || 'bind');
+                                }
+                                window.location.href = box.getAttribute('data-gsc-return') || location.pathname;
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not bind GSC property')));
+                            });
+                    }
+
+                    if (unbindBtn) {
+                        unbindBtn.addEventListener('click', function () {
+                            if (!currentDomain) return;
+                            setLoading(true);
+                            fetch(box.getAttribute('data-gsc-unbind-url'), {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                credentials: 'same-origin',
+                                body: JSON.stringify({ domain: currentDomain }),
+                            })
+                                .then(function (r) { return r.json(); })
+                                .then(function (data) {
+                                    if (!data || !data.ok) throw new Error('unbind');
+                                    window.location.href = box.getAttribute('data-gsc-return') || location.pathname;
+                                })
+                                .catch(function () {
+                                    setLoading(false);
+                                    setError(@json(__('Could not unbind GSC property')));
+                                });
+                        });
+                    }
+
+                    if (searchInput) {
+                        searchInput.addEventListener('input', applyPropertyFilter);
+                    }
+
+                    var openBtn = box.querySelector('[data-sr-gsc-open]');
+                    if (openBtn) {
+                        openBtn.addEventListener('click', function () {
+                            openForDomain(box.getAttribute('data-domain') || '');
+                        });
+                    }
+
+                    try {
+                        var params = new URLSearchParams(window.location.search);
+                        if (params.get('gsc_picker') === '1') {
+                            openForDomain(params.get('gsc_domain') || box.getAttribute('data-domain') || '');
+                            if (window.history && window.history.replaceState) {
+                                params.delete('gsc_picker');
+                                params.delete('gsc_domain');
                                 var q = params.toString();
                                 window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
                             }
