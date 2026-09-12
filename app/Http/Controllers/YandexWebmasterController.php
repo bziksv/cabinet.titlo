@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\YandexWebmaster\YandexWebmasterService;
 use App\Support\HomeUserSites;
+use App\Support\OauthReturnUrl;
 use App\YandexWebmasterDomainHost;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -189,18 +190,6 @@ class YandexWebmasterController extends Controller
 
     private function safeReturn($url): string
     {
-        $fallback = route('home');
-        if (!is_string($url) || $url === '') {
-            return $fallback;
-        }
-        if (strpos($url, '/') === 0 && strpos($url, '//') !== 0) {
-            return url($url);
-        }
-        $app = rtrim((string) config('app.url'), '/');
-        if ($app !== '' && strpos($url, $app) === 0) {
-            return $url;
-        }
-
-        return $fallback;
+        return OauthReturnUrl::sanitize($url);
     }
 }
