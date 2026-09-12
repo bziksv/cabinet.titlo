@@ -1395,35 +1395,56 @@
                             credentials: 'same-origin',
                         })
                             .then(function (r) { return r.json(); })
-                            .then(function (binding) {
-                                if (binding && binding.connected === false) {
+                            .then(function (info) {
+                                if (!info || info.ok === false) {
+                                    setLoading(false);
+                                    setError((info && info.message) || @json(__('Could not load GSC properties')));
+                                    return null;
+                                }
+                                if (!info.configured) {
+                                    setLoading(false);
+                                    setError(@json(__('Google Search Console is not configured')));
+                                    return null;
+                                }
+                                if (!info.connected) {
                                     setLoading(false);
                                     if (authEl) authEl.classList.remove('d-none');
                                     return null;
                                 }
-                                if (binding && binding.host_id) {
-                                    selectedPropertyId = String(binding.host_id);
-                                    if (currentEl) {
-                                        currentEl.textContent = (binding.host_url || binding.host_id) +
-                                            (binding.verified ? (' · ' + @json(__('GSC property verified'))) : '');
+                                if (info.binding) {
+                                    var propId = info.binding.property_id || info.binding.host_id || '';
+                                    var propUrl = info.binding.property_url || info.binding.host_url || propId;
+                                    selectedPropertyId = String(propId);
+                                    if (currentEl && propId) {
+                                        currentEl.textContent = @json(__('Current GSC property')) + ': ' + propUrl +
+                                            (info.binding.verified ? (' · ' + @json(__('GSC property verified'))) : '');
                                         currentEl.classList.remove('d-none');
                                     }
-                                    if (unbindBtn) unbindBtn.classList.remove('d-none');
+                                    if (unbindBtn && propId) unbindBtn.classList.remove('d-none');
                                 }
                                 return fetch(box.getAttribute('data-gsc-properties-url'), {
                                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                                     credentials: 'same-origin',
+                                }).then(function (r) {
+                                    return r.json().then(function (data) {
+                                        return { status: r.status, data: data };
+                                    });
                                 });
                             })
-                            .then(function (r) {
-                                if (!r) return null;
-                                return r.json();
-                            })
-                            .then(function (data) {
-                                if (!data) return;
+                            .then(function (result) {
                                 setLoading(false);
-                                allProperties = Array.isArray(data.hosts) ? data.hosts : [];
-                                setSearchVisible(allProperties.length > 8);
+                                if (!result) return;
+                                if (result.status === 401 || (result.data && result.data.need_auth)) {
+                                    if (authEl) authEl.classList.remove('d-none');
+                                    if (result.data && result.data.message) setError(result.data.message);
+                                    return;
+                                }
+                                if (!result.data || !result.data.ok) {
+                                    setError((result.data && result.data.message) || @json(__('Could not load GSC properties')));
+                                    return;
+                                }
+                                allProperties = result.data.properties || result.data.hosts || [];
+                                setSearchVisible(allProperties.length > 0);
                                 applyPropertyFilter();
                             })
                             .catch(function () {

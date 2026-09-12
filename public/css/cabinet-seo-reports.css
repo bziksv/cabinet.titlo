@@ -3620,9 +3620,10 @@ form.is-generating .modal-body {
     z-index: 1060;
 }
 
-/* Вложенные модалки Метрики / Вебмастера поверх мастера создания */
+/* Вложенные модалки Метрики / Вебмастера / GSC поверх мастера создания */
 #cabinet-sr-metrika-modal.cabinet-sr-modal-nested,
-#cabinet-sr-webmaster-modal.cabinet-sr-modal-nested {
+#cabinet-sr-webmaster-modal.cabinet-sr-modal-nested,
+#cabinet-sr-gsc-modal.cabinet-sr-modal-nested {
     z-index: 1080 !important;
 }
 
