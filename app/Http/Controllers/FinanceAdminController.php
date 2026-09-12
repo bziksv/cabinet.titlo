@@ -77,17 +77,64 @@ class FinanceAdminController extends Controller
     {
         $data = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
-            'sum' => ['required', 'integer', 'min:1', 'max:10000000'],
+            'wallet' => ['nullable', 'string', 'in:personal,company'],
+            'user_company_id' => ['nullable', 'integer', 'exists:user_companies,id'],
+            'company_invoice_id' => ['nullable', 'integer', 'exists:company_invoices,id'],
+            'sum' => ['nullable', 'integer', 'min:1', 'max:10000000'],
             'comment' => ['nullable', 'string', 'max:500'],
         ]);
 
         /** @var User $admin */
         $admin = Auth::user();
         $user = User::query()->findOrFail((int) $data['user_id']);
+        $wallet = $data['wallet'] ?? 'personal';
+
+        if ($wallet === 'company') {
+            $invoiceId = (int) ($data['company_invoice_id'] ?? 0);
+            if ($invoiceId < 1) {
+                throw ValidationException::withMessages([
+                    'company_invoice_id' => [__('Finance credit invoice placeholder')],
+                ]);
+            }
+
+            $invoice = \App\CompanyInvoice::query()->findOrFail($invoiceId);
+            if ((int) $invoice->user_id !== (int) $user->id) {
+                abort(403);
+            }
+            if (!empty($data['user_company_id']) && (int) $invoice->user_company_id !== (int) $data['user_company_id']) {
+                throw ValidationException::withMessages([
+                    'company_invoice_id' => ['Счёт не относится к выбранной компании.'],
+                ]);
+            }
+
+            $balance = $finance->creditCompanyInvoice($invoice, $admin, $data['comment'] ?? null);
+            $company = $balance->company;
+
+            flash()->overlay(
+                __('Finance credit company success', [
+                    'sum' => FinanceAdminService::formatMoney((int) $balance->sum),
+                    'company' => $company ? $company->name : '',
+                ]),
+                ' '
+            )->success();
+
+            return redirect()->route('admin.finance.index', [
+                'q' => (string) $user->email,
+                'status' => '1',
+                'period' => 'all',
+            ]);
+        }
+
+        $sum = (int) ($data['sum'] ?? 0);
+        if ($sum < 1) {
+            throw ValidationException::withMessages([
+                'sum' => [__('Sum must be positive')],
+            ]);
+        }
 
         $finance->creditUser(
             (int) $data['user_id'],
-            (int) $data['sum'],
+            $sum,
             $admin,
             $data['comment'] ?? null
         );
@@ -99,7 +146,7 @@ class FinanceAdminController extends Controller
 
         flash()->overlay(
             __('Finance credit success', [
-                'sum' => FinanceAdminService::formatMoney((int) $data['sum']),
+                'sum' => FinanceAdminService::formatMoney($sum),
                 'user' => $userName,
                 'email' => $user->email,
                 'balance' => FinanceAdminService::formatMoney((int) $user->fresh()->balance),
@@ -111,6 +158,29 @@ class FinanceAdminController extends Controller
             'q' => (string) $user->email,
             'status' => '1',
             'period' => 'all',
+        ]);
+    }
+
+    public function companies(Request $request, FinanceAdminService $finance): JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        return response()->json([
+            'results' => $finance->companiesForSelect((int) $data['user_id']),
+        ]);
+    }
+
+    public function invoices(Request $request, FinanceAdminService $finance): JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'company_id' => ['required', 'integer', 'exists:user_companies,id'],
+        ]);
+
+        return response()->json([
+            'results' => $finance->pendingInvoicesForSelect((int) $data['company_id'], (int) $data['user_id']),
         ]);
     }
 

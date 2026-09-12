@@ -207,7 +207,7 @@ class TextAnalyzerDemoService
     {
         $cfg = self::config();
         $moduleSlug = (string) ($cfg['module_slug'] ?? self::MODULE);
-        $registerBase = rtrim((string) config('app.url', 'https://lk.redbox.su'), '/');
+        $registerBase = rtrim((string) config('app.url', 'https://cabinet.titlo.ru'), '/');
 
         $registerUrl = $registerBase . '/register?' . http_build_query([
             'module' => $moduleSlug,

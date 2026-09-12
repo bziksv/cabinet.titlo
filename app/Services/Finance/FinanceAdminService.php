@@ -3,8 +3,11 @@
 namespace App\Services\Finance;
 
 use App\Balance;
-use App\User;
+use App\CompanyInvoice;
+use App\Services\Billing\CompanyInvoicePdfService;
 use App\Support\UserSmartSearch;
+use App\User;
+use App\UserCompany;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -210,6 +213,88 @@ class FinanceAdminService
         });
     }
 
+    /**
+     * Зачисление на баланс компании по неоплаченному счёту + акт PDF.
+     */
+    public function creditCompanyInvoice(CompanyInvoice $invoice, User $admin, ?string $comment = null): Balance
+    {
+        return DB::transaction(function () use ($invoice, $admin, $comment) {
+            /** @var CompanyInvoice $locked */
+            $locked = CompanyInvoice::query()->lockForUpdate()->findOrFail($invoice->id);
+            if (!$locked->isPending()) {
+                throw ValidationException::withMessages([
+                    'company_invoice_id' => ['Счёт уже оплачен или отменён.'],
+                ]);
+            }
+
+            /** @var UserCompany $company */
+            $company = UserCompany::query()->lockForUpdate()->findOrFail($locked->user_company_id);
+            $sum = (int) $locked->amount;
+
+            $locked->status = CompanyInvoice::STATUS_PAID;
+            $locked->paid_at = Carbon::now();
+            $locked->credited_by_admin_id = (int) $admin->id;
+            $locked->act_number = $locked->number;
+            $locked->act_issued_at = Carbon::now();
+            $locked->save();
+
+            $source = self::manualCreditSource($admin, $comment);
+            $source .= ' · счёт ' . $locked->number . ' · ' . $company->name;
+
+            $balance = Balance::query()->create([
+                'user_id' => (int) $locked->user_id,
+                'user_company_id' => (int) $company->id,
+                'company_invoice_id' => (int) $locked->id,
+                'sum' => $sum,
+                'status' => 1,
+                'source' => $source,
+                'counting' => 1,
+            ]);
+
+            $company->increment('balance', $sum);
+
+            app(CompanyInvoicePdfService::class)->storeActPdf($locked->fresh());
+
+            return $balance->fresh(['user', 'company', 'companyInvoice']);
+        });
+    }
+
+    public function companiesForSelect(int $userId): array
+    {
+        return UserCompany::query()
+            ->where('user_id', $userId)
+            ->orderBy('name')
+            ->get()
+            ->map(static function (UserCompany $c) {
+                return [
+                    'id' => (int) $c->id,
+                    'text' => $c->label() . ' · ' . self::formatMoney((int) $c->balance),
+                    'balance' => (int) $c->balance,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    public function pendingInvoicesForSelect(int $companyId, int $userId): array
+    {
+        return CompanyInvoice::query()
+            ->where('user_company_id', $companyId)
+            ->where('user_id', $userId)
+            ->where('status', CompanyInvoice::STATUS_PENDING)
+            ->orderByDesc('id')
+            ->get()
+            ->map(static function (CompanyInvoice $inv) {
+                return [
+                    'id' => (int) $inv->id,
+                    'text' => '№ ' . $inv->number . ' · ' . self::formatMoney((int) $inv->amount),
+                    'amount' => (int) $inv->amount,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     public static function manualCreditSource(User $admin, ?string $comment = null): string
     {
         $adminName = trim(($admin->name ?? '') . ' ' . ($admin->last_name ?? ''));
@@ -239,19 +324,24 @@ class FinanceAdminService
         $query = Balance::query()
             ->select('balances.*')
             ->selectRaw(
-                'SUM(CASE WHEN balances.status = 1 THEN balances.sum '
-                . 'WHEN balances.status = 2 THEN -balances.sum ELSE 0 END) '
+                'SUM(CASE '
+                . 'WHEN balances.user_company_id IS NOT NULL THEN 0 '
+                . 'WHEN balances.status = 1 THEN balances.sum '
+                . 'WHEN balances.status = 2 THEN -balances.sum '
+                . 'ELSE 0 END) '
                 . 'OVER (PARTITION BY balances.user_id ORDER BY balances.created_at ASC, balances.id ASC) '
                 . 'AS ledger_balance_after'
             )
-            ->with(['user:id,name,last_name,email', 'promoCode:id,code'])
+            ->with(['user:id,name,last_name,email', 'promoCode:id,code', 'company:id,name,inn,balance'])
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
         $this->applyFilters($query, $filters);
         $this->applyExcludeAdminsToBalancesQuery($query, $excludeAdmins);
 
-        return $query->paginate($perPage)->appends(array_filter($filters, static function ($value) {
+        return $query->paginate($perPage)->appends(array_filter(array_merge($filters, [
+            'exclude_admins' => $excludeAdmins ? '1' : '0',
+        ]), static function ($value) {
             return $value !== '' && $value !== 'all';
         }));
     }
@@ -343,7 +433,20 @@ class FinanceAdminService
             return;
         }
 
-        $this->applyExcludeAdminsToUserQuery($query, 'balances.user_id', $excludeAdmins);
+        $roles = config('cabinet-finance-admin.exclude_admin_roles', ['admin', 'Super Admin']);
+
+        // Личные операции админов скрываем; пополнения/списания по фирмам (счета) оставляем.
+        $query->where(function ($outer) use ($roles) {
+            $outer->whereNotNull('balances.user_company_id')
+                ->orWhereNotExists(function ($sub) use ($roles) {
+                    $sub->select(DB::raw('1'))
+                        ->from('model_has_roles as mhr')
+                        ->join('roles as r', 'r.id', '=', 'mhr.role_id')
+                        ->whereColumn('mhr.model_id', 'balances.user_id')
+                        ->where('mhr.model_type', User::class)
+                        ->whereIn('r.name', $roles);
+                });
+        });
     }
 
     /**

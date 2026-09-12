@@ -6,7 +6,18 @@ use Illuminate\Database\Eloquent\Model;
 
 class Balance extends Model
 {
-    protected $fillable = ['sum', 'paid_sum', 'bonus_sum', 'promo_code_id', 'status', 'source'];
+    protected $fillable = [
+        'user_id',
+        'sum',
+        'paid_sum',
+        'bonus_sum',
+        'promo_code_id',
+        'status',
+        'source',
+        'user_company_id',
+        'company_invoice_id',
+        'counting',
+    ];
 
     protected $dates = ['credited_at'];
 
@@ -19,6 +30,16 @@ class Balance extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(UserCompany::class, 'user_company_id');
+    }
+
+    public function companyInvoice()
+    {
+        return $this->belongsTo(CompanyInvoice::class);
     }
 
     public function promoCode()

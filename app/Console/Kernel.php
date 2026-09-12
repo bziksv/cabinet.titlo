@@ -98,6 +98,8 @@ class Kernel extends ConsoleKernel
 
         $schedule->call(new ProcessTriggerCampaigns())->everyMinute();
 
+        $schedule->command('tariff:auto-renew')->everyFiveMinutes();
+
         $schedule->command('telegram:poll-updates')->everyMinute();
 
         // SEO-чеклист: сброс monthly/weekly задач в начале периода

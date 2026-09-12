@@ -1,6 +1,10 @@
 @component('component.card', ['title' => __('Balance')])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-balance.css') }}?v={{ @filemtime(public_path('css/cabinet-balance.css')) ?: time() }}">
+        @if(($balanceTab ?? 'person') === 'legal')
+            <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
+            <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+        @endif
     @endslot
 
     @php
@@ -60,6 +64,21 @@
             </div>
         </div>
 
+        @php $balanceTab = $balanceTab ?? 'person'; @endphp
+        <ul class="nav nav-pills gap-2 mb-3" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link {{ $balanceTab === 'person' ? 'active' : '' }}"
+                   href="{{ route('balance.index', ['tab' => 'person']) }}">{{ __('Individual person') }}</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link {{ $balanceTab === 'legal' ? 'active' : '' }}"
+                   href="{{ route('balance.index', ['tab' => 'legal']) }}">{{ __('Legal entity') }}</a>
+            </li>
+        </ul>
+
+        @if($balanceTab === 'legal')
+            @include('balance.partials.legal-topup')
+        @else
         <div class="card card-outline card-success mb-4">
             <div class="card-header">
                 <h3 class="card-title mb-0">
@@ -192,6 +211,7 @@
             </div>
             {!! Form::close() !!}
         </div>
+        @endif
 
         <div class="card">
             <div class="card-header">
@@ -261,7 +281,12 @@
                                         </span>
                                     @endif
                                 </td>
-                                <td class="text-secondary">{{ __($balance->source) }}</td>
+                                <td class="text-secondary">
+                                    {{ __($balance->source) }}
+                                    @if($balance->company)
+                                        <span class="small d-block">{{ $balance->company->name }}</span>
+                                    @endif
+                                </td>
                                 <td class="text-end text-secondary text-nowrap">
                                     <time datetime="{{ $balance->created_at->toIso8601String() }}">
                                         {{ $balance->created_at->diffForHumans() }}
@@ -303,6 +328,115 @@
     @endif
 
     @slot('js')
+        @if(($balanceTab ?? 'person') === 'legal')
+            <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+            <script src="{{ asset('js/cabinet-select2-defaults.js') }}"></script>
+            <script>
+                (function ($) {
+                    var $sel = $('#invoice-company');
+                    if ($sel.length && $sel.find('option').length >= 10) {
+                        $sel.select2({
+                            theme: 'bootstrap4',
+                            width: '100%',
+                            placeholder: $sel.data('placeholder') || '',
+                            allowClear: true
+                        });
+                    }
+                })(jQuery);
+
+                (function () {
+                    function parseIntSpaces(v) {
+                        var s = String(v == null ? '' : v).replace(/[\s\u00a0\u202f]/g, '');
+                        var n = parseInt(s, 10);
+                        return isNaN(n) ? 0 : n;
+                    }
+
+                    function formatIntSpaces(n) {
+                        n = Math.max(0, Math.floor(Number(n) || 0));
+                        return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                    }
+
+                    function bindNumSpace(inp) {
+                        if (!inp || inp._numBound) return;
+                        inp._numBound = true;
+                        inp.addEventListener('input', function () {
+                            var digits = String(inp.value || '').replace(/\D+/g, '');
+                            inp.value = digits ? formatIntSpaces(parseInt(digits, 10) || 0) : '';
+                        });
+                        inp.addEventListener('blur', function () {
+                            var min = parseIntSpaces(inp.getAttribute('data-min') || '0');
+                            var maxAttr = inp.getAttribute('data-max');
+                            var max = maxAttr != null && maxAttr !== '' ? parseIntSpaces(maxAttr) : 0;
+                            var n = parseIntSpaces(inp.value);
+                            if (!n) {
+                                inp.value = '';
+                                return;
+                            }
+                            if (min > 0 && n < min) n = min;
+                            if (max > 0 && n > max) n = max;
+                            inp.value = formatIntSpaces(n);
+                        });
+                    }
+
+                    document.querySelectorAll('.sa-num-space').forEach(bindNumSpace);
+
+                    var invoiceForm = document.getElementById('invoice-create-form');
+                    if (invoiceForm) {
+                        invoiceForm.addEventListener('submit', function () {
+                            var sum = invoiceForm.querySelector('.sa-num-space[name="sum"]');
+                            if (sum) {
+                                sum.value = String(parseIntSpaces(sum.value) || '');
+                            }
+                        });
+                    }
+                })();
+
+                document.querySelectorAll('form.js-confirm-submit').forEach(function (form) {
+                    form.addEventListener('submit', function (e) {
+                        var msg = form.getAttribute('data-confirm') || '';
+                        if (msg && !window.confirm(msg)) {
+                            e.preventDefault();
+                        }
+                    });
+                });
+
+                (function () {
+                    var legal = document.getElementById('company-legal-address');
+                    var postal = document.getElementById('company-postal-address');
+                    var same = document.getElementById('company-postal-same');
+                    if (!legal || !postal || !same) {
+                        return;
+                    }
+
+                    function syncPostal() {
+                        if (!same.checked) {
+                            postal.readOnly = false;
+                            return;
+                        }
+                        postal.value = legal.value;
+                        postal.readOnly = true;
+                    }
+
+                    same.addEventListener('change', syncPostal);
+                    legal.addEventListener('input', syncPostal);
+                    syncPostal();
+                })();
+
+                (function () {
+                    var modalEl = document.getElementById('company-form-modal');
+                    if (!modalEl || modalEl.getAttribute('data-open-on-load') !== '1') {
+                        return;
+                    }
+                    if (window.bootstrap && bootstrap.Modal) {
+                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                        return;
+                    }
+                    if (window.jQuery && typeof jQuery(modalEl).modal === 'function') {
+                        jQuery(modalEl).modal('show');
+                    }
+                })();
+            </script>
+        @endif
         <script>
             (function () {
                 var sumInput = document.getElementById('balance-sum');

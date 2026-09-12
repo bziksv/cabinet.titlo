@@ -349,6 +349,16 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Balance::class);
     }
 
+    public function companies()
+    {
+        return $this->hasMany(UserCompany::class);
+    }
+
+    public function companyInvoices()
+    {
+        return $this->hasMany(CompanyInvoice::class);
+    }
+
     public function pay()
     {
         return $this->hasMany(TariffPay::class);

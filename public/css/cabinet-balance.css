@@ -140,6 +140,11 @@
     font-size: 1rem;
 }
 
+.cabinet-balance-page .border-dashed {
+    border-style: dashed !important;
+    min-height: 140px;
+}
+
 .cabinet-balance-page .cabinet-balance-promo-summary__row--total strong {
     color: var(--bs-success);
     font-size: 1.125rem;

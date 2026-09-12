@@ -111,7 +111,9 @@ class TariffPayController extends Controller
             $tariffsArray[$tariffKey]['settings'] = collect($tariffsArray[$tariffKey]['settings'])->sortBy('position')->toArray();
         }
 
-        return view('tariff.index', compact('select', 'total', 'actual', 'tariffsArray', 'staleRoleNotice'));
+        $payCompanies = $this->user->companies()->orderBy('name')->get();
+
+        return view('tariff.index', compact('select', 'total', 'actual', 'tariffsArray', 'staleRoleNotice', 'payCompanies'));
     }
 
     public function total(Request $request)
@@ -208,11 +210,36 @@ class TariffPayController extends Controller
 
         $tariff = $this->getTariff($request->input('tariff'));
         $tariff->setPeriod($this->getPeriod($request->input('period')));
+        $price = (int) $tariff->price('priceWithDiscount');
+
+        $wallet = (string) $request->input('wallet', 'personal');
+        $companyId = (int) $request->input('user_company_id', 0);
+        $company = null;
+
+        if ($wallet === 'company') {
+            if ($companyId < 1) {
+                Session::flash('error', __('Select company'));
+                return redirect()->route('tariff.index');
+            }
+            $company = $this->user->companies()->where('id', $companyId)->first();
+            if (!$company) {
+                Session::flash('error', __('Select company'));
+                return redirect()->route('tariff.index');
+            }
+            if ((int) $company->balance < $price) {
+                Session::flash('error', __('Replenish the company balance!'));
+                return redirect()->route('tariff.index');
+            }
+        }
 
         try {
-            $this->user->decrement('balance', $tariff->price('priceWithDiscount'));
+            if ($company) {
+                $company->decrement('balance', $price);
+            } else {
+                $this->user->decrement('balance', $price);
+            }
         } catch (QueryException $exception) {
-            Session::flash('error', __('Replenish the balance!'));
+            Session::flash('error', $company ? __('Replenish the company balance!') : __('Replenish the balance!'));
             return redirect()->route('tariff.index');
         }
 
@@ -220,14 +247,22 @@ class TariffPayController extends Controller
             'status' => true,
             'class_tariff' => get_class($tariff),
             'class_period' => get_class($tariff->getPeriod()),
-            'sum' => $tariff->price('priceWithDiscount'),
+            'sum' => $price,
+            'user_company_id' => $company ? (int) $company->id : null,
+            'auto_renewed' => false,
             'active_to' => Carbon::now()->addDays($tariff->getPeriod()->days())
         ]);
 
+        $source = 'Оплата тарифа ' . $tariff->name();
+        if ($company) {
+            $source .= ' · ' . $company->name;
+        }
+
         $this->user->balances()->create([
-            'sum' => $tariff->price('priceWithDiscount'),
-            'source' => "Оплата тарифа " . $tariff->name(),
-            'status' => 2
+            'sum' => $price,
+            'source' => $source,
+            'status' => 2,
+            'user_company_id' => $company ? (int) $company->id : null,
         ]);
 
         $tariff->assignRole();

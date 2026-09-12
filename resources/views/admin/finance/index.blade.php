@@ -75,7 +75,46 @@
                         @enderror
                         <div id="finance-credit-user-preview" class="small text-secondary mt-2 d-none"></div>
                     </div>
-                    <div class="col-12 col-md-6 col-lg-3">
+                    <div class="col-12 col-lg-7">
+                        <span class="form-label d-block">{{ __('Finance credit wallet') }}</span>
+                        <div class="d-flex flex-wrap gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="wallet" id="finance-wallet-personal" value="personal"
+                                       @if(old('wallet', 'personal') === 'personal') checked @endif>
+                                <label class="form-check-label" for="finance-wallet-personal">{{ __('Finance credit personal') }}</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="wallet" id="finance-wallet-company" value="company"
+                                       @if(old('wallet') === 'company') checked @endif>
+                                <label class="form-check-label" for="finance-wallet-company">{{ __('Finance credit company') }}</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-5 finance-credit-company-fields d-none">
+                        <label class="form-label" for="finance-credit-company">{{ __('Company') }}</label>
+                        <select name="user_company_id"
+                                id="finance-credit-company"
+                                class="form-select @error('user_company_id') is-invalid @enderror"
+                                data-placeholder="{{ __('Select company') }}">
+                            <option value=""></option>
+                        </select>
+                        @error('user_company_id')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-4 finance-credit-company-fields d-none">
+                        <label class="form-label" for="finance-credit-invoice">{{ __('Finance credit invoice') }}</label>
+                        <select name="company_invoice_id"
+                                id="finance-credit-invoice"
+                                class="form-select @error('company_invoice_id') is-invalid @enderror"
+                                data-placeholder="{{ __('Finance credit invoice placeholder') }}">
+                            <option value=""></option>
+                        </select>
+                        @error('company_invoice_id')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-3 finance-credit-personal-fields">
                         <label class="form-label" for="finance-credit-sum">{{ __('Sum') }}</label>
                         <div class="input-group">
                             <input type="number"
@@ -85,8 +124,7 @@
                                    min="1"
                                    step="1"
                                    value="{{ old('sum') }}"
-                                   placeholder="1000"
-                                   required>
+                                   placeholder="1000">
                             <span class="input-group-text">₽</span>
                         </div>
                         @error('sum')
@@ -128,39 +166,6 @@
         @include('admin.finance.partials.promo-codes')
 
         @include('admin.finance.partials.trigger-campaigns')
-
-        <div class="card shadow-sm mb-3 cabinet-finance-stats-settings">
-            <div class="card-body py-2">
-                <form method="get"
-                      action="{{ route('admin.finance.index') }}"
-                      id="cabinet-finance-stats-settings-form"
-                      class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                    @foreach($filters as $key => $value)
-                        @if($value !== '' && $value !== 'all')
-                            <input type="hidden" name="{{ $key }}" value="{{ $value }}">
-                        @endif
-                    @endforeach
-                    @if(request('tab'))
-                        <input type="hidden" name="tab" value="{{ request('tab') }}">
-                    @endif
-                    <div class="form-check form-switch mb-0">
-                        <input type="hidden" name="exclude_admins" value="0">
-                        <input class="form-check-input"
-                               type="checkbox"
-                               role="switch"
-                               name="exclude_admins"
-                               id="finance-exclude-admins"
-                               value="1"
-                               {{ $excludeAdmins ? 'checked' : '' }}
-                               onchange="this.form.submit()">
-                        <label class="form-check-label" for="finance-exclude-admins">
-                            {{ __('Finance exclude admin stats') }}
-                        </label>
-                    </div>
-                    <p class="text-secondary small mb-0">{{ __('Finance exclude admin stats hint') }}</p>
-                </form>
-            </div>
-        </div>
 
         <div class="row g-3 mb-4 cabinet-finance-stats">
             <div class="col-6 col-xl-4 col-xxl-2 d-flex">
@@ -335,6 +340,9 @@
             <div id="cabinet-finance-ledger-collapse" class="collapse show">
             <div class="card-body border-bottom cabinet-finance-filters">
                 <form method="get" action="{{ route('admin.finance.index') }}" class="row g-2 align-items-end">
+                    @if(request('tab'))
+                        <input type="hidden" name="tab" value="{{ request('tab') }}">
+                    @endif
                     <div class="col-12 col-md-4 col-lg-3">
                         <label class="form-label" for="finance-filter-q">{{ __('Finance filter user') }}</label>
                         <input type="search"
@@ -360,11 +368,27 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="col-12 col-lg-3">
+                        <div class="form-check form-switch mb-0 pt-lg-4">
+                            <input type="hidden" name="exclude_admins" value="0">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   role="switch"
+                                   name="exclude_admins"
+                                   id="finance-exclude-admins"
+                                   value="1"
+                                   {{ $excludeAdmins ? 'checked' : '' }}>
+                            <label class="form-check-label" for="finance-exclude-admins">
+                                {{ __('Finance exclude admin stats') }}
+                            </label>
+                        </div>
+                        <p class="form-text mb-0 small">{{ __('Finance exclude admin stats hint') }}</p>
+                    </div>
                     <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
                         <button type="submit" class="btn btn-sm btn-primary">
                             <i class="bi bi-funnel me-1"></i>{{ __('Apply') }}
                         </button>
-                        <a href="{{ route('admin.finance.index') }}" class="btn btn-sm btn-outline-secondary">
+                        <a href="{{ route('admin.finance.index', ['exclude_admins' => 1]) }}" class="btn btn-sm btn-outline-secondary">
                             {{ __('Reset') }}
                         </a>
                     </div>
@@ -425,6 +449,9 @@
                                             <i class="bi bi-x-circle me-1"></i>{{ __($tx->statuses[0]) }}
                                         </span>
                                     @endif
+                                    @if($tx->company)
+                                        <span class="badge text-bg-primary ms-1">{{ __('Finance wallet company') }}</span>
+                                    @endif
                                 </td>
                                 <td class="text-end cabinet-finance-amount text-nowrap
                                     @if($tx->isTopUp()) cabinet-finance-amount--in @elseif($tx->isExpense()) cabinet-finance-amount--out @else cabinet-finance-amount--fail @endif">
@@ -445,18 +472,28 @@
                                         @endif
                                     @endif
                                 </td>
-                                <td class="text-secondary">{{ __($tx->source) }}</td>
+                                <td class="text-secondary">
+                                    {{ __($tx->source) }}
+                                    @if($tx->company)
+                                        <span class="small d-block">{{ $tx->company->name }} · ИНН {{ $tx->company->inn }}</span>
+                                    @endif
+                                </td>
                                 <td class="text-end pe-3 cabinet-finance-amount text-nowrap small">
-                                    @php
-                                        $balanceBefore = $tx->ledgerBalanceBefore();
-                                        $balanceAfter = $tx->ledgerBalanceAfter();
-                                    @endphp
-                                    @if($balanceBefore !== null && $balanceAfter !== null)
-                                        <span class="text-secondary">{{ number_format($balanceBefore, 0, '.', ' ') }}</span>
-                                        <span class="text-secondary mx-1" aria-hidden="true">→</span>
-                                        <span class="fw-semibold">{{ number_format($balanceAfter, 0, '.', ' ') }} ₽</span>
+                                    @if($tx->company)
+                                        <span class="text-secondary">{{ __('Finance company balance now') }}</span>
+                                        <span class="fw-semibold d-block">{{ number_format((int) $tx->company->balance, 0, '.', ' ') }} ₽</span>
                                     @else
-                                        —
+                                        @php
+                                            $balanceBefore = $tx->ledgerBalanceBefore();
+                                            $balanceAfter = $tx->ledgerBalanceAfter();
+                                        @endphp
+                                        @if($balanceBefore !== null && $balanceAfter !== null)
+                                            <span class="text-secondary">{{ number_format($balanceBefore, 0, '.', ' ') }}</span>
+                                            <span class="text-secondary mx-1" aria-hidden="true">→</span>
+                                            <span class="fw-semibold">{{ number_format($balanceAfter, 0, '.', ' ') }} ₽</span>
+                                        @else
+                                            —
+                                        @endif
                                     @endif
                                 </td>
                             </tr>
@@ -537,10 +574,78 @@
             var $userSelect = $('#finance-credit-user');
             var $preview = $('#finance-credit-user-preview');
             var $sum = $('#finance-credit-sum');
+            var $companySelect = $('#finance-credit-company');
+            var $invoiceSelect = $('#finance-credit-invoice');
             var previewTpl = @json(__('Finance credit user preview'));
+
+            function financeWalletIsCompany() {
+                return document.getElementById('finance-wallet-company')
+                    && document.getElementById('finance-wallet-company').checked;
+            }
+
+            function syncFinanceWalletUi() {
+                var company = financeWalletIsCompany();
+                document.querySelectorAll('.finance-credit-company-fields').forEach(function (el) {
+                    el.classList.toggle('d-none', !company);
+                });
+                document.querySelectorAll('.finance-credit-personal-fields').forEach(function (el) {
+                    el.classList.toggle('d-none', company);
+                });
+                if ($sum.length) {
+                    $sum.prop('required', !company);
+                }
+                if ($companySelect.length) {
+                    $companySelect.prop('required', company);
+                }
+                if ($invoiceSelect.length) {
+                    $invoiceSelect.prop('required', company);
+                }
+            }
+
+            function resetCompanyInvoiceSelects() {
+                if ($companySelect.length) {
+                    $companySelect.empty().append('<option value=""></option>').val(null).trigger('change');
+                }
+                if ($invoiceSelect.length) {
+                    $invoiceSelect.empty().append('<option value=""></option>').val(null).trigger('change');
+                }
+            }
+
+            function loadFinanceCompanies(userId) {
+                resetCompanyInvoiceSelects();
+                if (!userId) {
+                    return;
+                }
+                $.getJSON(@json(route('admin.finance.companies')), {user_id: userId}).done(function (data) {
+                    (data.results || []).forEach(function (row) {
+                        var opt = new Option(row.text, row.id, false, false);
+                        $companySelect.append(opt);
+                    });
+                    $companySelect.trigger('change');
+                });
+            }
+
+            function loadFinanceInvoices(userId, companyId) {
+                $invoiceSelect.empty().append('<option value=""></option>').val(null).trigger('change');
+                if (!userId || !companyId) {
+                    return;
+                }
+                $.getJSON(@json(route('admin.finance.invoices')), {
+                    user_id: userId,
+                    company_id: companyId
+                }).done(function (data) {
+                    (data.results || []).forEach(function (row) {
+                        var opt = new Option(row.text, row.id, false, false);
+                        $(opt).attr('data-amount', row.amount);
+                        $invoiceSelect.append(opt);
+                    });
+                    $invoiceSelect.trigger('change');
+                });
+            }
 
             if ($userSelect.length && $.fn.select2) {
                 $userSelect.select2({
+                    theme: 'bootstrap4',
                     width: '100%',
                     allowClear: true,
                     minimumInputLength: 2,
@@ -563,6 +668,7 @@
                     var d = e.params.data || {};
                     if (!d.id) {
                         $preview.addClass('d-none').text('');
+                        resetCompanyInvoiceSelects();
                         return;
                     }
                     var balance = typeof d.balance === 'number'
@@ -574,12 +680,49 @@
                             .replace(':name', $('<div>').text(d.name || d.text || '').html())
                             .replace(':email', $('<div>').text(d.email || '').html())
                             .replace(':balance', balance));
+                    loadFinanceCompanies(d.id);
                 });
 
                 $userSelect.on('select2:clear', function () {
                     $preview.addClass('d-none').text('');
+                    resetCompanyInvoiceSelects();
                 });
             }
+
+            if ($companySelect.length && $.fn.select2) {
+                $companySelect.select2({
+                    theme: 'bootstrap4',
+                    width: '100%',
+                    allowClear: true,
+                    placeholder: $companySelect.data('placeholder') || '',
+                });
+                $companySelect.on('change', function () {
+                    var userId = $userSelect.val();
+                    var companyId = $companySelect.val();
+                    loadFinanceInvoices(userId, companyId);
+                });
+            }
+
+            if ($invoiceSelect.length && $.fn.select2) {
+                $invoiceSelect.select2({
+                    theme: 'bootstrap4',
+                    width: '100%',
+                    allowClear: true,
+                    placeholder: $invoiceSelect.data('placeholder') || '',
+                });
+                $invoiceSelect.on('change', function () {
+                    var $opt = $invoiceSelect.find('option:selected');
+                    var amount = $opt.data('amount');
+                    if (amount && $sum.length) {
+                        $sum.val(amount);
+                    }
+                });
+            }
+
+            document.querySelectorAll('input[name="wallet"]').forEach(function (radio) {
+                radio.addEventListener('change', syncFinanceWalletUi);
+            });
+            syncFinanceWalletUi();
 
             document.querySelectorAll('.cabinet-finance-credit-preset').forEach(function (btn) {
                 btn.addEventListener('click', function () {
@@ -593,11 +736,16 @@
             if (form) {
                 form.addEventListener('submit', function (e) {
                     var userData = $userSelect.length ? $userSelect.select2('data')[0] : null;
-                    var sumVal = $sum.val();
-                    if (!userData || !sumVal) {
+                    if (!userData) {
                         return;
                     }
                     var userLabel = userData.text || userData.email || ('#' + userData.id);
+                    var sumVal = financeWalletIsCompany()
+                        ? ($invoiceSelect.find('option:selected').data('amount') || $sum.val())
+                        : $sum.val();
+                    if (!sumVal) {
+                        return;
+                    }
                     var msg = @json(__('Finance credit confirm'));
                     msg = msg.replace(':sum', Number(sumVal).toLocaleString('ru-RU') + ' ₽')
                         .replace(':user', userLabel);

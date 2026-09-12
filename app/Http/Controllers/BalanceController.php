@@ -20,12 +20,44 @@ class BalanceController extends Controller
     public function index($response = null)
     {
         $user = Auth::user();
-        $balances = $user->balances()->with('promoCode:id,code')->orderBy('id', 'desc')->paginate(10);
+        $balances = $user->balances()->with(['promoCode:id,code', 'company:id,name'])->orderBy('id', 'desc')->paginate(10);
         $topUpsCount = $user->balances()->where('status', 1)->count();
         $lastTopUp = $user->balances()->where('status', 1)->orderBy('id', 'desc')->first();
         $promoLock = app(PromoCodeRateLimitService::class)->statusForUser($user);
+        $companies = $user->companies()->orderBy('name')->get();
+        $companyInvoices = $user->companyInvoices()
+            ->with('company:id,name,inn')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+        $balanceTab = request()->get('tab') === 'legal' ? 'legal' : 'person';
+        $editCompanyId = (int) request()->get('edit', 0);
+        if ($editCompanyId < 1 && old('_company_edit_id')) {
+            $editCompanyId = (int) old('_company_edit_id');
+        }
+        $editCompany = $editCompanyId > 0
+            ? $companies->firstWhere('id', $editCompanyId)
+            : null;
+        $companyLogs = $user->id
+            ? \App\UserCompanyLog::query()
+                ->where('user_id', (int) $user->id)
+                ->orderByDesc('id')
+                ->limit(30)
+                ->get()
+            : collect();
 
-        return view('balance.index', compact('balances', 'response', 'topUpsCount', 'lastTopUp', 'promoLock'));
+        return view('balance.index', compact(
+            'balances',
+            'response',
+            'topUpsCount',
+            'lastTopUp',
+            'promoLock',
+            'companies',
+            'companyInvoices',
+            'balanceTab',
+            'editCompany',
+            'companyLogs'
+        ));
     }
 
     /**

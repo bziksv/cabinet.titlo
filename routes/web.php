@@ -202,6 +202,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/admin/finance', 'FinanceAdminController@index')->name('admin.finance.index');
     Route::get('/admin/finance/users-search', 'FinanceAdminController@searchUsers')->name('admin.finance.users-search');
+    Route::get('/admin/finance/companies', 'FinanceAdminController@companies')->name('admin.finance.companies');
+    Route::get('/admin/finance/invoices', 'FinanceAdminController@invoices')->name('admin.finance.invoices');
     Route::post('/admin/finance/credit', 'FinanceAdminController@credit')->name('admin.finance.credit');
     Route::post('/admin/finance/promo', 'FinanceAdminController@storePromo')->name('admin.finance.promo.store');
     Route::put('/admin/finance/promo/{promoCode}', 'FinanceAdminController@updatePromo')->name('admin.finance.promo.update');
@@ -662,6 +664,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/balance/{response?}', 'BalanceController@index')->name('balance.index');
     Route::post('/balance/promo/preview', 'BalancePromoController@preview')->name('balance.promo.preview');
     Route::post('/balance/promo/redeem', 'BalancePromoController@redeem')->name('balance.promo.redeem');
+    Route::post('/balance/companies', 'BalanceCompanyController@store')->name('balance.companies.store');
+    Route::put('/balance/companies/{user_company}', 'BalanceCompanyController@update')->name('balance.companies.update');
+    Route::post('/balance/invoices', 'CompanyInvoiceController@store')->name('balance.invoices.store');
+    Route::post('/balance/invoices/{company_invoice}/cancel', 'CompanyInvoiceController@cancel')->name('balance.invoices.cancel');
+    Route::get('/balance/invoices/{company_invoice}/pdf', 'CompanyInvoiceController@download')->name('balance.invoice.download');
+    Route::get('/balance/invoices/{company_invoice}/act', 'CompanyInvoiceController@downloadAct')->name('balance.invoice.act');
     Route::post('/counting/yandex-metrics/', 'BalanceController@countingMetrics')->name('counting.metrics');
     Route::resource('balance-add', 'BalanceAddController');
 

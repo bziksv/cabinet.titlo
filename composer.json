@@ -31,6 +31,7 @@
         "lordelph/icofileloader": "^2.0",
         "maatwebsite/excel": "^3.1",
         "mpdf/mpdf": "^8.1",
+        "mpdf/qrcode": "^1.2",
         "predis/predis": "^2.0",
         "pusher/pusher-php-server": "4.1.5",
         "reinink/advanced-eloquent": "^0.2.0",

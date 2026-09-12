@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Classes\Tariffs\Facades\Tariffs;
+use App\Services\Billing\TariffAutoRenewalService;
 use App\TariffPay;
 use App\User;
 use Carbon\Carbon;
@@ -15,11 +16,13 @@ class DeleteTariffByUsers
 {
     protected $user;
     protected $tariff;
+    protected $renewal;
 
-    public function __construct(User $user, TariffPay $tariff)
+    public function __construct(User $user, TariffPay $tariff, TariffAutoRenewalService $renewal)
     {
         $this->user = $user;
         $this->tariff = $tariff;
+        $this->renewal = $renewal;
     }
 
     /**
@@ -49,6 +52,9 @@ class DeleteTariffByUsers
             ->get();
 
         foreach ($tariffs as $tariff) {
+            if ($this->renewal->tryRenew($tariff)) {
+                continue;
+            }
             $this->expirePaidTariff($tariff);
         }
 
@@ -61,7 +67,7 @@ class DeleteTariffByUsers
      * Снять роль и деактивировать запись. Роль — до status=false, иначе при сбое
      * middleware больше не видит подписку (active scope) и роль «залипает».
      */
-    protected function expirePaidTariff(TariffPay $tariff): void
+    public function expirePaidTariff(TariffPay $tariff): void
     {
         if (! is_string($tariff->class_tariff) || ! class_exists($tariff->class_tariff)) {
             $tariff->update(['status' => false]);

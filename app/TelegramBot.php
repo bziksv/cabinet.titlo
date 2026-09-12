@@ -67,6 +67,7 @@ class TelegramBot extends Model
 
     public static function sendNotificationAboutChangeStateProject($project, $chatId)
     {
+        $serviceUrl = self::domainInformationUrl();
         $text =
             __('Domain') .
             ' ' . $project->domain
@@ -76,7 +77,7 @@ class TelegramBot extends Model
             . "\n"
             . "\n"
             . __('Go to the service:')
-            . " <a href='https://lk.redbox.su/domain-information' target='_blank'>https://lk.redbox.su/domain-information</a>";
+            . ' <a href="' . e($serviceUrl) . '" target="_blank">' . e($serviceUrl) . '</a>';
 
         (new TelegramBotService($chatId))->sendMsg($text, null, self::dispatchMeta('domain-dns-changed', $project));
     }
@@ -90,6 +91,7 @@ class TelegramBot extends Model
 
     public static function sendNotificationAboutChangeDNS($project, $chatId, $dns, string $source = 'system')
     {
+        $serviceUrl = self::domainInformationUrl();
         $text = __('Domain') . ' ' . $project->domain
             . "\n"
             . __('DNS CHANGED')
@@ -100,13 +102,14 @@ class TelegramBot extends Model
             . "\n"
             . "\n"
             . __('Go to the service:')
-            . " <a href='https://lk.redbox.su/domain-information' target='_blank'>https://lk.redbox.su/domain-information</a>";
+            . ' <a href="' . e($serviceUrl) . '" target="_blank">' . e($serviceUrl) . '</a>';
 
         (new TelegramBotService($chatId))->sendMsg($text, null, self::dispatchMeta('domain-dns-changed', $project, $source));
     }
 
     public static function sendNotificationAboutExpirationRegistrationPeriod($project, $chatId, $diffInDays, string $source = 'system')
     {
+        $serviceUrl = self::domainInformationUrl();
         $text = __('Domain') . ' ' . $project->domain
             . "\n"
             . __('Notification of the expiration of the registration period')
@@ -115,9 +118,14 @@ class TelegramBot extends Model
             . "\n"
             . "\n"
             . __('Go to the service:')
-            . " <a href='https://lk.redbox.su/domain-information' target='_blank'>https://lk.redbox.su/domain-information</a>";
+            . ' <a href="' . e($serviceUrl) . '" target="_blank">' . e($serviceUrl) . '</a>';
 
         (new TelegramBotService($chatId))->sendMsg($text, null, self::dispatchMeta('domain-expiration', $project, $source));
+    }
+
+    private static function domainInformationUrl(): string
+    {
+        return route('domain.information');
     }
 
     /**
