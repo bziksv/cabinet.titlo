@@ -6649,5 +6649,20 @@
     "Could not load GSC properties": "Не удалось загрузить ресурсы Search Console",
     "Google Search Console property": "Ресурс Google Search Console",
     "Current GSC property": "Текущий ресурс Search Console",
-    "Could not bind GSC property": "Не удалось привязать ресурс Search Console"
+    "Could not bind GSC property": "Не удалось привязать ресурс Search Console",
+    "Site in module short": "в модуле",
+    "Site not in module short": "не в модуле",
+    "Metrika synced short": "Метрика",
+    "Metrika not synced short": "без Метрики",
+    "Webmaster short": "Вебмастер",
+    "Webmaster synced short": "Вебмастер",
+    "Webmaster not synced short": "без Вебмастера",
+    "Webmaster synced": "Вебмастер подключён",
+    "Webmaster not synced": "Вебмастер не подключён",
+    "SEO reports short": "Отчёты",
+    "Show sites with module presence": "Показать сайты с модулями",
+    "Show sites with module gaps": "Показать сайты без модулей",
+    "Show sites with Metrika": "Показать сайты с Метрикой",
+    "Show sites with Webmaster": "Показать сайты с Вебмастером",
+    "Show sites without Webmaster": "Показать сайты без Вебмастера"
 }
