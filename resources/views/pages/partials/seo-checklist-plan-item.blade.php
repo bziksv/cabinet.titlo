@@ -177,6 +177,12 @@
                     @if($helpText !== '')
                         <p class="cabinet-sc-plan__info-help">{{ $helpText }}</p>
                     @endif
+                    @if(trim((string) ($item->client_help ?? '')) !== '')
+                        <p class="cabinet-sc-plan__info-help text-secondary small mb-0">
+                            <span class="fw-semibold">{{ __('Client hint') }}:</span>
+                            {{ $item->client_help }}
+                        </p>
+                    @endif
                     @if($infoLinks !== [])
                         <div class="cabinet-sc-plan__info-links">
                             @foreach($infoLinks as $link)

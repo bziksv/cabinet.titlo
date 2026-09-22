@@ -94,8 +94,12 @@
                     <input type="text" name="title" class="form-control form-control-sm" value="{{ $task->title }}" required data-sc-tpl-title-input>
                 </label>
                 <label class="cabinet-sc-tpl-task__field">
-                    <span class="cabinet-sc-tpl-task__label">{{ __('Hint / help') }}</span>
+                    <span class="cabinet-sc-tpl-task__label">{{ __('Staff hint') }}</span>
                     <textarea name="help" class="form-control form-control-sm" rows="2" placeholder="{{ __('What to do and how to check') }}">{{ $task->help }}</textarea>
+                </label>
+                <label class="cabinet-sc-tpl-task__field">
+                    <span class="cabinet-sc-tpl-task__label">{{ __('Client hint') }}</span>
+                    <textarea name="client_help" class="form-control form-control-sm" rows="2" placeholder="{{ __('Short explanation for the client report') }}">{{ $task->client_help }}</textarea>
                 </label>
                 @if(count($taskLinks) > 0)
                     <div class="cabinet-sc-task__links cabinet-sc-task__links--tpl">

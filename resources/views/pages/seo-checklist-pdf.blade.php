@@ -158,8 +158,14 @@
                                         <span class="badge">↻</span>
                                     @endif
                                 </div>
-                                @if(!empty($item->help))
-                                    <div class="task-help">{{ \Illuminate\Support\Str::limit($item->help, 160) }}</div>
+                                @php
+                                    $reportHelp = trim((string) ($item->client_help ?? ''));
+                                    if ($reportHelp === '') {
+                                        $reportHelp = trim((string) ($item->help ?? ''));
+                                    }
+                                @endphp
+                                @if($reportHelp !== '')
+                                    <div class="task-help">{{ \Illuminate\Support\Str::limit($reportHelp, 160) }}</div>
                                 @endif
                             </td>
                             <td class="role">{{ $roleLabels[$item->role] ?? $item->role }}</td>

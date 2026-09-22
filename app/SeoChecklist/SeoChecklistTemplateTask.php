@@ -12,7 +12,7 @@ class SeoChecklistTemplateTask extends Model
 
     protected $fillable = [
         'template_id', 'parent_id', 'code', 'stage_key', 'stage_sort', 'sort',
-        'title', 'help', 'role', 'is_important', 'include_in_report', 'allows_subtasks', 'repeat_rule', 'due_days_from_start', 'links_json',
+        'title', 'help', 'client_help', 'role', 'is_important', 'include_in_report', 'allows_subtasks', 'repeat_rule', 'due_days_from_start', 'links_json',
     ];
 
     protected $casts = [

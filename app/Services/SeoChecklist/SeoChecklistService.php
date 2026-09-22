@@ -46,7 +46,7 @@ class SeoChecklistService
                 $template = SeoChecklistTemplate::query()->create($templateData);
 
                 foreach (SeoChecklistDefaultTemplate::tasks() as $task) {
-                    SeoChecklistTemplateTask::query()->create([
+                    $row = [
                         'template_id' => $template->id,
                         'parent_id' => null,
                         'code' => $task['code'],
@@ -64,7 +64,11 @@ class SeoChecklistService
                         'repeat_rule' => $task['repeat_rule'] ?? null,
                         'due_days_from_start' => $task['due_days_from_start'] ?? null,
                         'links_json' => $task['links'] ?? [],
-                    ]);
+                    ];
+                    if (Schema::hasColumn('seo_checklist_template_tasks', 'client_help')) {
+                        $row['client_help'] = $task['client_help'] ?? null;
+                    }
+                    SeoChecklistTemplateTask::query()->create($row);
                 }
 
                 return $template;
@@ -115,28 +119,32 @@ class SeoChecklistService
             $seedCodes = [];
             foreach ($seed as $task) {
                 $seedCodes[] = $task['code'];
+                $row = [
+                    'parent_id' => null,
+                    'stage_key' => $task['stage_key'],
+                    'stage_sort' => $task['stage_sort'],
+                    'sort' => $task['sort'],
+                    'title' => $task['title'],
+                    'help' => $task['help'],
+                    'role' => $task['role'],
+                    'is_important' => !empty($task['is_important']),
+                    'include_in_report' => array_key_exists('include_in_report', $task)
+                        ? !empty($task['include_in_report'])
+                        : true,
+                    'allows_subtasks' => !empty($task['allows_subtasks']),
+                    'repeat_rule' => $task['repeat_rule'] ?? null,
+                    'due_days_from_start' => $task['due_days_from_start'] ?? null,
+                    'links_json' => $task['links'] ?? [],
+                ];
+                if (Schema::hasColumn('seo_checklist_template_tasks', 'client_help')) {
+                    $row['client_help'] = $task['client_help'] ?? null;
+                }
                 SeoChecklistTemplateTask::query()->updateOrCreate(
                     [
                         'template_id' => $template->id,
                         'code' => $task['code'],
                     ],
-                    [
-                        'parent_id' => null,
-                        'stage_key' => $task['stage_key'],
-                        'stage_sort' => $task['stage_sort'],
-                        'sort' => $task['sort'],
-                        'title' => $task['title'],
-                        'help' => $task['help'],
-                        'role' => $task['role'],
-                        'is_important' => !empty($task['is_important']),
-                        'include_in_report' => array_key_exists('include_in_report', $task)
-                            ? !empty($task['include_in_report'])
-                            : true,
-                        'allows_subtasks' => !empty($task['allows_subtasks']),
-                        'repeat_rule' => $task['repeat_rule'] ?? null,
-                        'due_days_from_start' => $task['due_days_from_start'] ?? null,
-                        'links_json' => $task['links'] ?? [],
-                    ]
+                    $row
                 );
             }
 
@@ -1380,7 +1388,7 @@ class SeoChecklistService
                 $template = SeoChecklistTemplate::query()->create($templateData);
 
                 foreach ($source->tasks()->whereNull('parent_id')->orderBy('stage_sort')->orderBy('sort')->get() as $task) {
-                    $parent = SeoChecklistTemplateTask::query()->create([
+                    $parentData = [
                         'template_id' => $template->id,
                         'parent_id' => null,
                         'code' => $task->code,
@@ -1396,10 +1404,14 @@ class SeoChecklistService
                         'repeat_rule' => $task->repeat_rule,
                         'due_days_from_start' => $task->due_days_from_start,
                         'links_json' => $task->links_json ?: [],
-                    ]);
+                    ];
+                    if (Schema::hasColumn('seo_checklist_template_tasks', 'client_help')) {
+                        $parentData['client_help'] = $task->client_help;
+                    }
+                    $parent = SeoChecklistTemplateTask::query()->create($parentData);
 
                     foreach ($task->children as $child) {
-                        SeoChecklistTemplateTask::query()->create([
+                        $childData = [
                             'template_id' => $template->id,
                             'parent_id' => $parent->id,
                             'code' => $child->code,
@@ -1415,7 +1427,11 @@ class SeoChecklistService
                             'repeat_rule' => null,
                             'due_days_from_start' => null,
                             'links_json' => [],
-                        ]);
+                        ];
+                        if (Schema::hasColumn('seo_checklist_template_tasks', 'client_help')) {
+                            $childData['client_help'] = $child->client_help;
+                        }
+                        SeoChecklistTemplateTask::query()->create($childData);
                     }
                 }
 
@@ -1580,6 +1596,12 @@ class SeoChecklistService
                 ? $this->normalizeDueDays($payload['due_days_from_start'])
                 : $task->due_days_from_start,
         ])->save();
+
+        if (array_key_exists('client_help', $payload) && Schema::hasColumn('seo_checklist_template_tasks', 'client_help')) {
+            $task->forceFill([
+                'client_help' => trim((string) $payload['client_help']) ?: null,
+            ])->save();
+        }
 
         if (array_key_exists('allows_subtasks', $payload) && $task->code) {
             SeoChecklistItem::query()
@@ -2205,6 +2227,9 @@ class SeoChecklistService
         if (array_key_exists('help', $payload)) {
             $fill['help'] = trim((string) $payload['help']) ?: null;
         }
+        if (array_key_exists('client_help', $payload) && Schema::hasColumn('seo_checklist_items', 'client_help')) {
+            $fill['client_help'] = trim((string) $payload['client_help']) ?: null;
+        }
         if (array_key_exists('role', $payload)) {
             $role = (string) $payload['role'];
             if (in_array($role, ['owner', 'pm', 'shared', 'any'], true)) {
@@ -2392,7 +2417,9 @@ class SeoChecklistService
                         'links_json' => $task->links_json ?: [],
                         'status' => 'todo',
                         'created_by' => $userId,
-                    ]);
+                    ] + (Schema::hasColumn('seo_checklist_items', 'client_help')
+                        ? ['client_help' => $task->client_help]
+                        : []));
 
                     foreach ($task->children as $child) {
                         SeoChecklistItem::query()->create([
@@ -2414,7 +2441,9 @@ class SeoChecklistService
                             'links_json' => [],
                             'status' => 'todo',
                             'created_by' => $userId,
-                        ]);
+                        ] + (Schema::hasColumn('seo_checklist_items', 'client_help')
+                            ? ['client_help' => $child->client_help]
+                            : []));
                     }
                 }
 

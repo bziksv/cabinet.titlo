@@ -1007,6 +1007,7 @@ class SeoChecklistController extends Controller
         $result = $this->service->updateTemplateTask($template, $taskId, [
             'title' => $request->input('title'),
             'help' => $request->input('help'),
+            'client_help' => $request->input('client_help'),
             'role' => $request->input('role'),
             'is_important' => $request->has('is_important'),
             'include_in_report' => $request->has('include_in_report'),
