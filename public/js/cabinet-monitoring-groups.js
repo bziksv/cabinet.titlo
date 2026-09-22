@@ -138,12 +138,31 @@
     }
 
     function initTable() {
-        var columns = [
+        var canSelect = !!(cfg.canEdit || cfg.canDelete);
+        var nameColIndex = canSelect ? 3 : 2;
+        var columns = [];
+
+        if (canSelect) {
+            columns.push({
+                orderable: false,
+                searchable: false,
+                data: null,
+                defaultContent: '',
+                className: 'select-checkbox cabinet-mon-groups-col-check',
+                title:
+                    '<span class="visually-hidden">' +
+                    (cfg.i18n.selectAll || 'Select') +
+                    '</span>',
+            });
+        }
+
+        columns.push(
             {
                 orderable: false,
                 searchable: false,
                 data: null,
                 className: 'cabinet-mon-groups-col-expand',
+                title: '',
                 defaultContent:
                     '<button type="button" class="btn btn-sm btn-link text-secondary p-0 cabinet-mon-groups-expand" aria-label="' +
                     cfg.i18n.expand +
@@ -198,20 +217,20 @@
                         '">' +
                         '<a href="' +
                         openUrl +
-                        '" class="btn btn-sm btn-outline-secondary cabinet-mon-groups-row-actions__btn" title="' +
+                        '" class="btn btn-sm btn-outline-secondary cabinet-mon-groups-row-actions__btn" aria-label="' +
                         cfg.i18n.openGroup +
                         '"><i class="bi bi-folder2-open" aria-hidden="true"></i></a>';
 
                     if (cfg.canEdit) {
                         html +=
-                            '<button type="button" class="btn btn-sm btn-outline-secondary cabinet-mon-groups-row-actions__btn editor-edit" title="' +
+                            '<button type="button" class="btn btn-sm btn-outline-secondary cabinet-mon-groups-row-actions__btn editor-edit" aria-label="' +
                             cfg.i18n.editGroup +
                             '"><i class="bi bi-pencil" aria-hidden="true"></i></button>';
                     }
 
                     if (cfg.canDelete) {
                         html +=
-                            '<button type="button" class="btn btn-sm btn-outline-danger cabinet-mon-groups-row-actions__btn editor-delete" title="' +
+                            '<button type="button" class="btn btn-sm btn-outline-danger cabinet-mon-groups-row-actions__btn editor-delete" aria-label="' +
                             cfg.i18n.deleteGroup +
                             '"><i class="bi bi-trash" aria-hidden="true"></i></button>';
                     }
@@ -219,27 +238,35 @@
                     html += '</div>';
                     return html;
                 },
-            },
-        ];
+            }
+        );
 
-        var buttons = [
-            {
+        var buttons = [];
+
+        if (canSelect) {
+            buttons.push({
                 text: cfg.i18n.selectAll,
-                className: 'btn-outline-secondary btn-sm',
-                extend: 'selectAll',
-            },
-            {
+                className: 'btn btn-outline-secondary btn-sm',
+                action: function (e, dt) {
+                    e.preventDefault();
+                    dt.rows({ search: 'applied' }).select();
+                },
+            });
+            buttons.push({
                 text: cfg.i18n.selectNone,
-                className: 'btn-outline-secondary btn-sm',
-                extend: 'selectNone',
-            },
-        ];
+                className: 'btn btn-outline-secondary btn-sm',
+                action: function (e, dt) {
+                    e.preventDefault();
+                    dt.rows({ selected: true }).deselect();
+                },
+            });
+        }
 
         if (cfg.canCreate) {
             buttons.push({
                 extend: 'create',
                 editor: editor,
-                className: 'btn-primary btn-sm',
+                className: 'btn btn-primary btn-sm',
                 text: cfg.i18n.createButton,
                 action: function () {
                     dynamicHideFields.forEach(function (obj) {
@@ -256,11 +283,13 @@
         if (cfg.canEdit) {
             buttons.push({
                 text: cfg.i18n.editSelected,
-                className: 'btn-outline-primary btn-sm',
+                className: 'btn btn-outline-primary btn-sm',
                 extend: 'edit',
                 editor: editor,
             });
         }
+
+        var nonOrderable = canSelect ? [0, 1, 6, 7] : [0, 5, 6];
 
         table = $('#groups').DataTable({
             dom: 'Brt',
@@ -268,7 +297,7 @@
             fixedHeader: true,
             paging: false,
             ordering: true,
-            order: [[2, 'asc']],
+            order: [[nameColIndex, 'asc']],
             language: {
                 search: '_INPUT_',
                 searchPlaceholder: cfg.i18n.search,
@@ -288,17 +317,33 @@
                     showLoader(false);
                 },
             },
-            columnDefs: [
-                { orderable: false, targets: [0, 5, 6] },
-            ],
+            columnDefs: [{ orderable: false, targets: nonOrderable }],
             columns: columns,
-            select: cfg.canEdit || cfg.canDelete ? { style: 'multi' } : false,
-            buttons: buttons,
+            select: canSelect
+                ? {
+                      style: 'multi',
+                      selector: 'td.select-checkbox',
+                  }
+                : false,
+            buttons: {
+                dom: {
+                    container: {
+                        className: 'dt-buttons cabinet-mon-groups-dt-buttons',
+                    },
+                    button: {
+                        className: 'btn',
+                    },
+                },
+                buttons: buttons,
+            },
             initComplete: function () {
                 var api = this.api();
                 var $wrapper = $(api.table().container());
 
-                $wrapper.find('.dt-buttons').appendTo('#groups-dt-actions');
+                $wrapper
+                    .find('.dt-buttons')
+                    .removeClass('btn-group')
+                    .appendTo('#groups-dt-actions');
                 $wrapper.find('.dataTables_filter').appendTo('#groups-dt-filter');
 
                 if (window.cabinetMonitoringSearch) {
@@ -307,6 +352,7 @@
 
                 $('#groups').on('click', '.cabinet-mon-groups-expand', function (e) {
                     e.preventDefault();
+                    e.stopPropagation();
                     toggleChildRow($(this), api);
                 });
 
