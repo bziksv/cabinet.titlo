@@ -102,6 +102,17 @@
                 animation: false,
                 trigger: 'hover',
             });
+
+            if (window.cabinetMonitoringChildCharts) {
+                window.cabinetMonitoringChildCharts.wire($content, data.monitoring_project_id || cfg.projectId, {
+                    chartsUrl: cfg.chartsUrl || '/monitoring/charts',
+                    i18n: {
+                        childChartShow: cfg.i18n.childChartShow,
+                        childChartHide: cfg.i18n.childChartHide,
+                        loadError: cfg.i18n.loadError,
+                    },
+                });
+            }
         }).finally(function () {
             showLoader(false);
         });

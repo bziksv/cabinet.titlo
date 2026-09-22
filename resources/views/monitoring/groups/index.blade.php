@@ -61,6 +61,19 @@
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min-editor'])
         @include('monitoring.partials.smart-search-script')
+        <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-chart-scales.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-chart-scales.js')) ?: time() }}"></script>
+        <script>
+            window.cabinetMonitoringChildChartsConfig = {
+                chartsUrl: @json(url('/monitoring/charts')),
+                i18n: {
+                    childChartShow: @json(__('Monitoring child chart show')),
+                    childChartHide: @json(__('Monitoring child chart hide')),
+                    loadError: @json(__('Monitoring show chart load error')),
+                },
+            };
+        </script>
+        <script src="{{ asset('js/cabinet-monitoring-child-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-child-charts.js')) ?: time() }}"></script>
         <script>
             window.cabinetMonGroupsConfig = {
                 projectId: {{ (int) $project->id }},
@@ -68,6 +81,7 @@
                 canEdit: @json($canEdit),
                 canDelete: @json($canDelete),
                 csrf: @json(csrf_token()),
+                chartsUrl: @json(url('/monitoring/charts')),
                 routes: {
                     list: @json(route('groups.index', $project->id)),
                     action: @json(route('groups.action', $project->id)),
@@ -107,6 +121,9 @@
                     multiInfo: @json(__('Monitoring groups multi info')),
                     multiRestore: @json(__('Monitoring groups multi restore')),
                     multiNoMulti: @json(__('Monitoring groups multi no multi')),
+                    childChartShow: @json(__('Monitoring child chart show')),
+                    childChartHide: @json(__('Monitoring child chart hide')),
+                    loadError: @json(__('Monitoring show chart load error')),
                 },
             };
         </script>
