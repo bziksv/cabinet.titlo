@@ -19,6 +19,8 @@
     const $search = $('#cabinet-mon-v2-search');
     const $statusFilter = $('#cabinet-mon-v2-status-filter');
     const $loadError = $('#cabinet-mon-v2-load-error');
+    const $pendingInvites = $('#cabinet-mon-v2-pending-invites');
+    const $pendingInvitesList = $('#cabinet-mon-v2-pending-invites-list');
     const $tablePanel = $('#cabinet-mon-v2-table-panel');
     const $cardsPanel = $('#cabinet-mon-v2-cards-panel');
     const $viewCards = $('#cabinet-mon-v2-view-cards');
@@ -1055,6 +1057,13 @@
     }
 
     function userStatusBadge(u) {
+        if (u && u.approved === false) {
+            return {
+                text: cfg.i18n.userPendingShort || 'ожид.',
+                mod: 'pending',
+                title: cfg.i18n.userPending || 'Ожидает принятия приглашения',
+            };
+        }
         const code = ((u && u.status_code) || '').toUpperCase();
         if (!code || code === 'EMPTY') {
             return {
@@ -1076,21 +1085,76 @@
         };
     }
 
+    function renderPendingInvites(invites) {
+        if (!$pendingInvites.length || !$pendingInvitesList.length) {
+            return;
+        }
+        if (!invites || !invites.length) {
+            $pendingInvites.addClass('d-none');
+            $pendingInvitesList.empty();
+            return;
+        }
+
+        const approveLabel = cfg.i18n.pendingInvitesApprove || 'Принять';
+        const cancelLabel = cfg.i18n.pendingInvitesCancel || 'Отмена';
+        const items = invites
+            .map(function (p) {
+                return (
+                    '<li class="cabinet-mon-v2-pending-invites__item" data-id="' +
+                    escHtml(String(p.id)) +
+                    '">' +
+                    '<div class="cabinet-mon-v2-pending-invites__meta">' +
+                    '<span class="cabinet-mon-v2-pending-invites__name">' +
+                    escHtml(p.name || p.url || '#' + p.id) +
+                    '</span>' +
+                    (p.url
+                        ? '<span class="cabinet-mon-v2-pending-invites__url">' +
+                          escHtml(p.url) +
+                          '</span>'
+                        : '') +
+                    '</div>' +
+                    '<div class="cabinet-mon-v2-pending-invites__actions btn-group btn-group-sm">' +
+                    '<button type="button" class="btn btn-primary approve-project">' +
+                    escHtml(approveLabel) +
+                    '</button>' +
+                    '<button type="button" class="btn btn-outline-secondary cancel-project">' +
+                    escHtml(cancelLabel) +
+                    '</button>' +
+                    '</div>' +
+                    '</li>'
+                );
+            })
+            .join('');
+
+        $pendingInvitesList.html(items);
+        $pendingInvites.removeClass('d-none');
+    }
+
     function renderUsers(users) {
         if (!users || !users.length) {
             return '';
         }
         const items = users
             .map(function (u) {
+                const pending = u && u.approved === false;
                 const liClass =
-                    'list-inline-item position-relative' + (u.can_change_status ? ' change-user-status' : '');
+                    'list-inline-item position-relative' +
+                    (u.can_change_status && !pending ? ' change-user-status' : '') +
+                    (pending ? ' cabinet-mon-v2-user--pending' : '');
                 const avatarClass =
                     'cabinet-mon-v2-avatar table-avatar img-circle' +
-                    (u.is_admin || u.is_project_admin ? ' admin-monitoring' : '');
+                    (u.is_admin || u.is_project_admin ? ' admin-monitoring' : '') +
+                    (pending ? ' cabinet-mon-v2-avatar--pending' : '');
                 const initials = escHtml(u.initials || '?');
                 const imgSrc = avatarImageSrc(u.image);
                 const membership = userMembershipLabel(u);
-                const tip = membership ? u.name + ' — ' + membership : u.name;
+                let tip = membership ? u.name + ' — ' + membership : u.name;
+                if (pending) {
+                    tip =
+                        (u.name || '') +
+                        ' — ' +
+                        (cfg.i18n.userPending || 'Ожидает принятия приглашения');
+                }
                 const badge = userStatusBadge(u);
                 let html =
                     '<li class="' +
@@ -1099,7 +1163,7 @@
                     u.id +
                     '" project-id="' +
                     u.project_id +
-                    '" data-bs-toggle="tooltip" title="' +
+                    '" aria-label="' +
                     escHtml(tip) +
                     '">';
                 html +=
@@ -1119,8 +1183,6 @@
                 html +=
                     '<span class="cabinet-mon-v2-user-status cabinet-mon-v2-user-status--' +
                     escHtml(badge.mod) +
-                    '" title="' +
-                    escHtml(badge.title) +
                     '">' +
                     escHtml(badge.text) +
                     '</span>';
@@ -1958,6 +2020,7 @@
     function applyLoadedProjects(payload) {
         allRows = prepareRows(payload && payload.projects ? payload.projects : []);
         loadedCount = allRows.length;
+        renderPendingInvites(payload && payload.pending_invites ? payload.pending_invites : []);
 
         if (getViewMode() === 'table') {
             if (dataTable) {
@@ -2856,7 +2919,7 @@
 
     window.cabinetMonV2List = {
         reload: function () {
-            window.location.reload();
+            loadProjects(true);
         },
         patchPublicShare: function (projectId, share) {
             mergePublicShareUpdate(projectId, share);

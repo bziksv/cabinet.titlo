@@ -157,25 +157,61 @@
             }
         });
 
-        $root.on('click', '.cancel-project', function () {
+        $root.on('click', '.approve-project', function (e) {
+            e.preventDefault();
             const self = $(this);
-            const id = self.closest('.cabinet-mon-v2-card').data('project-id') || self.closest('tr').data('id');
+            const id =
+                self.closest('[data-id]').data('id') ||
+                self.closest('.cabinet-mon-v2-card').data('project-id') ||
+                self.closest('tr').data('id');
+
+            if (!id) {
+                return;
+            }
+
+            axios
+                .post(@json(route('approve.project')), { approve: 1, id: id })
+                .then(function () {
+                    toastr.success(@json(__('Monitoring v2 invite accepted')));
+                    refreshList();
+                })
+                .catch(function () {
+                    toastr.error(@json(__('Wrong request')));
+                });
+        });
+
+        $root.on('click', '.cancel-project', function (e) {
+            e.preventDefault();
+            const self = $(this);
+            const id =
+                self.closest('[data-id]').data('id') ||
+                self.closest('.cabinet-mon-v2-card').data('project-id') ||
+                self.closest('tr').data('id');
+
+            if (!id) {
+                return;
+            }
 
             axios
                 .post(@json(route('approve.project')), { approve: 0, id: id })
                 .then(function () {
                     toastr.success(@json(__('Request has been canceled')));
-                    self.closest('.cabinet-mon-v2-card').remove();
+                    refreshList();
+                })
+                .catch(function () {
+                    toastr.error(@json(__('Wrong request')));
                 });
         });
 
-        $root.on('click', '.add-user', function () {
+        $root.on('click', '.add-user', function (e) {
+            e.preventDefault();
             const id = $(this).data('id');
+            const $formModal = $('#cabinetMonV2FormModal');
 
             axios
                 .get('/monitoring/get-user-status-options')
                 .then(function (response) {
-                    $('.modal')
+                    $formModal
                         .modal('show')
                         .BootstrapModalFormTemplates({
                             title: @json(__('Add user to project')),
@@ -230,15 +266,17 @@
             return false;
         });
 
-        $root.on('click', '.change-user-status', function () {
+        $root.on('click', '.change-user-status', function (e) {
+            e.preventDefault();
             const self = $(this);
             const user = self.attr('user-id');
             const project = self.attr('project-id');
+            const $formModal = $('#cabinetMonV2FormModal');
 
             axios
                 .get('/monitoring/get-user-status-options')
                 .then(function (response) {
-                    $('.modal')
+                    $formModal
                         .modal('show')
                         .BootstrapModalFormTemplates({
                             title: @json(__('Set user status')),

@@ -42,6 +42,7 @@
         @include('monitoring.keywords.modal.main')
         @include('monitoring-v2.partials.public-share-modal')
         @include('monitoring-v2.partials.delete-projects-modal')
+        @include('monitoring-v2.partials.form-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
@@ -177,6 +178,10 @@
                     validUntil: @json(__('Valid until')),
                     publicShareBadge: @json(__('Monitoring v2 public share badge')),
                     publicShareActive: @json(__('Monitoring v2 public share active')),
+                    pendingInvitesApprove: @json(__('Approve')),
+                    pendingInvitesCancel: @json(__('Cancel')),
+                    userPending: @json(__('Monitoring v2 user pending')),
+                    userPendingShort: @json(__('Monitoring v2 user pending short')),
                 },
                 trendStaleHours: {{ (int) config('cabinet-monitoring.trend_stale_hours', 24) }},
                 defaultView: @json('table'),

@@ -216,4 +216,22 @@ class MonitoringPermissionsCatalog
 
         return $count;
     }
+
+    /**
+     * Spatie-роль проекта → код бейджа в monitoring_user_status (список v2 / фильтры).
+     */
+    public static function statusCodeForRole(?string $roleName): string
+    {
+        $map = [
+            'admin_monitoring' => 'OWNER',
+            'team_lead_monitoring' => 'TL',
+            'project_manager_monitoring' => 'PM',
+            'seo_monitoring' => 'SEO',
+            'viewer_monitoring' => 'EMPTY',
+        ];
+
+        $roleName = (string) $roleName;
+
+        return $map[$roleName] ?? 'EMPTY';
+    }
 }

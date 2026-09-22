@@ -1460,6 +1460,95 @@ button.cabinet-mon-v2-favicon-btn {
     padding-right: 0.2rem;
 }
 
+.cabinet-mon-v2-user-status--pending {
+    background: #b45309;
+    min-width: 2.1rem;
+}
+
+.cabinet-mon-v2-avatar--pending {
+    opacity: 0.72;
+    filter: grayscale(0.35);
+}
+
+.cabinet-mon-v2-pending-invites {
+    margin: 0 1rem 0.85rem;
+    padding: 0.85rem 1rem;
+    border-radius: 0.65rem;
+    border: 1px solid rgba(180, 83, 9, 0.35);
+    background: linear-gradient(180deg, #fffbeb 0%, #fff7ed 100%);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.cabinet-mon-v2-pending-invites__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    margin-bottom: 0.75rem;
+}
+
+.cabinet-mon-v2-pending-invites__head > i {
+    flex: 0 0 auto;
+    margin-top: 0.15rem;
+    font-size: 1.15rem;
+    color: #b45309;
+}
+
+.cabinet-mon-v2-pending-invites__title {
+    font-weight: 650;
+    color: #9a3412;
+    font-size: 0.95rem;
+}
+
+.cabinet-mon-v2-pending-invites__lead {
+    margin-top: 0.15rem;
+    color: #9a3412;
+    opacity: 0.85;
+    font-size: 0.8125rem;
+}
+
+.cabinet-mon-v2-pending-invites__list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.cabinet-mon-v2-pending-invites__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem 1rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 0.45rem;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(180, 83, 9, 0.18);
+}
+
+.cabinet-mon-v2-pending-invites__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.cabinet-mon-v2-pending-invites__name {
+    font-weight: 600;
+    color: #0f172a;
+    font-size: 0.875rem;
+}
+
+.cabinet-mon-v2-pending-invites__url {
+    color: #64748b;
+    font-size: 0.75rem;
+    word-break: break-all;
+}
+
+.cabinet-mon-v2-pending-invites__actions {
+    flex: 0 0 auto;
+}
+
 .cabinet-mon-v2-engines {
     display: inline-flex;
     flex-wrap: wrap;

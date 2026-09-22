@@ -65,6 +65,17 @@
 
     <div class="alert alert-danger d-none" id="cabinet-mon-v2-load-error" role="alert"></div>
 
+    <div class="cabinet-mon-v2-pending-invites d-none" id="cabinet-mon-v2-pending-invites" aria-live="polite">
+        <div class="cabinet-mon-v2-pending-invites__head">
+            <i class="bi bi-envelope-exclamation" aria-hidden="true"></i>
+            <div>
+                <p class="cabinet-mon-v2-pending-invites__title mb-0">{{ __('Monitoring v2 pending invites title') }}</p>
+                <p class="cabinet-mon-v2-pending-invites__lead mb-0">{{ __('Monitoring v2 pending invites lead') }}</p>
+            </div>
+        </div>
+        <ul class="cabinet-mon-v2-pending-invites__list mb-0" id="cabinet-mon-v2-pending-invites-list"></ul>
+    </div>
+
     <div class="cabinet-mon-v2-progress d-none" id="cabinet-mon-v2-progress">
         <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100">
             <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>

@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Support\MonitoringPermissionsCatalog;
 use App\User;
+use App\Classes\Monitoring\MonitoringProjectListSerializer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Models\Role;
 
 class MonitoringPermissionsController extends Controller
@@ -87,13 +89,22 @@ class MonitoringPermissionsController extends Controller
 
     public function syncProjectRoles(Request $request): void
     {
-        $id = $request->input('project');
-        $role = $request->input('status');
+        $id = (int) $request->input('project');
+        $role = (string) $request->input('status');
 
         $user = User::findOrFail($request->input('user'));
 
         apply_team_permissions($id);
 
-        $user->syncRoles([$role]);
+        if ($role !== '') {
+            $user->syncRoles([$role]);
+            $statusCode = MonitoringPermissionsCatalog::statusCodeForRole($role);
+            $statusId = MonitoringProjectUserStatusController::getIdStatusByCode($statusCode);
+            $user->monitoringProjects()->updateExistingPivot($id, ['status' => $statusId]);
+        }
+
+        if (Auth::id()) {
+            MonitoringProjectListSerializer::forgetCacheForUser((int) Auth::id());
+        }
     }
 }

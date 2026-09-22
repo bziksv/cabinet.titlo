@@ -116,21 +116,39 @@ class MonitoringController extends Controller
         if ($users->isEmpty())
             return abort('403');
 
-        $id = $request->input('id');
+        $id = (int) $request->input('id');
+        $roleName = (string) $request->input('status');
+        $statusCode = \App\Support\MonitoringPermissionsCatalog::statusCodeForRole($roleName);
+        $statusId = MonitoringProjectUserStatusController::getIdStatusByCode($statusCode);
 
         foreach ($users as $user) {
-            if ($user->monitoringProjects()->find($id) === null) {
+            $existing = $user->monitoringProjects()->find($id);
 
-                $result = $user->monitoringProjects()->syncWithoutDetaching([$id => ['approved' => 0]]);
+            if ($existing === null) {
+                $result = $user->monitoringProjects()->syncWithoutDetaching([
+                    $id => [
+                        'approved' => 0,
+                        'status' => $statusId,
+                    ],
+                ]);
 
                 if (count($result['attached']) > 0) {
                     Mail::to($user)->send(new MonitoringShareProjectMail(MonitoringProject::find($id)));
-
-                    apply_team_permissions($id);
-
-                    $user->assignRole($request->input('status'));
                 }
+            } else {
+                $user->monitoringProjects()->updateExistingPivot($id, ['status' => $statusId]);
             }
+
+            apply_team_permissions($id);
+            if ($roleName !== '') {
+                $user->syncRoles([$roleName]);
+            }
+
+            \App\Classes\Monitoring\MonitoringProjectListSerializer::forgetCacheForUser((int) $user->id);
+        }
+
+        if ($currentUser && !empty($currentUser['id'])) {
+            \App\Classes\Monitoring\MonitoringProjectListSerializer::forgetCacheForUser((int) $currentUser['id']);
         }
 
         return $users->count();
@@ -145,22 +163,40 @@ class MonitoringController extends Controller
 
         /** @var User $user */
         $user = $this->user;
+        $project = $user->monitoringProjects()->find($id);
+        $cacheUserIds = [(int) $user->id];
+        if ($project) {
+            foreach ($project->users as $projectUser) {
+                $cacheUserIds[] = (int) $projectUser->id;
+            }
+        }
+        $cacheUserIds = array_values(array_unique($cacheUserIds));
 
         if ($approve) {
-            $project = $user->monitoringProjects()->find($id);
-
-            foreach($project->users as $project_user) {
-                if ($project_user->hasRole('admin_monitoring')) {
-                    Mail::to($project_user)->send(new MonitoringApproveProjectMail($user, $project));
+            if ($project) {
+                foreach ($project->users as $project_user) {
+                    if ($project_user->hasRole('admin_monitoring')) {
+                        Mail::to($project_user)->send(new MonitoringApproveProjectMail($user, $project));
+                    }
                 }
             }
 
-            return $user->monitoringProjects()->updateExistingPivot($id, ["approved" => 1]);
+            $result = $user->monitoringProjects()->updateExistingPivot($id, ["approved" => 1]);
+            foreach ($cacheUserIds as $uid) {
+                \App\Classes\Monitoring\MonitoringProjectListSerializer::forgetCacheForUser($uid);
+            }
+
+            return $result;
         }
 
         $user->syncRoles([]);
 
-        return $user->monitoringProjects()->detach($id);
+        $result = $user->monitoringProjects()->detach($id);
+        foreach ($cacheUserIds as $uid) {
+            \App\Classes\Monitoring\MonitoringProjectListSerializer::forgetCacheForUser($uid);
+        }
+
+        return $result;
     }
 
     public function detachUser(Request $request)

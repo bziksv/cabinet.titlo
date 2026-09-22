@@ -19,7 +19,7 @@ class MonitoringProjectListSerializer
     private const CACHE_TTL_SECONDS = 120;
 
     /** Смена схемы ответа — сброс старого кэша с пустыми снимками. */
-    private const CACHE_KEY_SUFFIX = 's21';
+    private const CACHE_KEY_SUFFIX = 's23';
 
     /**
      * Снимки до этого момента могли быть посчитаны через addLastPositions
@@ -349,6 +349,7 @@ class MonitoringProjectListSerializer
                 'projects' => [],
                 'snapshots_pending' => 0,
                 'snapshots_rebuilt' => 0,
+                'pending_invites' => [],
             ];
         }
 
@@ -394,7 +395,36 @@ class MonitoringProjectListSerializer
             'snapshots_rebuilt' => $snapshotsRebuilt,
             'snapshots_pending' => $pending,
             'without_positions' => $this->projectsWithoutPositionsList($projects, $latestByProject),
+            'pending_invites' => $this->pendingInvitesForUser($user, $projects),
         ];
+    }
+
+    /**
+     * Проекты, куда текущего пользователя пригласили, но он ещё не принял (approved=0).
+     *
+     * @param \Illuminate\Support\Collection<int, MonitoringProject> $projects
+     * @return list<array{id:int,name:string,url:string}>
+     */
+    private function pendingInvitesForUser(User $user, $projects): array
+    {
+        $out = [];
+        $uid = (int) $user->id;
+        foreach ($projects as $project) {
+            $me = $project->users->firstWhere('id', $uid);
+            if (!$me) {
+                continue;
+            }
+            if ((int) ($me->pivot->approved ?? 0) === 1) {
+                continue;
+            }
+            $out[] = [
+                'id' => (int) $project->id,
+                'name' => (string) ($project->name ?: $project->url),
+                'url' => (string) $project->url,
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -575,11 +605,25 @@ class MonitoringProjectListSerializer
         $users = $project->users->map(function ($member) use ($project, $perms, $authId) {
             $statusId = (int) ($member->pivot->status ?? 0);
             $status = $this->statusById->get($statusId);
-            $role = $member->roles->first();
+            $roleMeta = \App\Support\MonitoringPermissionsCatalog::roleMeta();
+            $role = $member->roles->first(static function ($r) use ($roleMeta) {
+                return isset($roleMeta[$r->name]);
+            }) ?: $member->roles->first();
             $statusCode = $status ? (string) $status->code : '';
             $statusName = $status ? (string) $status->name : __('Without status');
             if ($statusCode === '' || $statusCode === 'EMPTY') {
-                $statusName = __('Without status');
+                // Роль уже могла быть выдана при приглашении, а pivot.status — нет.
+                $roleName = $role ? (string) $role->name : '';
+                $fromRole = \App\Support\MonitoringPermissionsCatalog::statusCodeForRole($roleName);
+                if ($fromRole !== 'EMPTY') {
+                    $mapped = $this->statusById->firstWhere('code', $fromRole);
+                    if ($mapped) {
+                        $statusCode = (string) $mapped->code;
+                        $statusName = (string) $mapped->name;
+                    }
+                } else {
+                    $statusName = __('Without status');
+                }
             }
 
             return [
@@ -595,6 +639,7 @@ class MonitoringProjectListSerializer
                 'can_detach' => $perms['detach_user'] && $member->id !== $authId,
                 'can_change_status' => $perms['change_status'],
                 'project_id' => $project->id,
+                'approved' => (int) ($member->pivot->approved ?? 0) === 1,
             ];
         })->values()->all();
 
