@@ -53,7 +53,10 @@
     }
 
     function updateStats(api) {
-        var data = api.rows({ page: 'current' }).data().toArray();
+        if (!api) {
+            return;
+        }
+        var data = api.rows({ search: 'applied' }).data().toArray();
         var count = data.length;
         var queries = data.reduce(function (sum, row) {
             return sum + (parseInt(row.queries, 10) || 0);
@@ -61,6 +64,19 @@
 
         $('#groups-stats-groups').text(count);
         $('#groups-stats-queries').text(queries);
+    }
+
+    function syncGroupChecks(api) {
+        if (!api) {
+            return;
+        }
+        api.rows({ page: 'current' }).every(function () {
+            var node = this.node();
+            if (!node) {
+                return;
+            }
+            $(node).find('.cabinet-mon-groups-check').prop('checked', !!this.selected());
+        });
     }
 
     function toggleChildRow($control, api) {
@@ -81,41 +97,53 @@
             .replace('__GROUP__', data.id);
 
         showLoader(true);
-        window.axios.get(url).then(function (response) {
-            var $content = $('<div class="cabinet-mon-groups-child" />').append($(response.data));
+        window.axios
+            .get(url)
+            .then(function (response) {
+                var $content = $('<div class="cabinet-mon-groups-child" />').append($(response.data));
 
-            $content.find('.top').each(function () {
-                var str = $(this).text();
-                if (str.indexOf('+') > 0) {
-                    $(this).addClass('cabinet-mon-groups-grow');
-                }
-                if (str.indexOf('-') > 0) {
-                    $(this).addClass('cabinet-mon-groups-shrink');
-                }
-            });
-
-            row.child($content).show();
-            $tr.addClass('shown');
-            $icon.removeClass('bi-plus-circle').addClass('bi-dash-circle');
-
-            $content.find('.tooltip-child-table').tooltip({
-                animation: false,
-                trigger: 'hover',
-            });
-
-            if (window.cabinetMonitoringChildCharts) {
-                window.cabinetMonitoringChildCharts.wire($content, data.monitoring_project_id || cfg.projectId, {
-                    chartsUrl: cfg.chartsUrl || '/monitoring/charts',
-                    i18n: {
-                        childChartShow: cfg.i18n.childChartShow,
-                        childChartHide: cfg.i18n.childChartHide,
-                        loadError: cfg.i18n.loadError,
-                    },
+                $content.find('.top').each(function () {
+                    var str = $(this).text();
+                    if (str.indexOf('+') > 0) {
+                        $(this).addClass('cabinet-mon-groups-grow');
+                    }
+                    if (str.indexOf('-') > 0) {
+                        $(this).addClass('cabinet-mon-groups-shrink');
+                    }
                 });
-            }
-        }).finally(function () {
-            showLoader(false);
-        });
+
+                row.child($content).show();
+                $tr.addClass('shown');
+                $icon.removeClass('bi-plus-circle').addClass('bi-dash-circle');
+
+                $content.find('.tooltip-child-table').tooltip({
+                    animation: false,
+                    trigger: 'hover',
+                });
+
+                if (window.cabinetMonitoringChildCharts) {
+                    window.cabinetMonitoringChildCharts.wire(
+                        $content,
+                        data.monitoring_project_id || cfg.projectId,
+                        {
+                            chartsUrl: cfg.chartsUrl || '/monitoring/charts',
+                            i18n: {
+                                childChartShow: cfg.i18n.childChartShow,
+                                childChartHide: cfg.i18n.childChartHide,
+                                loadError: cfg.i18n.loadError,
+                            },
+                        }
+                    );
+                }
+            })
+            .catch(function () {
+                if (typeof toastr !== 'undefined') {
+                    toastr.error(cfg.i18n.loadError || 'Error');
+                }
+            })
+            .finally(function () {
+                showLoader(false);
+            });
     }
 
     function initEditor() {
@@ -161,7 +189,7 @@
                 className: 'cabinet-mon-groups-col-check',
                 title: '',
                 defaultContent:
-                    '<input type="checkbox" class="form-check-input cabinet-mon-groups-check" tabindex="-1" aria-label="' +
+                    '<input type="checkbox" class="cabinet-mon-groups-check" tabindex="-1" aria-label="' +
                     (cfg.i18n.selectAll || 'Select') +
                     '">',
             });
@@ -316,15 +344,20 @@
                 emptyTable: cfg.i18n.emptyTable,
                 zeroRecords: cfg.i18n.zeroRecords,
             },
+            // API отдаёт весь список без draw/recordsTotal — serverSide здесь ломает redraw (статы 0 + залипший loader).
             processing: true,
-            serverSide: true,
+            serverSide: false,
             ajax: {
                 url: cfg.routes.list,
                 type: 'POST',
+                dataSrc: 'data',
                 beforeSend: function () {
                     showLoader(true);
                 },
                 complete: function () {
+                    showLoader(false);
+                },
+                error: function () {
                     showLoader(false);
                 },
             },
@@ -367,27 +400,16 @@
                     toggleChildRow($(this), api);
                 });
 
-                function syncGroupChecks() {
-                    api.rows({ page: 'current' }).every(function () {
-                        $(this.node())
-                            .find('.cabinet-mon-groups-check')
-                            .prop('checked', this.selected());
-                    });
-                }
-
-                api.on('select.dt deselect.dt', syncGroupChecks);
-                syncGroupChecks();
-                api.columns.adjust();
+                api.on('select.dt deselect.dt', function () {
+                    syncGroupChecks(api);
+                });
+                syncGroupChecks(api);
+                showLoader(false);
                 updateStats(api);
             },
             drawCallback: function () {
                 var api = this.api();
-                api.rows({ page: 'current' }).every(function () {
-                    $(this.node())
-                        .find('.cabinet-mon-groups-check')
-                        .prop('checked', this.selected());
-                });
-                api.columns.adjust();
+                syncGroupChecks(api);
                 updateStats(api);
             },
         });

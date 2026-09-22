@@ -3857,7 +3857,6 @@ button.cabinet-btn-busy:disabled {
     cursor: pointer;
 }
 
-/* Настоящий checkbox — без :before/:after DataTables Select (они улетали вверх). */
 .cabinet-mon-groups-table tbody td.cabinet-mon-groups-col-check:before,
 .cabinet-mon-groups-table tbody td.cabinet-mon-groups-col-check:after,
 .cabinet-mon-groups-table thead th.cabinet-mon-groups-col-check:before,
@@ -3869,15 +3868,25 @@ button.cabinet-btn-busy:disabled {
 }
 
 .cabinet-mon-groups-check {
+    -webkit-appearance: checkbox;
+    appearance: checkbox;
+    display: inline-block;
     width: 1.05rem;
     height: 1.05rem;
-    margin: 0;
+    margin: 0 auto;
     padding: 0;
+    float: none !important;
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
     vertical-align: middle;
     cursor: pointer;
-    float: none;
-    position: static;
     accent-color: #2563eb;
+}
+
+.cabinet-mon-groups-table-host__loader.d-none {
+    display: none !important;
 }
 
 .cabinet-mon-groups-col-expand {
