@@ -3844,39 +3844,61 @@ button.cabinet-btn-busy:disabled {
 }
 
 .cabinet-mon-groups-table.table.dataTable tbody > tr.selected > td.cabinet-mon-groups-col-check {
-    box-shadow: inset 3px 0 0 #2563eb !important;
+    box-shadow: none !important;
 }
 
 .cabinet-mon-groups-col-check {
-    width: 2.25rem;
-    min-width: 2.25rem;
-    max-width: 2.25rem;
-    padding-left: 0.65rem !important;
-    padding-right: 0.35rem !important;
+    width: 2.5rem;
+    min-width: 2.5rem;
+    max-width: 2.5rem;
+    padding: 0.4rem 0.35rem !important;
     text-align: center;
     cursor: pointer;
+    vertical-align: middle !important;
+}
+
+/* Свои чекбоксы: DT Select рисует ✓ с кривыми top/margin — не попадало в квадрат. */
+.cabinet-mon-groups-table tbody td.select-checkbox:before,
+.cabinet-mon-groups-table tbody td.select-checkbox:after,
+.cabinet-mon-groups-table thead th.select-checkbox:before,
+.cabinet-mon-groups-table thead th.select-checkbox:after {
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    box-sizing: border-box;
+    margin: 0 !important;
+    padding: 0;
+    text-shadow: none !important;
 }
 
 .cabinet-mon-groups-table tbody td.select-checkbox:before,
 .cabinet-mon-groups-table thead th.select-checkbox:before {
-    top: 50%;
-    left: 50%;
-    margin-top: -6px;
-    margin-left: -6px;
-    border-color: #94a3b8;
+    content: "" !important;
+    width: 1rem;
+    height: 1rem;
+    transform: translate(-50%, -50%);
+    border: 1.5px solid #94a3b8;
+    border-radius: 0.25rem;
     background: #fff;
 }
 
+.cabinet-mon-groups-table tbody tr.selected td.select-checkbox:before {
+    border-color: #2563eb;
+    background: #2563eb;
+}
+
 .cabinet-mon-groups-table tbody tr.selected td.select-checkbox:after {
-    top: 50%;
-    left: 50%;
-    margin-top: -11px;
-    margin-left: -6px;
-    color: #1d4ed8;
-    text-shadow: none;
-    font-size: 0.85rem;
-    line-height: 1;
-    content: "✓";
+    content: "" !important;
+    width: 0.32rem;
+    height: 0.55rem;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: translate(-50%, -60%) rotate(45deg);
+    font-size: 0 !important;
+    line-height: 0 !important;
+    color: transparent !important;
+    background: transparent !important;
 }
 
 .cabinet-mon-groups-col-expand {
