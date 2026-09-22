@@ -19,7 +19,7 @@ class MonitoringProjectListSerializer
     private const CACHE_TTL_SECONDS = 120;
 
     /** Смена схемы ответа — сброс старого кэша с пустыми снимками. */
-    private const CACHE_KEY_SUFFIX = 's23';
+    private const CACHE_KEY_SUFFIX = 's24';
 
     /**
      * Снимки до этого момента могли быть посчитаны через addLastPositions
