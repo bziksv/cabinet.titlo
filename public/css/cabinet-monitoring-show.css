@@ -3831,15 +3831,20 @@ button.cabinet-btn-busy:disabled {
     line-height: 1.35;
 }
 
-.cabinet-mon-groups-table tbody > tr.selected,
-.cabinet-mon-groups-table tbody > tr.selected > td {
-    background-color: #dbeafe !important;
-    box-shadow: inset 3px 0 0 #2563eb;
+/* Только фон строки — НЕ box-shadow на каждой td (иначе синие «колонки» по всей таблице). */
+.cabinet-mon-groups-table.table.dataTable tbody > tr.selected,
+.cabinet-mon-groups-table.table.dataTable tbody > tr.selected > td {
+    background-color: #eff6ff !important;
+    box-shadow: none !important;
 }
 
-.cabinet-mon-groups-table tbody > tr.selected:hover,
-.cabinet-mon-groups-table tbody > tr.selected:hover > td {
-    background-color: #bfdbfe !important;
+.cabinet-mon-groups-table.table.dataTable tbody > tr.selected:hover,
+.cabinet-mon-groups-table.table.dataTable tbody > tr.selected:hover > td {
+    background-color: #dbeafe !important;
+}
+
+.cabinet-mon-groups-table.table.dataTable tbody > tr.selected > td.cabinet-mon-groups-col-check {
+    box-shadow: inset 3px 0 0 #2563eb !important;
 }
 
 .cabinet-mon-groups-col-check {
@@ -3855,18 +3860,23 @@ button.cabinet-btn-busy:disabled {
 .cabinet-mon-groups-table tbody td.select-checkbox:before,
 .cabinet-mon-groups-table thead th.select-checkbox:before {
     top: 50%;
+    left: 50%;
     margin-top: -6px;
+    margin-left: -6px;
     border-color: #94a3b8;
     background: #fff;
 }
 
 .cabinet-mon-groups-table tbody tr.selected td.select-checkbox:after {
     top: 50%;
-    margin-top: -14px;
+    left: 50%;
+    margin-top: -11px;
+    margin-left: -6px;
     color: #1d4ed8;
     text-shadow: none;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     line-height: 1;
+    content: "✓";
 }
 
 .cabinet-mon-groups-col-expand {

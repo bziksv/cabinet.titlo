@@ -249,7 +249,7 @@
                 className: 'btn btn-outline-secondary btn-sm',
                 action: function (e, dt) {
                     e.preventDefault();
-                    dt.rows({ search: 'applied' }).select();
+                    dt.rows({ page: 'current', search: 'applied' }).select();
                 },
             });
             buttons.push({
@@ -294,7 +294,7 @@
         table = $('#groups').DataTable({
             dom: 'Brt',
             autoWidth: false,
-            fixedHeader: true,
+            fixedHeader: false,
             paging: false,
             ordering: true,
             order: [[nameColIndex, 'asc']],
@@ -356,10 +356,13 @@
                     toggleChildRow($(this), api);
                 });
 
+                api.columns.adjust();
                 updateStats(api);
             },
-            drawCallback: function () {
-                updateStats(this.api());
+            drawCallback: function (settings) {
+                var api = this.api();
+                api.columns.adjust();
+                updateStats(api);
             },
         });
     }
