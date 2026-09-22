@@ -3798,14 +3798,13 @@ button.cabinet-btn-busy:disabled {
     background: #fff;
 }
 
-.cabinet-mon-groups-table-host__loader {
-    position: absolute;
-    inset: 0;
-    z-index: 3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.88);
+/* Белый оверлей больше не используем — залипал поверх таблицы. */
+.cabinet-mon-groups-table-host__loader,
+.cabinet-mon-groups-table-host__loader.d-none {
+    display: none !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
 }
 
 .cabinet-mon-groups-table {
@@ -3883,10 +3882,6 @@ button.cabinet-btn-busy:disabled {
     vertical-align: middle;
     cursor: pointer;
     accent-color: #2563eb;
-}
-
-.cabinet-mon-groups-table-host__loader.d-none {
-    display: none !important;
 }
 
 .cabinet-mon-groups-col-expand {

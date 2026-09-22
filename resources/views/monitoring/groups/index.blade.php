@@ -45,9 +45,6 @@
                 </div>
 
                 <div class="cabinet-mon-groups-table-host" id="groups-table-host">
-                    <div class="cabinet-mon-groups-table-host__loader d-none" id="groupsLoader" role="status" aria-live="polite">
-                        @include('monitoring.partials.show.loader', ['label' => __('Monitoring groups table loading')])
-                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover table-sm mb-0 w-100 cabinet-mon-groups-table" id="groups"></table>
                     </div>

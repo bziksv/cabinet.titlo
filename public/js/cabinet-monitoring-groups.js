@@ -12,8 +12,9 @@
         { label: cfg.i18n.usersLabel, name: 'users_option', type: 'checkbox' },
     ];
 
-    function showLoader(show) {
-        $('#groupsLoader').toggleClass('d-none', !show);
+    function showLoader() {
+        // Оверлей отключён: раньше #groupsLoader с rgba(255,255,255,.88) залипал поверх таблицы.
+        $('#groupsLoader').addClass('d-none').attr('aria-hidden', 'true');
     }
 
     function buildFields() {
@@ -96,7 +97,7 @@
             .replace('__PROJECT__', data.monitoring_project_id)
             .replace('__GROUP__', data.id);
 
-        showLoader(true);
+        showLoader();
         window.axios
             .get(url)
             .then(function (response) {
@@ -142,7 +143,7 @@
                 }
             })
             .finally(function () {
-                showLoader(false);
+                showLoader();
             });
     }
 
@@ -344,21 +345,21 @@
                 emptyTable: cfg.i18n.emptyTable,
                 zeroRecords: cfg.i18n.zeroRecords,
             },
-            // API отдаёт весь список без draw/recordsTotal — serverSide здесь ломает redraw (статы 0 + залипший loader).
-            processing: true,
+            // API отдаёт весь список без draw/recordsTotal — serverSide здесь ломает redraw (статы 0).
+            processing: false,
             serverSide: false,
             ajax: {
                 url: cfg.routes.list,
                 type: 'POST',
                 dataSrc: 'data',
-                beforeSend: function () {
-                    showLoader(true);
-                },
                 complete: function () {
-                    showLoader(false);
+                    showLoader();
+                    if (table) {
+                        updateStats(table);
+                    }
                 },
                 error: function () {
-                    showLoader(false);
+                    showLoader();
                 },
             },
             columnDefs: [{ orderable: false, targets: nonOrderable }],
@@ -404,13 +405,14 @@
                     syncGroupChecks(api);
                 });
                 syncGroupChecks(api);
-                showLoader(false);
+                showLoader();
                 updateStats(api);
             },
             drawCallback: function () {
                 var api = this.api();
                 syncGroupChecks(api);
                 updateStats(api);
+                showLoader();
             },
         });
     }
@@ -418,6 +420,7 @@
     $(document).ready(function () {
         toastr.options = { preventDuplicates: true, timeOut: 5000 };
 
+        showLoader();
         initEditor();
         initTable();
 
