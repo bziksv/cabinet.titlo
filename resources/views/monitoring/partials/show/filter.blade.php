@@ -7,7 +7,16 @@
 
             <div class="card-body">
                 <div class="row g-3 align-items-end">
-                    <form action="" style="display: contents;">
+                    <form action="" method="get" style="display: contents;">
+                        @foreach(request()->except('region') as $key => $value)
+                            @if(is_array($value))
+                                @foreach($value as $item)
+                                    <input type="hidden" name="{{ $key }}[]" value="{{ $item }}">
+                                @endforeach
+                            @else
+                                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                            @endif
+                        @endforeach
                         <div class="col-md-4">
                             <div class="mb-0">
                                 <label class="form-label" for="searchengines">{{ __('Search engine') }}</label>

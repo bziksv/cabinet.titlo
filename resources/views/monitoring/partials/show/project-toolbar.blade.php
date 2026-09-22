@@ -1,5 +1,14 @@
 <div class="cabinet-mon-project-toolbar">
-    <form action="" class="cabinet-mon-project-toolbar__form">
+    <form action="" method="get" class="cabinet-mon-project-toolbar__form">
+        @foreach(request()->except('region') as $key => $value)
+            @if(is_array($value))
+                @foreach($value as $item)
+                    <input type="hidden" name="{{ $key }}[]" value="{{ $item }}">
+                @endforeach
+            @else
+                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+            @endif
+        @endforeach
         <label class="visually-hidden" for="searchengines">{{ __('Search engine') }}</label>
         <select name="region" class="form-select form-select-sm" id="searchengines" onchange="this.form.submit()">
             @if($project->searchengines->count() > 1)
