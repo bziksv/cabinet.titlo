@@ -3981,6 +3981,33 @@ button.cabinet-btn-busy:disabled {
     padding: 0.65rem 0.85rem 0.85rem;
 }
 
+.cabinet-mon-groups-child .cabinet-mon-v2-child-chart-controls__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    align-items: flex-end;
+    margin-bottom: 0.5rem;
+}
+
+.cabinet-mon-groups-child .cabinet-mon-v2-child-chart-controls__field {
+    min-width: 10rem;
+}
+
+.cabinet-mon-groups-child .cabinet-mon-v2-child-chart-controls__field .form-select {
+    min-width: 11rem;
+}
+
+.cabinet-mon-groups-child .cabinet-mon-v2-child-chart-canvas-wrap {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.cabinet-mon-groups-child .cabinet-mon-v2-child-chart-wrap--loading .cabinet-mon-v2-child-chart-canvas-wrap {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
 .cabinet-mon-groups-child .card {
     margin-bottom: 0.65rem;
     border-color: var(--mon-proj-border);
