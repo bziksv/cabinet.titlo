@@ -3851,54 +3851,33 @@ button.cabinet-btn-busy:disabled {
     width: 2.5rem;
     min-width: 2.5rem;
     max-width: 2.5rem;
-    padding: 0.4rem 0.35rem !important;
+    padding: 0.45rem 0.35rem !important;
     text-align: center;
-    cursor: pointer;
     vertical-align: middle !important;
+    cursor: pointer;
 }
 
-/* Свои чекбоксы: DT Select рисует ✓ с кривыми top/margin — не попадало в квадрат. */
+/* Настоящий checkbox — без :before/:after DataTables Select (они улетали вверх). */
+.cabinet-mon-groups-table tbody td.cabinet-mon-groups-col-check:before,
+.cabinet-mon-groups-table tbody td.cabinet-mon-groups-col-check:after,
+.cabinet-mon-groups-table thead th.cabinet-mon-groups-col-check:before,
+.cabinet-mon-groups-table thead th.cabinet-mon-groups-col-check:after,
 .cabinet-mon-groups-table tbody td.select-checkbox:before,
-.cabinet-mon-groups-table tbody td.select-checkbox:after,
-.cabinet-mon-groups-table thead th.select-checkbox:before,
-.cabinet-mon-groups-table thead th.select-checkbox:after {
-    display: block;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    box-sizing: border-box;
-    margin: 0 !important;
+.cabinet-mon-groups-table tbody td.select-checkbox:after {
+    content: none !important;
+    display: none !important;
+}
+
+.cabinet-mon-groups-check {
+    width: 1.05rem;
+    height: 1.05rem;
+    margin: 0;
     padding: 0;
-    text-shadow: none !important;
-}
-
-.cabinet-mon-groups-table tbody td.select-checkbox:before,
-.cabinet-mon-groups-table thead th.select-checkbox:before {
-    content: "" !important;
-    width: 1rem;
-    height: 1rem;
-    transform: translate(-50%, -50%);
-    border: 1.5px solid #94a3b8;
-    border-radius: 0.25rem;
-    background: #fff;
-}
-
-.cabinet-mon-groups-table tbody tr.selected td.select-checkbox:before {
-    border-color: #2563eb;
-    background: #2563eb;
-}
-
-.cabinet-mon-groups-table tbody tr.selected td.select-checkbox:after {
-    content: "" !important;
-    width: 0.32rem;
-    height: 0.55rem;
-    border: solid #fff;
-    border-width: 0 2px 2px 0;
-    transform: translate(-50%, -60%) rotate(45deg);
-    font-size: 0 !important;
-    line-height: 0 !important;
-    color: transparent !important;
-    background: transparent !important;
+    vertical-align: middle;
+    cursor: pointer;
+    float: none;
+    position: static;
+    accent-color: #2563eb;
 }
 
 .cabinet-mon-groups-col-expand {

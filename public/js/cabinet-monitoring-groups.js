@@ -158,12 +158,12 @@
                 orderable: false,
                 searchable: false,
                 data: null,
-                defaultContent: '',
-                className: 'select-checkbox cabinet-mon-groups-col-check',
-                title:
-                    '<span class="visually-hidden">' +
+                className: 'cabinet-mon-groups-col-check',
+                title: '',
+                defaultContent:
+                    '<input type="checkbox" class="form-check-input cabinet-mon-groups-check" tabindex="-1" aria-label="' +
                     (cfg.i18n.selectAll || 'Select') +
-                    '</span>',
+                    '">',
             });
         }
 
@@ -333,7 +333,7 @@
             select: canSelect
                 ? {
                       style: 'multi',
-                      selector: 'td.select-checkbox',
+                      selector: 'td.cabinet-mon-groups-col-check',
                   }
                 : false,
             buttons: {
@@ -367,11 +367,26 @@
                     toggleChildRow($(this), api);
                 });
 
+                function syncGroupChecks() {
+                    api.rows({ page: 'current' }).every(function () {
+                        $(this.node())
+                            .find('.cabinet-mon-groups-check')
+                            .prop('checked', this.selected());
+                    });
+                }
+
+                api.on('select.dt deselect.dt', syncGroupChecks);
+                syncGroupChecks();
                 api.columns.adjust();
                 updateStats(api);
             },
-            drawCallback: function (settings) {
+            drawCallback: function () {
                 var api = this.api();
+                api.rows({ page: 'current' }).every(function () {
+                    $(this.node())
+                        .find('.cabinet-mon-groups-check')
+                        .prop('checked', this.selected());
+                });
                 api.columns.adjust();
                 updateStats(api);
             },
