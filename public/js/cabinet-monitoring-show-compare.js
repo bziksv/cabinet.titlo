@@ -17,10 +17,6 @@
     var initialized = false;
     var lastNoticeKey = '';
 
-    function currentRegionKey() {
-        return cfg.baseRegion && cfg.baseRegion.id ? String(cfg.baseRegion.id) : 'all';
-    }
-
     function readStore() {
         try {
             var raw = localStorage.getItem(STORAGE_KEY);
@@ -39,8 +35,9 @@
         if (!patch || !patch.projectId) {
             delete all[key];
         } else {
+            // regionKey не используем для сброса: смена «все регионы» → конкретный
+            // регион как раз нужна для сравнения, выбор проекта должен сохраниться.
             all[key] = {
-                regionKey: currentRegionKey(),
                 projectId: parseInt(patch.projectId, 10),
                 groupId: patch.groupId != null && patch.groupId !== '' ? parseInt(patch.groupId, 10) : null,
                 projectName: patch.projectName || '',
@@ -57,9 +54,6 @@
         var all = readStore();
         var saved = all[String(cfg.projectId)];
         if (!saved || !saved.projectId) {
-            return null;
-        }
-        if (!saved.regionKey || saved.regionKey !== currentRegionKey()) {
             return null;
         }
         return {
@@ -146,7 +140,7 @@
         if (check.reason === 'no_base_region') {
             html = escapeHtml(
                 (cfg.i18n && cfg.i18n.compareNeedBaseRegion) ||
-                    'Чтобы сравнить графики, выберите регион у основного проекта.'
+                    'Чтобы сравнить проекты, выберите один регион в фильтре «Поисковая система».'
             );
             $notice.removeClass('cabinet-mon-compare-notice--warn');
         } else if (check.reason === 'missing_region') {
@@ -212,7 +206,65 @@
         }
     }
 
+    var panelOpen = false;
+
+    function chipIdleLabel() {
+        return (cfg.i18n && cfg.i18n.compareChipIdle) || (cfg.i18n && cfg.i18n.compareProject) || 'Сравнить с проектом';
+    }
+
+    function syncCompareChrome() {
+        var $root = $('#cabinetMonProjectCompare');
+        var $chip = $('#cabinet-mon-compare-toggle');
+        var $label = $('#cabinet-mon-compare-chip-label');
+        var $vs = $('#cabinet-mon-compare-chip-vs');
+        var $clear = $('#cabinet-mon-compare-clear');
+        var $panel = $('#cabinet-mon-compare-panel');
+        if (!$chip.length) {
+            return;
+        }
+
+        var active = !!state.projectId;
+        $root.toggleClass('is-expanded', panelOpen);
+        $chip.toggleClass('is-active', active);
+        $chip.toggleClass('is-open', panelOpen);
+        $chip.attr('aria-expanded', panelOpen ? 'true' : 'false');
+
+        if (active) {
+            $label.addClass('d-none');
+            $vs.removeClass('d-none').attr('aria-hidden', 'false').text('vs ' + (state.projectName || ('#' + state.projectId)));
+            $clear.removeClass('d-none');
+        } else {
+            $label.removeClass('d-none').text(chipIdleLabel());
+            $vs.addClass('d-none').attr('aria-hidden', 'true').text('');
+            $clear.addClass('d-none');
+        }
+
+        if (panelOpen) {
+            $panel.removeClass('d-none');
+        } else {
+            $panel.addClass('d-none');
+        }
+    }
+
+    function setPanelOpen(open) {
+        panelOpen = !!open;
+        syncCompareChrome();
+    }
+
+    function clearCompareUi() {
+        var $project = $('#cabinet-mon-compare-project');
+        var $group = $('#cabinet-mon-compare-group');
+        $project.val('').trigger('change');
+        if ($project.hasClass('select2-hidden-accessible')) {
+            $project.trigger('change.select2');
+        }
+        $group.prop('disabled', true).empty();
+        setState(null);
+        setPanelOpen(false);
+    }
+
     function notifyChange() {
+        syncCompareChrome();
         changeListeners.forEach(function (cb) {
             try {
                 cb(state);
@@ -228,6 +280,7 @@
             regionBlock = null;
             lastNoticeKey = '';
             renderIntersectHint(null);
+            renderCompareChartEmpty(false);
             writeStore(null);
             notifyChange();
             return;
@@ -235,10 +288,10 @@
         state = {
             projectId: parseInt(next.projectId, 10),
             groupId: next.groupId != null && next.groupId !== '' ? parseInt(next.groupId, 10) : null,
-            projectName: next.projectName || projectsById[parseInt(next.projectId, 10)] || '',
+            projectName: next.projectName || '',
         };
         if (!state.projectName && projectsById[state.projectId]) {
-            state.projectName = projectsById[state.projectId].name || projectsById[state.projectId].url || '';
+            state.projectName = projectLabel(projectsById[state.projectId]);
         }
         updateRegionBlock(state.projectId);
         writeStore(state);
@@ -274,6 +327,10 @@
                 spanGaps: true,
                 label: suffix ? ds.label + ' · ' + suffix : ds.label,
             });
+            if (ds._compareSeries) {
+                out.borderDash = ds.borderDash || [6, 4];
+                out._compareSeries = true;
+            }
             return out;
         }
 
@@ -282,17 +339,35 @@
             datasets.push(remapDataset(basePayload, ds, basePayload._projectSuffix || ''));
         });
         (comparePayload.datasets || []).forEach(function (ds) {
-            datasets.push(remapDataset(comparePayload, ds, comparePayload._projectSuffix || ''));
+            var marked = Object.assign({}, ds, { _compareSeries: true });
+            datasets.push(remapDataset(comparePayload, marked, comparePayload._projectSuffix || ''));
         });
 
         return { labels: labels, datasets: datasets };
     }
 
+    function chartPayloadHasSeries(payload) {
+        if (!payload || !payload.datasets || !payload.datasets.length) {
+            return false;
+        }
+        if (!payload.labels || !payload.labels.length) {
+            return false;
+        }
+        return payload.datasets.some(function (ds) {
+            var label = String((ds && ds.label) || '');
+            if (!label || label === 'Chart') {
+                return false;
+            }
+            var data = (ds && ds.data) || [];
+            return data.length > 0;
+        });
+    }
+
     function mergeChartPayloads(basePayload, comparePayload, baseName, compareName) {
-        if (!comparePayload || !comparePayload.datasets || !comparePayload.datasets.length) {
+        if (!chartPayloadHasSeries(comparePayload)) {
             return basePayload;
         }
-        if (!basePayload || !basePayload.datasets || !basePayload.datasets.length) {
+        if (!chartPayloadHasSeries(basePayload)) {
             return comparePayload;
         }
         var base = Object.assign({}, basePayload, { _projectSuffix: baseName || '' });
@@ -300,6 +375,33 @@
         var merged = alignPayloadLabels(base, cmp);
         delete merged._projectSuffix;
         return merged;
+    }
+
+    function renderCompareChartEmpty(isEmpty) {
+        var $notice = $('#cabinetMonCompareNotice');
+        if (!$notice.length) {
+            return;
+        }
+        if (!isEmpty || !canFetchCompareCharts()) {
+            if ($notice.attr('data-mon-compare-empty') === '1') {
+                $notice.addClass('d-none').empty().removeClass('cabinet-mon-compare-notice--warn').removeAttr('data-mon-compare-empty');
+            }
+            return;
+        }
+        var name = state.projectName || ('#' + state.projectId);
+        var html =
+            '<span class="cabinet-mon-compare-notice__lead">' +
+            escapeHtml(
+                ((cfg.i18n && cfg.i18n.compareChartEmpty) ||
+                    'У «:name» нет позиций за выбранный период/регион — вторая линия на графике не появится.')
+                    .replace(':name', name)
+            ) +
+            '</span>';
+        $notice
+            .attr('data-mon-compare-empty', '1')
+            .html(html)
+            .addClass('cabinet-mon-compare-notice--warn')
+            .removeClass('d-none');
     }
 
     function buildIntersectParams(otherProjectId, otherGroupId) {
@@ -342,7 +444,7 @@
             ':count общих запросов в выбранных папках.';
         var note =
             (cfg.i18n && cfg.i18n.compareIntersectChartsNote) ||
-            'Сравнение — на графиках (вкладка «Обзор»), в таблице ключей его нет.';
+            'В таблице — последние даты обоих проектов; на графиках «Обзор» — динамика.';
         $hint
             .html(
                 '<span class="cabinet-mon-compare-intersect__lead">' +
@@ -442,7 +544,11 @@
         }
         var noneLabel = (cfg.i18n && cfg.i18n.compareNone) || 'Без сравнения';
         var searchPlaceholder =
-            (cfg.i18n && cfg.i18n.compareSearchPlaceholder) || 'Начните вводить название…';
+            (cfg.i18n && cfg.i18n.compareSearchPlaceholder) || 'Название или домен…';
+        var $parent = $('#cabinet-mon-compare-panel');
+        if (!$parent.length) {
+            $parent = $root;
+        }
         $project.select2({
             theme: 'bootstrap4',
             width: 'style',
@@ -450,7 +556,7 @@
             allowClear: true,
             minimumResultsForSearch: 0,
             dropdownAutoWidth: true,
-            dropdownParent: $root.length ? $root : undefined,
+            dropdownParent: $parent.length ? $parent : undefined,
             matcher: function (params, data) {
                 if (window.cabinetMonitoringSearch && window.cabinetMonitoringSearch.select2Matcher) {
                     return window.cabinetMonitoringSearch.select2Matcher(params, data);
@@ -523,6 +629,7 @@
             });
 
             initProjectSelect2($project, $root);
+            syncCompareChrome();
 
             var saved = loadSaved();
             if (saved && saved.projectId && projectsById[saved.projectId]) {
@@ -536,6 +643,7 @@
                     projectName: saved.projectName || projectLabel(projectsById[saved.projectId]),
                 };
                 updateRegionBlock(saved.projectId);
+                setPanelOpen(true);
                 return loadGroups(saved.projectId).then(function (groups) {
                     fillGroupSelect($group, groups, saved.groupId);
                     $group.prop('disabled', false);
@@ -545,6 +653,7 @@
 
             $project.val('');
             $group.prop('disabled', true);
+            syncCompareChrome();
         });
     }
 
@@ -554,6 +663,30 @@
         if (!$project.length) {
             return;
         }
+
+        $('#cabinet-mon-compare-toggle')
+            .off('click.monCompare')
+            .on('click.monCompare', function (e) {
+                e.preventDefault();
+                setPanelOpen(!panelOpen);
+                if (panelOpen) {
+                    setTimeout(function () {
+                        try {
+                            $project.select2('open');
+                        } catch (err) {
+                            $project.trigger('focus');
+                        }
+                    }, 50);
+                }
+            });
+
+        $('#cabinet-mon-compare-clear')
+            .off('click.monCompare')
+            .on('click.monCompare', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                clearCompareUi();
+            });
 
         $project.on('change', function () {
             var pid = $(this).val();
@@ -565,6 +698,7 @@
             }
             var p = projectsById[pid];
             var name = p ? projectLabel(p) : $project.find('option:selected').text();
+            setPanelOpen(true);
             loadGroups(pid).then(function (groups) {
                 fillGroupSelect($group, groups, null);
                 $group.prop('disabled', false);
@@ -605,6 +739,8 @@
 
     global.cabinetMonitoringShowCompare = {
         init: function () {
+            // wireUi до restore-notify: слушатели страницы уже должны быть на onChange.
+            // Сам restore вызывает notifyChange в конце initUi — таблица/графики подхватят.
             return initUi().then(function () {
                 wireUi();
             });
@@ -615,7 +751,11 @@
         getChartParams: getChartParams,
         appendIntersectParams: appendIntersectParams,
         setIntersectMeta: renderIntersectHint,
+        setCompareChartEmpty: renderCompareChartEmpty,
+        chartPayloadHasSeries: chartPayloadHasSeries,
         mergeChartPayloads: mergeChartPayloads,
         onChange: onChange,
+        /** Принудительно дернуть слушателей (после init / смены региона). */
+        notify: notifyChange,
     };
 })(window);

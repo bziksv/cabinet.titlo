@@ -10,7 +10,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}?v={{ (@filemtime(public_path('plugins/daterangepicker/daterangepicker.css')) ?: time()) . '-drp2' }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc64' }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc65' }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-export.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-export.css')) ?: time() }}">
     @endslot
 
@@ -134,7 +134,11 @@
                     compareIntersectHint: @json(__('Monitoring show compare intersect hint')),
                     compareIntersectChartsNote: @json(__('Monitoring show compare intersect charts note')),
                     compareIntersectEmpty: @json(__('Monitoring show compare intersect empty')),
+                    compareChartEmpty: @json(__('Monitoring show compare chart empty')),
                     compareToolbarHint: @json(__('Monitoring show compare toolbar hint')),
+                    comparePickProject: @json(__('Monitoring show compare pick project')),
+                    compareClear: @json(__('Monitoring show compare clear')),
+                    compareChipIdle: @json(__('Monitoring show compare project')),
                     deleteConfirmSingle: @json(__('Monitoring keyword delete confirm single')),
                     deleteConfirmPlural: @json(__('Monitoring keyword delete confirm plural')),
                 },
@@ -274,7 +278,6 @@
                 $modal.find('#cabinetMonExportRegion').off('change.monExport').on('change.monExport', function () {
                     syncExportRegionMode();
                 });
-                syncExportRegionMode();
 
                 if ($.fn.datetimepicker) {
                     $modal.find('#startDatePicker, #endDatePicker').datetimepicker({
@@ -282,6 +285,43 @@
                         locale: 'ru',
                     });
                 }
+
+                // Даты/регион как на странице проекта — иначе дефолт «с 1 числа месяца»
+                // даёт меньше URL, чем в таблице (пример: apogee узи аппарат 2→1).
+                (function prefillsExportFromPage() {
+                    var start = null;
+                    var end = null;
+                    var $dr = $('#date-range');
+                    if ($dr.length && $dr.data('daterangepicker')) {
+                        var drp = $dr.data('daterangepicker');
+                        start = drp.startDate && drp.startDate.clone ? drp.startDate.clone() : null;
+                        end = drp.endDate && drp.endDate.clone ? drp.endDate.clone() : null;
+                    } else if (DATES && String(DATES).trim() && typeof moment !== 'undefined') {
+                        var parts = String(DATES).split(' - ');
+                        if (parts.length === 2) {
+                            start = moment(parts[0].trim(), ['YYYY-MM-DD', 'DD-MM-YYYY', 'DD.MM.YYYY'], true);
+                            end = moment(parts[1].trim(), ['YYYY-MM-DD', 'DD-MM-YYYY', 'DD.MM.YYYY'], true);
+                        }
+                    }
+                    if (start && end && start.isValid && start.isValid() && end.isValid()) {
+                        var fmt = 'DD.MM.YYYY';
+                        $modal.find('#startDatePickerInput').val(start.format(fmt));
+                        $modal.find('#endDatePickerInput').val(end.format(fmt));
+                        try {
+                            if ($modal.find('#startDatePicker').data('datetimepicker')) {
+                                $modal.find('#startDatePicker').datetimepicker('date', start.toDate());
+                            }
+                            if ($modal.find('#endDatePicker').data('datetimepicker')) {
+                                $modal.find('#endDatePicker').datetimepicker('date', end.toDate());
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                    if (REGION_ID) {
+                        $modal.find('#cabinetMonExportRegion').val(String(REGION_ID));
+                    }
+                })();
+
+                syncExportRegionMode();
 
                 var $groups = $modal.find('#cabinetMonExportGroups');
                 if ($groups.length && $.fn.select2) {
@@ -297,6 +337,29 @@
                         closeOnSelect: false
                     });
                 }
+
+                // Явный submit: иначе клик по «Экспорт» в BS-модалке иногда глотается
+                // (чужие .save-modal handlers / focus trap) и «ничего не происходит».
+                var $form = $modal.find('form.cabinet-mon-export-modal-form');
+                $form.off('submit.monExportDownload').on('submit.monExportDownload', function (e) {
+                    e.preventDefault();
+                    var formEl = this;
+                    var action = formEl.getAttribute('action') || '';
+                    if (!action) {
+                        return;
+                    }
+                    var qs = $(formEl).serialize();
+                    var url = action + (action.indexOf('?') >= 0 ? '&' : '?') + qs;
+                    monModalSetBusy($modal, true, @json(__('Monitoring export preparing')));
+                    // Новая вкладка: долгий PDF/Excel не «глушит» текущую страницу.
+                    var win = window.open(url, '_blank');
+                    if (!win) {
+                        window.location.href = url;
+                    }
+                    setTimeout(function () {
+                        monModalSetBusy($modal, false);
+                    }, 1500);
+                });
             }
 
             function openMonitoringExportModal() {
@@ -1262,6 +1325,9 @@
                 if (String(name).indexOf('col_') === 0) {
                     return '88px';
                 }
+                if (String(name).indexOf('cmp_') === 0) {
+                    return '108px';
+                }
                 if (String(name).indexOf('engine_') === 0) {
                     return '96px';
                 }
@@ -1281,6 +1347,8 @@
                     base: 'cabinet-mon-col-base',
                     phrasal: 'cabinet-mon-col-phrasal',
                     exact: 'cabinet-mon-col-exact',
+                    cmp_base: 'cabinet-mon-col-date cabinet-mon-col-cmp cabinet-mon-col-cmp-base',
+                    cmp_peer: 'cabinet-mon-col-date cabinet-mon-col-cmp cabinet-mon-col-cmp-peer',
                 };
                 if (map[name]) {
                     return map[name];
@@ -1296,7 +1364,7 @@
 
             function monIsPositionColumn(name) {
                 name = String(name || '');
-                return name.indexOf('col_') === 0 || name.indexOf('engine_') === 0;
+                return name.indexOf('col_') === 0 || name.indexOf('engine_') === 0 || name.indexOf('cmp_') === 0;
             }
 
             function monEscapeHtml(value) {
@@ -1356,6 +1424,10 @@
                 if (name === 'query') {
                     return true;
                 }
+                // Режим сравнения: две колонки последних дат всегда видны.
+                if (String(name).indexOf('cmp_') === 0) {
+                    return true;
+                }
                 if (monIsMultiRegionView() && ['dynamics', 'base', 'phrasal', 'exact'].indexOf(name) >= 0) {
                     return false;
                 }
@@ -1388,6 +1460,29 @@
                 payload.mode_range = MODE;
                 if (payload.lazy_positions == null) {
                     payload.lazy_positions = 1;
+                }
+                var compareApi = window.cabinetMonitoringShowCompare;
+                if (compareApi && compareApi.canFetchCompareCharts && compareApi.canFetchCompareCharts()) {
+                    var st = compareApi.getState ? compareApi.getState() : null;
+                    if (st && st.projectId) {
+                        payload.compare_project_id = st.projectId;
+                        if (st.groupId) {
+                            payload.compare_group = st.groupId;
+                        } else {
+                            delete payload.compare_group;
+                        }
+                        if (REGION_ENGINE) {
+                            payload.matchEngine = REGION_ENGINE;
+                        }
+                        if (REGION_LR) {
+                            payload.matchLr = REGION_LR;
+                        }
+                        // В режиме сравнения грузим только 2 последних дня — без lazy-чанков.
+                        payload.lazy_positions = 0;
+                    }
+                } else {
+                    delete payload.compare_project_id;
+                    delete payload.compare_group;
                 }
                 if (GROUP_ID) {
                     payload.columns = payload.columns || [];
@@ -1430,6 +1525,8 @@
                     payload.region_id || '',
                     payload.dates_range || '',
                     payload.mode_range || '',
+                    payload.compare_project_id || '',
+                    payload.compare_group || '',
                     payload.search && payload.search.value ? payload.search.value : '',
                     JSON.stringify(payload.order || []),
                     JSON.stringify(filters),
@@ -1490,7 +1587,7 @@
                     var src = this.dataSrc();
                     if (src === 'dynamics') {
                         dynIdx = idx;
-                    } else if (typeof src === 'string' && src.indexOf('col_') === 0) {
+                    } else if (typeof src === 'string' && (src.indexOf('col_') === 0 || src.indexOf('cmp_') === 0)) {
                         dateCols.push({ key: src, idx: idx });
                     }
                     return true;
@@ -1884,6 +1981,7 @@
             };
 
             var monKeywordsTableBootStarted = false;
+            var monKeywordsTableBootGen = 0;
 
             function monStartViewIsOverview() {
                 try {
@@ -1902,25 +2000,57 @@
                 return false;
             }
 
+            function remountMonitoringKeywordsTable() {
+                monKeywordsTableBootGen += 1;
+                try {
+                    if ($.fn.dataTable.isDataTable('#monitoringTable')) {
+                        var api = $('#monitoringTable').DataTable();
+                        api.clear();
+                        api.destroy();
+                    }
+                } catch (e) {
+                    console.error('monitoring table destroy', e);
+                }
+                $('#monitoringTable').empty();
+                window.__cabinetMonKeywordsTableApi = null;
+                window.__monPendingPosChunks = null;
+                window.__monTableEarlyPrefetch = null;
+                monTablePrefetch = null;
+                monTablePrefetchUsed = false;
+                monTableInflight = {};
+                monKeywordsTableBootStarted = false;
+                ensureMonitoringKeywordsTableBoot();
+            }
+
             function ensureMonitoringKeywordsTableBoot() {
                 if (monKeywordsTableBootStarted) {
                     return;
                 }
                 monKeywordsTableBootStarted = true;
+                var bootGen = monKeywordsTableBootGen;
 
             var bootPayload = monTableBootstrapPayload();
             var bootKey = monTableRequestKey(bootPayload);
-            var bootReq = window.__monTableEarlyPrefetch;
-            if (bootReq && !monTableInflight[bootKey]) {
-                monTableInflight[bootKey] = bootReq.then(function (response) {
-                    delete monTableInflight[bootKey];
-                    return response;
-                }, function (err) {
-                    delete monTableInflight[bootKey];
-                    throw err;
-                });
+            // Early prefetch всегда без compare — нельзя подставлять, если сравнение уже активно.
+            var bootReq = null;
+            if (window.__monTableEarlyPrefetch && !bootPayload.compare_project_id) {
+                bootReq = window.__monTableEarlyPrefetch;
+                if (!monTableInflight[bootKey]) {
+                    monTableInflight[bootKey] = bootReq.then(function (response) {
+                        delete monTableInflight[bootKey];
+                        return response;
+                    }, function (err) {
+                        delete monTableInflight[bootKey];
+                        throw err;
+                    });
+                }
+            } else if (window.__monTableEarlyPrefetch) {
+                window.__monTableEarlyPrefetch = null;
             }
             (bootReq || monTableFetch(bootPayload)).then(function (response) {
+                if (bootGen !== monKeywordsTableBootGen) {
+                    return;
+                }
                 monTablePrefetch = response.data;
 
                 let tableRegions = response.data.region || [];
@@ -2750,8 +2880,15 @@
                                 let action = form.attr('action') || '';
                                 let method = (form.attr('method') || 'POST').toUpperCase();
 
-                                // Экспорт — обычный GET/скачивание файла, не axios
+                                // Экспорт — GET-скачивание в новой вкладке (не axios).
                                 if (action.indexOf('/export') !== -1) {
+                                    e.preventDefault();
+                                    var qs = form.serialize();
+                                    var url = action + (action.indexOf('?') >= 0 ? '&' : '?') + qs;
+                                    var win = window.open(url, '_blank');
+                                    if (!win) {
+                                        window.location.href = url;
+                                    }
                                     return;
                                 }
 
@@ -2795,6 +2932,9 @@
                     }
                 });
             }).catch(function (err) {
+                if (bootGen !== monKeywordsTableBootGen) {
+                    return;
+                }
                 console.error('monitoring table bootstrap request failed', err);
                 monitoringTableShowLoadErrorToast();
             });
@@ -3905,6 +4045,20 @@
                         if (compareApi && compareApi.setIntersectMeta && basePayload && basePayload._meta) {
                             compareApi.setIntersectMeta(basePayload._meta);
                         }
+                        if (compareApi && compareApi.setCompareChartEmpty) {
+                            var compareEmpty =
+                                !!compareParams &&
+                                !(
+                                    compareApi.chartPayloadHasSeries
+                                        ? compareApi.chartPayloadHasSeries(comparePayload)
+                                        : comparePayload &&
+                                          comparePayload.datasets &&
+                                          comparePayload.datasets.length &&
+                                          comparePayload.labels &&
+                                          comparePayload.labels.length
+                                );
+                            compareApi.setCompareChartEmpty(compareEmpty);
+                        }
                         if (obj.chart === 'top' && topChartRef && window.cabinetMonitoringShowCharts) {
                             topChartRawBase = basePayload;
                             topChartRawCompare = comparePayload;
@@ -3956,14 +4110,31 @@
             })();
 
             if (window.cabinetMonitoringShowCompare) {
+                // Важно: onChange ДО init — иначе restore из localStorage шлёт notifyChange
+                // без слушателей, таблица остаётся на ordinary date columns без vilmed.
+                var monCompareRemountTimer = null;
+                function onMonCompareChange() {
+                    if (isMonOverviewView()) {
+                        reloadAllCharts();
+                    } else {
+                        chartsNetworkDirty = true;
+                    }
+                    // Колонки: дни ↔ две последние даты — пересобираем DataTable.
+                    // Debounce: init restore + ручной select иначе дают 2–3 remount подряд и UI «висит».
+                    if (!(monKeywordsTableBootStarted || $.fn.dataTable.isDataTable('#monitoringTable'))) {
+                        return;
+                    }
+                    if (monCompareRemountTimer) {
+                        clearTimeout(monCompareRemountTimer);
+                    }
+                    monCompareRemountTimer = setTimeout(function () {
+                        monCompareRemountTimer = null;
+                        remountMonitoringKeywordsTable();
+                    }, 120);
+                }
+                window.cabinetMonitoringShowCompare.onChange(onMonCompareChange);
                 window.cabinetMonitoringShowCompare.init().then(function () {
-                    window.cabinetMonitoringShowCompare.onChange(function () {
-                        if (isMonOverviewView()) {
-                            reloadAllCharts();
-                        } else {
-                            chartsNetworkDirty = true;
-                        }
-                    });
+                    // Remount при restore уже через onChange внутри init — второй раз не вызываем.
                     ensureOverviewChartsLoaded();
                 });
             } else {

@@ -117,7 +117,7 @@ class MonitoringChartsController extends Controller
 
         $this->region = $this->resolveSearchengine($request);
         if ($this->region === null || $this->keywords->isEmpty()) {
-            return (new AreaChartData([]))->setData([])->get();
+            return $this->wrapChartMeta($request, $this->emptyChartPayload());
         }
 
         switch ($request->input('chart')) {
@@ -130,6 +130,19 @@ class MonitoringChartsController extends Controller
             default:
                 return $this->wrapChartMeta($request, $this->getTopPercent($request));
         }
+    }
+
+    /**
+     * Пустой ответ без фейкового dataset label=Chart (иначе фронт не отличит «нет данных»).
+     *
+     * @return array{labels: list<string>, datasets: list<array<string, mixed>>}
+     */
+    private function emptyChartPayload(): array
+    {
+        return [
+            'labels' => [],
+            'datasets' => [],
+        ];
     }
 
     private function resolveKeywords(Request $request): void
@@ -204,7 +217,7 @@ class MonitoringChartsController extends Controller
         );
 
         if ($positionsByDay->isEmpty()) {
-            return (new AreaChartData([]))->setData([])->get();
+            return $this->emptyChartPayload();
         }
 
         $positions = $positionsByDay->last();
@@ -242,7 +255,7 @@ class MonitoringChartsController extends Controller
         );
 
         if ($series->isEmpty()) {
-            return (new AreaChartData([]))->setData([])->get();
+            return $this->emptyChartPayload();
         }
 
         $chart = new AreaChartData($series->keys()->values()->all());
@@ -258,7 +271,7 @@ class MonitoringChartsController extends Controller
     protected function getMiddlePositionAllRegions(Request $request)
     {
         if ($this->project->searchengines->count() <= 1) {
-            return (new AreaChartData([]))->setData([])->get();
+            return $this->emptyChartPayload();
         }
 
         [$start, $end] = MonitoringChartPositionSeries::parseDateRange($request->input('dateRange', null));
@@ -297,7 +310,7 @@ class MonitoringChartsController extends Controller
         }
 
         if ($seriesByEngine === [] || $labels === []) {
-            return (new AreaChartData([]))->setData([])->get();
+            return $this->emptyChartPayload();
         }
 
         $chart = new AreaChartData($labels);
@@ -327,7 +340,7 @@ class MonitoringChartsController extends Controller
     protected function getTopPercentAllRegions(Request $request)
     {
         if ($this->project->searchengines->count() <= 1) {
-            return (new AreaChartData([]))->setData([])->get();
+            return $this->emptyChartPayload();
         }
 
         $topN = (int) $request->input('topN', 10);
@@ -340,7 +353,7 @@ class MonitoringChartsController extends Controller
 
         $keywordCount = $this->keywords->count();
         if ($keywordCount === 0) {
-            return (new AreaChartData([]))->setData([])->get();
+            return $this->emptyChartPayload();
         }
 
         [$start, $end] = MonitoringChartPositionSeries::parseDateRange($request->input('dateRange', null));
@@ -383,7 +396,7 @@ class MonitoringChartsController extends Controller
         }
 
         if ($seriesByEngine === [] || $labels === []) {
-            return (new AreaChartData([]))->setData([])->get();
+            return $this->emptyChartPayload();
         }
 
         $chart = new AreaChartData($labels);
@@ -434,7 +447,7 @@ class MonitoringChartsController extends Controller
         );
 
         if ($positionsByDay->isEmpty()) {
-            return (new AreaChartData([]))->setData([])->get();
+            return $this->emptyChartPayload();
         }
 
         $response = ['labels' => [], 'data' => []];

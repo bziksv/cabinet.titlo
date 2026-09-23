@@ -6,9 +6,11 @@ use App\Exports\Monitoring\AttributeExport;
 use App\Exports\Monitoring\ColumnEditor;
 use App\Exports\Monitoring\Format\IFormat;
 use App\Exports\Monitoring\PositionsExportFactory;
+use App\Helpers\CollectionHelper;
 use App\MonitoringProject;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class MonitoringExportsController extends MonitoringKeywordsController
 {
@@ -83,6 +85,9 @@ class MonitoringExportsController extends MonitoringKeywordsController
         }
         $request->merge(['mode' => $mode]);
 
+        $wantUrlCount = $request->has('urlCol');
+        $wantUrlLinks = $request->has('url_linksCol');
+
         $params = collect([
             'length' => 0,
             // Экспорт — полный снимок: lazy-чанки только для UI, иначе finance/mastered падает 500.
@@ -126,11 +131,17 @@ class MonitoringExportsController extends MonitoringKeywordsController
         }
 
         $this->setProjectID($id)
-            ->dataPrepare($params)
-            ->columns
-            ->forget($this->removeColumns);
+            ->dataPrepare($params);
+
+        $dates = strlen($date) > 1 ? explode(' - ', $date, 2) : null;
+        if ($wantUrlCount || $wantUrlLinks) {
+            $this->ensureUrlsForExport($dates);
+        }
+
+        $this->columns->forget($this->removeColumns);
 
         $response = $this->generateDataTable();
+        $this->applyExportUrlColumns($response, $wantUrlCount, $wantUrlLinks);
 
         $editor = (new ColumnEditor($response))->setColumns($request);
 
@@ -143,6 +154,101 @@ class MonitoringExportsController extends MonitoringKeywordsController
 
         $file = $this->project['url'] . ' ' . $params['dates_range'];
         return $this->downloadFile($response, $file, $request['format']);
+    }
+
+    /**
+     * Подгрузить URL выдачи для колонок экспорта (даже если в UI колонка скрыта).
+     *
+     * @param list<string>|null $dates
+     */
+    protected function ensureUrlsForExport(?array $dates): void
+    {
+        if ($this->queries->isEmpty()) {
+            return;
+        }
+
+        $sample = $this->queries->first();
+        $positions = $sample->positions ?? null;
+        if ($positions instanceof Collection && $positions->isNotEmpty()) {
+            $this->assignUrlsFromLoadedPositions();
+
+            return;
+        }
+
+        $this->loadUrlsFromDb($dates);
+    }
+
+    /**
+     * «URL в выдаче (раз)» = число уникальных URL; «URL в выдаче ссылки» = список через \\n.
+     *
+     * @param \Illuminate\Support\Collection|array $response
+     */
+    protected function applyExportUrlColumns(&$response, bool $wantCount, bool $wantLinks): void
+    {
+        if (!$wantCount && !$wantLinks) {
+            return;
+        }
+
+        $columns = $response['columns'] instanceof Collection
+            ? $response['columns']
+            : collect($response['columns']);
+        $data = $response['data'] instanceof Collection
+            ? $response['data']
+            : collect($response['data']);
+
+        if ($wantCount && $columns->has('url')) {
+            $columns->put('url', __('Monitoring export col url count'));
+        }
+
+        if ($wantLinks) {
+            $label = __('Monitoring export col url links');
+            if ($columns->has('url')) {
+                $columns = CollectionHelper::appendAfter($columns, 'url_links', $label, 'url');
+            } elseif ($columns->has('query')) {
+                $columns = CollectionHelper::appendAfter($columns, 'url_links', $label, 'query');
+            } else {
+                $columns->put('url_links', $label);
+            }
+        }
+
+        $keywords = $this->queries->values();
+
+        $data = $data->values()->map(function ($row, $idx) use ($keywords, $wantCount, $wantLinks) {
+            $row = $row instanceof Collection ? $row : collect($row);
+            $kw = $keywords->get($idx);
+            $urls = collect();
+            if ($kw && isset($kw->urls)) {
+                $urls = collect($kw->urls)
+                    ->map(static function ($u) {
+                        return trim((string) ($u->url ?? ''));
+                    })
+                    ->filter(static function ($u) {
+                        return $u !== '';
+                    })
+                    ->unique()
+                    ->values();
+            }
+
+            if ($wantCount && $row->has('url')) {
+                $row->put('url', (string) $urls->count());
+            }
+
+            if ($wantLinks) {
+                $links = $urls->implode("\n");
+                if ($row->has('url')) {
+                    $row = CollectionHelper::appendAfter($row, 'url_links', $links, 'url');
+                } elseif ($row->has('query')) {
+                    $row = CollectionHelper::appendAfter($row, 'url_links', $links, 'query');
+                } else {
+                    $row->put('url_links', $links);
+                }
+            }
+
+            return $row;
+        });
+
+        $response['columns'] = $columns;
+        $response['data'] = $data;
     }
 
     public function edit($id)

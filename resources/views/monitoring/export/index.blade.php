@@ -34,6 +34,9 @@
                             <td style="background-color: {{ $field['color'] }}">
                                 @if(count($field) > 2) {{ $field[0] }} [{{ $field[1] }}] @else {{ $field[0] }} @endif
                             </td>
+                        @elseif($fk === 'url_links')
+                            {{-- Excel из HTML глотает \\n как пробел; <br> даёт реальный перенос в ячейке --}}
+                            <td style="text-align:left;vertical-align:top;white-space:normal;">{!! nl2br(e((string) $field), false) !!}</td>
                         @else
                             <td>{{ $field }}</td>
                         @endif

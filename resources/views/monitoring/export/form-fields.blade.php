@@ -151,7 +151,11 @@
                     </div>
                     <div class="custom-control custom-checkbox">
                         <input class="custom-control-input" name="urlCol" type="checkbox" id="url" value="1">
-                        <label for="url" class="custom-control-label">{{ __('URL') }}</label>
+                        <label for="url" class="custom-control-label">{{ __('Monitoring export col url count') }}</label>
+                    </div>
+                    <div class="custom-control custom-checkbox">
+                        <input class="custom-control-input" name="url_linksCol" type="checkbox" id="url_links" value="1">
+                        <label for="url_links" class="custom-control-label">{{ __('Monitoring export col url links') }}</label>
                     </div>
                     <div class="custom-control custom-checkbox">
                         <input class="custom-control-input" name="target_urlCol" type="checkbox" id="target_url" value="1">

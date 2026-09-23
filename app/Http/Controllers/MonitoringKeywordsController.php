@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Classes\Monitoring\Mastered;
+use App\Classes\Monitoring\MonitoringCompareKeywordIntersect;
 use App\Classes\Monitoring\MonitoringPositionDates;
 use App\Classes\Monitoring\MonitoringTableResponseCache;
 use App\Classes\Position\PositionStore;
@@ -50,6 +51,21 @@ class MonitoringKeywordsController extends Controller
     protected $lazyPositions = false;
     /** @var list<array{from: string, to: string}>|null */
     protected $positionChunks = null;
+
+    /**
+     * Сравнение проектов в таблице: две колонки последней даты (база + peer).
+     *
+     * @var array{
+     *   project_id: int,
+     *   group_id: int|null,
+     *   engine_id: int,
+     *   base_day: string|null,
+     *   peer_day: string|null,
+     *   base_label: string,
+     *   peer_label: string
+     * }|null
+     */
+    protected $compareMeta = null;
 
     public function __construct()
     {
@@ -172,6 +188,10 @@ class MonitoringKeywordsController extends Controller
         $payload['lazy'] = $request->boolean('lazy_positions', true) ? 1 : 0;
         // Видимость URL влияет на setUrls — иначе после включения колонки отдаётся кэш без urls.
         $payload['url_col'] = $this->isUrlColumnVisibleForProject($projectId) ? 1 : 0;
+        $payload['compare_project_id'] = (int) $request->input('compare_project_id', 0);
+        $payload['compare_group'] = $request->filled('compare_group') ? (int) $request->input('compare_group') : null;
+        $payload['match_engine'] = (string) $request->input('matchEngine', '');
+        $payload['match_lr'] = (string) $request->input('matchLr', '');
         $payload['ver'] = MonitoringTableResponseCache::version($projectId);
 
         return 'monitoring.table.v4.' . $projectId . '.' . Auth::id() . '.' . md5(json_encode($payload));
@@ -260,10 +280,30 @@ class MonitoringKeywordsController extends Controller
             $dates = explode(' - ', $datesRange, 2);
         }
 
-        $this->lazyPositions = $this->shouldLazyLoadPositions($dates, $collection);
+        $this->resolveCompareMeta($collection, $dates);
+
+        $this->lazyPositions = $this->compareMeta
+            ? false
+            : $this->shouldLazyLoadPositions($dates, $collection);
         $this->positionChunks = null;
 
         $this->loadKeywordPricesForTable();
+
+        if ($this->compareMeta) {
+            $this->queries->each(function ($keyword) {
+                $keyword->setRelation('positions', collect());
+            });
+            if ($this->isUrlColumnVisible()) {
+                $this->loadUrlsFromDb($dates);
+            }
+            if (!$this->isMainView()) {
+                $this->setOccurrence();
+            }
+            $this->applyCompareLatestColumns($dates);
+            // Динамика уже в applyCompareLatestColumns (peer − base).
+
+            return $this;
+        }
 
         if ($this->lazyPositions) {
             $this->queries->each(function ($keyword) {
@@ -372,6 +412,15 @@ class MonitoringKeywordsController extends Controller
             'lazy_positions' => $this->lazyPositions,
             'position_chunks' => $this->positionChunks,
             'keyword_ids' => $this->queries->pluck('id')->values()->all(),
+            'compare' => $this->compareMeta
+                ? [
+                    'project_id' => (int) $this->compareMeta['project_id'],
+                    'base_day' => $this->compareMeta['base_day'],
+                    'peer_day' => $this->compareMeta['peer_day'],
+                    'base_label' => $this->compareMeta['base_label'],
+                    'peer_label' => $this->compareMeta['peer_label'],
+                ]
+                : null,
         ]);
     }
 
@@ -673,6 +722,12 @@ class MonitoringKeywordsController extends Controller
                         $row->put('dynamics', '…');
                         break;
                     }
+                    if ($this->compareMeta) {
+                        $row->put('dynamics', view('monitoring.partials.show.dynamics', [
+                            'dynamics' => (int) $keyword->getAttribute('dynamic'),
+                        ])->render());
+                        break;
+                    }
                     $dynamics = 0;
                     if ($collectionPositions && $collectionPositions->count() > 1)
                         $dynamics = ($collectionPositions->last()->position - $collectionPositions->first()->position);
@@ -813,6 +868,271 @@ class MonitoringKeywordsController extends Controller
         $html .= '</span><div class="badge badge-info">' . e($model->date) . '</div>';
 
         return $html;
+    }
+
+    /**
+     * @param list<string>|null $dates
+     */
+    private function resolveCompareMeta(Collection $collection, ?array $dates): void
+    {
+        $this->compareMeta = null;
+
+        $compareProjectId = (int) $collection->get('compare_project_id', 0);
+        if ($compareProjectId < 1 || $compareProjectId === (int) $this->getProjectID()) {
+            return;
+        }
+        if ($this->regions->count() !== 1) {
+            return;
+        }
+
+        $baseRegion = $this->regions->first();
+        if (!$baseRegion) {
+            return;
+        }
+
+        $matchEngine = trim((string) ($collection->get('matchEngine') ?: $baseRegion->engine));
+        $matchLr = trim((string) ($collection->get('matchLr') !== null && $collection->get('matchLr') !== ''
+            ? $collection->get('matchLr')
+            : $baseRegion->lr));
+        if ($matchEngine === '' || $matchLr === '') {
+            return;
+        }
+
+        $compareProject = $this->user->monitoringProjects()->find($compareProjectId);
+        if (!$compareProject) {
+            return;
+        }
+
+        $peerEngine = MonitoringSearchengine::query()
+            ->where('monitoring_project_id', $compareProjectId)
+            ->whereRaw('LOWER(engine) = ?', [mb_strtolower($matchEngine)])
+            ->where('lr', (string) $matchLr)
+            ->orderBy('id')
+            ->first();
+        if (!$peerEngine) {
+            return;
+        }
+
+        $compareGroup = $collection->get('compare_group');
+        $compareGroupId = ($compareGroup !== null && $compareGroup !== '')
+            ? (int) $compareGroup
+            : null;
+
+        $this->compareMeta = [
+            'project_id' => $compareProjectId,
+            'group_id' => $compareGroupId,
+            'engine_id' => (int) $peerEngine->id,
+            'base_day' => null,
+            'peer_day' => null,
+            'base_label' => $this->compareProjectShortLabel($this->project),
+            'peer_label' => $this->compareProjectShortLabel($compareProject),
+        ];
+    }
+
+    private function compareProjectShortLabel(?MonitoringProject $project): string
+    {
+        if (!$project) {
+            return 'проект';
+        }
+        $name = trim((string) $project->name);
+        if ($name === '') {
+            $name = trim((string) ($project->url ?? ''));
+        }
+        if ($name === '') {
+            return '#' . (int) $project->id;
+        }
+        if (strpos($name, ' - ') !== false) {
+            return trim(explode(' - ', $name, 2)[0]);
+        }
+        if (mb_strlen($name) > 22) {
+            return mb_substr($name, 0, 20) . '…';
+        }
+
+        return $name;
+    }
+
+    /**
+     * Две колонки: последняя дата базы и последняя дата конкурента (с пометкой проекта).
+     *
+     * @param list<string>|null $dates
+     */
+    private function applyCompareLatestColumns(?array $dates): self
+    {
+        if (!$this->compareMeta || $this->regions->isEmpty()) {
+            return $this;
+        }
+
+        [$start, $end] = $this->positionsDateBounds($dates);
+        $baseEngineId = (int) $this->regions->first()->id;
+        $peerEngineId = (int) $this->compareMeta['engine_id'];
+
+        $baseDays = MonitoringPositionDates::datesForEngines([$baseEngineId], $start, $end);
+        $peerDays = MonitoringPositionDates::datesForEngines([$peerEngineId], $start, $end);
+        $baseDay = $baseDays[0] ?? null;
+        $peerDay = $peerDays[0] ?? null;
+        $this->compareMeta['base_day'] = $baseDay;
+        $this->compareMeta['peer_day'] = $peerDay;
+
+        $keywordIds = $this->queries->pluck('id')->map(static function ($id) {
+            return (int) $id;
+        })->all();
+
+        $baseByKw = $baseDay
+            ? $this->latestPositionsOnDay($keywordIds, $baseEngineId, $baseDay)
+            : [];
+
+        $peerKwByBaseId = $this->mapBaseKeywordsToCompareKeywordIds($keywordIds);
+        $peerKwIds = array_values(array_unique(array_filter(array_map('intval', $peerKwByBaseId))));
+        $peerByKw = ($peerDay && $peerKwIds !== [])
+            ? $this->latestPositionsOnDay($peerKwIds, $peerEngineId, $peerDay)
+            : [];
+
+        $baseHeader = $this->compareColumnHeaderHtml(
+            $baseDay,
+            $this->compareMeta['base_label'],
+            'base'
+        );
+        $peerHeader = $this->compareColumnHeaderHtml(
+            $peerDay,
+            $this->compareMeta['peer_label'],
+            'peer'
+        );
+
+        $this->setColumns(collect([
+            'cmp_base' => $baseHeader,
+            'cmp_peer' => $peerHeader,
+        ]));
+
+        $this->queries->transform(function ($item) use ($baseByKw, $peerByKw, $peerKwByBaseId) {
+            $basePos = $baseByKw[(int) $item->id] ?? null;
+            $peerKwId = $peerKwByBaseId[(int) $item->id] ?? null;
+            $peerPos = ($peerKwId && isset($peerByKw[$peerKwId])) ? $peerByKw[$peerKwId] : null;
+
+            $positions = collect([]);
+            if ($basePos) {
+                // Без day-to-day superscript — сравниваем проекты, не соседние дни.
+                $basePos->diffPosition = null;
+                $positions->put('cmp_base', $basePos);
+            }
+            if ($peerPos) {
+                $peerPos->diffPosition = null;
+                $positions->put('cmp_peer', $peerPos);
+            }
+            $item->positions_view = $positions;
+
+            // Динамика = наша позиция − позиция конкурента (плюс = мы выше в выдаче).
+            $dynamics = 0;
+            if ($basePos && $peerPos) {
+                $dynamics = (int) $peerPos->position - (int) $basePos->position;
+            }
+            $item->setAttribute('dynamic', $dynamics);
+
+            return $item;
+        });
+
+        return $this;
+    }
+
+    private function compareColumnHeaderHtml(?string $dayYmd, string $label, string $role): string
+    {
+        $dateLabel = $dayYmd
+            ? Carbon::parse($dayYmd)->format(self::MONITORING_TABLE_DATE_FORMAT)
+            : '—';
+        $roleClass = $role === 'peer' ? 'cabinet-mon-cmp-h--peer' : 'cabinet-mon-cmp-h--base';
+
+        return '<span class="cabinet-mon-cmp-h ' . $roleClass . '" title="' . e($label) . '">'
+            . '<span class="cabinet-mon-cmp-h__date">' . e($dateLabel) . '</span>'
+            . '<span class="cabinet-mon-cmp-h__tag">' . e($label) . '</span>'
+            . '</span>';
+    }
+
+    /**
+     * @param list<int> $baseKeywordIds
+     * @return array<int, int> base_keyword_id => compare_keyword_id
+     */
+    private function mapBaseKeywordsToCompareKeywordIds(array $baseKeywordIds): array
+    {
+        if (!$this->compareMeta || $baseKeywordIds === []) {
+            return [];
+        }
+
+        $baseRows = DB::table('monitoring_keywords')
+            ->whereIn('id', $baseKeywordIds)
+            ->get(['id', 'query']);
+
+        $normalizedToBase = [];
+        foreach ($baseRows as $row) {
+            $norm = MonitoringCompareKeywordIntersect::normalizeQuery($row->query);
+            if ($norm === '') {
+                continue;
+            }
+            $normalizedToBase[$norm] = (int) $row->id;
+        }
+        if ($normalizedToBase === []) {
+            return [];
+        }
+
+        $peerQuery = DB::table('monitoring_keywords')
+            ->where('monitoring_project_id', (int) $this->compareMeta['project_id']);
+        if (!empty($this->compareMeta['group_id'])) {
+            $peerQuery->where('monitoring_group_id', (int) $this->compareMeta['group_id']);
+        }
+        $peerRows = $peerQuery->get(['id', 'query']);
+
+        $map = [];
+        foreach ($peerRows as $row) {
+            $norm = MonitoringCompareKeywordIntersect::normalizeQuery($row->query);
+            if ($norm === '' || !isset($normalizedToBase[$norm])) {
+                continue;
+            }
+            $baseId = $normalizedToBase[$norm];
+            if (!isset($map[$baseId])) {
+                $map[$baseId] = (int) $row->id;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Последняя позиция ключей за календарный день съёма.
+     *
+     * @param list<int> $keywordIds
+     * @return array<int, \App\MonitoringPosition>
+     */
+    private function latestPositionsOnDay(array $keywordIds, int $engineId, string $dayYmd): array
+    {
+        $keywordIds = array_values(array_unique(array_filter(array_map('intval', $keywordIds))));
+        if ($keywordIds === [] || $engineId < 1) {
+            return [];
+        }
+
+        $dayStart = Carbon::parse($dayYmd)->startOfDay();
+        $dayEnd = Carbon::parse($dayYmd)->endOfDay();
+
+        $latestIds = DB::table('monitoring_positions as mp')
+            ->selectRaw('MAX(mp.id) as id')
+            ->whereIn('mp.monitoring_keyword_id', $keywordIds)
+            ->where('mp.monitoring_searchengine_id', $engineId)
+            ->where('mp.created_at', '>=', $dayStart)
+            ->where('mp.created_at', '<=', $dayEnd)
+            ->groupBy('mp.monitoring_keyword_id')
+            ->pluck('id')
+            ->all();
+
+        if ($latestIds === []) {
+            return [];
+        }
+
+        $out = [];
+        MonitoringPosition::query()
+            ->whereIn('id', $latestIds)
+            ->get()
+            ->each(function (MonitoringPosition $pos) use (&$out) {
+                $out[(int) $pos->monitoring_keyword_id] = $pos;
+            });
+
+        return $out;
     }
 
     private function getLatestPositions(?array $dates = null)
@@ -1066,6 +1386,12 @@ class MonitoringKeywordsController extends Controller
 
     private function persistPageLengthIfChanged(int $length): void
     {
+        // Не сохраняем случайные length из smoke/prefetch — только пункты меню пагинации.
+        $allowed = [10, 20, 50, 100, 500];
+        if (!in_array($length, $allowed, true)) {
+            return;
+        }
+
         $projectId = $this->getProjectID();
         $current = MonitoringProjectSettings::query()
             ->where('monitoring_project_id', $projectId)
@@ -1179,6 +1505,14 @@ class MonitoringKeywordsController extends Controller
 
     private function setUrls(?array $dates = null)
     {
+        $this->assignUrlsFromLoadedPositions();
+    }
+
+    /**
+     * URL в выдаче из уже загруженных positions (экспорт / таблица).
+     */
+    protected function assignUrlsFromLoadedPositions(): void
+    {
         $region = $this->regions->first();
         if (!$region) {
             return;
@@ -1227,7 +1561,7 @@ class MonitoringKeywordsController extends Controller
     /**
      * URL в выдаче при lazy-позициях: лёгкий GROUP BY (keyword, url), без дневных рядов.
      */
-    private function loadUrlsFromDb(?array $dates = null): void
+    protected function loadUrlsFromDb(?array $dates = null): void
     {
         $region = $this->regions->first();
         if (!$region) {

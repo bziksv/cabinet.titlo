@@ -67,27 +67,8 @@ class AttributeExport
 
     protected function url()
     {
-        $this->collection['data']->transform(function($item){
-            if ($item->has('url')) {
-                $url = $item['url'];
-
-                $doc = new \DOMDocument();
-                $doc->loadHTML($url);
-
-                $a = $doc->getElementsByTagName('a');
-                $links = $a[0]->getAttribute('data-content');
-
-                if ($links) {
-                    $doc->loadHTML($links);
-                    $a = $doc->getElementsByTagName('a');
-
-                    if ($a->length) {
-                        $item['url'] = strip_tags($a[$a->length - 1]->textContent);
-                    }
-                }
-            }
-            return $item;
-        });
+        // Колонки URL (раз / ссылки) заполняет MonitoringExportsController::applyExportUrlColumns.
+        // Старый DOM-парсер data-content ломался после перехода на data-bs-content.
     }
 
     public function getBudget()

@@ -46,15 +46,47 @@
     </form>
 
     <div class="cabinet-mon-project-toolbar__compare" id="cabinetMonProjectCompare">
-        <label class="visually-hidden" for="cabinet-mon-compare-project">{{ __('Monitoring show compare project') }}</label>
-        <select class="form-select form-select-sm cabinet-mon-compare-project-select" id="cabinet-mon-compare-project" title="{{ __('Monitoring show compare toolbar hint') }}" data-placeholder="{{ __('Monitoring show compare search placeholder') }}">
-            <option value="">{{ __('Monitoring show compare none') }}</option>
-        </select>
-        <label class="visually-hidden" for="cabinet-mon-compare-group">{{ __('Monitoring show compare group') }}</label>
-        <select class="form-select form-select-sm" id="cabinet-mon-compare-group" disabled title="{{ __('Monitoring show compare group') }}">
-            <option value="">{{ __('Monitoring show compare all groups') }}</option>
-        </select>
-        <div id="cabinetMonCompareNotice" class="cabinet-mon-compare-notice d-none" role="status" aria-live="polite"></div>
-        <div id="cabinetMonCompareIntersect" class="cabinet-mon-compare-intersect d-none" role="status" aria-live="polite"></div>
+        <button
+            type="button"
+            class="cabinet-mon-compare-chip"
+            id="cabinet-mon-compare-toggle"
+            aria-expanded="false"
+            aria-controls="cabinet-mon-compare-panel"
+        >
+            <i class="bi bi-intersect cabinet-mon-compare-chip__icon" aria-hidden="true"></i>
+            <span class="cabinet-mon-compare-chip__label" id="cabinet-mon-compare-chip-label">
+                {{ __('Monitoring show compare project') }}
+            </span>
+            <span class="cabinet-mon-compare-chip__vs d-none" id="cabinet-mon-compare-chip-vs" aria-hidden="true"></span>
+            <i class="bi bi-chevron-down cabinet-mon-compare-chip__chev" aria-hidden="true"></i>
+        </button>
+        <button
+            type="button"
+            class="cabinet-mon-compare-clear d-none"
+            id="cabinet-mon-compare-clear"
+            aria-label="{{ __('Monitoring show compare clear') }}"
+        >
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </button>
+
+        <div class="cabinet-mon-compare-panel d-none" id="cabinet-mon-compare-panel">
+            <p class="cabinet-mon-compare-panel__hint mb-0">{{ __('Monitoring show compare pick project') }}</p>
+            <div class="cabinet-mon-compare-panel__fields">
+                <label class="visually-hidden" for="cabinet-mon-compare-project">{{ __('Monitoring show compare project') }}</label>
+                <select
+                    class="form-select form-select-sm cabinet-mon-compare-project-select"
+                    id="cabinet-mon-compare-project"
+                    data-placeholder="{{ __('Monitoring show compare search placeholder') }}"
+                >
+                    <option value="">{{ __('Monitoring show compare none') }}</option>
+                </select>
+                <label class="visually-hidden" for="cabinet-mon-compare-group">{{ __('Monitoring show compare group') }}</label>
+                <select class="form-select form-select-sm" id="cabinet-mon-compare-group" disabled>
+                    <option value="">{{ __('Monitoring show compare all groups') }}</option>
+                </select>
+            </div>
+            <div id="cabinetMonCompareNotice" class="cabinet-mon-compare-notice d-none" role="status" aria-live="polite"></div>
+            <div id="cabinetMonCompareIntersect" class="cabinet-mon-compare-intersect d-none" role="status" aria-live="polite"></div>
+        </div>
     </div>
 </div>

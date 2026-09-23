@@ -33,12 +33,29 @@
                     </div>
                 </div>
 
-                @if($canCreate || $canEdit)
-                    <div class="cabinet-mon-groups-workspace__actions">
-                        <div class="cabinet-mon-groups-workspace__action-btns" id="groups-dt-actions"></div>
-                        <p class="cabinet-mon-groups-workspace__hint mb-0">{{ __('Monitoring groups actions hint') }}</p>
+                <div class="cabinet-mon-groups-workspace__actions">
+                    <div class="cabinet-mon-groups-workspace__action-btns" id="groups-dt-actions">
+                        @if($canEdit || $canDelete)
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="groups-select-all">
+                                {{ __('Monitoring groups select all') }}
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="groups-select-none">
+                                {{ __('Monitoring groups clear selection') }}
+                            </button>
+                        @endif
+                        @if($canCreate)
+                            <button type="button" class="btn btn-primary btn-sm" id="groups-create-btn">
+                                {{ __('Monitoring groups create button') }}
+                            </button>
+                        @endif
+                        @if($canEdit)
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="groups-edit-selected-btn">
+                                {{ __('Monitoring groups edit selected') }}
+                            </button>
+                        @endif
                     </div>
-                @endif
+                    <p class="cabinet-mon-groups-workspace__hint mb-0">{{ __('Monitoring groups actions hint') }}</p>
+                </div>
 
                 <div class="cabinet-mon-groups-dt-bar">
                     <div id="groups-dt-filter"></div>
@@ -50,6 +67,61 @@
                     </div>
                 </div>
             </section>
+        </div>
+    </div>
+
+    <div class="modal fade" id="groupsFormModal" tabindex="-1" aria-labelledby="groupsFormModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="groupsFormModalTitle">{{ __('Monitoring groups edit title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="groups-form-mode" value="edit">
+                    <input type="hidden" id="groups-form-ids" value="">
+                    <div class="mb-3">
+                        <label class="form-label" for="groups-form-name">{{ __('Group') }}</label>
+                        <input type="text" class="form-control" id="groups-form-name" autocomplete="off">
+                        <div class="form-text">{{ __('Monitoring groups name hint') }}</div>
+                        <div class="invalid-feedback" id="groups-form-name-error"></div>
+                    </div>
+                    <div class="mb-3 d-none" id="groups-form-move-wrap">
+                        <label class="form-label" for="groups-form-move">{{ __('Monitoring groups move queries') }}</label>
+                        <select class="form-select" id="groups-form-move">
+                            <option value="0">{{ __('Monitoring groups move none') }}</option>
+                        </select>
+                    </div>
+                    <div class="mb-0 d-none" id="groups-form-users-wrap">
+                        <div class="form-label">{{ __('Users') }}</div>
+                        <div id="groups-form-users" class="cabinet-mon-groups-form-users"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-primary" id="groups-form-submit">{{ __('Update') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="groupsDeleteModal" tabindex="-1" aria-labelledby="groupsDeleteModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="groupsDeleteModalTitle">{{ __('Monitoring groups delete title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" id="groups-delete-message">{{ __('Monitoring groups delete confirm one') }}</p>
+                    <input type="hidden" id="groups-delete-id" value="">
+                    <input type="hidden" id="groups-delete-name" value="">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-danger" id="groups-delete-submit">{{ __('Delete') }}</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -106,6 +178,7 @@
                     editTitle: @json(__('Monitoring groups edit title')),
                     editSubmit: @json(__('Update')),
                     editSelected: @json(__('Monitoring groups edit selected')),
+                    selectRowsFirst: @json(__('Monitoring groups select rows first')),
                     deleteTitle: @json(__('Monitoring groups delete title')),
                     deleteSubmit: @json(__('Delete')),
                     deleteConfirm: @json(__('Monitoring groups delete confirm')),
@@ -113,14 +186,13 @@
                     groupLabel: @json(__('Group')),
                     groupFieldInfo: @json(__('Monitoring groups name hint')),
                     moveQueriesLabel: @json(__('Monitoring groups move queries')),
+                    moveNone: @json(__('Monitoring groups move none')),
                     usersLabel: @json(__('Users')),
-                    multiTitle: @json(__('Monitoring groups multi title')),
-                    multiInfo: @json(__('Monitoring groups multi info')),
-                    multiRestore: @json(__('Monitoring groups multi restore')),
-                    multiNoMulti: @json(__('Monitoring groups multi no multi')),
+                    cancel: @json(__('Cancel')),
                     childChartShow: @json(__('Monitoring child chart show')),
                     childChartHide: @json(__('Monitoring child chart hide')),
                     loadError: @json(__('Monitoring show chart load error')),
+                    saved: @json(__('Saved')),
                 },
             };
         </script>

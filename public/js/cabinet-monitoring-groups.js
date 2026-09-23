@@ -5,29 +5,52 @@
         return;
     }
 
-    var editor = null;
     var table = null;
-    var dynamicHideFields = [
-        { label: cfg.i18n.moveQueriesLabel, name: 'groups_option', type: 'select' },
-        { label: cfg.i18n.usersLabel, name: 'users_option', type: 'checkbox' },
-    ];
+    var lastOptions = { groups_option: [], users_option: [] };
+    var formModalEl = null;
+    var deleteModalEl = null;
 
-    function showLoader() {
-        // Оверлей отключён: раньше #groupsLoader с rgba(255,255,255,.88) залипал поверх таблицы.
-        $('#groupsLoader').addClass('d-none').attr('aria-hidden', 'true');
+    function toastError(msg) {
+        if (typeof toastr !== 'undefined') {
+            toastr.error(msg || cfg.i18n.loadError || 'Error');
+        }
     }
 
-    function buildFields() {
-        var fields = [
-            { name: 'id', type: 'hidden' },
-            {
-                label: cfg.i18n.groupLabel,
-                name: 'name',
-                fieldInfo: cfg.i18n.groupFieldInfo,
-                def: '',
-            },
-        ];
-        return fields.concat(dynamicHideFields);
+    function toastOk(msg) {
+        if (typeof toastr !== 'undefined') {
+            toastr.success(msg || cfg.i18n.saved || 'OK');
+        }
+    }
+
+    function toastWarn(msg) {
+        if (typeof toastr !== 'undefined') {
+            toastr.warning(msg);
+        }
+    }
+
+    function showModal(el) {
+        if (!el) {
+            return;
+        }
+        if (window.bootstrap && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(el).show();
+            return;
+        }
+        $(el).modal('show');
+    }
+
+    function hideModal(el) {
+        if (!el) {
+            return;
+        }
+        if (window.bootstrap && bootstrap.Modal) {
+            var inst = bootstrap.Modal.getInstance(el);
+            if (inst) {
+                inst.hide();
+            }
+            return;
+        }
+        $(el).modal('hide');
     }
 
     function renderUsers(users) {
@@ -57,8 +80,11 @@
         if (!api) {
             return;
         }
-        var data = api.rows({ search: 'applied' }).data().toArray();
+        var data = api.rows().data().toArray();
         var count = data.length;
+        if (count === 0 && parseInt($('#groups-stats-groups').text(), 10) > 0) {
+            return;
+        }
         var queries = data.reduce(function (sum, row) {
             return sum + (parseInt(row.queries, 10) || 0);
         }, 0);
@@ -76,14 +102,49 @@
             if (!node) {
                 return;
             }
-            $(node).find('.cabinet-mon-groups-check').prop('checked', !!this.selected());
+            var selected = false;
+            try {
+                selected = typeof this.selected === 'function' ? !!this.selected() : $(node).hasClass('selected');
+            } catch (err) {
+                selected = $(node).hasClass('selected');
+            }
+            $(node).find('.cabinet-mon-groups-check').prop('checked', selected);
+        });
+    }
+
+    function selectedRows() {
+        if (!table) {
+            return [];
+        }
+        return table.rows({ selected: true }).data().toArray();
+    }
+
+    function applyTopColors($content) {
+        $content.find('.top').each(function () {
+            var str = $(this).text();
+            if (str.indexOf('+') > 0) {
+                $(this).addClass('cabinet-mon-groups-grow grow-color');
+            }
+            if (str.indexOf('-') > 0) {
+                $(this).addClass('cabinet-mon-groups-shrink shrink-color');
+            }
         });
     }
 
     function toggleChildRow($control, api) {
+        if (!$control || !api) {
+            return;
+        }
+
         var $icon = $control.find('i');
         var $tr = $control.closest('tr');
+        if (!$tr.length || $tr.hasClass('child')) {
+            return;
+        }
         var row = api.row($tr);
+        if (!row || !row.node()) {
+            return;
+        }
 
         if (row.child.isShown()) {
             row.child.hide();
@@ -92,27 +153,26 @@
             return;
         }
 
-        var data = row.data();
-        var url = cfg.routes.childRows
-            .replace('__PROJECT__', data.monitoring_project_id)
-            .replace('__GROUP__', data.id);
+        var data = row.data() || {};
+        var groupId = data.id;
+        var projectId = data.monitoring_project_id || cfg.projectId;
+        if (!groupId || !projectId) {
+            toastError(cfg.i18n.loadError);
+            return;
+        }
 
-        showLoader();
-        window.axios
-            .get(url)
+        var url = '/monitoring/' + projectId + '/child-rows/get/' + groupId;
+        var req = window.axios
+            ? window.axios.get(url)
+            : $.ajax({ url: url, method: 'GET', dataType: 'html' }).then(function (html) {
+                  return { data: html };
+              });
+
+        Promise.resolve(req)
             .then(function (response) {
-                var $content = $('<div class="cabinet-mon-groups-child" />').append($(response.data));
-
-                $content.find('.top').each(function () {
-                    var str = $(this).text();
-                    if (str.indexOf('+') > 0) {
-                        $(this).addClass('cabinet-mon-groups-grow');
-                    }
-                    if (str.indexOf('-') > 0) {
-                        $(this).addClass('cabinet-mon-groups-shrink');
-                    }
-                });
-
+                var html = response && response.data != null ? response.data : response;
+                var $content = $('<div class="cabinet-mon-groups-child" />').append($(html));
+                applyTopColors($content);
                 row.child($content).show();
                 $tr.addClass('shown');
                 $icon.removeClass('bi-plus-circle').addClass('bi-dash-circle');
@@ -123,58 +183,265 @@
                 });
 
                 if (window.cabinetMonitoringChildCharts) {
-                    window.cabinetMonitoringChildCharts.wire(
-                        $content,
-                        data.monitoring_project_id || cfg.projectId,
-                        {
-                            chartsUrl: cfg.chartsUrl || '/monitoring/charts',
-                            i18n: {
-                                childChartShow: cfg.i18n.childChartShow,
-                                childChartHide: cfg.i18n.childChartHide,
-                                loadError: cfg.i18n.loadError,
-                            },
-                        }
-                    );
+                    window.cabinetMonitoringChildCharts.wire($content, projectId, {
+                        chartsUrl: cfg.chartsUrl || '/monitoring/charts',
+                        i18n: {
+                            childChartShow: cfg.i18n.childChartShow,
+                            childChartHide: cfg.i18n.childChartHide,
+                            loadError: cfg.i18n.loadError,
+                        },
+                    });
                 }
             })
             .catch(function () {
-                if (typeof toastr !== 'undefined') {
-                    toastr.error(cfg.i18n.loadError || 'Error');
-                }
-            })
-            .finally(function () {
-                showLoader();
+                toastError(cfg.i18n.loadError);
             });
     }
 
-    function initEditor() {
-        editor = new $.fn.dataTable.Editor({
-            ajax: cfg.routes.action,
-            table: '#groups',
-            fields: buildFields(),
-            i18n: {
-                create: {
-                    button: cfg.i18n.createButton,
-                    submit: cfg.i18n.createSubmit,
-                },
-                edit: {
-                    submit: cfg.i18n.editSubmit,
-                },
-                remove: {
-                    submit: cfg.i18n.deleteSubmit,
-                    confirm: {
-                        _: cfg.i18n.deleteConfirm,
-                        1: cfg.i18n.deleteConfirmOne,
-                    },
-                },
-                multi: {
-                    title: cfg.i18n.multiTitle,
-                    info: cfg.i18n.multiInfo,
-                    restore: cfg.i18n.multiRestore,
-                    noMulti: cfg.i18n.multiNoMulti,
-                },
-            },
+    function fillMoveOptions(excludeIds) {
+        var $sel = $('#groups-form-move');
+        $sel.empty();
+        var exclude = {};
+        (excludeIds || []).forEach(function (id) {
+            exclude[String(id)] = true;
         });
+        var opts = lastOptions.groups_option || [];
+        var hasNone = opts.some(function (opt) {
+            return opt && String(opt.value) === '0';
+        });
+        if (!hasNone) {
+            $sel.append(
+                $('<option />', {
+                    value: '0',
+                    text: cfg.i18n.moveNone || '—',
+                })
+            );
+        }
+        opts.forEach(function (opt) {
+            if (!opt || exclude[String(opt.value)]) {
+                return;
+            }
+            $sel.append($('<option />', { value: opt.value, text: opt.label }));
+        });
+    }
+
+    function fillUsersOptions(selectedIds) {
+        var $wrap = $('#groups-form-users');
+        $wrap.empty();
+        var selected = {};
+        (selectedIds || []).forEach(function (id) {
+            selected[String(id)] = true;
+        });
+        var opts = lastOptions.users_option || [];
+        if (!opts.length) {
+            $wrap.append($('<div class="text-secondary small" />').text('—'));
+            return;
+        }
+        opts.forEach(function (opt) {
+            if (!opt) {
+                return;
+            }
+            var id = 'groups-user-' + opt.value;
+            var $item = $('<div class="form-check" />');
+            $item.append(
+                $('<input />', {
+                    type: 'checkbox',
+                    class: 'form-check-input groups-form-user-check',
+                    id: id,
+                    value: opt.value,
+                    checked: !!selected[String(opt.value)],
+                })
+            );
+            $item.append(
+                $('<label />', {
+                    class: 'form-check-label',
+                    for: id,
+                    text: opt.label,
+                })
+            );
+            $wrap.append($item);
+        });
+    }
+
+    function openCreateModal() {
+        $('#groups-form-mode').val('create');
+        $('#groups-form-ids').val('');
+        $('#groups-form-name').val('').removeClass('is-invalid');
+        $('#groups-form-name-error').text('');
+        $('#groups-form-move-wrap').addClass('d-none');
+        $('#groups-form-users-wrap').addClass('d-none');
+        $('#groupsFormModalTitle').text(cfg.i18n.createTitle);
+        $('#groups-form-submit').text(cfg.i18n.createSubmit);
+        showModal(formModalEl);
+        setTimeout(function () {
+            $('#groups-form-name').trigger('focus');
+        }, 200);
+    }
+
+    function openEditModal(rows) {
+        if (!rows || !rows.length) {
+            toastWarn(cfg.i18n.selectRowsFirst || 'Select rows');
+            return;
+        }
+        var ids = rows.map(function (r) {
+            return r.id;
+        });
+        var first = rows[0] || {};
+        var sameName = rows.every(function (r) {
+            return String(r.name || '') === String(first.name || '');
+        });
+
+        $('#groups-form-mode').val('edit');
+        $('#groups-form-ids').val(ids.join(','));
+        $('#groups-form-name')
+            .val(sameName ? first.name || '' : '')
+            .removeClass('is-invalid');
+        $('#groups-form-name-error').text('');
+        fillMoveOptions(ids);
+        fillUsersOptions(
+            (first.users || []).map(function (u) {
+                return u.id;
+            })
+        );
+        $('#groups-form-move-wrap').removeClass('d-none');
+        $('#groups-form-users-wrap').removeClass('d-none');
+        $('#groupsFormModalTitle').text(cfg.i18n.editTitle);
+        $('#groups-form-submit').text(cfg.i18n.editSubmit);
+        showModal(formModalEl);
+        setTimeout(function () {
+            $('#groups-form-name').trigger('focus');
+        }, 200);
+    }
+
+    function openDeleteModal(row) {
+        if (!row || !row.id) {
+            return;
+        }
+        $('#groups-delete-id').val(row.id);
+        $('#groups-delete-name').val(row.name || 'group');
+        $('#groups-delete-message').text(cfg.i18n.deleteConfirmOne);
+        showModal(deleteModalEl);
+    }
+
+    function postAction(payload) {
+        return $.ajax({
+            url: cfg.routes.action,
+            type: 'POST',
+            dataType: 'json',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': cfg.csrf || '',
+            },
+            data: $.extend({ _token: cfg.csrf }, payload),
+        });
+    }
+
+    function reloadTable() {
+        if (table) {
+            table.ajax.reload(null, false);
+        }
+    }
+
+    function submitForm() {
+        var mode = $('#groups-form-mode').val();
+        var name = $.trim($('#groups-form-name').val());
+        $('#groups-form-name').removeClass('is-invalid');
+        $('#groups-form-name-error').text('');
+
+        if (!name) {
+            $('#groups-form-name').addClass('is-invalid');
+            $('#groups-form-name-error').text(cfg.i18n.groupLabel || 'Name');
+            return;
+        }
+
+        var data = {};
+        if (mode === 'create') {
+            data[0] = { name: name };
+        } else {
+            var ids = String($('#groups-form-ids').val() || '')
+                .split(',')
+                .filter(Boolean);
+            if (!ids.length) {
+                toastWarn(cfg.i18n.selectRowsFirst);
+                return;
+            }
+            var moveTo = parseInt($('#groups-form-move').val(), 10) || 0;
+            var users = [];
+            $('#groups-form-users .groups-form-user-check:checked').each(function () {
+                users.push($(this).val());
+            });
+            ids.forEach(function (id) {
+                data[id] = {
+                    id: id,
+                    name: name,
+                    groups_option: moveTo,
+                    users_option: users,
+                };
+            });
+        }
+
+        var $btn = $('#groups-form-submit').prop('disabled', true);
+        postAction({ action: mode, data: data })
+            .done(function (resp) {
+                if (resp && resp.fieldErrors && resp.fieldErrors.length) {
+                    var err = resp.fieldErrors[0];
+                    $('#groups-form-name').addClass('is-invalid');
+                    $('#groups-form-name-error').text(err.status || cfg.i18n.loadError);
+                    return;
+                }
+                if (resp && resp.error) {
+                    toastError(resp.error);
+                    return;
+                }
+                hideModal(formModalEl);
+                toastOk(cfg.i18n.saved);
+                reloadTable();
+            })
+            .fail(function () {
+                toastError(cfg.i18n.loadError);
+            })
+            .always(function () {
+                $btn.prop('disabled', false);
+            });
+    }
+
+    function submitDelete() {
+        var id = $('#groups-delete-id').val();
+        var name = $('#groups-delete-name').val() || 'group';
+        if (!id) {
+            return;
+        }
+        var data = {};
+        data[id] = { id: id, name: name };
+        var $btn = $('#groups-delete-submit').prop('disabled', true);
+        postAction({ action: 'remove', data: data })
+            .done(function (resp) {
+                if (resp && resp.error) {
+                    toastError(resp.error);
+                    return;
+                }
+                hideModal(deleteModalEl);
+                toastOk(cfg.i18n.saved);
+                reloadTable();
+            })
+            .fail(function () {
+                toastError(cfg.i18n.loadError);
+            })
+            .always(function () {
+                $btn.prop('disabled', false);
+            });
+    }
+
+    function relocateFilter(api) {
+        if (!api) {
+            return;
+        }
+        var $filter = $('#groups-dt-filter');
+        if ($filter.length) {
+            $(api.table().container()).find('.dataTables_filter').appendTo($filter);
+        }
+        // прячем штатные dt-buttons — тулбар свой в blade
+        $(api.table().container()).find('.dt-buttons').addClass('d-none');
     }
 
     function initTable() {
@@ -220,7 +487,11 @@
                 name: 'name',
                 className: 'cabinet-mon-groups-col-name',
                 render: function (data) {
-                    return '<span class="cabinet-mon-groups-name">' + $('<div>').text(data || '').html() + '</span>';
+                    return (
+                        '<span class="cabinet-mon-groups-name">' +
+                        $('<div>').text(data || '').html() +
+                        '</span>'
+                    );
                 },
             },
             {
@@ -248,13 +519,13 @@
                 title: cfg.i18n.colActions,
                 orderable: false,
                 searchable: false,
-                className: 'cabinet-mon-groups-col-actions',
-                data: function (row) {
-                    var openUrl = '/monitoring/' + row.monitoring_project_id + '?group=' + row.id;
+                data: null,
+                className: 'cabinet-mon-groups-col-actions text-end',
+                render: function (data, type, row) {
+                    var openUrl =
+                        '/monitoring/' + (row.monitoring_project_id || cfg.projectId) + '?group=' + row.id;
                     var html =
-                        '<div class="cabinet-mon-groups-row-actions" role="group" aria-label="' +
-                        cfg.i18n.colActions +
-                        '">' +
+                        '<div class="cabinet-mon-groups-row-actions" role="group">' +
                         '<a href="' +
                         openUrl +
                         '" class="btn btn-sm btn-outline-secondary cabinet-mon-groups-row-actions__btn" aria-label="' +
@@ -267,72 +538,23 @@
                             cfg.i18n.editGroup +
                             '"><i class="bi bi-pencil" aria-hidden="true"></i></button>';
                     }
-
                     if (cfg.canDelete) {
                         html +=
                             '<button type="button" class="btn btn-sm btn-outline-danger cabinet-mon-groups-row-actions__btn editor-delete" aria-label="' +
                             cfg.i18n.deleteGroup +
                             '"><i class="bi bi-trash" aria-hidden="true"></i></button>';
                     }
-
                     html += '</div>';
                     return html;
                 },
             }
         );
 
-        var buttons = [];
-
-        if (canSelect) {
-            buttons.push({
-                text: cfg.i18n.selectAll,
-                className: 'btn btn-outline-secondary btn-sm',
-                action: function (e, dt) {
-                    e.preventDefault();
-                    dt.rows({ page: 'current', search: 'applied' }).select();
-                },
-            });
-            buttons.push({
-                text: cfg.i18n.selectNone,
-                className: 'btn btn-outline-secondary btn-sm',
-                action: function (e, dt) {
-                    e.preventDefault();
-                    dt.rows({ selected: true }).deselect();
-                },
-            });
-        }
-
-        if (cfg.canCreate) {
-            buttons.push({
-                extend: 'create',
-                editor: editor,
-                className: 'btn btn-primary btn-sm',
-                text: cfg.i18n.createButton,
-                action: function () {
-                    dynamicHideFields.forEach(function (obj) {
-                        editor.field(obj.name).hide();
-                    });
-                    editor.create({
-                        title: cfg.i18n.createTitle,
-                        buttons: cfg.i18n.createSubmit,
-                    });
-                },
-            });
-        }
-
-        if (cfg.canEdit) {
-            buttons.push({
-                text: cfg.i18n.editSelected,
-                className: 'btn btn-outline-primary btn-sm',
-                extend: 'edit',
-                editor: editor,
-            });
-        }
-
         var nonOrderable = canSelect ? [0, 1, 6, 7] : [0, 5, 6];
 
         table = $('#groups').DataTable({
             dom: 'Brt',
+            rowId: 'id',
             autoWidth: false,
             fixedHeader: false,
             paging: false,
@@ -345,21 +567,44 @@
                 emptyTable: cfg.i18n.emptyTable,
                 zeroRecords: cfg.i18n.zeroRecords,
             },
-            // API отдаёт весь список без draw/recordsTotal — serverSide здесь ломает redraw (статы 0).
             processing: false,
             serverSide: false,
             ajax: {
                 url: cfg.routes.list,
                 type: 'POST',
-                dataSrc: 'data',
-                complete: function () {
-                    showLoader();
-                    if (table) {
-                        updateStats(table);
-                    }
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': cfg.csrf || '',
                 },
-                error: function () {
-                    showLoader();
+                data: function (d) {
+                    d._token = cfg.csrf;
+                },
+                dataSrc: function (json) {
+                    function asOpts(raw) {
+                        if (!raw) {
+                            return [];
+                        }
+                        if (Array.isArray(raw)) {
+                            return raw;
+                        }
+                        if (typeof raw === 'object') {
+                            return Object.keys(raw).map(function (k) {
+                                return raw[k];
+                            });
+                        }
+                        return [];
+                    }
+                    if (json && json.options) {
+                        lastOptions.groups_option = asOpts(json.options.groups_option);
+                        lastOptions.users_option = asOpts(json.options.users_option);
+                    }
+                    var rows = json && Array.isArray(json.data) ? json.data : [];
+                    var queries = rows.reduce(function (sum, row) {
+                        return sum + (parseInt(row.queries, 10) || 0);
+                    }, 0);
+                    $('#groups-stats-groups').text(rows.length);
+                    $('#groups-stats-queries').text(queries);
+                    return rows;
                 },
             },
             columnDefs: [{ orderable: false, targets: nonOrderable }],
@@ -370,78 +615,118 @@
                       selector: 'td.cabinet-mon-groups-col-check',
                   }
                 : false,
-            buttons: {
-                dom: {
-                    container: {
-                        className: 'dt-buttons cabinet-mon-groups-dt-buttons',
-                    },
-                    button: {
-                        className: 'btn',
-                    },
-                },
-                buttons: buttons,
-            },
+            buttons: [],
             initComplete: function () {
                 var api = this.api();
-                var $wrapper = $(api.table().container());
-
-                $wrapper
-                    .find('.dt-buttons')
-                    .removeClass('btn-group')
-                    .appendTo('#groups-dt-actions');
-                $wrapper.find('.dataTables_filter').appendTo('#groups-dt-filter');
-
+                relocateFilter(api);
                 if (window.cabinetMonitoringSearch) {
                     window.cabinetMonitoringSearch.wireGlobalDataTableSearch(api);
                 }
-
-                $('#groups').on('click', '.cabinet-mon-groups-expand', function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleChildRow($(this), api);
-                });
-
                 api.on('select.dt deselect.dt', function () {
                     syncGroupChecks(api);
                 });
                 syncGroupChecks(api);
-                showLoader();
                 updateStats(api);
             },
             drawCallback: function () {
                 var api = this.api();
+                relocateFilter(api);
                 syncGroupChecks(api);
                 updateStats(api);
-                showLoader();
             },
         });
     }
 
     $(document).ready(function () {
-        toastr.options = { preventDuplicates: true, timeOut: 5000 };
+        if (typeof toastr !== 'undefined') {
+            toastr.options = { preventDuplicates: true, timeOut: 5000 };
+        }
 
-        showLoader();
-        initEditor();
+        formModalEl = document.getElementById('groupsFormModal');
+        deleteModalEl = document.getElementById('groupsDeleteModal');
+
         initTable();
 
-        $('#groups').on('click', 'td .editor-edit', function (e) {
+        $('#groups-select-all').on('click', function (e) {
             e.preventDefault();
-            dynamicHideFields.forEach(function (obj) {
-                editor.field(obj.name).show();
-            });
-            editor.edit($(this).closest('tr'), {
-                title: cfg.i18n.editTitle,
-                buttons: cfg.i18n.editSubmit,
-            });
+            if (table) {
+                table.rows({ page: 'current', search: 'applied' }).select();
+            }
+        });
+        $('#groups-select-none').on('click', function (e) {
+            e.preventDefault();
+            if (table) {
+                table.rows({ selected: true }).deselect();
+            }
+        });
+        $('#groups-create-btn').on('click', function (e) {
+            e.preventDefault();
+            openCreateModal();
+        });
+        $('#groups-edit-selected-btn').on('click', function (e) {
+            e.preventDefault();
+            openEditModal(selectedRows());
+        });
+        $('#groups-form-submit').on('click', function (e) {
+            e.preventDefault();
+            submitForm();
+        });
+        $('#groups-delete-submit').on('click', function (e) {
+            e.preventDefault();
+            submitDelete();
         });
 
-        $('#groups').on('click', 'td .editor-delete', function (e) {
+        $(document).on('click', '#groups .cabinet-mon-groups-expand', function (e) {
             e.preventDefault();
-            editor.remove($(this).closest('tr'), {
-                title: cfg.i18n.deleteTitle,
-                message: cfg.i18n.deleteConfirmOne,
-                buttons: cfg.i18n.deleteSubmit,
-            });
+            e.stopPropagation();
+            if (!table) {
+                return;
+            }
+            toggleChildRow($(this), table);
+        });
+
+        $(document).on('click', '#groups .cabinet-mon-groups-check', function (e) {
+            e.stopPropagation();
+        });
+        $(document).on('change', '#groups .cabinet-mon-groups-check', function () {
+            if (!table) {
+                return;
+            }
+            var row = table.row($(this).closest('tr'));
+            if (!row.node()) {
+                return;
+            }
+            if (this.checked) {
+                row.select();
+            } else {
+                row.deselect();
+            }
+        });
+
+        $(document).on('click', '#groups .editor-edit', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!table) {
+                return;
+            }
+            var row = table.row($(this).closest('tr'));
+            if (!row.node()) {
+                return;
+            }
+            openEditModal([row.data()]);
+        });
+
+        $(document).on('click', '#groups .editor-delete', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!table) {
+                return;
+            }
+            var row = table.row($(this).closest('tr'));
+            if (!row.node()) {
+                return;
+            }
+            openDeleteModal(row.data());
         });
     });
 }(window.jQuery, window.cabinetMonGroupsConfig));

@@ -3,38 +3,54 @@
 namespace App\Exports\Monitoring;
 
 use Illuminate\Contracts\View\View;
-use Iterator;
-use Maatwebsite\Excel\Concerns\FromIterator;
 use Maatwebsite\Excel\Concerns\FromView;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithColumnFormatting;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithDefaultStyles;
-use Maatwebsite\Excel\Concerns\WithDrawings;
 use Maatwebsite\Excel\Concerns\WithEvents;
-use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use Maatwebsite\Excel\Events\BeforeExport;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Shared\Drawing as XlsDrawing;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Style;
-use Maatwebsite\Excel\Events\BeforeExport;
-use PhpOffice\PhpSpreadsheet\Worksheet\BaseDrawing;
-use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 
-class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithStyles, WithTitle, ShouldAutoSize
+class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithStyles, WithTitle
 {
     protected $data;
     private $green = "#99e4b9";
     private $yellow = "#fbe1df";
 
+    /**
+     * Ширины по ключу колонки (см), не по букве Excel.
+     * № всегда первая колонка (_num). Остальные (target, dynamics, даты) — auto-size.
+     */
+    private const WIDTH_CM_BY_KEY = [
+        '_num' => 1.5,
+        'query' => 12.0,
+        'url' => 3.7,
+        'url_links' => 10.0,
+        'target_url' => 10.0,
+        'group' => 10.0,
+    ];
+
+    /** @var list<string> ключи data-колонок в порядке листа (без №) */
+    private $columnKeys = [];
+
     public function __construct($data)
     {
         $this->data = $data;
+        $columns = $data['columns'] ?? [];
+        if ($columns instanceof \Illuminate\Support\Collection) {
+            $this->columnKeys = $columns->keys()->map(static function ($k) {
+                return (string) $k;
+            })->values()->all();
+        } elseif (is_array($columns)) {
+            $this->columnKeys = array_map('strval', array_keys($columns));
+        }
         $this->dataFormat();
     }
 
@@ -47,10 +63,9 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
 
     public function defaultStyles(Style $defaultStyle)
     {
-        // Or return the styles array
         return [
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
             ],
             'borders' => [
                 'allBorders' => [
@@ -69,14 +84,87 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
      */
     public function registerEvents(): array
     {
+        $columnKeys = $this->columnKeys;
+
         return [
-            BeforeExport::class => function(BeforeExport $event) {
-                $properties = $event->writer->getProperties();
-                //$properties->setTitle('RedBox');
+            BeforeExport::class => function (BeforeExport $event) {
+                $event->writer->getProperties();
             },
 
-            AfterSheet::class => function(AfterSheet $event) {
-                //$event->sheet->getDelegate()->getPageSetup()->setPaperSize(PageSetup::PAPERSIZE_A4);
+            AfterSheet::class => function (AfterSheet $event) use ($columnKeys) {
+                $sheet = $event->sheet->getDelegate();
+                $highestColumn = $sheet->getHighestColumn();
+                $highestRow = (int) $sheet->getHighestRow();
+                if ($highestRow < 1) {
+                    return;
+                }
+
+                $font = $sheet->getParent()->getDefaultStyle()->getFont();
+                $highestIdx = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
+
+                // Порядок на листе: A = №, дальше ключи из экспорта.
+                $keyByLetter = ['_num'];
+                foreach ($columnKeys as $key) {
+                    $keyByLetter[] = $key;
+                }
+
+                // Сначала auto-size для колонок без фикс. ширины.
+                $fixedLetters = [];
+                foreach ($keyByLetter as $idx => $key) {
+                    $letter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($idx + 1);
+                    if ($idx + 1 > $highestIdx) {
+                        break;
+                    }
+                    if (isset(self::WIDTH_CM_BY_KEY[$key])) {
+                        $fixedLetters[$letter] = self::WIDTH_CM_BY_KEY[$key];
+                        $sheet->getColumnDimension($letter)->setAutoSize(false);
+                    } else {
+                        $sheet->getColumnDimension($letter)->setAutoSize(true);
+                    }
+                }
+                $sheet->calculateColumnWidths();
+
+                // Фикс. ширины по ключу (после auto-size, чтобы не перебило).
+                foreach ($fixedLetters as $letter => $cm) {
+                    $px = (int) round($cm * 37.795275591);
+                    $width = max(3.0, (float) XlsDrawing::pixelsToCellDimension($px, $font));
+                    $sheet->getColumnDimension($letter)->setAutoSize(false);
+                    $sheet->getColumnDimension($letter)->setWidth($width);
+                }
+
+                $linksCol = null;
+                foreach ($keyByLetter as $idx => $key) {
+                    if ($key === 'url_links') {
+                        $linksCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($idx + 1);
+                        break;
+                    }
+                }
+                if ($linksCol === null) {
+                    $linksCol = $this->findUrlLinksColumn($sheet, $highestColumn);
+                }
+                if ($linksCol === null) {
+                    return;
+                }
+
+                $sheet->getStyle($linksCol . '1:' . $linksCol . $highestRow)
+                    ->getAlignment()
+                    ->setWrapText(true)
+                    ->setVertical(Alignment::VERTICAL_TOP)
+                    ->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+                for ($row = 2; $row <= $highestRow; $row++) {
+                    $cell = $sheet->getCell($linksCol . $row);
+                    $raw = (string) $cell->getValue();
+                    if ($raw === '') {
+                        continue;
+                    }
+
+                    $normalized = $this->normalizeUrlLinksValue($raw);
+                    $cell->setValueExplicit($normalized, DataType::TYPE_STRING);
+
+                    $lines = max(1, substr_count($normalized, "\n") + 1);
+                    $sheet->getRowDimension($row)->setRowHeight(max(15.0, $lines * 15.0));
+                }
             },
         ];
     }
@@ -84,12 +172,12 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
     public function styles(Worksheet $sheet)
     {
         return [
-            // Style the first row as bold text.
             1 => [
                 'font' => ['bold' => true],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_LEFT,
                     'indent' => 1,
+                    'wrapText' => true,
                 ],
             ],
             'A' => [
@@ -102,6 +190,7 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_LEFT,
                     'indent' => 1,
+                    'wrapText' => true,
                 ],
             ],
         ];
@@ -112,10 +201,63 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
         return 'RedBox title';
     }
 
+    /**
+     * @param \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet
+     */
+    private function findUrlLinksColumn($sheet, string $highestColumn): ?string
+    {
+        $col = 'A';
+        while (true) {
+            $val = trim((string) $sheet->getCell($col . '1')->getValue());
+            $valNorm = mb_strtolower($val);
+            if (
+                $val !== ''
+                && (
+                    mb_strpos($valNorm, 'ссылки') !== false
+                    || mb_strpos($valNorm, 'url_links') !== false
+                    || (mb_strpos($valNorm, 'url') !== false && mb_strpos($valNorm, 'ссыл') !== false)
+                )
+            ) {
+                return $col;
+            }
+            if ($col === $highestColumn) {
+                break;
+            }
+            $col++;
+        }
+
+        return null;
+    }
+
+    private function normalizeUrlLinksValue(string $raw): string
+    {
+        $normalized = preg_replace('/<br\s*\/?>/i', "\n", $raw) ?? $raw;
+        $normalized = html_entity_decode(strip_tags($normalized), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $normalized = str_replace(["\r\n", "\r"], "\n", $normalized);
+        // HTML/Excel часто схлопывают переносы в пробелы между URL.
+        if (strpos($normalized, "\n") === false) {
+            $normalized = preg_replace('/(?<=\S)\s+(?=https?:\/\/)/', "\n", $normalized) ?? $normalized;
+        }
+        // Убрать пустые строки и пробелы по краям каждой ссылки.
+        $parts = preg_split("/\n+/", $normalized) ?: [];
+        $parts = array_values(array_filter(array_map('trim', $parts), static function ($u) {
+            return $u !== '';
+        }));
+
+        return implode("\n", $parts);
+    }
+
     private function dataFormat()
     {
         $data = $this->data['data'];
         foreach ($data as $ek => $el) {
+            // URL-ссылки нормализуем всегда (даже без колонки target).
+            if (isset($el['url_links'])) {
+                $this->data['data'][$ek]['url_links'] = $this->normalizeUrlLinksValue(
+                    is_string($el['url_links']) ? $el['url_links'] : (string) $el['url_links']
+                );
+            }
+
             if (!isset($el['target'])) {
                 continue;
             }
@@ -123,6 +265,10 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
             $target = (int) trim(strip_tags((string) $el['target']));
 
             foreach ($el as $fk => $field) {
+                if ($fk === 'url_links') {
+                    continue;
+                }
+
                 if (is_array($field) && array_key_exists('p', $field)) {
                     $this->data['data'][$ek][$fk] = $this->exportCellFromPositionPayload($field, $target, $el, (string) $fk);
                     continue;
@@ -160,8 +306,6 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
     }
 
     /**
-     * /table отдаёт positionCellPayload (массив), экспорт ждёт [position, diff?, color].
-     *
      * @param array{p: int, d?: int, t?: string} $field
      */
     private function exportCellFromPositionPayload(array $field, int $target, $row, string $fk): array
@@ -195,9 +339,6 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
         return $col;
     }
 
-    /**
-     * HTML ячейки «Запрос» содержит иконку целевого URL; strip_tags иначе оставляет «Целевой URL».
-     */
     private function plainCellText($key, $field): string
     {
         if (!is_string($field)) {

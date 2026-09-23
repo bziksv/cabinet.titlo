@@ -39,6 +39,12 @@ class MonitoringGroupsController extends Controller
         }
 
         if ($request->ajax()) {
+            // Editor (create/edit/remove) и DataTables бьют в один POST URL —
+            // второй route на action в web.php недостижим (первый match = index).
+            if ($request->filled('action')) {
+                return $this->action($request, $id);
+            }
+
             return $this->getDataTable();
         }
 
@@ -149,6 +155,7 @@ class MonitoringGroupsController extends Controller
             $item->DT_RowId = 'row_' . $item->id;
             $item->queries = (int) $item->keywords_count;
             $item->created = $item->created_at->diffForHumans();
+            $item->monitoring_project_id = (int) ($item->monitoring_project_id ?: $this->project->id);
 
             return $item;
         });
