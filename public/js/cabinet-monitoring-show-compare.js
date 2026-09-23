@@ -298,6 +298,28 @@
         notifyChange();
     }
 
+    /**
+     * Парсим подписи оси (d.m.Y / Y-m-d / m.Y) → timestamp для сортировки.
+     * Без сортировки даты второго проекта дописывались в хвост и ломали шкалу.
+     */
+    function chartLabelSortKey(label) {
+        var s = String(label || '').trim();
+        var m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (m) {
+            return Date.UTC(+m[3], +m[2] - 1, +m[1]);
+        }
+        m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (m) {
+            return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+        }
+        m = s.match(/^(\d{1,2})\.(\d{4})$/);
+        if (m) {
+            return Date.UTC(+m[2], +m[1] - 1, 1);
+        }
+        var t = Date.parse(s);
+        return Number.isFinite(t) ? t : Number.MAX_SAFE_INTEGER;
+    }
+
     function alignPayloadLabels(basePayload, comparePayload) {
         var labelSet = {};
         var labels = [];
@@ -313,6 +335,9 @@
 
         pushLabels(basePayload && basePayload.labels);
         pushLabels(comparePayload && comparePayload.labels);
+        labels.sort(function (a, b) {
+            return chartLabelSortKey(a) - chartLabelSortKey(b);
+        });
 
         function remapDataset(payload, ds, suffix) {
             var map = {};

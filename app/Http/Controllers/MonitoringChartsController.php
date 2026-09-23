@@ -539,9 +539,30 @@ class MonitoringChartsController extends Controller
         }
         $labels = array_values(array_unique($labels));
         usort($labels, function ($a, $b) {
-            return strtotime(str_replace('.', '-', $a)) <=> strtotime(str_replace('.', '-', $b));
+            return $this->chartLabelSortKey((string) $a) <=> $this->chartLabelSortKey((string) $b);
         });
 
         return $labels;
+    }
+
+    private function chartLabelSortKey(string $label): int
+    {
+        $label = trim($label);
+        foreach (['d.m.Y', 'Y-m-d', 'd-m-Y', 'm.Y'] as $format) {
+            try {
+                $dt = Carbon::createFromFormat($format, $label);
+                if ($dt !== false) {
+                    return $dt->getTimestamp();
+                }
+            } catch (\Throwable $e) {
+                // next format
+            }
+        }
+
+        try {
+            return Carbon::parse($label)->getTimestamp();
+        } catch (\Throwable $e) {
+            return PHP_INT_MAX;
+        }
     }
 }
