@@ -9,7 +9,7 @@
 ## Env
 
 ```env
-SITE_AUDIT_VNU_URL=http://127.0.0.1:8888/
+SITE_AUDIT_VNU_URL=http://127.0.0.1:8877/
 # опционально:
 # SITE_AUDIT_HTML_CHECKER=html5
 # SITE_AUDIT_VNU_TIMEOUT=8
@@ -20,15 +20,17 @@ SITE_AUDIT_VNU_URL=http://127.0.0.1:8888/
 Ставить на **той же машине, где крутятся `site_audit` воркеры** (сейчас cabinet;
 proxy2 — позже по этапности).
 
+> На prod cabinet порт **8888 занят nginx (fastpanel)** — используем **8877**.
+
 ## Установка (кратко)
 
 1. Java 17+.
 2. Скачать `vnu.jar` или runtime-image с
    [releases validator](https://github.com/validator/validator/releases).
-3. HTTP-сервис (пример):
+3. HTTP-сервис (пример; стек **≥ 2m**, иначе StackOverflowError на схемах):
 
 ```bash
-java -Xss512k -cp /opt/vnu/vnu.jar nu.validator.servlet.Main 8888
+java -Xss2m -Xmx768m -cp /opt/vnu/vnu.jar nu.validator.servlet.Main 8877
 ```
 
 Проверка:
@@ -36,7 +38,7 @@ java -Xss512k -cp /opt/vnu/vnu.jar nu.validator.servlet.Main 8888
 ```bash
 curl -sS -H 'Content-Type: text/html; charset=utf-8' \
   --data-binary '<!doctype html><title>t</title><p>ok' \
-  'http://127.0.0.1:8888/?out=json' | head
+  'http://127.0.0.1:8877/?out=json' | head
 ```
 
 ## Supervisor (пример unit)
@@ -45,16 +47,17 @@ curl -sS -H 'Content-Type: text/html; charset=utf-8' \
 
 ```ini
 [program:cabinet-titlo-vnu]
-command=/usr/bin/java -Xss512k -Xmx512m -cp /opt/vnu/vnu.jar nu.validator.servlet.Main 8888
+command=/usr/lib/jvm/java-17-openjdk-amd64/bin/java -Xss2m -Xmx768m -cp /opt/vnu/vnu.jar nu.validator.servlet.Main 8877
 directory=/opt/vnu
-user=cabinet_titl_usr
+user=root
 autostart=true
 autorestart=true
+startsecs=8
 stdout_logfile=/var/log/supervisor/cabinet-titlo-vnu.log
 stderr_logfile=/var/log/supervisor/cabinet-titlo-vnu.err.log
 ```
 
-После старта: `SITE_AUDIT_VNU_URL` в `.env` кабинета → `config:cache` →
+После старта: `SITE_AUDIT_VNU_URL=http://127.0.0.1:8877/` в `.env` кабинета → `config:cache` →
 `queue:restart` / `supervisorctl restart cabinet-titlo-site-audit:*`.
 
 ## Поведение краула
