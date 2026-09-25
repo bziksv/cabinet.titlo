@@ -368,7 +368,10 @@ class SiteAuditPageProcessor
 
             $isHtml = SiteAuditUrlNormalizer::isHtmlDocument($result['content_type'] ?? null, $url);
             if ($isHtml && $code >= 200 && $code < 400) {
-                $parsed = $this->parser->parse($body, $result['final_url'] ?: $url);
+                $parsed = $this->parser->parse($body, $result['final_url'] ?: $url, [
+                    'html_checker' => $crawlSettings['html_checker']
+                        ?? SiteAuditHtmlChecker::defaultChecker(),
+                ]);
                 $pageData['title'] = $parsed['title'];
                 $pageData['title_hash'] = $parsed['title'] ? hash('sha256', mb_strtolower($parsed['title'])) : null;
                 $pageData['description'] = $parsed['description'];
@@ -471,6 +474,8 @@ class SiteAuditPageProcessor
                     $findings[] = $this->finding('html_critical_errors', $url, $urlHash, [
                         'count' => (int) $parsed['html_error_count'],
                         'samples' => array_slice($parsed['html_error_samples'] ?? [], 0, 8),
+                        'checker' => (string) ($parsed['html_checker'] ?? SiteAuditHtmlChecker::LIBXML),
+                        'checker_fallback' => ! empty($parsed['html_checker_fallback']),
                     ]);
                 }
 

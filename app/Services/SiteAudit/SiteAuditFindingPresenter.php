@@ -287,6 +287,16 @@ class SiteAuditFindingPresenter
 
         $parts = [];
         $hints = [];
+        $checker = ! empty($meta['checker'])
+            ? SiteAuditHtmlChecker::label((string) $meta['checker'])
+            : '';
+        if ($checker !== '') {
+            $badge = e($checker);
+            if (! empty($meta['checker_fallback'])) {
+                $badge .= ' → libxml';
+            }
+            $parts[] = '<span class="cabinet-sa-html-err__checker">' . $badge . '</span>';
+        }
         if ($n > 0) {
             $parts[] = '<span class="cabinet-sa-html-err__count">ошибок: ' . $n . '</span>';
         }
@@ -303,7 +313,7 @@ class SiteAuditFindingPresenter
                 ? (int) $sample['line']
                 : null;
             $label = e(self::clip($msg, 90));
-            $q = 'html libxml "' . $msg . '"';
+            $q = 'html validation "' . $msg . '"';
             $href = e(self::googleSearchUrl($q));
             $lineBit = $line !== null
                 ? ' <span class="text-muted">стр. ' . $line . '</span>'
@@ -2362,8 +2372,24 @@ class SiteAuditFindingPresenter
                 $msg = ! empty($meta['samples'][0]['message'])
                     ? self::clip((string) $meta['samples'][0]['message'], 70)
                     : '';
+                $checker = ! empty($meta['checker'])
+                    ? SiteAuditHtmlChecker::label((string) $meta['checker'])
+                    : '';
+                $bits = [];
+                if ($n) {
+                    $bits[] = 'ошибок: ' . $n;
+                }
+                if ($checker !== '') {
+                    $bits[] = $checker;
+                }
+                if (! empty($meta['checker_fallback'])) {
+                    $bits[] = 'fallback libxml';
+                }
+                if ($msg !== '') {
+                    $bits[] = $msg;
+                }
 
-                return $n ? ('ошибок: ' . $n . ($msg !== '' ? ' · ' . $msg : '')) : 'ошибки HTML';
+                return $bits ? implode(' · ', $bits) : 'ошибки HTML';
 
             case 'lost_file':
                 $asset = ! empty($meta['asset']) ? self::clip((string) $meta['asset'], 55) : '';

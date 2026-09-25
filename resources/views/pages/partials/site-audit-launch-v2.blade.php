@@ -200,6 +200,8 @@
                                 </div>
                             </details>
 
+                            @include('pages.partials.site-audit-html-checker')
+
                             <div class="cabinet-sa-launch__actions">
                                 <button type="button" class="btn btn-primary cabinet-sa-start-btn" id="sa-start">
                                     <i class="bi bi-play-fill" aria-hidden="true"></i>

@@ -88,6 +88,15 @@ return [
     'aggregate_image_head_chunk' => (int) env('SITE_AUDIT_IMAGE_HEAD_CHUNK', 80),
     'heavy_image_bytes' => (int) env('SITE_AUDIT_HEAVY_IMAGE_BYTES', 500000),
     'html_critical_min' => (int) env('SITE_AUDIT_HTML_CRITICAL_MIN', 1),
+    // Чекер разметки: libxml (быстрый) | html5 (Nu Html Checker / vnu HTTP).
+    // Пустой SITE_AUDIT_HTML_CHECKER → html5 если задан VNU_URL, иначе libxml.
+    'html_checker_default' => strtolower(trim((string) env('SITE_AUDIT_HTML_CHECKER', ''))),
+    // Nu Html Checker HTTP, напр. http://127.0.0.1:8888/ — пусто = HTML5 недоступен
+    'vnu_url' => trim((string) env('SITE_AUDIT_VNU_URL', '')),
+    'vnu_timeout' => (float) env('SITE_AUDIT_VNU_TIMEOUT', 8),
+    'vnu_connect_timeout' => (float) env('SITE_AUDIT_VNU_CONNECT_TIMEOUT', 2),
+    'vnu_max_bytes' => (int) env('SITE_AUDIT_VNU_MAX_BYTES', 1_500_000),
+    'vnu_sample_max' => (int) env('SITE_AUDIT_VNU_SAMPLE_MAX', 10),
     'lost_file_head_max' => (int) env('SITE_AUDIT_LOST_FILE_HEAD_MAX', 40),
     'lost_file_max_findings' => (int) env('SITE_AUDIT_LOST_FILE_MAX', 80),
     'error_spike_min_count' => (int) env('SITE_AUDIT_ERROR_SPIKE_MIN', 5),
@@ -920,7 +929,7 @@ return [
             'phase' => 'C',
             'severity' => 'other',
             'title' => 'Критические ошибки HTML',
-            'description' => 'Сэмпл критичных ошибок разметки. Одинаковая ошибка на многих URL = почти всегда сквозной шаблон (шапка/подвал). Смотрите вид «По ошибкам».',
+            'description' => 'Сэмпл критичных ошибок разметки (чекер: libxml или HTML5/Nu — выбирается при запуске). Одинаковая ошибка на многих URL = почти всегда сквозной шаблон (шапка/подвал). Смотрите вид «По ошибкам».',
             'group' => 'tech',
         ],
         'lost_file' => [

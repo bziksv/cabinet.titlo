@@ -19,6 +19,10 @@ class SiteAuditCrawlOptions
         $concurrency = isset($input['concurrency']) ? (int) $input['concurrency'] : 1;
         $concurrency = max(1, min($maxConcurrency, $concurrency));
 
+        $htmlChecker = SiteAuditHtmlChecker::normalize(
+            $input['html_checker'] ?? SiteAuditHtmlChecker::defaultChecker()
+        );
+
         return array_merge($input, [
             'crawl_speed' => $speed,
             'rps' => $rps,
@@ -26,6 +30,7 @@ class SiteAuditCrawlOptions
             'save_html' => $input['save_html'] ?? 'off',
             'exclude_patterns' => SiteAuditUrlFilter::parsePatterns($input['exclude_patterns'] ?? []),
             'virtual_robots' => self::normalizeVirtualRobots($input['virtual_robots'] ?? ''),
+            'html_checker' => $htmlChecker,
             // URL-нормализация всегда включена (не опция UI).
             'unify_www' => true,
             'force_https' => true,

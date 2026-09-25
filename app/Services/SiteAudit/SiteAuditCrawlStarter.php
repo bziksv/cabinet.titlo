@@ -97,6 +97,7 @@ class SiteAuditCrawlStarter
                     'concurrency' => (int) ($settings['concurrency'] ?? 1),
                     'exclude_patterns' => $settings['exclude_patterns'] ?? [],
                     'virtual_robots' => $settings['virtual_robots'] ?? '',
+                    'html_checker' => $settings['html_checker'] ?? SiteAuditHtmlChecker::defaultChecker(),
                     'unify_www' => true,
                     'force_https' => true,
                     'strip_trailing_slash' => false,

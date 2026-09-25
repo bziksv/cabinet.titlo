@@ -1475,6 +1475,7 @@ class SiteAuditController extends Controller
                         'concurrency' => SiteAuditLimits::resolveConcurrency($user, $request->input('concurrency', 1)),
                         'exclude_patterns' => '',
                         'virtual_robots' => (string) $request->input('virtual_robots', ''),
+                        'html_checker' => (string) $request->input('html_checker', \App\Services\SiteAudit\SiteAuditHtmlChecker::defaultChecker()),
                         'extra_hosts' => [],
                     ],
                 ];
@@ -1489,6 +1490,7 @@ class SiteAuditController extends Controller
                     'concurrency' => SiteAuditLimits::resolveConcurrency($user, $request->input('concurrency', 1)),
                     'exclude_patterns' => '',
                     'virtual_robots' => (string) $request->input('virtual_robots', ''),
+                    'html_checker' => (string) $request->input('html_checker', \App\Services\SiteAudit\SiteAuditHtmlChecker::defaultChecker()),
                     'extra_hosts' => count($domains) === 1
                         ? \App\Services\SiteAudit\SiteAuditUrlNormalizer::parseExtraHosts($request->input('extra_hosts', ''))
                         : [],

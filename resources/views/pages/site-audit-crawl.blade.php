@@ -103,6 +103,9 @@
                     @if(!empty($s))
                         · скорость {{ $s['crawl_speed'] ?? '—' }} ({{ $s['rps'] ?? '—' }} URL/с на поток)
                         · потоки {{ (int) ($s['concurrency'] ?? 1) }}
+                        @if(!empty($s['html_checker']))
+                            · HTML {{ \App\Services\SiteAudit\SiteAuditHtmlChecker::label((string) $s['html_checker']) }}
+                        @endif
                     @endif
                     @if($crawl->started_at) · старт {{ $crawl->started_at->format('d.m.Y H:i') }} @endif
                     @if($crawl->finished_at) · конец {{ $crawl->finished_at->format('d.m.Y H:i') }} @endif

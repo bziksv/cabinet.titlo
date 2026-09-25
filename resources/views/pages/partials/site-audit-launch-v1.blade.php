@@ -105,6 +105,8 @@
                                       placeholder="User-agent: *&#10;Disallow: /cart&#10;Disallow: /admin&#10;Allow: /"></textarea>
                         </div>
 
+                        @include('pages.partials.site-audit-html-checker')
+
                         <div data-sa-tour="speed" data-sa-pro>
                         <div class="mb-3 cabinet-sa-field">
                             <label class="form-label fw-medium" for="sa-speed">

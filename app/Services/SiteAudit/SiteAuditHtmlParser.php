@@ -7,8 +7,11 @@ namespace App\Services\SiteAudit;
  */
 class SiteAuditHtmlParser
 {
-    public function parse(string $html, string $finalUrl): array
+    public function parse(string $html, string $finalUrl, array $options = []): array
     {
+        $htmlChecker = SiteAuditHtmlChecker::normalize(
+            $options['html_checker'] ?? SiteAuditHtmlChecker::defaultChecker()
+        );
         $titleRaws = $this->allMatches('/<title[^>]*>(.*?)<\/title>/is', $html);
         $titles = [];
         foreach ($titleRaws as $rawTitle) {
@@ -147,7 +150,10 @@ class SiteAuditHtmlParser
         $mixedSamples = $isHttps ? $this->collectMixedContentSamples($html) : [];
 
         $insecureForms = $isHttps ? $this->insecureFormActions($html) : [];
-        $htmlErrors = $this->collectHtmlErrors($html);
+        $htmlErrorsBag = $this->collectHtmlErrors($html, $htmlChecker);
+        $htmlErrors = $htmlErrorsBag['errors'];
+        $htmlCheckerEffective = $htmlErrorsBag['checker'];
+        $htmlCheckerFallback = ! empty($htmlErrorsBag['fallback']);
         $headingOutline = $this->headingOutline($markup);
         $headingIssues = $this->headingHierarchyIssues($headingOutline);
         $headingsByLevel = $this->headingsByLevel($headingOutline, $h1s, $h2s);
@@ -207,6 +213,8 @@ class SiteAuditHtmlParser
             'insecure_form_samples' => $insecureForms,
             'html_error_count' => count($htmlErrors),
             'html_error_samples' => $htmlErrors,
+            'html_checker' => $htmlCheckerEffective,
+            'html_checker_fallback' => $htmlCheckerFallback,
             'content_risk' => $contentRisk,
             'contacts' => $contacts + $signals + [
                 'commercial' => $looksCommercial,
@@ -218,11 +226,6 @@ class SiteAuditHtmlParser
         ];
     }
 
-    /**
-     * Критические ошибки разметки: libxml ERROR/FATAL + грубые эвристики (сэмпл).
-     *
-     * @return list<array{line:?int, level:string, message:string}>
-     */
     /**
      * Mixed content = HTTP-подресурсы на HTTPS-странице (img/script/css/iframe/…).
      * Не считаем: обычные &lt;a href&gt;, rel=canonical, form action (это insecure_form).
@@ -286,7 +289,16 @@ class SiteAuditHtmlParser
         return array_slice($samples, 0, 5);
     }
 
-    private function collectHtmlErrors(string $html): array
+    /**
+     * Критические ошибки разметки: эвристики + libxml или Nu (vnu).
+     *
+     * @return array{
+     *   errors:list<array{line:?int,level:string,message:string}>,
+     *   checker:string,
+     *   fallback:bool
+     * }
+     */
+    private function collectHtmlErrors(string $html, string $checker): array
     {
         $out = [];
         $push = function (string $level, string $message, ?int $line = null) use (&$out) {
@@ -307,7 +319,7 @@ class SiteAuditHtmlParser
             ];
         };
 
-        // эвристики без DOM
+        // эвристики без DOM — для обоих режимов
         if (substr_count(mb_strtolower($html), '</html>') > 1) {
             $push('error', 'Несколько закрывающих тегов </html>');
         }
@@ -320,8 +332,51 @@ class SiteAuditHtmlParser
             $push('error', 'Незакрытый HTML-комментарий <!--');
         }
 
+        $fallback = false;
+        $effective = SiteAuditHtmlChecker::LIBXML;
+
+        if ($checker === SiteAuditHtmlChecker::HTML5) {
+            $vnu = new SiteAuditVnuClient();
+            $result = $vnu->validate($html);
+            if (! empty($result['ok'])) {
+                $effective = SiteAuditHtmlChecker::HTML5;
+                foreach ($result['errors'] as $err) {
+                    $push(
+                        (string) ($err['level'] ?? 'error'),
+                        (string) ($err['message'] ?? ''),
+                        isset($err['line']) ? (int) $err['line'] : null
+                    );
+                    if (count($out) >= 10) {
+                        break;
+                    }
+                }
+
+                return [
+                    'errors' => array_slice($out, 0, 10),
+                    'checker' => $effective,
+                    'fallback' => false,
+                ];
+            }
+            $fallback = true;
+        }
+
+        $this->collectLibxmlHtmlErrors($html, $push, $out);
+
+        return [
+            'errors' => array_slice($out, 0, 10),
+            'checker' => $effective,
+            'fallback' => $fallback,
+        ];
+    }
+
+    /**
+     * @param callable(string,string,?int):void $push
+     * @param list<array{line:?int,level:string,message:string}> $out
+     */
+    private function collectLibxmlHtmlErrors(string $html, callable $push, array &$out): void
+    {
         if (! class_exists(\DOMDocument::class)) {
-            return array_slice($out, 0, 10);
+            return;
         }
 
         $prev = libxml_use_internal_errors(true);
@@ -334,11 +389,21 @@ class SiteAuditHtmlParser
                 continue;
             }
             $msg = trim($err->message);
-            // шум HTML5 / entities
+            // шум HTML5 / entities: libxml HTML-парсер по таблице HTML4 → «Tag X invalid» на нормальных тегах.
             if (preg_match('/htmlParseEntityRef|htmlParseCharRef|Unexpected end tag : (html|body|head)/i', $msg)) {
                 continue;
             }
-            if (preg_match('/Tag (nav|section|article|header|footer|main|figure|figcaption|aside|svg|path|source|picture|template) invalid/i', $msg)) {
+            if (preg_match(
+                '/Tag ('
+                // semantic HTML5
+                . 'nav|section|article|header|footer|main|figure|figcaption|aside|mark|time|dialog'
+                . '|details|summary|picture|source|template|video|audio|canvas|track|embed|wbr|slot'
+                // SVG root + common children (circle/rect часто на иконках/рейтингах)
+                . '|svg|path|circle|rect|ellipse|line|polyline|polygon|g|defs|use|symbol|clippath|mask'
+                . '|lineargradient|radialgradient|stop|text|tspan|title|desc|foreignobject|view|image|pattern|filter'
+                . ') invalid/i',
+                $msg
+            )) {
                 continue;
             }
             $level = ((int) $err->level >= LIBXML_ERR_FATAL) ? 'fatal' : 'error';
@@ -349,8 +414,6 @@ class SiteAuditHtmlParser
         }
         libxml_clear_errors();
         libxml_use_internal_errors($prev);
-
-        return array_slice($out, 0, 10);
     }
 
     private function metaContents(string $html, string $name): array

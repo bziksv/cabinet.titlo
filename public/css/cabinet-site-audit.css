@@ -8627,3 +8627,57 @@ html.sa-tour-active body {
   padding: 0.35rem 0;
 }
 
+/* Выбор чекера HTML (libxml / Nu) на форме запуска */
+.cabinet-sa-html-checker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+@media (max-width: 575.98px) {
+  .cabinet-sa-html-checker { grid-template-columns: 1fr; }
+}
+.cabinet-sa-html-checker__opt {
+  display: block;
+  margin: 0;
+  cursor: pointer;
+}
+.cabinet-sa-html-checker__opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.cabinet-sa-html-checker__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  min-height: 100%;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.cabinet-sa-html-checker__opt input:checked + .cabinet-sa-html-checker__card {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+.cabinet-sa-html-checker__opt input:focus-visible + .cabinet-sa-html-checker__card {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+.cabinet-sa-html-checker__opt.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.cabinet-sa-html-checker__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+.cabinet-sa-html-checker__note {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+

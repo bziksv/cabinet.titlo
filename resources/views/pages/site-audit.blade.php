@@ -737,6 +737,10 @@
                             pages_only: pagesOnlyEl && pagesOnlyEl.checked ? '1' : '0',
                             extra_hosts: (document.getElementById('sa-extra-hosts') || {}).value || '',
                             virtual_robots: document.getElementById('sa-robots').value,
+                            html_checker: (function () {
+                                var el = document.querySelector('input[name="html_checker"]:checked');
+                                return el && el.value ? el.value : 'libxml';
+                            })(),
                             crawl_speed: document.getElementById('sa-speed').value,
                             concurrency: concurrency,
                             unify_www: true,

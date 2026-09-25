@@ -77,6 +77,9 @@
                     $speed = (string) ($s['crawl_speed'] ?? '—');
                     $rps = isset($s['rps']) ? (float) $s['rps'] : null;
                     $pagesOnly = ! empty($s['pages_only']);
+                    $htmlChecker = ! empty($s['html_checker'])
+                        ? \App\Services\SiteAudit\SiteAuditHtmlChecker::label((string) $s['html_checker'])
+                        : '';
                     $limitShow = (int) ($c->pages_limit ?: ($s['pages_limit'] ?? 0));
                     $domain = optional($project)->domain ?? '—';
                     $teamId = (int) (optional($project)->team_id ?? 0);
@@ -141,6 +144,9 @@
                         </div>
                         <div class="cabinet-sa-ht-crawl__meta" data-sa-settings>
                             <span>{{ $concurrency }}× {{ $speed }}@if($rpsLabel) · {{ $rpsLabel }}/с@endif</span>
+                            @if($htmlChecker !== '')
+                                <span>· {{ $htmlChecker }}</span>
+                            @endif
                             @if($limitShow > 0)
                                 <span>· лимит {{ number_format($limitShow, 0, '', ' ') }}</span>
                             @endif
