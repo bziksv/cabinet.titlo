@@ -421,34 +421,37 @@ class SiteAuditIgnoreService
         }
 
         $codes = array_keys($urlLevelCodes);
+        // Важно: идём от ignores/notes (тысячи), а не от findings (миллионы).
+        // EXISTS по site_audit_findings на больших краулах давал 20+ с на /site-audit.
         try {
-            $rows = SiteAuditFinding::query()
-                ->from('site_audit_findings as f')
-                ->join('site_audit_crawls as c', 'c.id', '=', 'f.crawl_id')
-                ->whereIn('f.crawl_id', $crawlIds)
-                ->whereIn('f.code', $codes)
-                ->where(function ($q) use ($notesReady) {
-                    $q->whereExists(function ($iq) {
-                        $iq->select(DB::raw(1))
-                            ->from('site_audit_ignores as sai')
-                            ->whereColumn('sai.code', 'f.code')
-                            ->whereColumn('sai.project_id', 'c.project_id')
-                            ->whereColumn('sai.url_hash', 'f.url_hash')
-                            ->where('sai.url_hash', '!=', '')
-                            ->where('sai.url_hash', 'not like', self::PATTERN_HASH_PREFIX . '%');
-                    });
-                    if ($notesReady) {
-                        $q->orWhereExists(function ($nq) {
-                            $nq->select(DB::raw(1))
-                                ->from('site_audit_finding_notes as san')
-                                ->whereColumn('san.code', 'f.code')
-                                ->whereColumn('san.url_hash', 'f.url_hash')
-                                ->whereColumn('san.project_id', 'c.project_id')
-                                ->where('san.status', SiteAuditFindingNote::STATUS_FIXED)
-                                ->where('san.url_hash', '!=', '')
-                                ->where('san.url_hash', 'not like', self::PATTERN_HASH_PREFIX . '%');
-                        });
-                    }
+            $ignorePairs = DB::table('site_audit_ignores')
+                ->whereIn('project_id', $projectIds)
+                ->whereIn('code', $codes)
+                ->where('url_hash', '!=', '')
+                ->where('url_hash', 'not like', self::PATTERN_HASH_PREFIX . '%')
+                ->select('project_id', 'code', 'url_hash');
+
+            if ($notesReady) {
+                $notePairs = DB::table('site_audit_finding_notes')
+                    ->whereIn('project_id', $projectIds)
+                    ->whereIn('code', $codes)
+                    ->where('status', SiteAuditFindingNote::STATUS_FIXED)
+                    ->where('url_hash', '!=', '')
+                    ->where('url_hash', 'not like', self::PATTERN_HASH_PREFIX . '%')
+                    ->select('project_id', 'code', 'url_hash');
+                $ignorePairs = $ignorePairs->union($notePairs);
+            }
+
+            $rows = DB::query()
+                ->fromSub($ignorePairs, 'p')
+                ->join('site_audit_crawls as c', function ($j) use ($crawlIds) {
+                    $j->on('c.project_id', '=', 'p.project_id')
+                        ->whereIn('c.id', $crawlIds);
+                })
+                ->join('site_audit_findings as f', function ($j) {
+                    $j->on('f.crawl_id', '=', 'c.id')
+                        ->on('f.code', '=', 'p.code')
+                        ->on('f.url_hash', '=', 'p.url_hash');
                 })
                 ->select('f.crawl_id', 'f.severity', DB::raw('COUNT(DISTINCT f.id) as c'))
                 ->groupBy('f.crawl_id', 'f.severity')
