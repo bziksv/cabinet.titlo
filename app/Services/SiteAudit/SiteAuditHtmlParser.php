@@ -150,8 +150,9 @@ class SiteAuditHtmlParser
         $mixedSamples = $isHttps ? $this->collectMixedContentSamples($html) : [];
 
         $insecureForms = $isHttps ? $this->insecureFormActions($html) : [];
-        $htmlErrorsBag = $this->collectHtmlErrors($html, $htmlChecker);
+        $htmlErrorsBag = $this->collectHtmlErrors($html, $htmlChecker, $options);
         $htmlErrors = $htmlErrorsBag['errors'];
+
         $htmlCheckerEffective = $htmlErrorsBag['checker'];
         $htmlCheckerFallback = ! empty($htmlErrorsBag['fallback']);
         $headingOutline = $this->headingOutline($markup);
@@ -292,13 +293,14 @@ class SiteAuditHtmlParser
     /**
      * Критические ошибки разметки: эвристики + libxml или Nu (vnu).
      *
+     * @param array{vnu_precomputed?:array{ok?:bool,errors?:list,error?:?string}} $options
      * @return array{
      *   errors:list<array{line:?int,level:string,message:string}>,
      *   checker:string,
      *   fallback:bool
      * }
      */
-    private function collectHtmlErrors(string $html, string $checker): array
+    private function collectHtmlErrors(string $html, string $checker, array $options = []): array
     {
         $out = [];
         $push = function (string $level, string $message, ?int $line = null) use (&$out) {
@@ -336,11 +338,21 @@ class SiteAuditHtmlParser
         $effective = SiteAuditHtmlChecker::LIBXML;
 
         if ($checker === SiteAuditHtmlChecker::HTML5) {
-            $vnu = new SiteAuditVnuClient();
-            $result = $vnu->validate($html);
+            if (isset($options['vnu_precomputed']) && is_array($options['vnu_precomputed'])) {
+                $result = $options['vnu_precomputed'];
+            } else {
+                $vnu = new SiteAuditVnuClient();
+                $result = $vnu->validate($html);
+            }
             if (! empty($result['ok'])) {
                 $effective = SiteAuditHtmlChecker::HTML5;
-                foreach ($result['errors'] as $err) {
+                $vnuErrors = isset($result['errors']) && is_array($result['errors'])
+                    ? $result['errors']
+                    : [];
+                foreach ($vnuErrors as $err) {
+                    if (! is_array($err)) {
+                        continue;
+                    }
                     $push(
                         (string) ($err['level'] ?? 'error'),
                         (string) ($err['message'] ?? ''),

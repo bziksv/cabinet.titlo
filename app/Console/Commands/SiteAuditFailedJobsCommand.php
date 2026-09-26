@@ -28,6 +28,7 @@ class SiteAuditFailedJobsCommand extends Command
 
         $limit = max(1, min(100, (int) $this->option('limit')));
         $queue = (string) config('site_audit.queue', 'site_audit');
+        $aggregateQueue = (string) config('site_audit.aggregate_queue', 'site_audit_aggregate');
 
         $rows = DB::table('failed_jobs')
             ->select([
@@ -37,8 +38,9 @@ class SiteAuditFailedJobsCommand extends Command
                 DB::raw('LEFT(exception, 300) as exception_clip'),
                 DB::raw("LEFT(payload, 400) as payload_clip"),
             ])
-            ->where(function ($q) use ($queue) {
+            ->where(function ($q) use ($queue, $aggregateQueue) {
                 $q->where('queue', $queue)
+                    ->orWhere('queue', $aggregateQueue)
                     ->orWhere('payload', 'like', '%SiteAudit%')
                     ->orWhere('payload', 'like', '%site_audit%');
             })
@@ -60,6 +62,7 @@ class SiteAuditFailedJobsCommand extends Command
         if ($this->option('json')) {
             $this->line(json_encode([
                 'queue' => $queue,
+                'aggregate_queue' => $aggregateQueue,
                 'count' => count($matched),
                 'items' => $matched,
             ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));

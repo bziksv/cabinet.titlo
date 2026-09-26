@@ -55,6 +55,7 @@ return [
         'cabinet-titlo-competitor-analyse' => ['label' => 'Competitor analysis', 'route' => 'competitor.analysis'],
         'cabinet-titlo-ai-generation' => ['label' => 'Supervisor module ai generation', 'route' => 'ai.generation.story'],
         'cabinet-titlo-site-audit' => ['label' => 'Site audit', 'route' => 'pages.site-audit'],
+        'cabinet-titlo-site-audit-aggregate' => ['label' => 'Site audit (aggregate)', 'route' => 'pages.site-audit'],
         'cabinet-titlo-websockets' => ['label' => 'Supervisor module websockets', 'route' => null],
     ],
 
@@ -119,6 +120,10 @@ return [
             'queues' => ['site_audit'],
             'numprocs_lk' => 3,
         ],
+        'cabinet-titlo-site-audit-aggregate' => [
+            'queues' => ['site_audit_aggregate'],
+            'numprocs_lk' => 2,
+        ],
         'cabinet-titlo-websockets' => [
             'queues' => [],
             'numprocs_lk' => 1,
@@ -140,6 +145,8 @@ return [
         'cabinet-titlo-monitoring-competitors-stat' => 'storage/logs/supervisor-monitoring-competitors-stat.log',
         'cabinet-titlo-competitor-analyse' => 'storage/logs/supervisor-competitor-analyse.log',
         'cabinet-titlo-ai-generation' => 'storage/logs/supervisor-ai-generation.log',
+        'cabinet-titlo-site-audit' => 'storage/logs/supervisor-site-audit.log',
+        'cabinet-titlo-site-audit-aggregate' => 'storage/logs/supervisor-site-audit-aggregate.log',
         'cabinet-titlo-websockets' => 'storage/logs/supervisor-websockets.log',
     ],
 ];

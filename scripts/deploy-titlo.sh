@@ -52,6 +52,7 @@ SUPERVISOR_GROUPS=(
   cabinet-titlo-competitor-analyse
   cabinet-titlo-ai-generation
   cabinet-titlo-site-audit
+  cabinet-titlo-site-audit-aggregate
 )
 
 for group in "${SUPERVISOR_GROUPS[@]}"; do

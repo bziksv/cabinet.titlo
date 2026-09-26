@@ -86,7 +86,7 @@ class SiteAuditPageProcessor
     }
 
     /**
-     * Параллельный fetch + последовательный parse.
+     * Параллельный fetch + (при html5) параллельный vnu, затем parse.
      *
      * @param string[] $urls
      * @param array<string, array{via?:string,from?:?string}> $originsByUrl
@@ -113,6 +113,8 @@ class SiteAuditPageProcessor
             SiteAuditHostThrottle::wait($projectHost, $hostRps);
         });
 
+        $vnuByIndex = $this->prevalidateHtml5Wave($fetched, $urls, $crawlSettings, $concurrency);
+
         $outs = [];
         foreach ($urls as $i => $url) {
             $result = $fetched[$i] ?? [
@@ -134,12 +136,16 @@ class SiteAuditPageProcessor
                 $discovery = isset($originsByUrl[$url]) && is_array($originsByUrl[$url])
                     ? $originsByUrl[$url]
                     : null;
+                $settings = $crawlSettings;
+                if (isset($vnuByIndex[$i]) && is_array($vnuByIndex[$i])) {
+                    $settings['vnu_precomputed'] = $vnuByIndex[$i];
+                }
                 $outs[] = $this->processFetchedResult(
                     $crawlId,
                     $url,
                     $result,
                     $projectHost,
-                    $crawlSettings,
+                    $settings,
                     $discovery
                 );
             } catch (\Throwable $e) {
@@ -148,6 +154,59 @@ class SiteAuditPageProcessor
         }
 
         return $outs;
+    }
+
+    /**
+     * Параллельный vnu для HTML-кандидатов волны (только html5 + сконфигурированный vnu).
+     *
+     * @param array<int, array> $fetched
+     * @param string[] $urls
+     * @return array<int, array{ok:bool,errors:list,error:?string}>
+     */
+    private function prevalidateHtml5Wave(
+        array $fetched,
+        array $urls,
+        array $crawlSettings,
+        int $concurrency
+    ): array {
+        $checker = SiteAuditHtmlChecker::normalize(
+            $crawlSettings['html_checker'] ?? SiteAuditHtmlChecker::defaultChecker()
+        );
+        if ($checker !== SiteAuditHtmlChecker::HTML5 || ! SiteAuditHtmlChecker::vnuEnabled()) {
+            return [];
+        }
+
+        $htmlByIndex = [];
+        foreach ($urls as $i => $url) {
+            $result = $fetched[$i] ?? null;
+            if (! is_array($result) || empty($result['ok'])) {
+                continue;
+            }
+            $code = (int) ($result['status_code'] ?? 0);
+            if ($code < 200 || $code >= 400) {
+                continue;
+            }
+            if (! SiteAuditUrlNormalizer::isHtmlDocument($result['content_type'] ?? null, $url)) {
+                continue;
+            }
+            $body = SiteAuditBodyTemp::takeBody($result);
+            if ($body === null || $body === '') {
+                continue;
+            }
+            $htmlByIndex[$i] = $body;
+        }
+
+        if ($htmlByIndex === []) {
+            return [];
+        }
+
+        $vnuConc = (int) config('site_audit.vnu_concurrency', 0);
+        if ($vnuConc <= 0) {
+            $vnuConc = $concurrency;
+        }
+        $vnuConc = max(1, min($concurrency, $vnuConc));
+
+        return (new SiteAuditVnuClient())->validateMany($htmlByIndex, $vnuConc);
     }
 
     private static function discoveredColumnsReady(): bool
@@ -368,10 +427,14 @@ class SiteAuditPageProcessor
 
             $isHtml = SiteAuditUrlNormalizer::isHtmlDocument($result['content_type'] ?? null, $url);
             if ($isHtml && $code >= 200 && $code < 400) {
-                $parsed = $this->parser->parse($body, $result['final_url'] ?: $url, [
+                $parseOpts = [
                     'html_checker' => $crawlSettings['html_checker']
                         ?? SiteAuditHtmlChecker::defaultChecker(),
-                ]);
+                ];
+                if (isset($crawlSettings['vnu_precomputed']) && is_array($crawlSettings['vnu_precomputed'])) {
+                    $parseOpts['vnu_precomputed'] = $crawlSettings['vnu_precomputed'];
+                }
+                $parsed = $this->parser->parse($body, $result['final_url'] ?: $url, $parseOpts);
                 $pageData['title'] = $parsed['title'];
                 $pageData['title_hash'] = $parsed['title'] ? hash('sha256', mb_strtolower($parsed['title'])) : null;
                 $pageData['description'] = $parsed['description'];

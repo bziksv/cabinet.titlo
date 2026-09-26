@@ -11,6 +11,10 @@ return [
     */
     // local + remote MySQL: не класть jobs в общий site_audit — prod съест тик без локального crawl_N.json.
     'queue' => env('SITE_AUDIT_QUEUE') ?: (env('APP_ENV') === 'local' ? 'site_audit_local' : 'site_audit'),
+    // Тяжёлая агрегация отдельно — иначе Aggregate* занимает воркеры и тормозит fetch.
+    'aggregate_queue' => env('SITE_AUDIT_AGGREGATE_QUEUE')
+        ?: (env('APP_ENV') === 'local' ? 'site_audit_aggregate_local' : 'site_audit_aggregate'),
+
     'user_agent' => env('SITE_AUDIT_UA', 'TitloSiteAuditBot/1.0 (+https://titlo.ru)'),
     // Повтор внешней проверки без слова Bot в UA — иначе WAF рвёт TLS (пример: almamed.su).
     'link_check_browser_ua' => env(
@@ -99,6 +103,9 @@ return [
     'vnu_connect_timeout' => (float) env('SITE_AUDIT_VNU_CONNECT_TIMEOUT', 2),
     'vnu_max_bytes' => (int) env('SITE_AUDIT_VNU_MAX_BYTES', 1_500_000),
     'vnu_sample_max' => (int) env('SITE_AUDIT_VNU_SAMPLE_MAX', 10),
+    // Параллельные POST к vnu внутри волны. 0 = как concurrency краула.
+    'vnu_concurrency' => (int) env('SITE_AUDIT_VNU_CONCURRENCY', 0),
+
     'lost_file_head_max' => (int) env('SITE_AUDIT_LOST_FILE_HEAD_MAX', 40),
     'lost_file_max_findings' => (int) env('SITE_AUDIT_LOST_FILE_MAX', 80),
     'error_spike_min_count' => (int) env('SITE_AUDIT_ERROR_SPIKE_MIN', 5),

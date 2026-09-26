@@ -33,7 +33,7 @@ class AggregateSiteAuditCrawlJob implements ShouldQueue
     public function __construct(int $crawlId)
     {
         $this->crawlId = $crawlId;
-        $this->onQueue(config('site_audit.queue', 'site_audit'));
+        $this->onQueue(config('site_audit.aggregate_queue', 'site_audit_aggregate'));
         $this->timeout = max(300, (int) config('site_audit.aggregate_job_timeout', 600));
     }
 

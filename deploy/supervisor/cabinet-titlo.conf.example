@@ -209,6 +209,20 @@ stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/
 stdout_logfile_maxbytes=20MB
 stderr_logfile_maxbytes=20MB
 
+[program:cabinet-titlo-site-audit-aggregate]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=site_audit_aggregate --sleep=1 --tries=2 --timeout=3600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=2
+autostart=true
+autorestart=true
+stopwaitsecs=3660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-site-audit-aggregate.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-site-audit-aggregate.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
 [program:cabinet-titlo-websockets]
 process_name=%(program_name)s_%(process_num)02d
 command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan websockets:serve --host=127.0.0.1 --port=6001
