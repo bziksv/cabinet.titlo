@@ -118,7 +118,7 @@ class SiteAuditController extends Controller
 
             $crawlSizes = SiteAuditCrawlStorage::payloadBytesByCrawlIds($crawls->pluck('id')->all());
             $crawlHiddenBuckets = (new SiteAuditIgnoreService())
-                ->hiddenBucketsByCrawlIds($crawls->pluck('id')->all());
+                ->hiddenBucketsByCrawlIds($crawls->pluck('id')->all(), false);
 
             if (! $isHistoryPartial) {
                 $projectsQuery = SiteAuditProject::query()

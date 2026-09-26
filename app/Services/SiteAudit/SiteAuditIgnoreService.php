@@ -292,7 +292,15 @@ class SiteAuditIgnoreService
      * @param  array<int>  $crawlIds
      * @return array<int, array{critical:int,other:int,important:int,warning:int,info:int}>
      */
-    public function hiddenBucketsByCrawlIds(array $crawlIds): array
+    /**
+     * Сколько findings «скрыто» игнором/«исправлено» по бакетам severity — для списка краулов.
+     *
+     * @param  list<int>  $crawlIds
+     * @param  bool  $includeUrlLevel  URL-level ignores требуют join к findings;
+     *                                 на /site-audit (20 краулов) выключаем — иначе 10–20 с.
+     * @return array<int, array{critical:int,other:int,important:int,warning:int,info:int}>
+     */
+    public function hiddenBucketsByCrawlIds(array $crawlIds, bool $includeUrlLevel = true): array
     {
         $crawlIds = array_values(array_unique(array_filter(array_map('intval', $crawlIds))));
         $empty = [
@@ -320,10 +328,13 @@ class SiteAuditIgnoreService
         }
 
         $projectIds = [];
+        $crawlProject = [];
         foreach ($crawlRows as $row) {
             $pid = (int) ($row->project_id ?? 0);
+            $cid = (int) $row->id;
             if ($pid > 0) {
                 $projectIds[$pid] = $pid;
+                $crawlProject[$cid] = $pid;
             }
         }
         $projectIds = array_values($projectIds);
@@ -349,7 +360,9 @@ class SiteAuditIgnoreService
         }
 
         $codeWide = []; // project_id => [code => true]
-        $urlLevelCodes = []; // code => true (нужен scan findings)
+        $urlPairs = []; // "pid|code|hash" => true
+        $urlHashes = [];
+        $urlCodes = [];
         foreach ($ignores as $ig) {
             $hash = (string) ($ig->url_hash ?? '');
             if (self::isPatternUrlHash($hash)) {
@@ -363,7 +376,9 @@ class SiteAuditIgnoreService
             if ($hash === '') {
                 $codeWide[$pid][$code] = true;
             } else {
-                $urlLevelCodes[$code] = true;
+                $urlPairs[$pid . '|' . $code . '|' . $hash] = true;
+                $urlHashes[$hash] = true;
+                $urlCodes[$code] = true;
             }
         }
         foreach ($notes as $note) {
@@ -372,12 +387,16 @@ class SiteAuditIgnoreService
                 continue;
             }
             $code = (string) $note->code;
-            if ($code !== '') {
-                $urlLevelCodes[$code] = true;
+            if ($code === '') {
+                continue;
             }
+            $pid = (int) $note->project_id;
+            $urlPairs[$pid . '|' . $code . '|' . $hash] = true;
+            $urlHashes[$hash] = true;
+            $urlCodes[$code] = true;
         }
 
-        if ($codeWide === [] && $urlLevelCodes === []) {
+        if ($codeWide === [] && $urlPairs === []) {
             return $out;
         }
 
@@ -416,57 +435,33 @@ class SiteAuditIgnoreService
             }
         }
 
-        if ($urlLevelCodes === []) {
+        if (! $includeUrlLevel || $urlPairs === []) {
             return $out;
         }
 
-        $codes = array_keys($urlLevelCodes);
-        // Важно: идём от ignores/notes (тысячи), а не от findings (миллионы).
-        // EXISTS по site_audit_findings на больших краулах давал 20+ с на /site-audit.
+        // Lookup по url_hash (индекс), без EXISTS на всю таблицу findings.
         try {
-            $ignorePairs = DB::table('site_audit_ignores')
-                ->whereIn('project_id', $projectIds)
-                ->whereIn('code', $codes)
-                ->where('url_hash', '!=', '')
-                ->where('url_hash', 'not like', self::PATTERN_HASH_PREFIX . '%')
-                ->select('project_id', 'code', 'url_hash');
-
-            if ($notesReady) {
-                $notePairs = DB::table('site_audit_finding_notes')
-                    ->whereIn('project_id', $projectIds)
-                    ->whereIn('code', $codes)
-                    ->where('status', SiteAuditFindingNote::STATUS_FIXED)
-                    ->where('url_hash', '!=', '')
-                    ->where('url_hash', 'not like', self::PATTERN_HASH_PREFIX . '%')
-                    ->select('project_id', 'code', 'url_hash');
-                $ignorePairs = $ignorePairs->union($notePairs);
-            }
-
-            $rows = DB::query()
-                ->fromSub($ignorePairs, 'p')
-                ->join('site_audit_crawls as c', function ($j) use ($crawlIds) {
-                    $j->on('c.project_id', '=', 'p.project_id')
-                        ->whereIn('c.id', $crawlIds);
-                })
-                ->join('site_audit_findings as f', function ($j) {
-                    $j->on('f.crawl_id', '=', 'c.id')
-                        ->on('f.code', '=', 'p.code')
-                        ->on('f.url_hash', '=', 'p.url_hash');
-                })
-                ->select('f.crawl_id', 'f.severity', DB::raw('COUNT(DISTINCT f.id) as c'))
-                ->groupBy('f.crawl_id', 'f.severity')
-                ->get();
+            $rows = DB::table('site_audit_findings')
+                ->whereIn('crawl_id', $crawlIds)
+                ->whereIn('code', array_keys($urlCodes))
+                ->whereIn('url_hash', array_keys($urlHashes))
+                ->get(['crawl_id', 'code', 'url_hash', 'severity']);
         } catch (\Throwable $e) {
             return $out;
         }
 
         foreach ($rows as $row) {
             $cid = (int) $row->crawl_id;
+            $pid = $crawlProject[$cid] ?? 0;
+            $key = $pid . '|' . $row->code . '|' . $row->url_hash;
+            if (! isset($urlPairs[$key])) {
+                continue;
+            }
             $sev = (string) $row->severity;
             if (! isset($out[$cid][$sev])) {
                 continue;
             }
-            $out[$cid][$sev] += (int) $row->c;
+            $out[$cid][$sev]++;
         }
 
         return $out;
