@@ -41,12 +41,13 @@ class AggregateSiteAuditCrawlJob implements ShouldQueue
     {
         $lockKey = 'site_audit_aggregate_' . $this->crawlId;
         $lockTtl = max(
-            180,
+            (int) $this->timeout + 60,
             (int) config('site_audit.aggregate_tick_seconds', 150) + 180
         );
         if (! Cache::add($lockKey, 1, $lockTtl)) {
-            self::dispatch($this->crawlId)->delay(now()->addSeconds(20));
-
+            // Другой тик уже работает. Не dispatch'ить «подождать» — иначе
+            // при долгом stage (85k URL) очередь забивается Aggregate* и голодает fetch.
+            // Оборванный holder снимет kickStuckActive / reclaimStale.
             return;
         }
 

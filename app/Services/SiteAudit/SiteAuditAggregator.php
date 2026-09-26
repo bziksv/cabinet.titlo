@@ -289,8 +289,10 @@ class SiteAuditAggregator
 
                 return $more;
             case 'url_param_risks':
-                $this->emitUrlParamRisks($crawl->id);
-                break;
+                $more = $this->emitUrlParamRisks($crawl->id, $meta, $deadline);
+                $state['meta'] = $meta;
+
+                return $more;
             case 'broken_links':
                 $more = $this->emitBrokenLinks($crawl, $meta, $deadline);
                 $state['meta'] = $meta;
@@ -1366,8 +1368,11 @@ class SiteAuditAggregator
 
     /**
      * Рисковые session/sort params и пагинация/facets в URL.
+     * Крупные краулы — по after_id и дедлайну тика (иначе 85k URL блокируют воркеры).
+     *
+     * @return bool true — нужен ещё тик на том же stage
      */
-    private function emitUrlParamRisks(int $crawlId): void
+    private function emitUrlParamRisks(int $crawlId, array &$meta = [], ?float $deadline = null): bool
     {
         $riskyKeys = config('site_audit.risky_query_keys', [
             'phpsessid', 'sid', 'sessionid', 'session_id', 'jsessionid',
@@ -1396,89 +1401,104 @@ class SiteAuditAggregator
 
         $maxRisky = (int) config('site_audit.risky_query_max', 300);
         $maxPag = (int) config('site_audit.pagination_param_max', 300);
-        $emittedRisky = 0;
-        $emittedPag = 0;
+        $chunkSize = max(50, (int) config('site_audit.aggregate_from_pages_chunk', 200));
+        $afterId = (int) ($meta['after_id'] ?? 0);
+        $emittedRisky = (int) ($meta['emitted_risky'] ?? 0);
+        $emittedPag = (int) ($meta['emitted_pag'] ?? 0);
 
-        SiteAuditPage::query()
-            ->where('crawl_id', $crawlId)
-            ->orderBy('id')
-            ->chunkById(200, function ($pages) use (
-                $crawlId,
-                $riskyKeys,
-                $paginationKeys,
-                $facetKeys,
-                $maxRisky,
-                $maxPag,
-                &$emittedRisky,
-                &$emittedPag
-            ) {
-                foreach ($pages as $page) {
-                    $code = (int) ($page->status_code ?? 0);
-                    // 4xx/5xx /missing/page-2/ и т.п. — не «пагинация в индексе».
-                    if ($code > 0 && ($code < 200 || $code >= 400)) {
-                        continue;
-                    }
+        while ($emittedRisky < $maxRisky || $emittedPag < $maxPag) {
+            $pages = SiteAuditPage::query()
+                ->where('crawl_id', $crawlId)
+                ->where('id', '>', $afterId)
+                ->orderBy('id')
+                ->limit($chunkSize)
+                ->get(['id', 'url', 'url_hash', 'status_code']);
 
-                    $query = parse_url($page->url, PHP_URL_QUERY);
-                    $path = (string) (parse_url($page->url, PHP_URL_PATH) ?: '');
-                    $params = [];
-                    if (is_string($query) && $query !== '') {
-                        parse_str($query, $params);
-                    }
-                    $keys = array_map('strtolower', array_keys($params));
+            if ($pages->isEmpty()) {
+                $meta['after_id'] = $afterId;
+                $meta['emitted_risky'] = $emittedRisky;
+                $meta['emitted_pag'] = $emittedPag;
 
-                    if ($emittedRisky < $maxRisky) {
-                        $hit = array_values(array_intersect($keys, $riskyKeys));
-                        $manyKeys = count($keys) >= (int) config('site_audit.risky_query_key_count', 8);
-                        $longQuery = is_string($query) && strlen($query) >= (int) config('site_audit.risky_query_len', 120);
-                        if ($hit !== [] || $manyKeys || $longQuery) {
-                            $cfg = config('site_audit.findings.risky_query_params', []);
-                            SiteAuditFinding::query()->create([
-                                'crawl_id' => $crawlId,
-                                'code' => 'risky_query_params',
-                                'severity' => $cfg['severity'] ?? 'warning',
-                                'url' => $page->url,
-                                'url_hash' => $page->url_hash,
-                                'meta_json' => [
-                                    'keys' => $hit,
-                                    'key_count' => count($keys),
-                                    'query_len' => is_string($query) ? strlen($query) : 0,
-                                    'many_keys' => $manyKeys,
-                                    'long_query' => $longQuery,
-                                ],
-                            ]);
-                            $emittedRisky++;
-                        }
-                    }
+                return false;
+            }
 
-                    if ($emittedPag < $maxPag) {
-                        $pagHit = array_values(array_intersect($keys, $paginationKeys));
-                        $facetHit = array_values(array_intersect($keys, $facetKeys));
-                        $pathPag = (bool) preg_match('#/(?:page|pagen)/\d+(?:/|$|\?)#i', $path)
-                            || (bool) preg_match('#/page-\d+(?:/|$|\?)#i', $path);
-                        if ($pagHit !== [] || $facetHit !== [] || $pathPag) {
-                            $cfg = config('site_audit.findings.pagination_param', []);
-                            SiteAuditFinding::query()->create([
-                                'crawl_id' => $crawlId,
-                                'code' => 'pagination_param',
-                                'severity' => $cfg['severity'] ?? 'info',
-                                'url' => $page->url,
-                                'url_hash' => $page->url_hash,
-                                'meta_json' => [
-                                    'pagination_keys' => $pagHit,
-                                    'facet_keys' => $facetHit,
-                                    'path_pagination' => $pathPag,
-                                ],
-                            ]);
-                            $emittedPag++;
-                        }
-                    }
+            foreach ($pages as $page) {
+                $afterId = (int) $page->id;
+                $code = (int) ($page->status_code ?? 0);
+                // 4xx/5xx /missing/page-2/ и т.п. — не «пагинация в индексе».
+                if ($code > 0 && ($code < 200 || $code >= 400)) {
+                    continue;
+                }
 
-                    if ($emittedRisky >= $maxRisky && $emittedPag >= $maxPag) {
-                        return false;
+                $query = parse_url($page->url, PHP_URL_QUERY);
+                $path = (string) (parse_url($page->url, PHP_URL_PATH) ?: '');
+                $params = [];
+                if (is_string($query) && $query !== '') {
+                    parse_str($query, $params);
+                }
+                $keys = array_map('strtolower', array_keys($params));
+
+                if ($emittedRisky < $maxRisky) {
+                    $hit = array_values(array_intersect($keys, $riskyKeys));
+                    $manyKeys = count($keys) >= (int) config('site_audit.risky_query_key_count', 8);
+                    $longQuery = is_string($query) && strlen($query) >= (int) config('site_audit.risky_query_len', 120);
+                    if ($hit !== [] || $manyKeys || $longQuery) {
+                        $cfg = config('site_audit.findings.risky_query_params', []);
+                        SiteAuditFinding::query()->create([
+                            'crawl_id' => $crawlId,
+                            'code' => 'risky_query_params',
+                            'severity' => $cfg['severity'] ?? 'warning',
+                            'url' => $page->url,
+                            'url_hash' => $page->url_hash,
+                            'meta_json' => [
+                                'keys' => $hit,
+                                'key_count' => count($keys),
+                                'query_len' => is_string($query) ? strlen($query) : 0,
+                                'many_keys' => $manyKeys,
+                                'long_query' => $longQuery,
+                            ],
+                        ]);
+                        $emittedRisky++;
                     }
                 }
-            });
+
+                if ($emittedPag < $maxPag) {
+                    $pagHit = array_values(array_intersect($keys, $paginationKeys));
+                    $facetHit = array_values(array_intersect($keys, $facetKeys));
+                    $pathPag = (bool) preg_match('#/(?:page|pagen)/\d+(?:/|$|\?)#i', $path)
+                        || (bool) preg_match('#/page-\d+(?:/|$|\?)#i', $path);
+                    if ($pagHit !== [] || $facetHit !== [] || $pathPag) {
+                        $cfg = config('site_audit.findings.pagination_param', []);
+                        SiteAuditFinding::query()->create([
+                            'crawl_id' => $crawlId,
+                            'code' => 'pagination_param',
+                            'severity' => $cfg['severity'] ?? 'info',
+                            'url' => $page->url,
+                            'url_hash' => $page->url_hash,
+                            'meta_json' => [
+                                'pagination_keys' => $pagHit,
+                                'facet_keys' => $facetHit,
+                                'path_pagination' => $pathPag,
+                            ],
+                        ]);
+                        $emittedPag++;
+                    }
+                }
+            }
+
+            $meta['after_id'] = $afterId;
+            $meta['emitted_risky'] = $emittedRisky;
+            $meta['emitted_pag'] = $emittedPag;
+
+            if ($emittedRisky >= $maxRisky && $emittedPag >= $maxPag) {
+                return false;
+            }
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function emitDuplicateUrlVariants(int $crawlId): void
