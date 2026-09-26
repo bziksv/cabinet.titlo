@@ -1735,8 +1735,38 @@ class SiteAuditController extends Controller
         $counts = (new SiteAuditIgnoreService())->applyToCounts($counts, $crawl);
         $counts = (new SiteAuditFindingNoteService())->applyFixedToCounts($counts, $crawl);
 
+        $liveCountsMax = max(500, (int) config('site_audit.live_counts_max_pages', 3000));
+        $heavyLive = ! $crawl->isFinished() && (int) $crawl->pages_fetched >= $liveCountsMax;
+
         $buckets = is_array($crawl->buckets_json) ? $crawl->buckets_json : [];
-        if ($buckets === [] || ! $crawl->isFinished()) {
+        if ($crawl->isFinished()) {
+            if ($buckets === []) {
+                $buckets = $this->bucketsFromTree($this->buildReportTree($counts, null));
+            }
+        } elseif ($heavyLive) {
+            // Крупный скан: не GROUP BY code на каждый poll — берём снимок severity.
+            if ($crawl->bucketsAreEmpty()) {
+                $lockKey = 'site_audit_bucket_snap_poll_' . $crawl->id;
+                if (\Illuminate\Support\Facades\Cache::add($lockKey, 1, 45)) {
+                    try {
+                        $crawl->maybeRefreshBucketSnapshot(true);
+                        $crawl->refresh();
+                    } catch (\Throwable $e) {
+                        // оставляем нули до следующего тика Continue
+                    }
+                    $buckets = is_array($crawl->buckets_json) ? $crawl->buckets_json : [];
+                }
+            }
+            if ($buckets === []) {
+                $buckets = [
+                    'critical' => 0,
+                    'other' => 0,
+                    'important' => 0,
+                    'warning' => 0,
+                    'info' => 0,
+                ];
+            }
+        } else {
             $buckets = $this->bucketsFromTree($this->buildReportTree($counts, null));
         }
 
@@ -3510,9 +3540,10 @@ class SiteAuditController extends Controller
     private function countsForCrawlDisplay(SiteAuditCrawl $crawl): array
     {
         $stored = is_array($crawl->counts_json) ? $crawl->counts_json : [];
-        // Крупные незавершённые краулы: полный GROUP BY findings на каждый poll статуса
-        // кладёт MySQL (сотни тысяч–миллионы строк) и стопорит fetch соседних краулов.
-        $heavyLive = ! $crawl->isFinished() && (int) $crawl->pages_fetched >= 3000;
+        // Крупные незавершённые краулы: полный GROUP BY findings.code на каждый poll
+        // кладёт MySQL. Корзины в истории — из buckets_json (снимки severity пачками).
+        $liveCountsMax = max(500, (int) config('site_audit.live_counts_max_pages', 3000));
+        $heavyLive = ! $crawl->isFinished() && (int) $crawl->pages_fetched >= $liveCountsMax;
         if ($heavyLive) {
             return $stored;
         }

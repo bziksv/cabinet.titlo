@@ -105,6 +105,12 @@ return [
     'vnu_sample_max' => (int) env('SITE_AUDIT_VNU_SAMPLE_MAX', 10),
     // Параллельные POST к vnu внутри волны. 0 = как concurrency краула.
     'vnu_concurrency' => (int) env('SITE_AUDIT_VNU_CONCURRENCY', 0),
+    // Live GROUP BY по code на status-poll — только пока страниц меньше порога.
+    // Дальше UI берёт buckets_json со снимков (severity GROUP BY пачками).
+    'live_counts_max_pages' => (int) env('SITE_AUDIT_LIVE_COUNTS_MAX_PAGES', 3000),
+    // Снимок корзин во время fetch: не чаще чем раз в N страниц и M секунд.
+    'bucket_snapshot_every_pages' => (int) env('SITE_AUDIT_BUCKET_SNAPSHOT_PAGES', 400),
+    'bucket_snapshot_min_seconds' => (int) env('SITE_AUDIT_BUCKET_SNAPSHOT_SEC', 60),
 
     'lost_file_head_max' => (int) env('SITE_AUDIT_LOST_FILE_HEAD_MAX', 40),
     'lost_file_max_findings' => (int) env('SITE_AUDIT_LOST_FILE_MAX', 80),

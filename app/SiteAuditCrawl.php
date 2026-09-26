@@ -282,6 +282,52 @@ class SiteAuditCrawl extends Model
         return $buckets;
     }
 
+    /**
+     * Промежуточный снимок корзин во время скана (лёгкий GROUP BY severity, не по code).
+     * Нужен, когда live counts на poll отключены для крупных краулов.
+     */
+    public function maybeRefreshBucketSnapshot(bool $force = false): bool
+    {
+        if ($this->isFinished()) {
+            return false;
+        }
+        $fetched = (int) $this->pages_fetched;
+        if ($fetched < 1) {
+            return false;
+        }
+
+        $every = max(50, (int) config('site_audit.bucket_snapshot_every_pages', 400));
+        $minSec = max(15, (int) config('site_audit.bucket_snapshot_min_seconds', 60));
+        $progress = is_array($this->progress_json) ? $this->progress_json : [];
+        $snap = isset($progress['bucket_snapshot']) && is_array($progress['bucket_snapshot'])
+            ? $progress['bucket_snapshot']
+            : [];
+        $lastPages = (int) ($snap['pages'] ?? 0);
+        $lastAt = ! empty($snap['at']) ? strtotime((string) $snap['at']) : 0;
+
+        if (! $force) {
+            $pagesDelta = $fetched - $lastPages;
+            $age = $lastAt > 0 ? (time() - $lastAt) : PHP_INT_MAX;
+            // Ждём либо пачку страниц, либо мин. интервал (и хотя бы 1 новая страница).
+            if ($pagesDelta < 1) {
+                return false;
+            }
+            if ($pagesDelta < $every && $age < $minSec) {
+                return false;
+            }
+        }
+
+        $this->refreshBucketsFromFindings(false);
+        $progress['bucket_snapshot'] = [
+            'pages' => $fetched,
+            'at' => now()->toIso8601String(),
+        ];
+        $this->progress_json = $progress;
+        $this->save();
+
+        return true;
+    }
+
     /** buckets_json ещё не заполняли (типично cancelled/failed до finalize). */
     public function bucketsAreEmpty(): bool
     {

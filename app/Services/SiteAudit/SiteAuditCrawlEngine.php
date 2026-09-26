@@ -357,6 +357,14 @@ class SiteAuditCrawlEngine
                 $crawl->save();
             }
             $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
+            // Промежуточный снимок корзин (severity) — чтобы история не показывала нули
+            // на крупных краулах, где live GROUP BY по code на poll отключён.
+            try {
+                $crawl->refresh();
+                $crawl->maybeRefreshBucketSnapshot(false);
+            } catch (\Throwable $e) {
+                // снимок не должен рвать цепочку Continue
+            }
 
             if ($dispatchContinue) {
                 clearstatcache(true, $this->engineStatePath((int) $crawl->id));
