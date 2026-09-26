@@ -81,12 +81,28 @@ class SiteAuditCrawlEngine
         // и копит «промахи» / отложенные тики впустую.
         $continueAfterUnlock = null;
         if (! Cache::add($lockKey, 1, $lockTtl)) {
-            // Иначе при убитом воркере с живым lock цепочка Continue обрывается навсегда.
-            if ($dispatchContinue) {
-                $this->scheduleContinue((int) $crawl->id, 45);
-            }
+            // Orphan lock после kill воркера (deploy/supervisor): иначе Continue
+            // только откладывается на 45с, а fetched стоит минутами.
+            $crawl->refresh();
+            $staleLock = $crawl->updated_at
+                && $crawl->updated_at->lt(now()->subSeconds(90))
+                && ! $crawl->isFinished();
+            if ($staleLock) {
+                Cache::forget($lockKey);
+                if (! Cache::add($lockKey, 1, $lockTtl)) {
+                    if ($dispatchContinue) {
+                        $this->scheduleContinue((int) $crawl->id, 20);
+                    }
 
-            return true;
+                    return true;
+                }
+            } else {
+                if ($dispatchContinue) {
+                    $this->scheduleContinue((int) $crawl->id, 45);
+                }
+
+                return true;
+            }
         }
 
         try {
