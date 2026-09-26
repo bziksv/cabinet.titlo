@@ -3510,6 +3510,13 @@ class SiteAuditController extends Controller
     private function countsForCrawlDisplay(SiteAuditCrawl $crawl): array
     {
         $stored = is_array($crawl->counts_json) ? $crawl->counts_json : [];
+        // Крупные незавершённые краулы: полный GROUP BY findings на каждый poll статуса
+        // кладёт MySQL (сотни тысяч–миллионы строк) и стопорит fetch соседних краулов.
+        $heavyLive = ! $crawl->isFinished() && (int) $crawl->pages_fetched >= 3000;
+        if ($heavyLive) {
+            return $stored;
+        }
+
         $live = SiteAuditFinding::query()
             ->where('crawl_id', $crawl->id)
             ->selectRaw('code, count(*) as c')

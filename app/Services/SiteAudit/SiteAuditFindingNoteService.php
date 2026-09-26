@@ -193,27 +193,57 @@ class SiteAuditFindingNoteService
     public function applyFixedToCounts(array $rawCounts, SiteAuditCrawl $crawl): array
     {
         $projectId = (int) $crawl->project_id;
-        if ($projectId < 1 || ! $this->projectHasFixed($projectId)) {
+        if ($projectId < 1 || $rawCounts === [] || ! $this->projectHasFixed($projectId)) {
             return $rawCounts;
         }
 
-        $fixedByCode = SiteAuditFinding::query()
-            ->where('crawl_id', $crawl->id)
-            ->whereExists(function ($q) use ($projectId) {
-                $q->select(DB::raw(1))
-                    ->from('site_audit_finding_notes as san')
-                    ->whereColumn('san.code', 'site_audit_findings.code')
-                    ->whereColumn('san.url_hash', 'site_audit_findings.url_hash')
-                    ->where('san.project_id', $projectId)
-                    ->where('san.status', SiteAuditFindingNote::STATUS_FIXED);
-            })
-            ->select('code', DB::raw('count(*) as c'))
-            ->groupBy('code')
-            ->pluck('c', 'code')
-            ->all();
+        $notes = SiteAuditFindingNote::query()
+            ->where('project_id', $projectId)
+            ->where('status', SiteAuditFindingNote::STATUS_FIXED)
+            ->where('url_hash', '!=', '')
+            ->get(['code', 'url_hash']);
 
-        if ($fixedByCode === []) {
+        if ($notes->isEmpty()) {
             return $rawCounts;
+        }
+
+        $urlPairs = [];
+        $urlHashes = [];
+        $urlCodes = [];
+        foreach ($notes as $n) {
+            $code = (string) $n->code;
+            $hash = (string) $n->url_hash;
+            if ($code === '' || $hash === '') {
+                continue;
+            }
+            if (strpos($hash, 'g:') === 0) {
+                continue;
+            }
+            $urlPairs[$code . '|' . $hash] = true;
+            $urlHashes[$hash] = true;
+            $urlCodes[$code] = true;
+        }
+        if ($urlPairs === []) {
+            return $rawCounts;
+        }
+
+        try {
+            $rows = \App\SiteAuditFinding::query()
+                ->where('crawl_id', (int) $crawl->id)
+                ->whereIn('code', array_keys($urlCodes))
+                ->whereIn('url_hash', array_keys($urlHashes))
+                ->get(['code', 'url_hash']);
+        } catch (\Throwable $e) {
+            return $rawCounts;
+        }
+
+        $fixedByCode = [];
+        foreach ($rows as $row) {
+            $key = $row->code . '|' . $row->url_hash;
+            if (! isset($urlPairs[$key])) {
+                continue;
+            }
+            $fixedByCode[$row->code] = ($fixedByCode[$row->code] ?? 0) + 1;
         }
 
         $out = $rawCounts;

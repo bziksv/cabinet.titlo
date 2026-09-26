@@ -188,6 +188,8 @@ class SiteAuditIgnoreService
 
     /**
      * Скорректировать counts_json с учётом ignores проекта.
+     * Считаем от ignores (тысячи), не EXISTS по миллионам findings —
+     * иначе crawlStatus / история кладут MySQL и стопорят fetch.
      *
      * @param array<string,int|float> $rawCounts
      * @return array<string,int|float>
@@ -195,32 +197,63 @@ class SiteAuditIgnoreService
     public function applyToCounts(array $rawCounts, SiteAuditCrawl $crawl): array
     {
         $projectId = (int) $crawl->project_id;
-        if ($projectId < 1 || ! $this->projectHasIgnores($projectId)) {
+        if ($projectId < 1 || $rawCounts === [] || ! $this->projectHasIgnores($projectId)) {
             return $rawCounts;
         }
 
-        $ignoredByCode = SiteAuditFinding::query()
-            ->where('crawl_id', $crawl->id)
-            ->whereExists(function ($q) use ($projectId) {
-                $q->select(DB::raw(1))
-                    ->from('site_audit_ignores as sai')
-                    ->whereColumn('sai.code', 'site_audit_findings.code')
-                    ->where('sai.project_id', $projectId)
-                    ->where(function ($w) {
-                        $w->where('sai.url_hash', '')
-                            ->orWhereColumn('sai.url_hash', 'site_audit_findings.url_hash');
-                    });
-            })
-            ->select('code', DB::raw('count(*) as c'))
-            ->groupBy('code')
-            ->pluck('c', 'code')
-            ->all();
+        $ignores = SiteAuditIgnore::query()
+            ->where('project_id', $projectId)
+            ->get(['code', 'url_hash']);
 
-        if ($ignoredByCode === []) {
-            return $rawCounts;
+        $codeWide = [];
+        $urlHashes = [];
+        $urlCodes = [];
+        $urlPairs = [];
+        foreach ($ignores as $ig) {
+            $code = (string) $ig->code;
+            $hash = (string) ($ig->url_hash ?? '');
+            if ($code === '' || self::isPatternUrlHash($hash)) {
+                continue;
+            }
+            if ($hash === '') {
+                $codeWide[$code] = true;
+                continue;
+            }
+            $urlPairs[$code . '|' . $hash] = true;
+            $urlHashes[$hash] = true;
+            $urlCodes[$code] = true;
         }
 
         $out = $rawCounts;
+        foreach ($codeWide as $code => $_) {
+            if (isset($out[$code])) {
+                $out[$code] = 0;
+            }
+        }
+
+        if ($urlPairs === []) {
+            return $out;
+        }
+
+        try {
+            $rows = SiteAuditFinding::query()
+                ->where('crawl_id', (int) $crawl->id)
+                ->whereIn('code', array_keys($urlCodes))
+                ->whereIn('url_hash', array_keys($urlHashes))
+                ->get(['code', 'url_hash']);
+        } catch (\Throwable $e) {
+            return $out;
+        }
+
+        $ignoredByCode = [];
+        foreach ($rows as $row) {
+            $key = $row->code . '|' . $row->url_hash;
+            if (! isset($urlPairs[$key])) {
+                continue;
+            }
+            $ignoredByCode[$row->code] = ($ignoredByCode[$row->code] ?? 0) + 1;
+        }
+
         foreach ($ignoredByCode as $code => $c) {
             if (! isset($out[$code])) {
                 continue;
