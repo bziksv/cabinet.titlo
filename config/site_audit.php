@@ -47,6 +47,8 @@ return [
     'aggregate_tick_seconds' => (float) env('SITE_AUDIT_AGG_TICK_SECONDS', 150),
     'aggregate_tick_pause_seconds' => (int) env('SITE_AUDIT_AGG_TICK_PAUSE', 3),
     'aggregate_job_timeout' => (int) env('SITE_AUDIT_AGG_JOB_TIMEOUT', 600),
+    /** Сколько раз failed() перекидывает aggregate job, прежде чем failed краул */
+    'aggregate_job_fail_retries' => (int) env('SITE_AUDIT_AGG_JOB_FAIL_RETRIES', 40),
     'aggregate_from_pages_chunk' => (int) env('SITE_AUDIT_AGG_FROM_PAGES_CHUNK', 200),
     'aggregate_broken_links_chunk' => (int) env('SITE_AUDIT_AGG_BROKEN_CHUNK', 250),
     // local/тесты: не резать по тарифу, пока UI/модуль сырые

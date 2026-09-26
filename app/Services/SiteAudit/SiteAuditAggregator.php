@@ -284,8 +284,10 @@ class SiteAuditAggregator
                 $this->emitOrphans($crawl->id);
                 break;
             case 'no_outbound':
-                $this->emitNoOutboundInternal($crawl->id);
-                break;
+                $more = $this->emitNoOutboundInternal($crawl->id, $meta, $deadline);
+                $state['meta'] = $meta;
+
+                return $more;
             case 'url_param_risks':
                 $this->emitUrlParamRisks($crawl->id);
                 break;
@@ -1289,47 +1291,77 @@ class SiteAuditAggregator
 
     /**
      * Успешные HTML-страницы без исходящих внутренних ссылок (тупики).
+     * Крупные краулы — по after_id и дедлайну тика, иначе job падает по timeout
+     * (85k URL × chunk) и слот зависает до reclaim.
+     *
+     * @return bool true — нужен ещё тик на том же stage
      */
-    private function emitNoOutboundInternal(int $crawlId): void
+    private function emitNoOutboundInternal(int $crawlId, array &$meta = [], ?float $deadline = null): bool
     {
         $severity = config('site_audit.findings.no_outbound_internal.severity', 'info');
         $max = (int) config('site_audit.no_outbound_internal_max', 500);
+        $chunkSize = max(50, (int) config('site_audit.aggregate_from_pages_chunk', 200));
+        $afterId = (int) ($meta['after_id'] ?? 0);
+        $emitted = (int) ($meta['emitted'] ?? 0);
 
-        $emitted = 0;
-        SiteAuditPage::query()
-            ->where('crawl_id', $crawlId)
-            ->orderBy('id')
-            ->chunkById(200, function ($pages) use ($crawlId, $severity, $max, &$emitted) {
-                foreach ($pages as $page) {
-                    if ($emitted >= $max) {
-                        return false;
-                    }
-                    $code = (int) $page->status_code;
-                    if ($code < 200 || $code >= 400) {
-                        continue;
-                    }
-                    if (! SiteAuditUrlNormalizer::isHtmlDocument($page->content_type ?? null, (string) $page->url)) {
-                        continue;
-                    }
-                    $path = parse_url($page->url, PHP_URL_PATH);
-                    if ($path === '/' || $path === '' || $path === null) {
-                        continue;
-                    }
-                    $outs = is_array($page->out_links_json) ? $page->out_links_json : [];
-                    if ($outs !== []) {
-                        continue;
-                    }
-                    SiteAuditFinding::query()->create([
-                        'crawl_id' => $crawlId,
-                        'code' => 'no_outbound_internal',
-                        'severity' => $severity,
-                        'url' => $page->url,
-                        'url_hash' => $page->url_hash,
-                        'meta_json' => ['reason' => 'empty_out_links'],
-                    ]);
-                    $emitted++;
+        while ($emitted < $max) {
+            $pages = SiteAuditPage::query()
+                ->where('crawl_id', $crawlId)
+                ->where('id', '>', $afterId)
+                ->orderBy('id')
+                ->limit($chunkSize)
+                ->get(['id', 'url', 'url_hash', 'out_links_json', 'status_code', 'content_type']);
+
+            if ($pages->isEmpty()) {
+                $meta['after_id'] = $afterId;
+                $meta['emitted'] = $emitted;
+
+                return false;
+            }
+
+            foreach ($pages as $page) {
+                $afterId = (int) $page->id;
+                if ($emitted >= $max) {
+                    break;
                 }
-            });
+                $code = (int) $page->status_code;
+                if ($code < 200 || $code >= 400) {
+                    continue;
+                }
+                if (! SiteAuditUrlNormalizer::isHtmlDocument($page->content_type ?? null, (string) $page->url)) {
+                    continue;
+                }
+                $path = parse_url($page->url, PHP_URL_PATH);
+                if ($path === '/' || $path === '' || $path === null) {
+                    continue;
+                }
+                $outs = is_array($page->out_links_json) ? $page->out_links_json : [];
+                if ($outs !== []) {
+                    continue;
+                }
+                SiteAuditFinding::query()->create([
+                    'crawl_id' => $crawlId,
+                    'code' => 'no_outbound_internal',
+                    'severity' => $severity,
+                    'url' => $page->url,
+                    'url_hash' => $page->url_hash,
+                    'meta_json' => ['reason' => 'empty_out_links'],
+                ]);
+                $emitted++;
+            }
+
+            $meta['after_id'] = $afterId;
+            $meta['emitted'] = $emitted;
+
+            if ($emitted >= $max) {
+                return false;
+            }
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

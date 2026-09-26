@@ -47,8 +47,7 @@ class SiteAuditReaggregateCommand extends Command
                     $this->warn('Resume: stage пустой/done — старт с начала агрегации');
                 } else {
                     $agg['notify'] = $notify;
-                    // Сброс meta текущего stage — тик начнёт этап заново, но без cleanup всех findings.
-                    $agg['meta'] = [];
+                    // meta (after_id / cursor) сохраняем — иначе тяжёлый stage стартует с нуля и дублирует findings.
                     $progress['aggregate'] = $agg;
                     $crawl->progress_json = $progress;
                     $crawl->save();

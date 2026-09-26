@@ -2,6 +2,7 @@
 
 namespace App\Services\SiteAudit;
 
+use App\Jobs\SiteAudit\AggregateSiteAuditCrawlJob;
 use App\Jobs\SiteAudit\DiscoverSiteAuditUrlsJob;
 use App\SiteAuditCrawl;
 use App\Support\SiteAuditAdminRuntimeSettings;
@@ -103,7 +104,9 @@ class SiteAuditGlobalCap
     }
 
     /**
-     * Зависшие active-краулы (нет updated_at дольше N мин) → failed, иначе слот вечный.
+     * Зависшие active-краулы (нет updated_at дольше N мин).
+     * Агрегация с уже скачанными страницами — не failed, а снова в очередь тиков.
+     * Иначе слот вечный только для discover/fetch без прогресса.
      */
     public static function reclaimStale(): int
     {
@@ -118,6 +121,11 @@ class SiteAuditGlobalCap
 
         $n = 0;
         foreach ($stale as $crawl) {
+            if (self::requeueStaleAggregate($crawl, $minutes)) {
+                $n++;
+                continue;
+            }
+
             $crawl->status = SiteAuditCrawl::STATUS_FAILED;
             $crawl->error = 'Прерван: нет прогресса более ' . $minutes . ' мин (освобождение слота)';
             $crawl->finished_at = now();
@@ -130,6 +138,32 @@ class SiteAuditGlobalCap
         }
 
         return $n;
+    }
+
+    /**
+     * Агрегация оборвалась (timeout job / restart воркера) — дожимаем, не failed.
+     */
+    private static function requeueStaleAggregate(SiteAuditCrawl $crawl, int $minutes): bool
+    {
+        if ($crawl->status !== SiteAuditCrawl::STATUS_AGGREGATING
+            || (int) $crawl->pages_fetched < 1) {
+            return false;
+        }
+
+        Cache::forget('site_audit_aggregate_' . $crawl->id);
+        $crawl->error = null;
+        $crawl->finished_at = null;
+        $crawl->updated_at = now();
+        $crawl->save();
+        AggregateSiteAuditCrawlJob::dispatch((int) $crawl->id);
+
+        Log::warning('SiteAudit stale aggregate re-queued', [
+            'crawl_id' => $crawl->id,
+            'minutes' => $minutes,
+            'pages_fetched' => (int) $crawl->pages_fetched,
+        ]);
+
+        return true;
     }
 
     /**
@@ -149,6 +183,7 @@ class SiteAuditGlobalCap
                 SiteAuditCrawl::STATUS_QUEUED,
                 SiteAuditCrawl::STATUS_DISCOVERING,
                 SiteAuditCrawl::STATUS_FETCHING,
+                SiteAuditCrawl::STATUS_AGGREGATING,
             ])
             ->where('updated_at', '<', $idleCutoff)
             ->where('updated_at', '>=', $staleCutoff)
@@ -169,7 +204,10 @@ class SiteAuditGlobalCap
             }
 
             try {
-                if ($crawl->status === SiteAuditCrawl::STATUS_FETCHING || $engine->hasEngineState($crawl)) {
+                if ($crawl->status === SiteAuditCrawl::STATUS_AGGREGATING) {
+                    Cache::forget('site_audit_aggregate_' . $crawl->id);
+                    AggregateSiteAuditCrawlJob::dispatch((int) $crawl->id);
+                } elseif ($crawl->status === SiteAuditCrawl::STATUS_FETCHING || $engine->hasEngineState($crawl)) {
                     $engine->pushContinueJob((int) $crawl->id);
                 } else {
                     self::pushDiscoverJob((int) $crawl->id);

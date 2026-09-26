@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Log;
 /**
  * Агрегация краула тиками: один job = несколько лёгких этапов или кусок тяжёлого.
  * Большие сайты (десятки тысяч URL) дожимаются цепочкой Continue без 300s timeout.
+ *
+ * Падение/timeout тика не должно убивать краул: kickStuckActive / failed() снова
+ * ставят AggregateSiteAuditCrawlJob, пока pages уже скачаны.
  */
 class AggregateSiteAuditCrawlJob implements ShouldQueue
 {
@@ -65,14 +68,8 @@ class AggregateSiteAuditCrawlJob implements ShouldQueue
                 self::dispatch($this->crawlId)->delay(now()->addSeconds($pause));
             }
         } catch (\Throwable $e) {
-            $crawl = SiteAuditCrawl::query()->find($this->crawlId);
-            if ($crawl && ! $crawl->isFinished()) {
-                $crawl->status = SiteAuditCrawl::STATUS_FAILED;
-                $crawl->error = 'Aggregate failed: ' . mb_substr($e->getMessage(), 0, 500);
-                $crawl->finished_at = now();
-                $crawl->save();
-                \App\Services\SiteAudit\SiteAuditGlobalCap::promoteWaiting();
-            }
+            // Не переводим краул в failed: иначе слот мёртв до ручного reaggregate.
+            // Retries / failed() / kickStuckActive дожмут тик.
             Log::error('SiteAudit aggregate tick failed', [
                 'crawl_id' => $this->crawlId,
                 'error' => $e->getMessage(),
@@ -81,5 +78,64 @@ class AggregateSiteAuditCrawlJob implements ShouldQueue
         } finally {
             Cache::forget($lockKey);
         }
+    }
+
+    /**
+     * После исчерпания tries / timeout — снова в очередь, не failed краул.
+     */
+    public function failed(\Throwable $exception = null): void
+    {
+        Cache::forget('site_audit_aggregate_' . $this->crawlId);
+
+        $crawl = SiteAuditCrawl::query()->find($this->crawlId);
+        if (! $crawl || $crawl->isFinished()) {
+            return;
+        }
+
+        if ((int) $crawl->pages_fetched < 1) {
+            $crawl->status = SiteAuditCrawl::STATUS_FAILED;
+            $msg = $exception ? $exception->getMessage() : 'aggregate job failed';
+            $crawl->error = 'Aggregate failed: ' . mb_substr($msg, 0, 500);
+            $crawl->finished_at = now();
+            $crawl->save();
+            \App\Services\SiteAudit\SiteAuditGlobalCap::promoteWaiting();
+
+            return;
+        }
+
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $agg = is_array($progress['aggregate'] ?? null) ? $progress['aggregate'] : [];
+        $retries = (int) ($agg['job_fail_retries'] ?? 0) + 1;
+        $agg['job_fail_retries'] = $retries;
+        $progress['aggregate'] = $agg;
+        $crawl->progress_json = $progress;
+        $crawl->status = SiteAuditCrawl::STATUS_AGGREGATING;
+        $crawl->error = null;
+        $crawl->finished_at = null;
+        $crawl->updated_at = now();
+        $crawl->save();
+
+        $maxAuto = max(5, (int) config('site_audit.aggregate_job_fail_retries', 40));
+        if ($retries > $maxAuto) {
+            $crawl->status = SiteAuditCrawl::STATUS_FAILED;
+            $msg = $exception ? $exception->getMessage() : 'aggregate job failed';
+            $crawl->error = 'Aggregate failed after ' . $retries . ' retries: ' . mb_substr($msg, 0, 400);
+            $crawl->finished_at = now();
+            $crawl->save();
+            \App\Services\SiteAudit\SiteAuditGlobalCap::promoteWaiting();
+            Log::error('SiteAudit aggregate gave up after retries', [
+                'crawl_id' => $this->crawlId,
+                'retries' => $retries,
+            ]);
+
+            return;
+        }
+
+        self::dispatch($this->crawlId)->delay(now()->addSeconds(45));
+        Log::warning('SiteAudit aggregate job exhausted — requeued', [
+            'crawl_id' => $this->crawlId,
+            'retries' => $retries,
+            'error' => $exception ? $exception->getMessage() : null,
+        ]);
     }
 }
