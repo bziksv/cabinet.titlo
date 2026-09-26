@@ -283,8 +283,9 @@ class SiteAuditCrawl extends Model
     }
 
     /**
-     * Промежуточный снимок корзин во время скана (лёгкий GROUP BY severity, не по code).
-     * Нужен, когда live counts на poll отключены для крупных краулов.
+     * Промежуточный снимок корзин + counts во время скана.
+     * Severity GROUP BY — для истории; code GROUP BY — для сводки/дерева отчётов,
+     * когда live counts на каждый poll отключены.
      */
     public function maybeRefreshBucketSnapshot(bool $force = false): bool
     {
@@ -318,9 +319,25 @@ class SiteAuditCrawl extends Model
         }
 
         $this->refreshBucketsFromFindings(false);
+        try {
+            $byCode = SiteAuditFinding::query()
+                ->where('crawl_id', $this->id)
+                ->selectRaw('code, count(*) as c')
+                ->groupBy('code')
+                ->pluck('c', 'code')
+                ->all();
+            $counts = [];
+            foreach ($byCode as $code => $c) {
+                $counts[(string) $code] = (int) $c;
+            }
+            $this->counts_json = $counts;
+        } catch (\Throwable $e) {
+            // корзины уже есть — counts подтянутся следующим снимком
+        }
         $progress['bucket_snapshot'] = [
             'pages' => $fetched,
             'at' => now()->toIso8601String(),
+            'has_counts' => is_array($this->counts_json) && $this->counts_json !== [],
         ];
         $this->progress_json = $progress;
         $this->save();

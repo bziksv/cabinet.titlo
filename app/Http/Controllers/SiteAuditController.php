@@ -272,6 +272,8 @@ class SiteAuditController extends Controller
         $crawl = $this->ownedCrawl($id, true, true);
         $crawl->load('project');
 
+        $this->ensureLiveCrawlDisplaySnapshot($crawl);
+
         $counts = $this->countsForCrawlDisplay($crawl);
         $counts = (new SiteAuditIgnoreService())->applyToCounts($counts, $crawl);
         $counts = (new SiteAuditFindingNoteService())->applyFixedToCounts($counts, $crawl);
@@ -462,6 +464,8 @@ class SiteAuditController extends Controller
         // Без progress — ложное «не было» и пустой список проверенных URL.
         $crawl = $this->ownedCrawl($id, true, true);
         $crawl->load('project');
+
+        $this->ensureLiveCrawlDisplaySnapshot($crawl);
 
         $meta = config('site_audit.findings.' . $code);
         if (! $meta) {
@@ -3532,6 +3536,35 @@ class SiteAuditController extends Controller
     }
 
     /**
+     * Крупный незавершённый краул: без counts_json сводка/отчёты пустые (live GROUP BY
+     * на poll отключён). Один раз дотягиваем снимок под Cache-lock.
+     */
+    private function ensureLiveCrawlDisplaySnapshot(SiteAuditCrawl $crawl): void
+    {
+        if ($crawl->isFinished()) {
+            return;
+        }
+        $liveCountsMax = max(500, (int) config('site_audit.live_counts_max_pages', 3000));
+        if ((int) $crawl->pages_fetched < $liveCountsMax) {
+            return;
+        }
+        $counts = is_array($crawl->counts_json) ? $crawl->counts_json : [];
+        if ($counts !== []) {
+            return;
+        }
+        $lockKey = 'site_audit_display_snap_' . $crawl->id;
+        if (! \Illuminate\Support\Facades\Cache::add($lockKey, 1, 90)) {
+            return;
+        }
+        try {
+            $crawl->maybeRefreshBucketSnapshot(true);
+            $crawl->refresh();
+        } catch (\Throwable $e) {
+            // пустая сводка лучше 500
+        }
+    }
+
+    /**
      * Счётчики по кодам: после агрегации — counts_json, во время проверки — live из findings.
      * Иначе на отчётах нули, хотя строки findings уже есть.
      *
@@ -3541,7 +3574,7 @@ class SiteAuditController extends Controller
     {
         $stored = is_array($crawl->counts_json) ? $crawl->counts_json : [];
         // Крупные незавершённые краулы: полный GROUP BY findings.code на каждый poll
-        // кладёт MySQL. Корзины в истории — из buckets_json (снимки severity пачками).
+        // кладёт MySQL. Сводка/дерево берут counts_json со снимков (Continue + ensure*).
         $liveCountsMax = max(500, (int) config('site_audit.live_counts_max_pages', 3000));
         $heavyLive = ! $crawl->isFinished() && (int) $crawl->pages_fetched >= $liveCountsMax;
         if ($heavyLive) {
