@@ -226,6 +226,7 @@ class SiteAuditCrawl extends Model
             'sitemap_coverage' => 'Sitemap',
             'landing_coverage' => 'Посадочные',
             'broken_links' => 'Битые',
+            'retry_timeouts' => 'Повтор таймаутов',
             'from_pages' => 'Страницы',
         ];
 

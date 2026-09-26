@@ -2017,7 +2017,19 @@ class SiteAuditFindingPresenter
 
             case 'unreachable':
                 $bits = [];
-                if (! empty($meta['error'])) {
+                if (! empty($meta['retried']) || (isset($meta['attempts']) && is_array($meta['attempts']) && count($meta['attempts']) >= 2)) {
+                    $bits[] = '2 обхода';
+                    $a = is_array($meta['attempts'] ?? null) ? $meta['attempts'] : [];
+                    $l1 = trim((string) ($a[0]['label'] ?? ''));
+                    $l2 = trim((string) ($a[1]['label'] ?? ''));
+                    if ($l1 === '') {
+                        $l1 = self::connectionErrorLabel((string) ($meta['error_first'] ?? $meta['error'] ?? ''));
+                    }
+                    if ($l2 === '') {
+                        $l2 = self::connectionErrorLabel((string) ($meta['error'] ?? ''));
+                    }
+                    $bits[] = '1: ' . $l1 . ' → 2: ' . $l2;
+                } elseif (! empty($meta['error'])) {
                     $bits[] = self::clip((string) $meta['error'], 40);
                 }
                 $refN = (int) ($meta['referrer_count'] ?? 0);
@@ -3901,6 +3913,27 @@ class SiteAuditFindingPresenter
     /**
      * Человекочитаемая причина сбоя соединения (timeout / DNS / SSL…).
      */
+    public static function connectionErrorLabelPublic(string $err): string
+    {
+        return self::connectionErrorLabel($err);
+    }
+
+    public static function isTimeoutFetchError(string $err): bool
+    {
+        $err = strtolower(trim($err));
+        if ($err === '') {
+            return false;
+        }
+
+        return strpos($err, 'timed out') !== false
+            || strpos($err, 'timeout') !== false
+            || strpos($err, 'operation timedout') !== false
+            || strpos($err, 'curl error 28') !== false;
+    }
+
+    /**
+     * Человекочитаемая причина сбоя соединения (timeout / DNS / SSL…).
+     */
     private static function connectionErrorLabel(string $err): string
     {
         $err = strtolower(trim($err));
@@ -3917,7 +3950,7 @@ class SiteAuditFindingPresenter
         if (strpos($err, 'could not resolve') !== false || strpos($err, 'resolve host') !== false) {
             return 'DNS не резолвится';
         }
-        if (strpos($err, 'timed out') !== false || strpos($err, 'timeout') !== false) {
+        if (self::isTimeoutFetchError($err)) {
             return 'таймаут';
         }
         if (strpos($err, 'unexpected eof') !== false
@@ -3956,6 +3989,31 @@ class SiteAuditFindingPresenter
         }
 
         $html = '<div class="cabinet-sa-broken-status">' . $pill . '</div>';
+
+        $attempts = isset($meta['attempts']) && is_array($meta['attempts']) ? $meta['attempts'] : [];
+        if ($code === 'unreachable' && (count($attempts) >= 2 || ! empty($meta['retried']))) {
+            $a1 = is_array($attempts[0] ?? null) ? $attempts[0] : [];
+            $a2 = is_array($attempts[1] ?? null) ? $attempts[1] : [];
+            $l1 = trim((string) ($a1['label'] ?? ''));
+            $l2 = trim((string) ($a2['label'] ?? ''));
+            if ($l1 === '') {
+                $l1 = self::connectionErrorLabel((string) ($meta['error_first'] ?? $meta['error'] ?? ''));
+            }
+            if ($l2 === '') {
+                $l2 = self::connectionErrorLabel((string) ($meta['error'] ?? ''));
+            }
+            $e1 = trim((string) ($a1['error'] ?? $meta['error_first'] ?? ''));
+            $e2 = trim((string) ($a2['error'] ?? $meta['error'] ?? ''));
+            $html .= '<div class="cabinet-sa-broken-status__hint">'
+                . '<div><strong>1-й обход</strong> (в скане): ' . e($l1)
+                . ($e1 !== '' ? ' <span class="text-muted">(' . e(self::clip($e1, 80)) . ')</span>' : '')
+                . '</div>'
+                . '<div><strong>2-й обход</strong> (повтор после скана): ' . e($l2)
+                . ($e2 !== '' ? ' <span class="text-muted">(' . e(self::clip($e2, 80)) . ')</span>' : '')
+                . '</div>'
+                . '<div class="text-muted" style="margin-top:2px">Оба раза ответ не получен — URL остаётся в отчёте.</div>'
+                . '</div>';
+        }
 
         $slashUrl = trim((string) ($meta['slash_url'] ?? ''));
         $showSlash = (! empty($meta['slash_hint']) || ! empty($meta['false_404_slash']))

@@ -105,6 +105,9 @@ return [
     'vnu_sample_max' => (int) env('SITE_AUDIT_VNU_SAMPLE_MAX', 10),
     // Параллельные POST к vnu внутри волны. 0 = как concurrency краула.
     'vnu_concurrency' => (int) env('SITE_AUDIT_VNU_CONCURRENCY', 0),
+    // После скана: повторно запросить unreachable с таймаутом (пачками в агрегации).
+    'retry_timeout_chunk' => (int) env('SITE_AUDIT_RETRY_TIMEOUT_CHUNK', 25),
+    'retry_timeout_max' => (int) env('SITE_AUDIT_RETRY_TIMEOUT_MAX', 5000),
     // Live GROUP BY по code на status-poll — только пока страниц меньше порога.
     // Дальше UI берёт buckets_json со снимков (severity GROUP BY пачками).
     'live_counts_max_pages' => (int) env('SITE_AUDIT_LIVE_COUNTS_MAX_PAGES', 3000),

@@ -391,6 +391,8 @@ class SiteAuditPageProcessor
                 $findings[] = $this->finding('unreachable', $url, $urlHash, [
                     'error' => $result['error'],
                     'chain' => $chain ?: null,
+                    'attempt' => 1,
+                    'attempt_at' => now()->toIso8601String(),
                 ]);
             }
         } else {

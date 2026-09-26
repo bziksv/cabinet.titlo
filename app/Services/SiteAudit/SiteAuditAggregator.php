@@ -21,6 +21,7 @@ class SiteAuditAggregator
         'duplicates_description',
         'duplicates_content',
         'similar_pages',
+        'retry_timeouts',
         'from_pages',
         'redirect_loops',
         'duplicate_url_variants',
@@ -269,6 +270,11 @@ class SiteAuditAggregator
             case 'similar_pages':
                 $this->emitSimilarPages($crawl->id);
                 break;
+            case 'retry_timeouts':
+                $more = $this->retryTimeoutUnreachable($crawl, $meta, $deadline);
+                $state['meta'] = $meta;
+
+                return $more;
             case 'from_pages':
                 $more = $this->emitFromPages($crawl->id, $meta, $deadline);
                 $state['meta'] = $meta;
@@ -477,6 +483,178 @@ class SiteAuditAggregator
     private function brokenLinksCacheKey(int $crawlId): string
     {
         return 'site_audit_agg_broken_' . $crawlId;
+    }
+
+    /**
+     * После скана: повторно запросить URL с unreachable из‑за таймаута.
+     * Успех — перепарсить страницу (unreachable снимается). Провал — meta с двумя обходами.
+     *
+     * @param array<string,mixed> $meta
+     * @return bool true — нужен ещё тик
+     */
+    private function retryTimeoutUnreachable(SiteAuditCrawl $crawl, array &$meta = [], ?float $deadline = null): bool
+    {
+        $chunkSize = max(5, (int) config('site_audit.retry_timeout_chunk', 25));
+        $maxTotal = max(0, (int) config('site_audit.retry_timeout_max', 5000));
+        $afterId = (int) ($meta['retry_timeout_after_id'] ?? 0);
+        $retried = (int) ($meta['retry_timeout_done'] ?? 0);
+        if ($maxTotal <= 0 || $retried >= $maxTotal) {
+            return false;
+        }
+
+        $project = SiteAuditProject::query()->find($crawl->project_id);
+        if (! $project) {
+            return false;
+        }
+        $host = SiteAuditUrlNormalizer::hostOf('https://' . $project->domain) ?: $project->domain;
+        $settings = array_merge(
+            is_array($project->settings_json) ? $project->settings_json : [],
+            is_array($crawl->progress_json['settings'] ?? null) ? $crawl->progress_json['settings'] : []
+        );
+        // Повтор без HTML5/vnu — иначе агрегация снова упрётся в Nu на тысячах URL.
+        $settings['html_checker'] = SiteAuditHtmlChecker::LIBXML;
+
+        $processor = new SiteAuditPageProcessor();
+        $fetcher = SiteAuditFetcher::fromCrawlSettings($settings, (int) $crawl->id);
+        $scanLimit = min($chunkSize * 4, 120);
+
+        while ($retried < $maxTotal) {
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                $meta['retry_timeout_after_id'] = $afterId;
+                $meta['retry_timeout_done'] = $retried;
+
+                return true;
+            }
+
+            $batch = SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', 'unreachable')
+                ->where('id', '>', $afterId)
+                ->orderBy('id')
+                ->limit($scanLimit)
+                ->get(['id', 'url', 'url_hash', 'meta_json', 'created_at']);
+
+            if ($batch->isEmpty()) {
+                $meta['retry_timeout_after_id'] = $afterId;
+                $meta['retry_timeout_done'] = $retried;
+
+                return false;
+            }
+
+            $processedInTick = 0;
+            foreach ($batch as $row) {
+                if ($deadline !== null && microtime(true) >= $deadline) {
+                    $meta['retry_timeout_after_id'] = $afterId;
+                    $meta['retry_timeout_done'] = $retried;
+
+                    return true;
+                }
+
+                $rowId = (int) $row->id;
+                $rowMeta = is_array($row->meta_json) ? $row->meta_json : [];
+                if (! empty($rowMeta['retried'])) {
+                    $afterId = $rowId;
+                    continue;
+                }
+                $firstErr = trim((string) ($rowMeta['error'] ?? ''));
+                if (! SiteAuditFindingPresenter::isTimeoutFetchError($firstErr)) {
+                    $afterId = $rowId;
+                    continue;
+                }
+
+                $url = (string) $row->url;
+                if ($url === '') {
+                    $afterId = $rowId;
+                    continue;
+                }
+
+                try {
+                    $result = $fetcher->fetch($url);
+                } catch (\Throwable $e) {
+                    $result = [
+                        'ok' => false,
+                        'error' => $e->getMessage(),
+                        'status_code' => null,
+                        'body' => null,
+                        'body_path' => null,
+                    ];
+                }
+
+                $retried++;
+                $processedInTick++;
+                $afterId = $rowId;
+                $secondErr = trim((string) ($result['error'] ?? ''));
+                $code = (int) ($result['status_code'] ?? 0);
+                $hasBody = (isset($result['body']) && is_string($result['body']) && $result['body'] !== '')
+                    || (! empty($result['body_path']) && is_string($result['body_path']) && is_file($result['body_path']));
+                $ok = ! empty($result['ok']) && $code >= 200 && $code < 400 && $hasBody;
+
+                if ($ok) {
+                    try {
+                        $processor->processFetchedResult(
+                            (int) $crawl->id,
+                            $url,
+                            $result,
+                            $host,
+                            $settings,
+                            null
+                        );
+                    } catch (\Throwable $e) {
+                        Log::warning('SiteAudit retry_timeouts reprocess failed', [
+                            'crawl_id' => $crawl->id,
+                            'url' => $url,
+                            'error' => $e->getMessage(),
+                        ]);
+                        SiteAuditBodyTemp::release($result['body_path'] ?? null);
+                        $ok = false;
+                        $secondErr = $secondErr !== '' ? $secondErr : $e->getMessage();
+                    }
+                } else {
+                    SiteAuditBodyTemp::release($result['body_path'] ?? null);
+                }
+
+                if (! $ok) {
+                    $firstAt = (string) ($rowMeta['attempt_at'] ?? '');
+                    if ($firstAt === '' && $row->created_at) {
+                        $firstAt = $row->created_at->toIso8601String();
+                    }
+                    $rowMeta['retried'] = true;
+                    $rowMeta['attempts_count'] = 2;
+                    $rowMeta['attempts'] = [
+                        [
+                            'n' => 1,
+                            'at' => $firstAt !== '' ? $firstAt : null,
+                            'error' => $firstErr !== '' ? $firstErr : 'timeout',
+                            'label' => SiteAuditFindingPresenter::connectionErrorLabelPublic($firstErr),
+                        ],
+                        [
+                            'n' => 2,
+                            'at' => now()->toIso8601String(),
+                            'error' => $secondErr !== '' ? $secondErr : 'timeout',
+                            'label' => SiteAuditFindingPresenter::connectionErrorLabelPublic(
+                                $secondErr !== '' ? $secondErr : $firstErr
+                            ),
+                        ],
+                    ];
+                    $rowMeta['error'] = $secondErr !== '' ? $secondErr : $firstErr;
+                    $rowMeta['error_first'] = $firstErr;
+                    $row->meta_json = $rowMeta;
+                    $row->save();
+                }
+
+                if ($processedInTick >= $chunkSize) {
+                    $meta['retry_timeout_after_id'] = $afterId;
+                    $meta['retry_timeout_done'] = $retried;
+
+                    return $retried < $maxTotal;
+                }
+            }
+        }
+
+        $meta['retry_timeout_after_id'] = $afterId;
+        $meta['retry_timeout_done'] = $retried;
+
+        return false;
     }
 
     /**
