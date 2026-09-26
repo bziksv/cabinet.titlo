@@ -98,6 +98,7 @@ class AggregateSiteAuditCrawlJob implements ShouldQueue
             $msg = $exception ? $exception->getMessage() : 'aggregate job failed';
             $crawl->error = 'Aggregate failed: ' . mb_substr($msg, 0, 500);
             $crawl->finished_at = now();
+            $crawl->refreshBucketsFromFindings(false);
             $crawl->save();
             \App\Services\SiteAudit\SiteAuditGlobalCap::promoteWaiting();
 
@@ -122,6 +123,7 @@ class AggregateSiteAuditCrawlJob implements ShouldQueue
             $msg = $exception ? $exception->getMessage() : 'aggregate job failed';
             $crawl->error = 'Aggregate failed after ' . $retries . ' retries: ' . mb_substr($msg, 0, 400);
             $crawl->finished_at = now();
+            $crawl->refreshBucketsFromFindings(false);
             $crawl->save();
             \App\Services\SiteAudit\SiteAuditGlobalCap::promoteWaiting();
             Log::error('SiteAudit aggregate gave up after retries', [

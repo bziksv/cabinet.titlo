@@ -3,6 +3,7 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class SiteAuditCrawl extends Model
 {
@@ -241,6 +242,52 @@ class SiteAuditCrawl extends Model
         }
 
         return 'run';
+    }
+
+    /**
+     * Пересчитать buckets_json из site_audit_findings (для cancelled/failed без finalize).
+     * Иначе в истории краулов всегда 0 / 0 / 0 — бакеты пишутся только в aggregate finalize.
+     *
+     * @return array{critical:int,other:int,important:int,warning:int,info:int}
+     */
+    public function refreshBucketsFromFindings(bool $save = true): array
+    {
+        $buckets = [
+            'critical' => 0,
+            'other' => 0,
+            'important' => 0,
+            'warning' => 0,
+            'info' => 0,
+        ];
+        try {
+            $counts = SiteAuditFinding::query()
+                ->where('crawl_id', $this->id)
+                ->select('severity', DB::raw('count(*) as c'))
+                ->groupBy('severity')
+                ->pluck('c', 'severity')
+                ->all();
+            foreach ($buckets as $sev => $_) {
+                $buckets[$sev] = (int) ($counts[$sev] ?? 0);
+            }
+        } catch (\Throwable $e) {
+            // таблица/связь — оставляем нули
+        }
+        $this->buckets_json = $buckets;
+        if ($save) {
+            // Не трогаем updated_at прогресса active-краула лишний раз при backfill —
+            // но для cancel/fail уже пишем finished_at в том же save.
+            $this->save();
+        }
+
+        return $buckets;
+    }
+
+    /** buckets_json ещё не заполняли (типично cancelled/failed до finalize). */
+    public function bucketsAreEmpty(): bool
+    {
+        $b = $this->buckets_json;
+
+        return ! is_array($b) || $b === [];
     }
 
     /**

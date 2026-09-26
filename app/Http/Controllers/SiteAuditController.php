@@ -1060,6 +1060,9 @@ class SiteAuditController extends Controller
         $crawl->status = SiteAuditCrawl::STATUS_CANCELLED;
         $crawl->error = 'Остановлен пользователем';
         $crawl->finished_at = now();
+        // Бакеты пишутся только в aggregate finalize — при стопе снимем снимок из findings,
+        // иначе в истории всегда 0.
+        $buckets = $crawl->refreshBucketsFromFindings(false);
         $crawl->save();
 
         SiteAuditUserAgentSession::clear($crawl->id);
@@ -1074,6 +1077,7 @@ class SiteAuditController extends Controller
                 'can_resume' => (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($crawl),
                 'pages_fetched' => (int) $crawl->pages_fetched,
                 'pages_total' => $crawl->displayPagesTotal(),
+                'buckets' => $buckets,
                 'id' => (int) $crawl->id,
             ]);
         }

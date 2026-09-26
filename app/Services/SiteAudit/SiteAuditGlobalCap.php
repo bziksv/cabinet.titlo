@@ -129,6 +129,7 @@ class SiteAuditGlobalCap
             $crawl->status = SiteAuditCrawl::STATUS_FAILED;
             $crawl->error = 'Прерван: нет прогресса более ' . $minutes . ' мин (освобождение слота)';
             $crawl->finished_at = now();
+            $crawl->refreshBucketsFromFindings(false);
             $crawl->save();
             $n++;
             Log::warning('SiteAudit stale crawl reclaimed', [
