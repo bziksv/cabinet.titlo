@@ -1632,16 +1632,27 @@ button.cabinet-btn-busy:disabled {
 }
 
 .cabinet-mon-project-page[data-view='keywords'] .cabinet-mon-project-table-panel:not(.cabinet-mon-view-panel--collapsed) {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-height: 18rem;
     display: flex;
     flex-direction: column;
 }
 
 .cabinet-mon-project-page[data-view='keywords'] .cabinet-mon-project-table-panel:not(.cabinet-mon-view-panel--collapsed) .dataTables_wrapper {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     display: flex;
     flex-direction: column;
+    min-height: 0;
+}
+
+/* Пагинация у края таблицы: card-body не растягиваем под viewport при 10/20 строках */
+.cabinet-mon-project-page[data-view='keywords'] #monitoringTable_wrapper > .card-header,
+.cabinet-mon-project-page[data-view='keywords'] #monitoringTable_wrapper > .card-footer {
+    flex: 0 0 auto;
+}
+
+.cabinet-mon-project-page[data-view='keywords'] #monitoringTable_wrapper > .card-body {
+    flex: 0 1 auto;
     min-height: 0;
 }
 

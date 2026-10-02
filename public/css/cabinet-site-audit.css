@@ -2678,6 +2678,11 @@ label.cabinet-sa-act__main {
   font-size: 0.85em;
 }
 
+.cabinet-sa-bulk-page__count {
+  font-weight: 600;
+  opacity: 0.9;
+}
+
 .cabinet-sa-crawl-pages-toolbar__presets {
   display: flex;
   flex-wrap: wrap;

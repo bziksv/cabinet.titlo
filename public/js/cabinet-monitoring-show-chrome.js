@@ -1,7 +1,7 @@
 /**
  * /monitoring/{id} — SER: «Обзор» = графики, «Ключевые слова» = таблица (без дубля «Позиции»).
  *
- * Таблица #monitoringTable: FixedColumns baseline fc61.
+ * Таблица #monitoringTable: FixedColumns baseline fc66.
  * Док: docs/frontend/monitoring-keywords-fixed-columns.md
  */
 (function () {
@@ -1317,6 +1317,7 @@
             }
 
             enforceMonColumnWidths(api);
+            fitMonTableScrollArea(api);
             if (settings && settings._oFixedColumns) {
                 syncFixedLeftBlock(api);
                 syncMonTableRowHeights(api);
@@ -1327,10 +1328,12 @@
                 monTableInitialLayoutDone = true;
             }
             requestAnimationFrame(function () {
+                fitMonTableScrollArea(api);
                 syncMonTableRowHeights(api);
                 remeasureMainTableLeftHiddenWidths(api);
                 requestAnimationFrame(function () {
                     relayoutMonTableFcLayout(api);
+                    fitMonTableScrollArea(api);
                     wireMonTableRowHover(api);
                     repairMonTableRenderedRows(api);
                     ensureMonTableAjaxReady(api);
@@ -1386,8 +1389,10 @@
         }
 
         var rowH = TABLE_ROW_HEIGHT_FALLBACK;
+        var $wrapper = null;
         if (api && window.jQuery) {
-            var $row = jQuery(api.table().container()).find(
+            $wrapper = jQuery(api.table().container());
+            var $row = $wrapper.find(
                 '.dataTables_scrollBody tbody tr:visible:first, .DTFC_LeftBodyLiner tbody tr:visible:first'
             );
             if ($row.length) {
@@ -1398,7 +1403,28 @@
             }
         }
 
-        return TABLE_VISIBLE_ROWS * rowH;
+        var pageLen = TABLE_VISIBLE_ROWS;
+        try {
+            pageLen = parseInt(api.page.len(), 10) || TABLE_VISIBLE_ROWS;
+        } catch (e) {}
+
+        var rowsOnPage = 0;
+        if ($wrapper && $wrapper.length) {
+            rowsOnPage = $wrapper.find('.dataTables_scrollBody tbody tr:visible').length;
+        }
+        if (!rowsOnPage && api) {
+            try {
+                rowsOnPage = api.rows({ page: 'current' }).count();
+            } catch (e2) {}
+        }
+        if (!rowsOnPage) {
+            rowsOnPage = Math.min(pageLen, TABLE_VISIBLE_ROWS);
+        }
+
+        // Мало строк (10/20 или хвост последней страницы) — высота = контент, пагинация у края.
+        // Много строк — потолок TABLE_VISIBLE_ROWS, дальше скролл внутри тела.
+        var rows = Math.min(rowsOnPage, pageLen, TABLE_VISIBLE_ROWS);
+        return Math.max(rows, 1) * rowH;
     }
 
     function fitMonTableScrollArea(api) {
@@ -1427,6 +1453,12 @@
             height: heightPx,
             paddingBottom: '0',
         });
+
+        var $wrapper = jQuery(api.table().container());
+        $wrapper.find('.DTFC_LeftBodyWrapper, .DTFC_LeftBodyLiner').css({
+            height: heightPx,
+            maxHeight: heightPx,
+        });
     }
 
     function afterMonTableDraw(api, done) {
@@ -1444,6 +1476,7 @@
             return;
         }
         resetMonTableBodyScroll(api);
+        fitMonTableScrollArea(api);
         if (runMonTablePendingRelayout(api)) {
             if (typeof done === 'function') {
                 done();
@@ -1457,6 +1490,7 @@
                 }
                 return;
             }
+            fitMonTableScrollArea(api);
             relayoutMonTableFcLayout(api);
             wireMonTableRowHover(api);
             repairMonTableRenderedRows(api);

@@ -519,12 +519,16 @@ class SiteAuditPageProcessor
                     $urlOpts
                 );
                 $internalLinks = $links['internal'];
-                // URL-строки (не только hash) — для orphan + broken links
-                // Больше ссылок — точнее колонка «Откуда» на крупных сайтах с жирным меню.
-                $pageData['out_links_json'] = array_slice($internalLinks, 0, 400) ?: null;
-                $pageData['out_links_count'] = is_array($pageData['out_links_json'])
-                    ? count($pageData['out_links_json'])
-                    : 0;
+                // URL-строки (не только hash) — для orphan + broken links / «Откуда».
+                // Полный count — всегда; в JSON — cap с приоритетом того же раздела
+                // (иначе мегаменю каталога съедает лимит, а /vendors/* выглядят «сиротами»).
+                $pageData['out_links_count'] = count($internalLinks);
+                $storedOut = self::selectOutLinksForStorage(
+                    $internalLinks,
+                    $result['final_url'] ?: $url,
+                    (int) config('site_audit.out_links_store_max', 2500)
+                );
+                $pageData['out_links_json'] = $storedOut !== [] ? $storedOut : null;
                 $pageData['img_srcs_json'] = ! empty($links['img_srcs'])
                     ? array_slice($links['img_srcs'], 0, 40)
                     : null;
@@ -1014,6 +1018,79 @@ class SiteAuditPageProcessor
             'url_hash' => $urlHash,
             'meta_json' => $meta ?: null,
         ];
+    }
+
+    /**
+     * Укладываем исходящие в лимит JSON: сначала ссылки того же раздела пути,
+     * затем остальные в порядке появления в HTML.
+     *
+     * @param string[] $internalLinks
+     * @return string[]
+     */
+    public static function selectOutLinksForStorage(array $internalLinks, string $pageUrl, int $max): array
+    {
+        $max = max(50, $max);
+        if (count($internalLinks) <= $max) {
+            return array_values($internalLinks);
+        }
+
+        $prefix = self::outLinksSectionPrefix($pageUrl);
+        $priority = [];
+        $rest = [];
+        foreach ($internalLinks as $link) {
+            $link = (string) $link;
+            if ($link === '') {
+                continue;
+            }
+            if ($prefix !== '' && self::urlPathStartsWithPrefix($link, $prefix)) {
+                $priority[] = $link;
+            } else {
+                $rest[] = $link;
+            }
+        }
+
+        $out = array_slice($priority, 0, $max);
+        if (count($out) < $max) {
+            $out = array_merge($out, array_slice($rest, 0, $max - count($out)));
+        }
+
+        return $out;
+    }
+
+    /**
+     * Префикс раздела: /vendors/ для /vendors/ и /vendors/philips/;
+     * /catalog/anesteziologiya/ для вложенных каталогов.
+     */
+    public static function outLinksSectionPrefix(string $pageUrl): string
+    {
+        $path = (string) (parse_url($pageUrl, PHP_URL_PATH) ?: '/');
+        if ($path === '' || $path === '/') {
+            return '';
+        }
+        $path = '/' . trim($path, '/') . '/';
+        $parts = array_values(array_filter(explode('/', trim($path, '/')), 'strlen'));
+        if ($parts === []) {
+            return '';
+        }
+        // односегментный раздел (/vendors/, /news/) — весь раздел
+        if (count($parts) === 1) {
+            return '/' . $parts[0] . '/';
+        }
+        // вложенный URL: префикс = родительская папка (без последнего сегмента)
+        array_pop($parts);
+
+        return '/' . implode('/', $parts) . '/';
+    }
+
+    private static function urlPathStartsWithPrefix(string $url, string $prefix): bool
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '');
+        if ($path === '') {
+            return false;
+        }
+        $path = '/' . trim($path, '/') . '/';
+
+        return strpos($path, $prefix) === 0;
     }
 
     /**

@@ -51,6 +51,11 @@
             'code' => $code ?? '',
             'canNote' => $canNote ?? false,
             'canIgnore' => $canIgnore ?? false,
+            'reportTotal' => $reportTotal ?? 0,
+            'reportTitle' => $reportTitle ?? ($code ?? ''),
+            'codeWideIgnored' => $codeWideIgnored ?? false,
+            'filtersActive' => $filtersActive ?? false,
+            'meta' => $meta ?? [],
         ])
         <details class="cabinet-sa-crawl-pages-cols">
             <summary class="btn btn-sm btn-outline-secondary">Столбцы</summary>

@@ -948,6 +948,11 @@
         'code' => $code,
         'canNote' => $canNote ?? false,
         'canIgnore' => $canIgnore ?? false,
+        'reportTotal' => (int) ($total ?? 0),
+        'reportTitle' => (string) ($meta['title'] ?? $code),
+        'codeWideIgnored' => $codeWideIgnored ?? false,
+        'filtersActive' => $filtersActive ?? false,
+        'meta' => $meta ?? [],
     ])
     <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isRedirectReport ? ' cabinet-sa-table-wrap--redirect' : '' }}{{ $isImageCardReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}{{ !empty($isIndexMismatchReport) ? ' cabinet-sa-table-wrap--index-mismatch' : '' }}{{ $isCannibalReport ? ' cabinet-sa-table-wrap--cannibal' : '' }}">
         <table class="table table-sm table-hover mb-0 cabinet-sa-findings-table"

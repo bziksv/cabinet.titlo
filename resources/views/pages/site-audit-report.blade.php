@@ -95,25 +95,32 @@
                        title="Показать URL, которые вы пометили «Исправлено» (они не в счётчиках)">Показать исправленные</a>
                 @endif
                 @if(!empty($canIgnore))
+                    @php
+                        $saReportIgnoreTotal = number_format((int) ($total ?? 0), 0, '', ' ');
+                        $saReportIgnoreTitle = (string) ($meta['title'] ?? $code);
+                    @endphp
                     @if(!empty($codeWideIgnored))
-                        <form method="POST" action="{{ route('pages.site-audit.ignore.restore', $crawl->id) }}" class="d-inline">
+                        <form method="POST" action="{{ route('pages.site-audit.ignore.restore', $crawl->id) }}" class="d-inline"
+                              data-cabinet-confirm="Снять игнор со всего отчёта «{{ $saReportIgnoreTitle }}»? Находки снова попадут в счётчики."
+                              data-cabinet-confirm-title="Вернуть · весь отчёт"
+                              data-cabinet-confirm-ok="Вернуть">
                             @csrf
                             <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
                             <input type="hidden" name="scope" value="code">
                             <input type="hidden" name="code" value="{{ $code }}">
-                            <button type="submit" class="btn btn-sm btn-outline-success">Вернуть все страницы в группе</button>
+                            <button type="submit" class="btn btn-sm btn-outline-success">Вернуть · весь отчёт</button>
                         </form>
                     @else
                         <form method="POST" action="{{ route('pages.site-audit.ignore', $crawl->id) }}" class="d-inline"
-                              data-cabinet-confirm="Игнорировать все страницы в отчёте «{{ $meta['title'] ?? $code }}» для проекта?"
-                              data-cabinet-confirm-title="Игнорировать группу"
-                              data-cabinet-confirm-ok="Игнорировать"
+                              data-cabinet-confirm="Добавить в игнор весь отчёт «{{ $saReportIgnoreTitle }}» ({{ $saReportIgnoreTotal }} находок)? Все URL этого отчёта не будут считаться ошибками в этой и следующих проверках. Снять: «Показать игнор» → «Вернуть · весь отчёт»."
+                              data-cabinet-confirm-title="Игнор · весь отчёт"
+                              data-cabinet-confirm-ok="В игнор всё"
                               data-cabinet-confirm-danger="1">
                             @csrf
                             <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
                             <input type="hidden" name="scope" value="code">
                             <input type="hidden" name="code" value="{{ $code }}">
-                            <button type="submit" class="btn btn-sm btn-outline-secondary">Игнор всех страниц в группе</button>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Игнор · весь отчёт ({{ $saReportIgnoreTotal }})</button>
                         </form>
                     @endif
                 @endif

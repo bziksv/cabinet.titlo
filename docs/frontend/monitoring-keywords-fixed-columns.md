@@ -23,6 +23,7 @@
 | Шапка «уезжает» при докрутке вправо | `scrollHeadInner` шире viewport тела; нет `fitMonTableScrollHeadInner` |
 | Шапка и тело разъезжаются при 2–3 датах / выключенных столбцах | Таблица растянута на 100% viewport; нет `lockMonScrollTablesWidth` |
 | macOS: шапка короче тела, сдвиг в конце | **Не чинить** fallback `barGap=15` и `scrollbar-gutter: stable` — fc48 ломало выравнивание (`lastDelta: -15`). Эталон: только `offsetWidth - clientWidth` |
+| Дыра над пагинацией при 10/20 строк | `scrollY: 1020px` без `fitMonTableScrollArea` / `scrollCollapse`; высота не под число строк на странице |
 
 ---
 

@@ -2214,11 +2214,15 @@ class SiteAuditController extends Controller
             return response()->json(['ok' => true, 'code' => $code]);
         }
 
+        $flash = $scope === 'code'
+            ? 'Весь отчёт добавлен в игнор (для следующих проверок тоже)'
+            : 'Находка добавлена в игнор (для следующих проверок тоже)';
+
         return $this->redirectAfterFindingAction(
             $request,
             (int) $crawl->id,
             $code,
-            'Находка добавлена в игнор (для следующих проверок тоже)'
+            $flash
         );
     }
 
@@ -2262,11 +2266,15 @@ class SiteAuditController extends Controller
             return response()->json(['ok' => true, 'code' => $code]);
         }
 
+        $flash = $scope === 'code'
+            ? 'Игнор всего отчёта снят'
+            : 'Игнор снят';
+
         return $this->redirectAfterFindingAction(
             $request,
             (int) $crawl->id,
             $code,
-            'Игнор снят',
+            $flash,
             ['ignored' => 1]
         );
     }

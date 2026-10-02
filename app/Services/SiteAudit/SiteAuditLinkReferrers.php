@@ -74,7 +74,8 @@ class SiteAuditLinkReferrers
 
         if ($lookup !== null && $pagesFetched > 0 && $pagesFetched <= 12000) {
             // Точечный поиск на умеренных проверких: SQL LIKE по URL, без полной выгрузки.
-            // На 40k+ это слишком тяжело, а out_links всё равно часто обрезаны (лимит 150).
+            // На 40k+ это слишком тяжело, а out_links всё равно часто обрезаны (лимит store_max).
+            // С 2026-10: лимит 2500 + приоритет того же раздела пути (см. selectOutLinksForStorage).
             $needles = array_keys($lookup);
             $query = SiteAuditPage::query()
                 ->where('crawl_id', $crawlId)

@@ -77,6 +77,10 @@ return [
     'incremental_by_content_hash' => (bool) env('SITE_AUDIT_INCREMENTAL', true),
     'robots_max_bytes' => (int) env('SITE_AUDIT_ROBOTS_MAX_BYTES', 512000),
     'simhash_hamming_max' => (int) env('SITE_AUDIT_SIMHASH_HAMMING', 6),
+    // Сколько исходящих внутренних URL храним в out_links_json (orphan / depth / «Откуда»).
+    // На витринах с жирным меню (Bitrix) 400 мало: ссылки контента (/vendors/*) идут
+    // после каталога и обрезаются → ложные «сироты». При обрезке приоритет — тот же раздел.
+    'out_links_store_max' => (int) env('SITE_AUDIT_OUT_LINKS_STORE_MAX', 2500),
     // Второй проход: 5-граммы. Кандидат с Hamming≤max остаётся только если доля общих шинголов ≥ порога.
     'simhash_shingle_size' => (int) env('SITE_AUDIT_SIMHASH_SHINGLE_SIZE', 5),
     // 0.15: при общем меню 10% слишком легко набиралось на шаблоне.
