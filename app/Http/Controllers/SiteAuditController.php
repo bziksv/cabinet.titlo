@@ -601,6 +601,7 @@ class SiteAuditController extends Controller
             if (! $showFixed) {
                 $noteSvc->excludeFixed($query, $projectId);
             }
+            $this->excludeEntityJunkNgramFindings($query, $code);
 
             $total = (clone $query)->count();
 
@@ -2052,6 +2053,8 @@ class SiteAuditController extends Controller
             if (! $includeFixed) {
                 (new SiteAuditFindingNoteService())->excludeFixed($query, $projectId);
             }
+            // $code from outer scope — filter entity junk for ngram spam reports
+            $this->excludeEntityJunkNgramFindings($query, $code);
             $query->chunk(200, function ($rows) use ($out) {
                 foreach ($rows as $row) {
                     fputcsv($out, [
@@ -2684,6 +2687,29 @@ class SiteAuditController extends Controller
             return response()->json(['error' => $error], $status);
         }
         abort($status);
+    }
+
+    /**
+     * Старые проверки: &amp;amp; → токен «amp» → ложный bigram/trigram spam.
+     * Прячем из UI/CSV; новые краулы уже без этого (decodeHtmlText).
+     */
+    private function excludeEntityJunkNgramFindings($query, string $code): void
+    {
+        $field = null;
+        if ($code === 'text_trigram_spam') {
+            $field = 'trigram';
+        } elseif ($code === 'text_bigram_spam') {
+            $field = 'bigram';
+        }
+        if ($field === null) {
+            return;
+        }
+        $junk = 'amp|nbsp|quot|apos|lt|gt|ndash|mdash|hellip|laquo|raquo';
+        $pattern = '^(' . $junk . ')( (' . $junk . '))*$';
+        $query->whereRaw(
+            'LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(meta_json, ?)), \'\'))) NOT REGEXP ?',
+            ['$.' . $field, $pattern]
+        );
     }
 
     private function ownedCrawl(int $id, bool $withProgress = true, bool $slimProgress = false): SiteAuditCrawl

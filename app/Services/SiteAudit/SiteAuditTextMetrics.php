@@ -20,7 +20,28 @@ class SiteAuditTextMetrics
         'этом', 'эти', 'что', 'это', 'для', 'при', 'без', 'под', 'над', 'про', 'через', 'также',
         'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'is', 'are', 'was', 'with',
         'by', 'from', 'as', 'at', 'be', 'this', 'that', 'it', 'we', 'you', 'they', 'not',
+        // хвосты HTML-entity после неполного decode (&amp;amp; → токен «amp»)
+        'amp', 'nbsp', 'quot', 'apos', 'lt', 'gt', 'ndash', 'mdash', 'hellip', 'laquo', 'raquo',
     ];
+
+    /**
+     * Декод HTML-текста для метрик: Bitrix часто пишет &amp;amp; — один проход
+     * оставляет &amp;, а токенизатор режет это в слово «amp» → ложный trigram spam.
+     */
+    public static function decodeHtmlText(string $text): string
+    {
+        for ($i = 0; $i < 4; $i++) {
+            $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($decoded === $text) {
+                break;
+            }
+            $text = $decoded;
+        }
+        // незакрытые / остаточные entity: &amp &nbsp; &#38;
+        $text = preg_replace('/&(?:#\d{1,7}|#x[\da-f]{1,6}|[a-z][\w:-]{0,31});?/iu', ' ', $text) ?? $text;
+
+        return $text;
+    }
 
     /**
      * @return array{
@@ -234,6 +255,7 @@ class SiteAuditTextMetrics
      */
     public static function tokens(string $text, int $minLen = 3): array
     {
+        $text = self::decodeHtmlText($text);
         $text = mb_strtolower($text);
         $text = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $text);
         $parts = preg_split('/\s+/u', trim((string) $text), -1, PREG_SPLIT_NO_EMPTY);
@@ -262,6 +284,33 @@ class SiteAuditTextMetrics
         }
 
         return isset(self::$stopMap[$w]);
+    }
+
+    /**
+     * N-грамма только из хвостов HTML-entity (amp amp amp) — не контентный спам.
+     */
+    public static function isEntityJunkNgram(?string $ngram): bool
+    {
+        $ngram = mb_strtolower(trim((string) $ngram));
+        if ($ngram === '') {
+            return true;
+        }
+        $junk = [
+            'amp' => true, 'nbsp' => true, 'quot' => true, 'apos' => true,
+            'lt' => true, 'gt' => true, 'ndash' => true, 'mdash' => true,
+            'hellip' => true, 'laquo' => true, 'raquo' => true,
+        ];
+        $parts = preg_split('/\s+/u', $ngram, -1, PREG_SPLIT_NO_EMPTY);
+        if (! is_array($parts) || $parts === []) {
+            return true;
+        }
+        foreach ($parts as $p) {
+            if (! isset($junk[$p])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -327,7 +376,7 @@ class SiteAuditTextMetrics
         }
 
         $text = strip_tags($joined);
-        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = self::decodeHtmlText($text);
         $text = trim(preg_replace('/\s+/u', ' ', $text) ?: '');
         $sample = $text;
         if ($sample === '' && $links !== []) {

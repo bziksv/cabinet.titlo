@@ -897,6 +897,7 @@ class SiteAuditAggregator
                     if ($words >= $ngramMinWords
                         && $page->top_bigram
                         && $bgKey !== ''
+                        && ! SiteAuditTextMetrics::isEntityJunkNgram($bgKey)
                         && ! isset($chromeBigrams[$bgKey])
                         && $bgCount >= $bigramMin
                         && $bgDensity >= $bigramDensityMin
@@ -922,6 +923,7 @@ class SiteAuditAggregator
                     if ($words >= $ngramMinWords
                         && ! empty($page->top_trigram)
                         && $tgKey !== ''
+                        && ! SiteAuditTextMetrics::isEntityJunkNgram($tgKey)
                         && ! isset($chromeTrigrams[$tgKey])
                         && $tgCount >= $trigramMin
                         && $tgDensity >= $trigramDensityMin
