@@ -5,11 +5,13 @@ namespace App\Services\SiteAudit;
 use App\SiteAuditCrawl;
 use App\SiteAuditFinding;
 use App\SiteAuditPage;
+use App\Support\Esenin\EseninMorphology;
 
 /**
  * Соответствие запроса посадочной (lite):
- * токены monitoring.query должны встречаться в title/h1/description назначенной page.
- * Полная текстовая релевантность / TF — позже.
+ * exact-фраза в title/h1 — strong OK;
+ * иначе покрытие лемм токенов monitoring.query в title/h1/description (phpMorphy).
+ * Body / proximity / TF — позже (этапы 2–3).
  */
 class SiteAuditLandingQueryMatchProbe
 {
@@ -78,28 +80,39 @@ class SiteAuditLandingQueryMatchProbe
             $inH1 = $h1 !== '' && mb_strpos($h1, $queryNorm) !== false;
             $inDesc = $desc !== '' && mb_strpos($desc, $queryNorm) !== false;
 
+            $titleBag = self::fieldForms($title, $minTokenLen);
+            $h1Bag = self::fieldForms($h1, $minTokenLen);
+            $descBag = self::fieldForms($desc, $minTokenLen);
+
+            $queryLemmas = [];
+            foreach ($tokens as $tok) {
+                $lemma = EseninMorphology::lemma($tok);
+                $queryLemmas[] = $lemma !== '' ? $lemma : $tok;
+            }
+
             $hitsTitle = 0;
             $hitsH1 = 0;
             $hitsDesc = 0;
             $hitsAny = 0;
-            foreach ($tokens as $tok) {
-                $t = false;
-                $h = false;
-                $d = false;
-                if ($title !== '' && mb_strpos($title, $tok) !== false) {
+            $missing = [];
+            foreach ($tokens as $i => $tok) {
+                $lemma = $queryLemmas[$i];
+                $t = self::formHit($tok, $lemma, $titleBag);
+                $h = self::formHit($tok, $lemma, $h1Bag);
+                $d = self::formHit($tok, $lemma, $descBag);
+                if ($t) {
                     $hitsTitle++;
-                    $t = true;
                 }
-                if ($h1 !== '' && mb_strpos($h1, $tok) !== false) {
+                if ($h) {
                     $hitsH1++;
-                    $h = true;
                 }
-                if ($desc !== '' && mb_strpos($desc, $tok) !== false) {
+                if ($d) {
                     $hitsDesc++;
-                    $d = true;
                 }
                 if ($t || $h || $d) {
                     $hitsAny++;
+                } else {
+                    $missing[] = $tok;
                 }
             }
 
@@ -107,7 +120,7 @@ class SiteAuditLandingQueryMatchProbe
             $share = $tokenCount > 0 ? ($hitsAny / $tokenCount) : 0.0;
             $needHits = max($minHits, (int) ceil($tokenCount * $minShare));
 
-            // OK: полный запрос в title или h1, либо достаточно токенов в meta
+            // OK: полный запрос в title или h1, либо достаточно лемм в meta (+ хотя бы одна в title/h1)
             $ok = $inTitle || $inH1 || ($hitsAny >= $needHits && ($hitsTitle + $hitsH1) >= 1);
             if ($ok) {
                 continue;
@@ -124,10 +137,10 @@ class SiteAuditLandingQueryMatchProbe
                 $reasons[] = 'no_full_query_in_title_h1';
             }
             if ($hitsAny < $needHits) {
-                $reasons[] = 'low_token_coverage';
+                $reasons[] = 'low_lemma_coverage';
             }
             if (($hitsTitle + $hitsH1) < 1) {
-                $reasons[] = 'no_tokens_in_title_h1';
+                $reasons[] = 'no_lemmas_in_title_h1';
             }
 
             SiteAuditFinding::query()->create([
@@ -140,6 +153,7 @@ class SiteAuditLandingQueryMatchProbe
                     'query' => $query,
                     'monitoring_keyword_id' => (int) $kid,
                     'landing_url' => $landingUrl,
+                    'match_mode' => 'lemmas',
                     'in_title' => $inTitle,
                     'in_h1' => $inH1,
                     'in_description' => $inDesc,
@@ -150,11 +164,55 @@ class SiteAuditLandingQueryMatchProbe
                     'hits_description' => $hitsDesc,
                     'need_hits' => $needHits,
                     'share' => round($share, 3),
+                    'query_lemmas' => array_values(array_unique($queryLemmas)),
+                    'missing_tokens' => array_slice($missing, 0, 12),
                     'reasons' => $reasons,
                     'page_title' => $page->title,
                 ],
             ]);
             $emitted++;
         }
+    }
+
+    /**
+     * Surface + lemma sets for a meta field.
+     *
+     * @return array{surfaces: array<string, true>, lemmas: array<string, true>}
+     */
+    private static function fieldForms(string $text, int $minLen): array
+    {
+        $surfaces = [];
+        $lemmas = [];
+        if ($text === '') {
+            return ['surfaces' => $surfaces, 'lemmas' => $lemmas];
+        }
+        if (! preg_match_all('/[\p{L}\p{N}]{' . max(2, $minLen) . ',}/u', $text, $m)) {
+            return ['surfaces' => $surfaces, 'lemmas' => $lemmas];
+        }
+        foreach ($m[0] as $tok) {
+            $tok = mb_strtolower((string) $tok);
+            $surfaces[$tok] = true;
+            $lemma = EseninMorphology::lemma($tok);
+            if ($lemma !== '') {
+                $lemmas[$lemma] = true;
+            }
+        }
+
+        return ['surfaces' => $surfaces, 'lemmas' => $lemmas];
+    }
+
+    /**
+     * @param array{surfaces: array<string, true>, lemmas: array<string, true>} $forms
+     */
+    private static function formHit(string $surface, string $lemma, array $forms): bool
+    {
+        if ($lemma !== '' && isset($forms['lemmas'][$lemma])) {
+            return true;
+        }
+        if ($surface !== '' && isset($forms['surfaces'][$surface])) {
+            return true;
+        }
+
+        return false;
     }
 }

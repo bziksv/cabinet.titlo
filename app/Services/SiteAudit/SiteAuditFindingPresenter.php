@@ -2469,12 +2469,37 @@ class SiteAuditFindingPresenter
 
             case 'landing_query_mismatch':
                 $q = ! empty($meta['query']) ? self::clip((string) $meta['query'], 40) : '';
+                $mode = (string) ($meta['match_mode'] ?? '');
                 $hits = isset($meta['hits_any'], $meta['token_count'])
-                    ? ((int) $meta['hits_any'] . '/' . (int) $meta['token_count'] . ' токенов')
+                    ? ((int) $meta['hits_any'] . '/' . (int) $meta['token_count']
+                        . ($mode === 'lemmas' ? ' лемм' : ' токенов'))
                     : '';
+                $bits = [];
+                if ($q !== '') {
+                    $bits[] = '«' . $q . '»';
+                }
+                if ($hits !== '') {
+                    $bits[] = $hits;
+                }
+                $zones = [];
+                if (! empty($meta['in_title']) || (int) ($meta['hits_title'] ?? 0) > 0) {
+                    $zones[] = 'title';
+                }
+                if (! empty($meta['in_h1']) || (int) ($meta['hits_h1'] ?? 0) > 0) {
+                    $zones[] = 'h1';
+                }
+                if (! empty($meta['in_description']) || (int) ($meta['hits_description'] ?? 0) > 0) {
+                    $zones[] = 'desc';
+                }
+                if ($zones !== []) {
+                    $bits[] = implode('/', $zones);
+                }
+                $missing = $meta['missing_tokens'] ?? null;
+                if (is_array($missing) && $missing !== []) {
+                    $bits[] = 'нет: ' . self::clip(implode(', ', array_slice($missing, 0, 4)), 40);
+                }
 
-                return ($q !== '' ? ('«' . $q . '»') : 'запрос')
-                    . ($hits !== '' ? (' · ' . $hits) : '');
+                return $bits !== [] ? implode(' · ', $bits) : 'запрос слабо в meta';
 
             case 'commercial_missing_contacts':
                 return self::commercialMissingContactsPlain($meta);

@@ -1452,8 +1452,15 @@ class SiteAuditDemoFixture
             case 'landing_query_mismatch':
                 return [
                     'query' => 'купить диван демо',
+                    'match_mode' => 'lemmas',
                     'hits_any' => 1 + ($j % 3),
                     'token_count' => 3,
+                    'hits_title' => 1,
+                    'hits_h1' => 0,
+                    'hits_description' => 0,
+                    'missing_tokens' => ['демо'],
+                    'in_title' => false,
+                    'in_h1' => false,
                 ];
             case 'commercial_missing_price':
             case 'commercial_missing_contacts':

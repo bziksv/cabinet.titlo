@@ -144,7 +144,7 @@
                         <div class="mb-3 cabinet-sa-field">
                             <label class="form-label fw-medium" for="sa-limit">
                                 Лимит URL
-                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько страниц сканировать в этой проверке.\nНе выше лимита тарифа (сейчас {{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}).\nМожно поставить меньше, чтобы быстрее прогнать важные разделы."])
+                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько страниц обойти в этой проверке (не выше лимита тарифа).\nДо 10 000 обычно достаточно: типичные ошибки сидят в шаблонах и повторяются на многих URL — полный обход каталога редко даёт новые находки.\nМожно поставить меньше, чтобы быстрее прогнать важные разделы.\nНужен лимит выше — напишите в поддержку, подберём персональный тариф по аудиту."])
                             </label>
                             <input type="text" class="form-control sa-num-space" id="sa-limit"
                                    inputmode="numeric" autocomplete="off"

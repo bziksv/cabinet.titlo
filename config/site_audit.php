@@ -1030,7 +1030,7 @@ return [
             'phase' => 'D',
             'severity' => 'warning',
             'title' => 'Несоответствие запроса посадочной',
-            'description' => 'Запрос из мониторинга слабо отражён в title/h1/description назначенной посадочной (lite по мета).',
+            'description' => 'Запрос из мониторинга слабо отражён в title/h1/description назначенной посадочной (exact-фраза или покрытие лемм токенов; body — позже).',
             'group' => 'seo',
         ],
         'commercial_missing_contacts' => [
