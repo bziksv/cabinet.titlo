@@ -38,15 +38,9 @@ final class EseninExternalAnalyzer
             $extraMarks = array_merge($extraMarks, $lt['marks']);
         }
 
-        $turgenevOptions = [];
-        if (! empty($options['url'])) {
-            $turgenevOptions['url'] = (string) $options['url'];
-            if (! empty($options['tbclass'])) {
-                $turgenevOptions['tbclass'] = (string) $options['tbclass'];
-            }
-        }
-
-        $turgenev = TurgenevClient::checkText($plain, $turgenevOptions);
+        // Всегда отдаём уже выделенный текст. Параметр url заставляет API
+        // качать страницу повторно — запрос в кабинете висит на «Проверяем…».
+        $turgenev = TurgenevClient::checkText($plain);
         $providers['turgenev'] = [
             'ok' => (bool) ($turgenev['ok'] ?? false),
             'error' => $turgenev['error'] ?? null,

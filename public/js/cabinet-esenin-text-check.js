@@ -135,14 +135,18 @@
         return meta ? meta.getAttribute('content') : '';
     }
 
-    function postJson(url, payload) {
+    function postJson(url, payload, timeoutMs) {
         if (typeof window.axios !== 'undefined') {
-            return window.axios.post(url, payload, {
+            var axiosOpts = {
                 headers: {
                     'X-CSRF-TOKEN': csrfToken(),
                     'X-Requested-With': 'XMLHttpRequest'
                 }
-            }).then(function (response) {
+            };
+            if (timeoutMs) {
+                axiosOpts.timeout = timeoutMs;
+            }
+            return window.axios.post(url, payload, axiosOpts).then(function (response) {
                 return response.data;
             });
         }
@@ -153,12 +157,16 @@
                 return;
             }
 
-            window.jQuery.ajax({
+            var ajaxOpts = {
                 url: url,
                 method: 'POST',
                 data: Object.assign({ _token: csrfToken() }, payload || {}),
                 dataType: 'json'
-            }).done(resolve).fail(function (xhr) {
+            };
+            if (timeoutMs) {
+                ajaxOpts.timeout = timeoutMs;
+            }
+            window.jQuery.ajax(ajaxOpts).done(resolve).fail(function (xhr) {
                 reject(xhr);
             });
         });
@@ -2523,6 +2531,9 @@
     }
 
     function runCheck() {
+        if (checkInFlight > 0) {
+            return;
+        }
         var payload = {
             ajax: 1,
             source: activeSource,
@@ -2601,8 +2612,8 @@
                 } catch (e) {
                     /* ignore */
                 }
-            } else if (xhr && xhr.message && !/frameElement|CKEDITOR|Cannot read prop/i.test(String(xhr.message))) {
-                message = xhr.message;
+            } else if (xhr && (xhr.code === 'ECONNABORTED' || xhr.message === 'timeout' || xhr.statusText === 'timeout')) {
+                message = 'Проверка слишком долгая. Попробуйте ещё раз или вставьте текст вручную.';
             }
             showError(message);
         }
@@ -2618,7 +2629,7 @@
         }
 
         if (typeof window.axios !== 'undefined') {
-            postJson('/esenin-text-check?ajax=1', payload)
+            postJson('/esenin-text-check?ajax=1', payload, 70000)
                 .then(function (data) {
                     applyCheckResponse(data);
                 })
@@ -2634,7 +2645,8 @@
                 url: '/esenin-text-check?ajax=1',
                 method: 'POST',
                 data: payload,
-                dataType: 'json'
+                dataType: 'json',
+                timeout: 70000
             }).done(applyCheckResponse).fail(handleFailure).always(finishRequest);
             return;
         }

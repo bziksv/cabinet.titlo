@@ -107,25 +107,139 @@ final class EseninAnalyzer
     {
         $html = TextAnalyzer::curlInitV2($url);
         if (! is_string($html) || trim($html) === '') {
-            throw new \RuntimeException('Не удалось загрузить страницу');
+            throw new \RuntimeException('Не удалось загрузить страницу. Проверьте URL или попробуйте без селектора.');
         }
 
+        $selector = self::normalizeContentSelector($selector);
         if ($selector !== '') {
-            $document = new HtmlDocument();
-            $document->load($html);
-            $nodes = $document->find($selector);
-            $chunks = [];
-            foreach ($nodes as $node) {
-                $chunks[] = html_entity_decode(strip_tags($node->innertext()), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            }
-            $text = trim(implode("\n\n", array_filter($chunks)));
+            $text = self::extractHtmlBySelector($html, $selector);
             if ($text !== '') {
                 return $text;
             }
+
+            throw new \RuntimeException(
+                'На странице нет блока по селектору «' . $selector . '». Укажите класс текстового блока или оставьте поле пустым.'
+            );
         }
 
+        $text = self::extractMainContentGuess($html);
+        if ($text !== '') {
+            return $text;
+        }
+
+        $text = self::htmlToPlain($html);
+        if ($text === '') {
+            throw new \RuntimeException('Не удалось выделить текст на странице');
+        }
+
+        return $text;
+    }
+
+    private static function normalizeContentSelector(string $selector): string
+    {
+        $selector = trim($selector);
+        if ($selector === '') {
+            return '';
+        }
+        if (preg_match('/^[\p{L}\p{N}_-]+$/u', $selector)) {
+            return '.' . $selector;
+        }
+
+        return $selector;
+    }
+
+    private static function extractHtmlBySelector(string $html, string $selector): string
+    {
+        $parts = preg_split('/\s*,\s*/', $selector, -1, PREG_SPLIT_NO_EMPTY);
+        if (! is_array($parts) || $parts === []) {
+            return '';
+        }
+
+        try {
+            $document = new HtmlDocument();
+            $document->load($html);
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        $best = '';
+        foreach ($parts as $part) {
+            try {
+                $nodes = $document->find($part);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (! is_array($nodes) && ! ($nodes instanceof \Traversable)) {
+                $nodes = $nodes ? [$nodes] : [];
+            }
+            foreach ($nodes as $node) {
+                if (! is_object($node) || ! method_exists($node, 'innertext')) {
+                    continue;
+                }
+                $chunk = self::htmlToPlain((string) $node->innertext());
+                if (mb_strlen($chunk, 'UTF-8') > mb_strlen($best, 'UTF-8')) {
+                    $best = $chunk;
+                }
+            }
+        }
+
+        return $best;
+    }
+
+    private static function extractMainContentGuess(string $html): string
+    {
+        try {
+            $document = new HtmlDocument();
+            $document->load($html);
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        $full = self::htmlToPlain($html);
+        $fullLen = mb_strlen($full, 'UTF-8');
+        foreach (['.vmd-desc', '.item-desc', 'article', '[role=main]', 'main'] as $sel) {
+            try {
+                $nodes = $document->find($sel);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (! is_array($nodes) && ! ($nodes instanceof \Traversable)) {
+                $nodes = $nodes ? [$nodes] : [];
+            }
+            $best = '';
+            $bestLen = 0;
+            foreach ($nodes as $node) {
+                if (! is_object($node) || ! method_exists($node, 'innertext')) {
+                    continue;
+                }
+                $chunk = self::htmlToPlain((string) $node->innertext());
+                $len = mb_strlen($chunk, 'UTF-8');
+                if ($len > $bestLen) {
+                    $best = $chunk;
+                    $bestLen = $len;
+                }
+            }
+            if ($bestLen < 200) {
+                continue;
+            }
+            if ($fullLen > 0 && $bestLen > (int) ($fullLen * 0.9)) {
+                continue;
+            }
+
+            return $best;
+        }
+
+        return '';
+    }
+
+    private static function htmlToPlain(string $html): string
+    {
+        $html = preg_replace('/<(script|style|noscript|svg|iframe)[^>]*>.*?<\/\1>/is', ' ', $html) ?? $html;
+        $html = preg_replace('/<\s*br\s*\/?>/i', "\n", $html) ?? $html;
+        $html = preg_replace('/<\/\s*(p|div|h[1-6]|li|tr|blockquote|section|article)\s*>/i', "\n", $html) ?? $html;
         $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/\s+/u', ' ', $text) ?? '';
+        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
 
         return trim($text);
     }

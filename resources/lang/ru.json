@@ -1566,7 +1566,7 @@
     "Esenin text check tab url": "Проверка по URL",
     "Esenin text check task name label": "Название задания",
     "Esenin text check task name placeholder": "Например: Статья про замену прокладки Kia Rio",
-    "Esenin text check tbclass hint": "Например .content — если не указать, «Тургенев» попробует выделить SEO-текст автоматически.",
+    "Esenin text check tbclass hint": "Например .content или content — класс блока с SEO-текстом. Если не указать, возьмём основной контент страницы (не меню и не скрипты).",
     "Esenin text check tbclass label": "CSS-селектор текстового блока (необязательно)",
     "Esenin text check text label": "Текст для проверки",
     "Esenin text check text placeholder": "Вставьте SEO-текст, HTML-разметку или статью…",

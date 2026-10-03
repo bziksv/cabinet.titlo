@@ -53,9 +53,10 @@ class TextAnalyzer extends Model
             curl_setopt($curl, CURLOPT_FAILONERROR, false);
             curl_setopt($curl, CURLOPT_AUTOREFERER, true);
             curl_setopt($curl, CURLOPT_ENCODING, '');
-            curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 4);
-            curl_setopt($curl, CURLOPT_TIMEOUT, 5);
+            curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 6);
+            curl_setopt($curl, CURLOPT_TIMEOUT, 12);
             curl_setopt($curl, CURLOPT_REFERER, $refers[array_rand($refers)]);
+            curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
             curl_setopt($curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
 
             $raw = curl_exec($curl);
