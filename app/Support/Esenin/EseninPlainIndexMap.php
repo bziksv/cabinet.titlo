@@ -286,11 +286,6 @@ final class EseninPlainIndexMap
         $markEl = self::createMarkElement($dom, $mark);
         $middleNode = $dom->createTextNode($middle);
         $markEl->appendChild($middleNode);
-        $icon = $dom->createElement('span');
-        $icon->setAttribute('class', 'esenin-mark__icon');
-        $icon->setAttribute('aria-hidden', 'true');
-        $icon->appendChild($dom->createTextNode('!'));
-        $markEl->appendChild($icon);
 
         $parent = $node->parentNode;
         $next = $node->nextSibling;

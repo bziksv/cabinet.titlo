@@ -1080,7 +1080,7 @@ final class EseninAnalyzer
             $title = htmlspecialchars((string) ($mark['hint'] ?? ''), ENT_QUOTES, 'UTF-8');
             $replacement = '<mark class="' . $class . '" data-esenin-tip="' . $title . '" data-esenin-mark="' . htmlspecialchars((string) ($mark['block'] ?? ''), ENT_QUOTES, 'UTF-8') . '">' .
                 htmlspecialchars($fragment, ENT_QUOTES, 'UTF-8') .
-                '<span class="esenin-mark__icon" aria-hidden="true">!</span></mark>';
+                '</mark>';
             $html = mb_substr($html, 0, $start, 'UTF-8') . $replacement . mb_substr($html, $start + $length, null, 'UTF-8');
         }
 

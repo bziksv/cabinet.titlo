@@ -577,7 +577,7 @@ class TextUniquenessService
             $html .= '<mark class="cabinet-ta-uniq-mark esenin-mark esenin-mark--uniqueness" data-esenin-tip="'
                 . $tipAttr . '"' . $urlAttr . '>'
                 . $fragment
-                . '<span class="esenin-mark__icon" aria-hidden="true">!</span></mark>';
+                . '</mark>';
             $cursor = $end;
         }
         if ($cursor < $textLen) {

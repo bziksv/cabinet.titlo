@@ -365,24 +365,9 @@ body > .cke_float {
     border-bottom: 2px solid rgba(111, 66, 193, 0.55);
 }
 
+/* Старые сохранённые отчёты могли содержать «!» — больше не показываем */
 .cabinet-esenin-text-view__content mark.esenin-mark .esenin-mark__icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    vertical-align: super;
-    width: 0.85em;
-    height: 0.85em;
-    margin-left: 0.12em;
-    border-radius: 50%;
-    background: #dc3545;
-    color: #fff;
-    font-size: 0.62em;
-    font-weight: 700;
-    line-height: 1;
-    flex-shrink: 0;
-    user-select: none;
-    -webkit-user-select: none;
-    pointer-events: none;
+    display: none;
 }
 
 .cabinet-esenin-frequency-tabs .nav-link {

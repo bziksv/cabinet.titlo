@@ -1944,8 +1944,7 @@
                 return;
             }
             container.querySelectorAll('.esenin-mark__icon').forEach(function (icon) {
-                icon.setAttribute('contenteditable', 'false');
-                icon.setAttribute('aria-hidden', 'true');
+                icon.remove();
             });
         }
 
