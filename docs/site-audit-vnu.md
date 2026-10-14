@@ -80,4 +80,5 @@ stderr_logfile=/var/log/supervisor/cabinet-titlo-vnu.err.log
   параллельно по concurrency краула / `SITE_AUDIT_VNU_CONCURRENCY`, затем parse с
   `vnu_precomputed` (без повторного HTTP на страницу).
 - Если vnu недоступен при parse → **fallback на libxml** + `checker_fallback` в meta finding.
+- Ретрай unreachable при агрегации **не подменяет** чекер: выбран Nu — снова Nu.
 - Не вызывать `java -jar` на каждую страницу: только long-running servlet.

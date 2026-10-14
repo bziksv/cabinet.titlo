@@ -525,8 +525,10 @@ class SiteAuditAggregator
             is_array($project->settings_json) ? $project->settings_json : [],
             is_array($crawl->progress_json['settings'] ?? null) ? $crawl->progress_json['settings'] : []
         );
-        // Повтор без HTML5/vnu — иначе агрегация снова упрётся в Nu на тысячах URL.
-        $settings['html_checker'] = SiteAuditHtmlChecker::LIBXML;
+        // Чекер как у краула: Nu выбран — Nu и на ретрае (без тихой подмены на libxml).
+        $settings['html_checker'] = SiteAuditHtmlChecker::normalize(
+            $settings['html_checker'] ?? SiteAuditHtmlChecker::defaultChecker()
+        );
 
         $processor = new SiteAuditPageProcessor();
         $fetcher = SiteAuditFetcher::fromCrawlSettings($settings, (int) $crawl->id);
