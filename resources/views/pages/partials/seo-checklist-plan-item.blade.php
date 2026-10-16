@@ -75,6 +75,7 @@
     data-stage-key="{{ $item->stage_key === 'connect' ? 'access' : $item->stage_key }}"
     data-important="{{ $item->is_important ? '1' : '0' }}"
     data-overdue="{{ $isOver ? '1' : '0' }}"
+    data-due-past="{{ ($item->due_at && $item->due_at->isPast()) ? '1' : '0' }}"
     data-due-soon="{{ (method_exists($item, 'isDueSoon') && $item->isDueSoon()) ? '1' : '0' }}"
     data-later="{{ (!$isOver && $item->due_at && !(method_exists($item, 'isDueSoon') && $item->isDueSoon()) && $item->due_at->gt(now()->addDays(7)->endOfDay())) ? '1' : '0' }}"
     data-can-approve="{{ $canApprove ? '1' : '0' }}"
@@ -108,7 +109,10 @@
                                 aria-label="{{ __('Task info') }}">i</button>
                     @endif
                     @if($item->due_at)
-                        <span class="cabinet-sc-plan__due @if($isOver) is-overdue @endif">
+                        <span class="cabinet-sc-plan__due @if($isOver) is-overdue @endif"
+                              data-sc-due
+                              data-label-overdue="{{ __('Overdue') }} · {{ $item->due_at->format('d.m') }}"
+                              data-label-date="{{ __('Due') }} {{ $item->due_at->format('d.m') }}">
                             @if($isOver)
                                 {{ __('Overdue') }} · {{ $item->due_at->format('d.m') }}
                             @else
@@ -265,50 +269,13 @@
         </div>
         <ul class="cabinet-sc-notes-list" data-sc-notes-list>
             @foreach(($item->relationLoaded('notes') ? $item->notes : collect()) as $note)
-                @php
-                    $noteIsOwn = (int) $note->user_id === $authId;
-                    $noteIsUnread = in_array((int) $note->id, $unreadNoteIds, true);
-                @endphp
-                <li class="@if($noteIsUnread) is-unread @endif"
-                    @if($noteIsUnread) data-sc-note-unread="1" @endif
-                    data-note-id="{{ $note->id }}"
-                    data-note-own="{{ $noteIsOwn ? '1' : '0' }}">
-                    @include('pages.partials.seo-checklist-note-avatar', ['user' => $note->user, 'name' => $note->authorLabel()])
-                    <div class="cabinet-sc-notes-list__main">
-                        <div class="cabinet-sc-notes-list__meta">
-                            <strong class="cabinet-sc-notes-list__author">{{ $note->authorLabel() }}</strong>
-                            <span class="text-secondary small">{{ $note->created_at->format('d.m.Y H:i') }}</span>
-                            @if($noteIsUnread)
-                                <span class="cabinet-sc-notes-list__unread-badge">{{ __('Unread') }}</span>
-                            @endif
-                        </div>
-                        <div class="cabinet-sc-notes-list__body">{!! \App\Support\TextAutoLinker::format((string) $note->body) !!}</div>
-                        @include('pages.partials.seo-checklist-note-attachments', ['note' => $note, 'projectId' => $item->project_id])
-                    </div>
-                    @if(!$noteIsOwn)
-                        <div class="cabinet-sc-notes-list__side" data-sc-note-side>
-                            @if($noteIsUnread)
-                                <button type="button"
-                                        class="cabinet-sc-plan__side-btn"
-                                        data-sc-mark-note-read
-                                        data-note-id="{{ $note->id }}"
-                                        aria-label="{{ __('Mark as read') }}">
-                                    <i class="bi bi-flag" aria-hidden="true"></i>
-                                    <span class="cabinet-sc-plan__side-btn-label">{{ __('Mark as read') }}</span>
-                                </button>
-                            @else
-                                <button type="button"
-                                        class="cabinet-sc-plan__side-btn"
-                                        data-sc-mark-note-unread
-                                        data-note-id="{{ $note->id }}"
-                                        aria-label="{{ __('Mark note unread') }}">
-                                    <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
-                                    <span class="cabinet-sc-plan__side-btn-label">{{ __('Mark unread short') }}</span>
-                                </button>
-                            @endif
-                        </div>
-                    @endif
-                </li>
+                @include('pages.partials.seo-checklist-note-row', [
+                    'note' => $note,
+                    'projectId' => $item->project_id,
+                    'authId' => $authId,
+                    'noteIsUnread' => in_array((int) $note->id, $unreadNoteIds, true),
+                    'noteEditable' => empty($projectArchived),
+                ])
             @endforeach
         </ul>
         @if(!$projectArchived)

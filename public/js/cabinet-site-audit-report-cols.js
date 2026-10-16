@@ -122,6 +122,12 @@
       if (!key || input.disabled) return;
       input.checked = !!set[key];
     });
+
+    /* «Все meta» не влезает в экран: отдельные ширины и горизонтальный скролл. */
+    table.classList.toggle(
+      'cabinet-sa-findings-table--meta-wide',
+      !!(set.title_len || set.desc_len || set.keywords)
+    );
   }
 
   function applyOrder(table, order) {

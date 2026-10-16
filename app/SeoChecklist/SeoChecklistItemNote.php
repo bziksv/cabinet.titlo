@@ -35,6 +35,20 @@ class SeoChecklistItemNote extends Model
         return $this->hasMany(SeoChecklistItemAttachment::class, 'note_id')->orderBy('id');
     }
 
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(SeoChecklistNoteRevision::class, 'note_id')->orderByDesc('id');
+    }
+
+    public function wasEdited(): bool
+    {
+        if ($this->relationLoaded('revisions')) {
+            return $this->revisions->isNotEmpty();
+        }
+
+        return $this->revisions()->exists();
+    }
+
     public function authorLabel(): string
     {
         $user = $this->user;

@@ -124,10 +124,13 @@
                           action="{{ route('pages.seo-checklist.teams.delete', ['teamId' => $team->id]) }}"
                           class="cabinet-sc-team-card__summary-action"
                           data-sc-stop-toggle
-                          onsubmit='return confirm(@json(__("Delete this team?")));'>
+                          data-cabinet-confirm="{{ __('Delete this team?') }}"
+                          data-cabinet-confirm-title="Удалить команду"
+                          data-cabinet-confirm-ok="Удалить"
+                          data-cabinet-confirm-danger="1">
                         @csrf
                         @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
-                        <button type="submit" class="btn btn-sm btn-outline-danger" @if($team->projects_count > 0) disabled title="{{ __('Team is used by projects') }}" @endif>
+                        <button type="submit" class="btn btn-sm btn-outline-danger" @if($team->projects_count > 0) disabled aria-label="{{ __('Team is used by projects') }}" @endif>
                             {{ __('Delete') }}
                         </button>
                     </form>
@@ -182,7 +185,10 @@
                                                         </select>
                                                     </form>
                                                     <form method="post" action="{{ route('pages.seo-checklist.teams.members.delete', ['teamId' => $team->id, 'memberId' => $member->id]) }}"
-                                                          onsubmit='return confirm(@json(__("Remove member?")));'>
+                                                          data-cabinet-confirm="{{ __('Remove member?') }}"
+                                                          data-cabinet-confirm-title="Удалить участника"
+                                                          data-cabinet-confirm-ok="Удалить"
+                                                          data-cabinet-confirm-danger="1">
                                                         @csrf
                                                         @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
                                                         <button type="submit" class="btn btn-sm btn-outline-danger cabinet-sc-icon-btn" title="{{ __('Remove member') }}">×</button>
@@ -284,3 +290,7 @@
         <p class="cabinet-sc-empty-filter small text-secondary d-none mb-0 mt-2" data-sc-assign-empty>{{ __('No projects match filters') }}</p>
     </div>
 @endif
+
+@once
+    @include('partials.cabinet-confirm-modal')
+@endonce

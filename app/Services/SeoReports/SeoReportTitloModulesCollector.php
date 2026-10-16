@@ -132,7 +132,7 @@ class SeoReportTitloModulesCollector
         $closedInPeriod = (int) $closedQuery->count();
 
         $overdue = (int) $project->items()
-            ->whereIn('status', SeoChecklistItem::OPEN_STATUSES)
+            ->whereIn('status', SeoChecklistItem::ASSIGNEE_DUE_STATUSES)
             ->whereNotNull('due_at')
             ->where('due_at', '<', Carbon::now())
             ->count();
@@ -224,7 +224,6 @@ class SeoReportTitloModulesCollector
             ->all();
 
         $horizonEnd = ($to ? $to->copy() : Carbon::now())->addDays(21)->endOfDay();
-        $now = Carbon::now();
         $plan = $project->items()
             ->where('include_in_report', true)
             ->whereIn('status', SeoChecklistItem::OPEN_STATUSES)
@@ -238,14 +237,14 @@ class SeoReportTitloModulesCollector
             ->orderBy('id')
             ->limit(30)
             ->get(['id', 'title', 'status', 'due_at', 'parent_id'])
-            ->map(static function (SeoChecklistItem $item) use ($now) {
+            ->map(static function (SeoChecklistItem $item) {
                 $due = $item->due_at;
                 return [
                     'id' => (int) $item->id,
                     'title' => (string) $item->title,
                     'status' => (string) $item->status,
                     'due_at' => $due ? $due->format('Y-m-d') : null,
-                    'overdue' => $due ? $due->lt($now) : false,
+                    'overdue' => $item->isOverdue(),
                 ];
             })
             ->values()

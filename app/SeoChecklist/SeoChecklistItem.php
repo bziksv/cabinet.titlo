@@ -15,6 +15,11 @@ class SeoChecklistItem extends Model
 
     public const CLOSED_STATUSES = ['done', 'skip'];
 
+    /**
+     * Срок ещё на исполнителе. «На проверку» и «На уточнении» в просрочку не входят.
+     */
+    public const ASSIGNEE_DUE_STATUSES = ['todo', 'doing', 'rework'];
+
     protected $table = 'seo_checklist_items';
 
     protected $fillable = [
@@ -50,9 +55,16 @@ class SeoChecklistItem extends Model
         return $this->parent_id !== null;
     }
 
+    public function countsAsAssigneeWork(): bool
+    {
+        $status = $this->status === 'blocked' ? 'clarify' : $this->status;
+
+        return in_array($status, self::ASSIGNEE_DUE_STATUSES, true);
+    }
+
     public function isOverdue(): bool
     {
-        if (!$this->due_at || !$this->isOpenStatus()) {
+        if (!$this->due_at || !$this->countsAsAssigneeWork()) {
             return false;
         }
 
@@ -61,7 +73,7 @@ class SeoChecklistItem extends Model
 
     public function isDueSoon(int $withinDays = 2): bool
     {
-        if (!$this->due_at || !$this->isOpenStatus() || $this->isOverdue()) {
+        if (!$this->due_at || !$this->isOpenStatus() || $this->isOverdue() || $this->due_at->isPast()) {
             return false;
         }
 

@@ -91,20 +91,13 @@
         @php $subVisible = 5; @endphp
         <div class="cabinet-sc-subtask__comments" data-sc-sub-comments>
             @foreach($subNotes as $subIdx => $subNote)
-                @php $subAuthor = $subNote->authorLabel(); @endphp
-                <div class="cabinet-sc-subtask__comment" @if($subIdx >= $subVisible) hidden data-sc-sub-comment-extra @endif>
-                    @include('pages.partials.seo-checklist-note-avatar', ['user' => $subNote->user, 'name' => $subAuthor])
-                    <div class="cabinet-sc-subtask__comment-main">
-                        <div class="cabinet-sc-subtask__comment-head">
-                            <strong>{{ $subAuthor }}</strong>
-                            <span class="cabinet-sc-subtask__comment-date">{{ $subNote->created_at->format('d.m H:i') }}</span>
-                        </div>
-                        @if(trim((string) $subNote->body) !== '')
-                            <div class="cabinet-sc-subtask__comment-body">{!! \App\Support\TextAutoLinker::format((string) $subNote->body) !!}</div>
-                        @endif
-                        @include('pages.partials.seo-checklist-note-attachments', ['note' => $subNote, 'projectId' => $child->project_id])
-                    </div>
-                </div>
+                @include('pages.partials.seo-checklist-note-sub', [
+                    'note' => $subNote,
+                    'projectId' => $child->project_id,
+                    'authId' => (int) auth()->id(),
+                    'noteEditable' => $subEditable,
+                    'hiddenExtra' => $subIdx >= $subVisible,
+                ])
             @endforeach
             @if($subNotes->count() > $subVisible)
                 <button type="button"

@@ -409,6 +409,9 @@ class InactiveUsersPurge
                         if ($noteIds->isNotEmpty() && Schema::hasTable('seo_checklist_note_reads')) {
                             DB::table('seo_checklist_note_reads')->whereIn('note_id', $noteIds)->delete();
                         }
+                        if ($noteIds->isNotEmpty() && Schema::hasTable('seo_checklist_note_revisions')) {
+                            DB::table('seo_checklist_note_revisions')->whereIn('note_id', $noteIds)->delete();
+                        }
                         DB::table('seo_checklist_item_notes')->whereIn('item_id', $itemIds)->delete();
                     }
                     if (Schema::hasTable('seo_checklist_item_time_logs')) {

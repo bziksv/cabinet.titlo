@@ -256,12 +256,14 @@
 
     </div>
 
+    @include('partials.cabinet-confirm-modal')
     @include('pages.partials.seo-checklist-status-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-attach.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-attach.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-status-modal.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-status-modal.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-seo-checklist-notes.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-notes.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-plan.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-plan.js')) ?: time() }}"></script>
         <script>
             (function () {

@@ -1646,14 +1646,14 @@ a.cabinet-sa-bucket--link:hover {
   width: 100%;
 }
 
-/* Много meta-столбцов: не сжимать в кашу — горизонтальный скролл */
-.cabinet-sa-findings-table:has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
-.cabinet-sa-findings-table:has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
-.cabinet-sa-findings-table:has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
-.cabinet-sa-findings-table:has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"]) {
-  table-layout: auto;
-  width: max-content;
-  min-width: 100%;
+/* Много meta-столбцов: таблица остаётся в ширине экрана, текст переносится. */
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"]) {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
 }
 
 .cabinet-sa-findings-table td.cabinet-sa-page-col:not(.is-col-hidden),
@@ -1703,6 +1703,229 @@ a.cabinet-sa-bucket--link:hover {
 
 .cabinet-sa-findings-table > colgroup > .cabinet-sa-col-actions {
   width: 148px;
+}
+
+/*
+ * Пресет с TITLE / HTTP / H1 / Description: доли экрана, не ширина по тексту.
+ * max-width:0 вместе с table-layout:fixed заставляет ячейку переносить строку.
+ */
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > thead > tr > th[data-sa-col="url"],
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td[data-sa-col="url"],
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td.cabinet-sa-url {
+  width: 16%;
+  min-width: 0;
+  max-width: none;
+}
+
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > thead > tr > th[data-sa-col="details"],
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td[data-sa-col="details"],
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td.cabinet-sa-details-cell {
+  width: 22%;
+  min-width: 0;
+  max-width: none;
+}
+
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > thead > tr > th[data-sa-col]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td[data-sa-col]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]) {
+  width: 8%;
+  min-width: 0;
+  max-width: none;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > thead > tr > th[data-sa-col="status"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td[data-sa-col="status"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > thead > tr > th[data-sa-col="index"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td[data-sa-col="index"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]) {
+  width: 4.5%;
+  max-width: none;
+  white-space: nowrap;
+}
+
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > thead > tr > th[data-sa-col="title"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td[data-sa-col="title"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > thead > tr > th[data-sa-col="description"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td[data-sa-col="description"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > thead > tr > th[data-sa-col="h1"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]),
+.cabinet-sa-findings-table:not(.cabinet-sa-findings-table--meta-wide):is(
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="title"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="status"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="h1"]),
+  :has([data-sa-col]:not(.is-col-hidden)[data-sa-col="description"])
+) > tbody > tr > td[data-sa-col="h1"]:not(.is-col-hidden):not([data-sa-col="url"]):not([data-sa-col="details"]):not([data-sa-col="actions"]):not([data-sa-col="from"]):not([data-sa-col="severity"]) {
+  width: 12%;
+  max-width: none;
+}
+
+/* «Все meta»: колонки шире экрана, у каждой своя ширина, текст не залезает на соседнюю. */
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide {
+  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+}
+
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col]:not(.is-col-hidden),
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col]:not(.is-col-hidden) {
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="url"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="url"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td.cabinet-sa-url {
+  width: 13rem;
+  min-width: 13rem;
+  max-width: 13rem;
+}
+
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="details"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="details"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td.cabinet-sa-details-cell {
+  width: 20rem;
+  min-width: 20rem;
+  max-width: 20rem;
+}
+
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="status"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="status"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="index"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="index"] {
+  width: 4.5rem;
+  min-width: 4.5rem;
+  max-width: 4.5rem;
+  white-space: nowrap;
+}
+
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="title_len"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="title_len"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="desc_len"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="desc_len"] {
+  width: 6.75rem;
+  min-width: 6.75rem;
+  max-width: 6.75rem;
+}
+
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="title"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="title"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="description"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="description"] {
+  width: 14rem;
+  min-width: 14rem;
+  max-width: 14rem;
+}
+
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="keywords"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="keywords"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="canonical"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="canonical"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="h1"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="h1"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="h2"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="h2"] {
+  width: 10rem;
+  min-width: 10rem;
+  max-width: 10rem;
+}
+
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="robots"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="robots"] {
+  width: 7rem;
+  min-width: 7rem;
+  max-width: 7rem;
+}
+
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > thead > tr > th[data-sa-col="actions"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--meta-wide > tbody > tr > td[data-sa-col="actions"] {
+  position: static;
 }
 
 .cabinet-sa-table-wrap--broken > .cabinet-sa-findings-table > thead > tr > th[data-sa-col="url"],
@@ -4680,6 +4903,7 @@ label.cabinet-sa-act__main {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  container-type: inline-size;
 }
 
 .cabinet-sa-similar__head {
@@ -4694,6 +4918,19 @@ label.cabinet-sa-act__main {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 8px;
   align-items: stretch;
+}
+
+@container (max-width: 24rem) {
+  .cabinet-sa-similar__pair {
+    grid-template-columns: 1fr;
+  }
+  .cabinet-sa-similar__vs {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+  .cabinet-sa-similar__wc {
+    margin-left: 0;
+  }
 }
 
 .cabinet-sa-similar__side {

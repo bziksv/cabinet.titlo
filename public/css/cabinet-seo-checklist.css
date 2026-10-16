@@ -4835,6 +4835,98 @@ span.cabinet-sc-time--sub {
     word-break: break-word;
 }
 
+.cabinet-sc-note-edited {
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+.cabinet-sc-note-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+.cabinet-sc-note-editor__actions {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.cabinet-sc-notes-list__side .cabinet-sc-note-delete {
+    color: #b91c1c;
+}
+
+.cabinet-sc-notes-list__side .cabinet-sc-note-delete:hover,
+.cabinet-sc-notes-list__side .cabinet-sc-note-delete:focus-visible {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.cabinet-sc-note-history {
+    margin-top: 0.35rem;
+}
+
+.cabinet-sc-note-history__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.cabinet-sc-note-history__count {
+    min-width: 1.1rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 0.68rem;
+    line-height: 1.35rem;
+    text-align: center;
+}
+
+.cabinet-sc-note-history__item {
+    margin-top: 0.35rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 6px;
+    background: #f1f5f9;
+}
+
+.cabinet-sc-note-history__meta {
+    color: #64748b;
+    font-size: 0.72rem;
+    margin-bottom: 0.15rem;
+}
+
+.cabinet-sc-note-history__body {
+    color: #475569;
+    white-space: pre-line;
+    word-break: break-word;
+}
+
+.cabinet-sc-note-inline-actions {
+    display: inline-flex;
+    gap: 0.55rem;
+    margin-left: auto;
+}
+
+.cabinet-sc-note-inline-actions button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.cabinet-sc-note-inline-actions button.is-danger {
+    color: #b91c1c;
+}
+
 .cabinet-sc-notes-list__body .cabinet-text-autolink,
 .cabinet-sc-feed__note .cabinet-text-autolink {
     color: #0f766e;
@@ -7056,10 +7148,12 @@ html.cabinet-sc-lightbox-open {
     flex-wrap: wrap;
     gap: 0.2rem;
     padding: 0 0.35rem 0.55rem 0.45rem;
+    overflow: visible;
 }
 
 .cabinet-sc-plan-v2 .cabinet-sc-plan-rail__chip {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 0.18rem;
     min-height: 1.25rem;

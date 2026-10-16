@@ -235,7 +235,12 @@
         <div class="modal fade" id="cabinetScCreateModal" tabindex="-1" aria-labelledby="cabinetScCreateModalTitle" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
-                    <form method="post" action="{{ route('pages.seo-checklist.store') }}" data-sc-create-form>
+                        <form method="post" action="{{ route('pages.seo-checklist.store') }}"
+                              data-sc-create-form
+                              data-archived-domains='@json(isset($archived) ? $archived->pluck("domain")->values() : [])'
+                              data-i18n-replace-title="{{ e(__('Replace archived checklist title')) }}"
+                              data-i18n-replace-text="{{ e(__('Replace archived checklist text')) }}"
+                              data-i18n-replace-ok="{{ e(__('Create checklist again')) }}">
                         @csrf
                         <div class="modal-header">
                             <h5 class="modal-title" id="cabinetScCreateModalTitle">{{ __('Create checklist') }}</h5>
@@ -278,6 +283,7 @@
     @endif
 
     @include('pages.partials.seo-checklist-delete-project-modal')
+    @include('partials.cabinet-confirm-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>

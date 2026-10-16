@@ -571,6 +571,30 @@
         if (!isSub) {
             syncParentClosedOptions(itemEl, status);
         }
+        if (syncAssigneeDue(itemEl, status) && filtersReady) {
+            applyFilters();
+        }
+    }
+
+    function syncAssigneeDue(itemEl, status) {
+        if (!itemEl.hasAttribute('data-due-past')) return false;
+        var past = itemEl.getAttribute('data-due-past') === '1';
+        var inWork = status === 'todo' || status === 'doing' || status === 'rework';
+        var overdue = past && inWork ? '1' : '0';
+        var prev = itemEl.getAttribute('data-overdue') === '1' ? '1' : '0';
+        itemEl.setAttribute('data-overdue', overdue);
+        itemEl.classList.toggle('is-overdue', overdue === '1');
+        var dueEl = itemEl.querySelector('[data-sc-due]');
+        if (dueEl) {
+            var soon = overdue !== '1' && !past && itemEl.getAttribute('data-due-soon') === '1';
+            dueEl.classList.toggle('is-overdue', overdue === '1');
+            dueEl.classList.toggle('is-due-soon', soon);
+            var label = overdue === '1'
+                ? dueEl.getAttribute('data-label-overdue')
+                : (soon ? dueEl.getAttribute('data-label-soon') : dueEl.getAttribute('data-label-date'));
+            if (label) dueEl.textContent = label;
+        }
+        return prev !== overdue;
     }
 
     function applyAuditMeta(itemEl, audit) {
@@ -960,6 +984,7 @@
         continueBtn.addEventListener('click', jumpToNextOpenTask);
     }
 
+    var filtersReady = false;
     var prefs = loadPrefs();
     if (prefs.search && taskSearch) {
         currentSearch = String(prefs.search);
@@ -973,6 +998,7 @@
         activeFilters = ['open'];
     }
     applyFilters();
+    filtersReady = true;
 
     function focusHashTarget() {
         var hash = String(window.location.hash || '');
@@ -1455,6 +1481,9 @@
                                 alert((result.data && result.data.message) || 'Error');
                                 return;
                             }
+                            if (result.data.html) {
+                                notesList.insertAdjacentHTML('afterbegin', result.data.html);
+                            } else {
                             var li = document.createElement('li');
                             var noteId = parseInt((result.data.note && result.data.note.id) || 0, 10) || 0;
                             var author = String((result.data.note && result.data.note.author) || '').replace(/</g, '&lt;');
@@ -1472,6 +1501,7 @@
                                 '<div class="cabinet-sc-notes-list__body">' + bodyHtml + '</div>' +
                                 ((result.data.note && result.data.note.attachments_html) || '') + '</div>';
                             notesList.insertBefore(li, notesList.firstChild);
+                            }
                             noteBody.value = '';
                             if (window.cabinetScAttach) window.cabinetScAttach.reset(noteForm);
                             var total = (parseInt(el.getAttribute('data-notes-count') || '0', 10) || 0) + 1;
@@ -1818,9 +1848,14 @@
 
             var naturalH = railContentHeight(maxH);
             var pinTop = line;
-            var maxTop = layoutRect.bottom - bottomGap - naturalH;
-            if (maxTop < pinTop) {
-                pinTop = Math.max(8, maxTop);
+            var limitBottom = layoutRect.bottom - bottomGap;
+            var room = limitBottom - pinTop;
+            if (room < 120) {
+                unpinRail();
+                return;
+            }
+            if (naturalH > room) {
+                naturalH = room;
             }
 
             railSlot.style.height = naturalH + 'px';

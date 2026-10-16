@@ -125,9 +125,40 @@
     });
 
     document.querySelectorAll('[data-sc-create-form]').forEach(function (form) {
-        form.addEventListener('submit', function () {
-            var select = form.querySelector('[data-sc-template-select]');
-            if (select && select.value) writeDefaultTemplateId(select.value);
+        form.addEventListener('submit', function (e) {
+            var templateSelect = form.querySelector('[data-sc-template-select]');
+            if (templateSelect && templateSelect.value) writeDefaultTemplateId(templateSelect.value);
+
+            if (form.getAttribute('data-sc-replace-ok') === '1') {
+                return;
+            }
+            var archived = [];
+            try {
+                archived = JSON.parse(form.getAttribute('data-archived-domains') || '[]');
+            } catch (err) {
+                archived = [];
+            }
+            var domainSelect = form.querySelector('[data-sc-domain-select]');
+            var domain = domainSelect ? String(domainSelect.value || '') : '';
+            if (!domain || archived.indexOf(domain) === -1) {
+                return;
+            }
+            e.preventDefault();
+            if (!window.CabinetConfirm || typeof window.CabinetConfirm.show !== 'function') {
+                form.setAttribute('data-sc-replace-ok', '1');
+                form.submit();
+                return;
+            }
+            window.CabinetConfirm.show({
+                title: form.getAttribute('data-i18n-replace-title') || '',
+                text: form.getAttribute('data-i18n-replace-text') || '',
+                okLabel: form.getAttribute('data-i18n-replace-ok') || '',
+                danger: true,
+                onConfirm: function () {
+                    form.setAttribute('data-sc-replace-ok', '1');
+                    form.submit();
+                },
+            });
         });
     });
 

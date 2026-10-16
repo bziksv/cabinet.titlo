@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\SeoChecklist\SeoChecklistItem;
 use App\SeoChecklist\SeoChecklistItemAttachment;
 use App\SeoChecklist\SeoChecklistItemNote;
+use App\SeoChecklist\SeoChecklistNoteRead;
+use App\SeoChecklist\SeoChecklistNoteRevision;
 use App\SeoChecklist\SeoChecklistProject;
 use App\SeoChecklist\SeoChecklistTemplate;
 use App\SeoChecklist\SeoChecklistUserPreference;
@@ -784,9 +786,19 @@ class SeoChecklistController extends Controller
                 ->with('error', $result['message'] ?? __('Could not create SEO checklist'));
         }
 
+        if (!empty($result['reused'])) {
+            return redirect()
+                ->route('pages.seo-checklist.show', ['id' => $result['project']->id])
+                ->with('success', __('SEO checklist already exists'));
+        }
+
+        $createdMessage = !empty($result['replaced_archive'])
+            ? __('SEO checklist recreated')
+            : __('SEO checklist created');
+
         return redirect()
             ->route('pages.seo-checklist.show', ['id' => $result['project']->id])
-            ->with('success', __('SEO checklist created'));
+            ->with('success', $createdMessage);
     }
 
     /**
@@ -1338,7 +1350,7 @@ class SeoChecklistController extends Controller
         $this->service->syncAutoStatuses($project, $authId);
         $project->refresh();
         $project->load(['ownerUser', 'pmUser', 'team.members.user']);
-        $noteWith = ['notes.user', 'notes.attachments'];
+        $noteWith = ['notes.user', 'notes.attachments', 'notes.revisions.user'];
         if (\App\SeoChecklist\SeoChecklistNoteRead::tableReady()) {
             $noteWith['notes.reads'] = function ($q) use ($authId) {
                 $q->where('user_id', $authId);
@@ -1352,6 +1364,7 @@ class SeoChecklistController extends Controller
             'children.assigneeUser',
             'children.notes.user',
             'children.notes.attachments',
+            'children.notes.revisions.user',
             'children.timeLogs' => function ($q) use ($authId) {
                 $q->where('user_id', $authId)->whereNull('ended_at')->orderByDesc('id');
             },
@@ -1667,7 +1680,7 @@ class SeoChecklistController extends Controller
                 'repeat_rule' => $item->repeat_rule,
                 'meta_html' => $item->isSubtask()
                     ? view('pages.partials.seo-checklist-subtask-meta', [
-                        'child' => $item->load(['assigneeUser', 'notes.user', 'notes.attachments']),
+                        'child' => $item->load(['assigneeUser', 'notes.user', 'notes.attachments', 'notes.revisions.user']),
                         'project' => $project,
                     ])->render()
                     : null,
@@ -1751,7 +1764,7 @@ class SeoChecklistController extends Controller
             'body' => $body,
         ]);
         $saved = $attachments->store($item, (int) $note->id, (int) Auth::id(), $files);
-        $note->load(['user', 'attachments']);
+        $note->load(['user', 'attachments', 'revisions.user']);
         $project->forceFill(['last_activity_at' => now()])->save();
         $this->service->logActivity((int) $project->id, (int) $item->id, (int) Auth::id(), 'note', [
             'note_id' => $note->id,
@@ -1761,6 +1774,7 @@ class SeoChecklistController extends Controller
 
         return response()->json([
             'ok' => true,
+            'html' => $this->renderNoteElement($note, $item, (int) $project->id, (int) Auth::id(), false),
             'note' => [
                 'id' => $note->id,
                 'body' => $note->body,
@@ -1775,11 +1789,136 @@ class SeoChecklistController extends Controller
             ],
             'meta_html' => $item->isSubtask()
                 ? view('pages.partials.seo-checklist-subtask-meta', [
-                    'child' => $item->load(['assigneeUser', 'notes.user', 'notes.attachments']),
+                    'child' => $item->load(['assigneeUser', 'notes.user', 'notes.attachments', 'notes.revisions.user']),
                     'project' => $project,
                 ])->render()
                 : null,
         ]);
+    }
+
+    public function updateNote(Request $request, int $id, int $noteId): JsonResponse
+    {
+        $found = $this->findEditableNote($id, $noteId);
+        if ($found instanceof JsonResponse) {
+            return $found;
+        }
+        /** @var SeoChecklistItemNote $note */
+        $note = $found['note'];
+        /** @var SeoChecklistItem $item */
+        $item = $found['item'];
+        /** @var SeoChecklistProject $project */
+        $project = $found['project'];
+
+        $body = trim((string) $request->input('body', ''));
+        $note->loadMissing('attachments');
+        if ($body === '' && $note->attachments->isEmpty()) {
+            return response()->json(['ok' => false, 'message' => __('Note cannot be empty')], 422);
+        }
+
+        $previous = (string) $note->body;
+        if ($body !== $previous) {
+            SeoChecklistNoteRevision::query()->create([
+                'note_id' => $note->id,
+                'user_id' => (int) Auth::id(),
+                'body' => $previous,
+                'created_at' => now(),
+            ]);
+            $note->body = $body;
+            $note->save();
+            $project->forceFill(['last_activity_at' => now()])->save();
+            $this->service->logActivity((int) $project->id, (int) $item->id, (int) Auth::id(), 'note_edited', [
+                'note_id' => $note->id,
+                'title' => $item->title,
+                'previous' => $previous,
+                'body' => $body,
+            ]);
+        }
+
+        $note->load(['user', 'attachments', 'revisions.user']);
+
+        return response()->json([
+            'ok' => true,
+            'html' => $this->renderNoteElement($note, $item, (int) $project->id, (int) Auth::id(), false),
+        ]);
+    }
+
+    public function deleteNote(int $id, int $noteId): JsonResponse
+    {
+        $found = $this->findEditableNote($id, $noteId);
+        if ($found instanceof JsonResponse) {
+            return $found;
+        }
+        /** @var SeoChecklistItemNote $note */
+        $note = $found['note'];
+        /** @var SeoChecklistItem $item */
+        $item = $found['item'];
+        /** @var SeoChecklistProject $project */
+        $project = $found['project'];
+
+        $body = (string) $note->body;
+        $this->service->logActivity((int) $project->id, (int) $item->id, (int) Auth::id(), 'note_deleted', [
+            'note_id' => $note->id,
+            'title' => $item->title,
+            'body' => $body,
+        ]);
+
+        $note->loadMissing('attachments');
+        $disk = Storage::disk(SeoChecklistItemAttachment::DISK);
+        foreach ($note->attachments as $attachment) {
+            try {
+                $disk->delete((string) $attachment->path);
+            } catch (\Throwable $e) {
+            }
+            $attachment->delete();
+        }
+        if (SeoChecklistNoteRead::tableReady()) {
+            SeoChecklistNoteRead::query()->where('note_id', $note->id)->delete();
+        }
+        SeoChecklistNoteRevision::query()->where('note_id', $note->id)->delete();
+        $note->delete();
+        $project->forceFill(['last_activity_at' => now()])->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * @return array{note: SeoChecklistItemNote, item: SeoChecklistItem, project: SeoChecklistProject}|JsonResponse
+     */
+    private function findEditableNote(int $projectId, int $noteId)
+    {
+        $project = $this->findAccessibleProject($projectId);
+        if (!$project || $project->status === 'archived') {
+            return response()->json(['ok' => false, 'message' => __('Project not found')], 404);
+        }
+
+        /** @var SeoChecklistItemNote|null $note */
+        $note = SeoChecklistItemNote::query()->with('item')->find($noteId);
+        $item = $note ? $note->item : null;
+        if (!$note || !$item || (int) $item->project_id !== (int) $project->id) {
+            return response()->json(['ok' => false, 'message' => __('Task not found')], 404);
+        }
+        return ['note' => $note, 'item' => $item, 'project' => $project];
+    }
+
+    private function renderNoteElement(
+        SeoChecklistItemNote $note,
+        SeoChecklistItem $item,
+        int $projectId,
+        int $authId,
+        bool $unread
+    ): string {
+        $view = $item->isSubtask()
+            ? 'pages.partials.seo-checklist-note-sub'
+            : 'pages.partials.seo-checklist-note-row';
+
+        return view($view, [
+            'note' => $note,
+            'projectId' => $projectId,
+            'authId' => $authId,
+            'noteIsUnread' => $unread,
+            'noteEditable' => true,
+            'hiddenExtra' => false,
+        ])->render();
     }
 
     public function downloadAttachment(Request $request, int $id, int $attachmentId)
@@ -1974,7 +2113,7 @@ class SeoChecklistController extends Controller
                 'title' => $child->title,
             ]);
         }
-        $child->load(['notes.user', 'notes.attachments']);
+        $child->load(['notes.user', 'notes.attachments', 'notes.revisions.user']);
 
         return response()->json([
             'ok' => true,

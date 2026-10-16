@@ -224,6 +224,48 @@
                                                     <span>{{ number_format((int) $stage['done'], 0, '', ' ') }}</span>
                                                 </span>
                                             @endif
+                                            @php
+                                                $stageExtra = [
+                                                    'rework' => 0,
+                                                    'clarify' => 0,
+                                                    'review' => 0,
+                                                    'overdue' => 0,
+                                                    'due_soon' => 0,
+                                                    'later' => 0,
+                                                ];
+                                                foreach ($stage['items'] as $stageItem) {
+                                                    $stageStatus = $stageItem->status === 'blocked' ? 'clarify' : (string) $stageItem->status;
+                                                    if (isset($stageExtra[$stageStatus])) {
+                                                        $stageExtra[$stageStatus]++;
+                                                    }
+                                                    if (!in_array($stageItem->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true)) {
+                                                        if ($stageItem->isOverdue()) {
+                                                            $stageExtra['overdue']++;
+                                                        } elseif ($stageItem->isDueSoon()) {
+                                                            $stageExtra['due_soon']++;
+                                                        } elseif ($stageItem->due_at && $stageItem->due_at->gt(now()->addDays(7)->endOfDay())) {
+                                                            $stageExtra['later']++;
+                                                        }
+                                                    }
+                                                }
+                                                $stageExtraMeta = [
+                                                    'rework' => ['bi-arrow-repeat', __('Status rework'), 'rework'],
+                                                    'clarify' => ['bi-question-circle', __('Status clarify'), 'clarify'],
+                                                    'review' => ['bi-eye', __('Status review'), 'review'],
+                                                    'overdue' => ['bi-exclamation-triangle-fill', __('Overdue'), 'overdue'],
+                                                    'due_soon' => ['bi-calendar-event', __('Due soon'), 'due_soon'],
+                                                    'later' => ['bi-clock', __('Later'), 'later'],
+                                                ];
+                                            @endphp
+                                            @foreach($stageExtraMeta as $extraKey => $extraMeta)
+                                                @if($stageExtra[$extraKey] > 0)
+                                                    <span class="cabinet-sc-plan-rail__chip cabinet-sc-plan-rail__chip--{{ $extraMeta[2] }}"
+                                                          data-tip="{{ $extraMeta[1] }} — {{ number_format($stageExtra[$extraKey], 0, '', ' ') }}">
+                                                        <i class="bi {{ $extraMeta[0] }}" aria-hidden="true"></i>
+                                                        <span>{{ number_format($stageExtra[$extraKey], 0, '', ' ') }}</span>
+                                                    </span>
+                                                @endif
+                                            @endforeach
                                         </div>
                                     </div>
                                 </li>
@@ -493,6 +535,7 @@
                                 data-role="{{ $role }}"
                                 data-important="{{ $item->is_important ? '1' : '0' }}"
                                 data-overdue="{{ $itemOverdue ? '1' : '0' }}"
+                                data-due-past="{{ ($item->due_at && $item->due_at->isPast()) ? '1' : '0' }}"
                                 data-due-soon="{{ $itemDueSoon ? '1' : '0' }}"
                                 data-allows-subtasks="{{ $item->allows_subtasks ? '1' : '0' }}"
                                 data-can-approve="{{ !empty($canApproveReview) ? '1' : '0' }}"
@@ -577,6 +620,10 @@
                                                 @endif
                                                 @if($item->due_at)
                                                     <span class="cabinet-sc-plan__due @if($itemOverdue) is-overdue @elseif($itemDueSoon) is-due-soon @endif"
+                                                          data-sc-due
+                                                          data-label-overdue="{{ __('Overdue') }}"
+                                                          data-label-soon="{{ __('Due soon') }}"
+                                                          data-label-date="{{ __('Due') }} {{ $item->due_at->format('d.m') }}"
                                                           data-tip="{{ $dueTitle }}">
                                                         @if($itemOverdue)
                                                             {{ __('Overdue') }}
@@ -740,50 +787,13 @@
                                     </div>
                                     <ul class="cabinet-sc-notes-list" data-sc-notes-list>
                                         @foreach($item->notes as $note)
-                                            @php
-                                                $noteIsOwn = (int) $note->user_id === $viewerId;
-                                                $noteIsUnread = in_array((int) $note->id, $unreadNoteIds, true);
-                                            @endphp
-                                            <li class="@if($noteIsUnread) is-unread @endif"
-                                                @if($noteIsUnread) data-sc-note-unread="1" @endif
-                                                data-note-id="{{ $note->id }}"
-                                                data-note-own="{{ $noteIsOwn ? '1' : '0' }}">
-                                                @include('pages.partials.seo-checklist-note-avatar', ['user' => $note->user, 'name' => $note->authorLabel()])
-                                                <div class="cabinet-sc-notes-list__main">
-                                                    <div class="cabinet-sc-notes-list__meta">
-                                                        <strong class="cabinet-sc-notes-list__author">{{ $note->authorLabel() }}</strong>
-                                                        <span class="text-secondary small">{{ $note->created_at->format('d.m.Y H:i') }}</span>
-                                                        @if($noteIsUnread)
-                                                            <span class="cabinet-sc-notes-list__unread-badge">{{ __('Unread') }}</span>
-                                                        @endif
-                                                    </div>
-                                                    <div class="cabinet-sc-notes-list__body">{!! \App\Support\TextAutoLinker::format((string) $note->body) !!}</div>
-                                                    @include('pages.partials.seo-checklist-note-attachments', ['note' => $note, 'projectId' => $project->id])
-                                                </div>
-                                                @if(!$noteIsOwn)
-                                                    <div class="cabinet-sc-notes-list__side" data-sc-note-side>
-                                                        @if($noteIsUnread)
-                                                            <button type="button"
-                                                                    class="cabinet-sc-plan__side-btn"
-                                                                    data-sc-mark-note-read
-                                                                    data-note-id="{{ $note->id }}"
-                                                                    aria-label="{{ __('Mark as read') }}">
-                                                                <i class="bi bi-flag" aria-hidden="true"></i>
-                                                                <span class="cabinet-sc-plan__side-btn-label">{{ __('Mark as read') }}</span>
-                                                            </button>
-                                                        @else
-                                                            <button type="button"
-                                                                    class="cabinet-sc-plan__side-btn"
-                                                                    data-sc-mark-note-unread
-                                                                    data-note-id="{{ $note->id }}"
-                                                                    aria-label="{{ __('Mark note unread') }}">
-                                                                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
-                                                                <span class="cabinet-sc-plan__side-btn-label">{{ __('Mark unread short') }}</span>
-                                                            </button>
-                                                        @endif
-                                                    </div>
-                                                @endif
-                                            </li>
+                                            @include('pages.partials.seo-checklist-note-row', [
+                                                'note' => $note,
+                                                'projectId' => $project->id,
+                                                'authId' => $viewerId,
+                                                'noteIsUnread' => in_array((int) $note->id, $unreadNoteIds, true),
+                                                'noteEditable' => $project->status !== 'archived',
+                                            ])
                                         @endforeach
                                     </ul>
                                     @if($project->status !== 'archived')
@@ -974,6 +984,7 @@
         </div>{{-- layout --}}
     </div>
 
+    @include('partials.cabinet-confirm-modal')
     @include('pages.partials.seo-checklist-delete-project-modal')
     @include('pages.partials.seo-checklist-delete-item-modal')
     @include('pages.partials.seo-checklist-status-modal')
@@ -982,6 +993,7 @@
         <script src="{{ asset('js/cabinet-seo-checklist-hub.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-hub.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-attach.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-attach.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-status-modal.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-status-modal.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-seo-checklist-notes.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-notes.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist.js')) ?: time() }}"></script>
     @endslot
 @endcomponent

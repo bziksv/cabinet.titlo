@@ -332,6 +332,7 @@
 @if(config('app.env') !== 'local')
 <script src="{{ asset('js/demo.js') }}"></script>
 @endif
+<script src="{{ asset('js/cabinet-team-create.js') }}?v={{ @filemtime(public_path('js/cabinet-team-create.js')) ?: time() }}"></script>
 @yield('js')
 
 <span class="click_tracking another_action"></span>

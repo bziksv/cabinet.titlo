@@ -488,6 +488,8 @@
                                             : $projectUrl;
                                         $taskTitle = $meta['title'] ?? ($item->title ?? null);
                                         $isNote = $log->type === 'note';
+                                        $isNoteEdit = $log->type === 'note_edited';
+                                        $isNoteDelete = $log->type === 'note_deleted';
                                         $isStatus = $log->type === 'status_change';
                                         $isCreated = $log->type === 'item_created';
                                         $isItemMeta = $log->type === 'item_meta';
@@ -524,7 +526,7 @@
                                                 'date' => $log->created_at->format('d.m.Y H:i'),
                                             ]);
                                         }
-                                        $noteId = $isNote ? (int) ($meta['note_id'] ?? 0) : 0;
+                                        $noteId = ($isNote || $isNoteEdit) ? (int) ($meta['note_id'] ?? 0) : 0;
                                         $isOwnNote = $isNote && (int) $log->user_id === (int) ($authUserId ?? 0);
                                         $noteIsRead = $noteId > 0 && !empty(($readNoteIds ?? [])[$noteId]);
                                         $noteIsUnread = $isNote && !$isOwnNote && $noteId > 0 && !$noteIsRead;
@@ -544,6 +546,10 @@
                                                 @endif
                                                 @if($isNote)
                                                     <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--note">{{ __('Note') }}</span>
+                                                @elseif($isNoteEdit)
+                                                    <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--note">{{ __('Note edited') }}</span>
+                                                @elseif($isNoteDelete)
+                                                    <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--note">{{ __('Note deleted') }}</span>
                                                 @elseif($isCreated)
                                                     <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--created">{{ __('Chronicle kind created') }}</span>
                                                 @elseif($isDoneEvent)
@@ -584,11 +590,16 @@
                                                     <span class="cabinet-sc-feed__arrow" aria-hidden="true">→</span>
                                                     {!! $statusPill($meta['to'] ?? null) !!}
                                                 </div>
-                                            @elseif($isNote)
+                                            @elseif($isNote || $isNoteDelete)
                                                 <div class="cabinet-sc-feed__note">{!! \App\Support\TextAutoLinker::format((string) ($meta['body'] ?? ''), 220) !!}</div>
-                                                @if($noteId > 0 && $feedNotes->has($noteId))
+                                                @if($isNote && $noteId > 0 && $feedNotes->has($noteId))
                                                     @include('pages.partials.seo-checklist-note-attachments', ['note' => $feedNotes->get($noteId), 'projectId' => $project ? $project->id : 0])
                                                 @endif
+                                            @elseif($isNoteEdit)
+                                                <div class="cabinet-sc-note-history__meta">{{ __('Was') }}</div>
+                                                <div class="cabinet-sc-feed__note">{!! \App\Support\TextAutoLinker::format((string) ($meta['previous'] ?? ''), 220) !!}</div>
+                                                <div class="cabinet-sc-note-history__meta">{{ __('Became') }}</div>
+                                                <div class="cabinet-sc-feed__note">{!! \App\Support\TextAutoLinker::format((string) ($meta['body'] ?? ''), 220) !!}</div>
                                             @elseif($isItemMeta)
                                                 <div class="cabinet-sc-feed__changes">
                                                     @if(array_key_exists('due_to', $meta))

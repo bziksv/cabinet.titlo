@@ -391,6 +391,10 @@ class SeoChecklistService
             ->limit(40)
             ->get();
 
+        $items = $items->filter(function (SeoChecklistItem $item) {
+            return $item->isOverdue() || $item->isDueSoon();
+        })->values();
+
         $overdue = 0;
         $soon = 0;
         foreach ($items as $item) {
@@ -460,7 +464,7 @@ class SeoChecklistService
                 'createdByUser',
                 'doneByUser',
                 'notes' => function ($q) use ($userId) {
-                    $q->orderByDesc('id')->with(['user', 'attachments']);
+                    $q->orderByDesc('id')->with(['user', 'attachments', 'revisions.user']);
                     if (SeoChecklistNoteRead::tableReady()) {
                         $q->with([
                             'reads' => function ($rq) use ($userId) {
@@ -477,6 +481,7 @@ class SeoChecklistService
                             'assigneeUser',
                             'notes.user',
                             'notes.attachments',
+                            'notes.revisions.user',
                             'timeLogs' => function ($tq) use ($userId) {
                                 $tq->where('user_id', $userId)->whereNull('ended_at')->orderByDesc('id');
                             },
@@ -782,7 +787,7 @@ class SeoChecklistService
                 'createdByUser',
                 'doneByUser',
                 'notes' => function ($q) use ($userId) {
-                    $q->orderByDesc('id')->with(['user', 'attachments']);
+                    $q->orderByDesc('id')->with(['user', 'attachments', 'revisions.user']);
                     if (SeoChecklistNoteRead::tableReady()) {
                         $q->with([
                             'reads' => function ($rq) use ($userId) {
@@ -799,6 +804,7 @@ class SeoChecklistService
                             'assigneeUser',
                             'notes.user',
                             'notes.attachments',
+                            'notes.revisions.user',
                             'timeLogs' => function ($tq) use ($userId) {
                                 $tq->where('user_id', $userId)->whereNull('ended_at')->orderByDesc('id');
                             },
@@ -2391,22 +2397,65 @@ class SeoChecklistService
      */
     public function deleteProject(SeoChecklistProject $project): array
     {
-        DB::transaction(function () use ($project) {
-            $itemIds = SeoChecklistItem::query()
-                ->where('project_id', $project->id)
-                ->pluck('id')
-                ->all();
+        try {
+            DB::transaction(function () use ($project) {
+                $this->purgeProjectData((int) $project->id);
+                $project->delete();
+            });
+        } catch (Throwable $e) {
+            report($e);
 
-            if (!empty($itemIds)) {
-                app(SeoChecklistAttachmentService::class)->deleteForItems(array_map('intval', $itemIds));
-                SeoChecklistItemNote::query()->whereIn('item_id', $itemIds)->delete();
-                SeoChecklistItem::query()->where('project_id', $project->id)->delete();
-            }
-
-            $project->delete();
-        });
+            return ['ok' => false, 'message' => __('Could not delete project')];
+        }
 
         return ['ok' => true];
+    }
+
+    /**
+     * Задачи, заметки, хроника и вложения проекта. Саму строку проекта не удаляет.
+     */
+    private function purgeProjectData(int $projectId): void
+    {
+        $itemIds = array_map('intval', SeoChecklistItem::query()
+            ->where('project_id', $projectId)
+            ->pluck('id')
+            ->all());
+
+        if ($itemIds !== []) {
+            app(SeoChecklistAttachmentService::class)->deleteForItems($itemIds);
+
+            $noteIds = array_map('intval', SeoChecklistItemNote::query()
+                ->whereIn('item_id', $itemIds)
+                ->pluck('id')
+                ->all());
+            if ($noteIds !== []) {
+                if (Schema::hasTable('seo_checklist_note_reads')) {
+                    DB::table('seo_checklist_note_reads')->whereIn('note_id', $noteIds)->delete();
+                }
+                if (Schema::hasTable('seo_checklist_note_revisions')) {
+                    DB::table('seo_checklist_note_revisions')->whereIn('note_id', $noteIds)->delete();
+                }
+                SeoChecklistItemNote::query()->whereIn('item_id', $itemIds)->delete();
+            }
+            if (Schema::hasTable('seo_checklist_item_time_logs')) {
+                DB::table('seo_checklist_item_time_logs')->whereIn('item_id', $itemIds)->delete();
+            }
+        }
+
+        if (Schema::hasTable('seo_checklist_activity_logs')) {
+            $activityIds = DB::table('seo_checklist_activity_logs')
+                ->where('project_id', $projectId)
+                ->pluck('id')
+                ->all();
+            if ($activityIds !== [] && Schema::hasTable('seo_checklist_activity_reads')) {
+                DB::table('seo_checklist_activity_reads')->whereIn('activity_id', $activityIds)->delete();
+            }
+            DB::table('seo_checklist_activity_logs')->where('project_id', $projectId)->delete();
+        }
+
+        if ($itemIds !== []) {
+            SeoChecklistItem::query()->where('project_id', $projectId)->delete();
+        }
     }
 
     /**
@@ -2445,12 +2494,12 @@ class SeoChecklistService
             ->where('user_id', $userId)
             ->where('domain', $domain)
             ->first();
+        $replacedArchive = false;
         if ($existing) {
-            if ($existing->status === 'archived') {
-                $this->restoreProject($existing);
+            if ($existing->status !== 'archived') {
+                return ['ok' => true, 'project' => $existing->fresh(), 'reused' => true];
             }
-
-            return ['ok' => true, 'project' => $existing->fresh()];
+            $replacedArchive = true;
         }
 
         $template = $this->findUsableTemplate($userId, $templateId);
@@ -2459,7 +2508,12 @@ class SeoChecklistService
         }
 
         try {
-            $project = DB::transaction(function () use ($userId, $domain, $ownerUserId, $pmUserId, $template) {
+            $project = DB::transaction(function () use ($userId, $domain, $ownerUserId, $pmUserId, $template, $existing, $replacedArchive) {
+                if ($replacedArchive && $existing) {
+                    $this->purgeProjectData((int) $existing->id);
+                    $existing->delete();
+                }
+
                 $skipWeekends = Schema::hasColumn('seo_checklist_projects', 'skip_weekends')
                     ? (bool) ($template->skip_weekends ?? false)
                     : false;
@@ -2551,7 +2605,11 @@ class SeoChecklistService
             return ['ok' => false, 'message' => __('Could not create SEO checklist')];
         }
 
-        return ['ok' => true, 'project' => $project];
+        return [
+            'ok' => true,
+            'project' => $project,
+            'replaced_archive' => $replacedArchive,
+        ];
     }
 
     public function setItemStatus(SeoChecklistItem $item, string $status, int $userId): bool
@@ -2802,7 +2860,7 @@ class SeoChecklistService
                 'createdByUser',
                 'doneByUser',
                 'notes' => function ($q) use ($userId) {
-                    $q->orderByDesc('id')->with(['user', 'attachments']);
+                    $q->orderByDesc('id')->with(['user', 'attachments', 'revisions.user']);
                     if (SeoChecklistNoteRead::tableReady()) {
                         $q->with([
                             'reads' => function ($rq) use ($userId) {
@@ -2819,6 +2877,7 @@ class SeoChecklistService
                             'assigneeUser',
                             'notes.user',
                             'notes.attachments',
+                            'notes.revisions.user',
                             'timeLogs' => function ($tq) use ($userId) {
                                 $tq->where('user_id', $userId)->whereNull('ended_at')->orderByDesc('id');
                             },
@@ -3161,7 +3220,7 @@ class SeoChecklistService
             }
             // «Заметки» — без мусора по сменам статусов
             if ($preset === 'notes') {
-                $logQuery->where('type', 'note');
+                $logQuery->whereIn('type', ['note', 'note_edited', 'note_deleted']);
             }
             // Окно — последние N, при asc показываем их от старых к новым
             $items = $logQuery->limit($limit)->get();
@@ -3171,7 +3230,7 @@ class SeoChecklistService
         }
 
         $feedNotes = collect();
-        $noteIds = $items->where('type', 'note')->map(function ($log) {
+        $noteIds = $items->whereIn('type', ['note', 'note_edited'])->map(function ($log) {
             $meta = is_array($log->meta_json) ? $log->meta_json : [];
 
             return (int) ($meta['note_id'] ?? 0);

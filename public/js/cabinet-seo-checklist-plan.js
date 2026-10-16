@@ -341,6 +341,25 @@
         box.hidden = !hasCreated && !hasStatus && !hasDone;
     }
 
+    function syncAssigneeDue(itemEl, status) {
+        if (!itemEl.hasAttribute('data-due-past')) return false;
+        var past = itemEl.getAttribute('data-due-past') === '1';
+        var inWork = status === 'todo' || status === 'doing' || status === 'rework';
+        var overdue = past && inWork ? '1' : '0';
+        var prev = itemEl.getAttribute('data-overdue') === '1' ? '1' : '0';
+        itemEl.setAttribute('data-overdue', overdue);
+        itemEl.classList.toggle('is-overdue', overdue === '1');
+        var dueEl = itemEl.querySelector('[data-sc-due]');
+        if (dueEl) {
+            dueEl.classList.toggle('is-overdue', overdue === '1');
+            var label = overdue === '1'
+                ? dueEl.getAttribute('data-label-overdue')
+                : dueEl.getAttribute('data-label-date');
+            if (label) dueEl.textContent = label;
+        }
+        return prev !== overdue;
+    }
+
     function applyStatusUi(itemEl, status) {
         if (!status) return;
         var isSub = itemEl.hasAttribute('data-sc-plan-sub');
@@ -358,6 +377,9 @@
             ? itemEl.querySelector('[data-sc-review-hint]')
             : itemEl.querySelector('.cabinet-sc-plan__meta [data-sc-review-hint]');
         if (hint) hint.hidden = status !== 'review';
+        if (syncAssigneeDue(itemEl, status)) {
+            root.dispatchEvent(new CustomEvent('cabinet-sc-plan-filters-refresh'));
+        }
 
         var select = null;
         if (isSub) {
@@ -1011,6 +1033,9 @@
                     alert((result.data && result.data.message) || 'Error');
                     return;
                 }
+                if (result.data.html) {
+                    notesList.insertAdjacentHTML('afterbegin', result.data.html);
+                } else {
                 var li = document.createElement('li');
                 var author = String((result.data.note && result.data.note.author) || '').replace(/</g, '&lt;');
                 var created = String((result.data.note && result.data.note.created_at) || '');
@@ -1027,6 +1052,7 @@
                     '<div class="cabinet-sc-notes-list__body">' + bodyHtml + '</div>' +
                     ((result.data.note && result.data.note.attachments_html) || '') + '</div>';
                 notesList.insertBefore(li, notesList.firstChild);
+                }
                 noteBody.value = '';
                 if (window.cabinetScAttach) window.cabinetScAttach.reset(noteForm);
                 bumpNotesCount(noteItem);
@@ -1572,9 +1598,15 @@
 
             var naturalH = contentHeight(maxH);
             var pinTop = stickLine;
-            var maxTop = layoutRect.bottom - bottomGap - naturalH;
-            if (maxTop < pinTop) {
-                pinTop = Math.max(metrics.minTop, maxTop);
+            var limitBottom = layoutRect.bottom - bottomGap;
+            var room = limitBottom - pinTop;
+            if (room < 120) {
+                unpin();
+                slot.style.maxHeight = maxH + 'px';
+                return;
+            }
+            if (naturalH > room) {
+                naturalH = room;
             }
 
             slot.style.height = naturalH + 'px';
