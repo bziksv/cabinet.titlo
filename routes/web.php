@@ -336,6 +336,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('site-audit/crawl/{id}/ignore', 'SiteAuditController@ignoreFinding')->name('pages.site-audit.ignore')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/ignore/restore', 'SiteAuditController@restoreIgnore')->name('pages.site-audit.ignore.restore')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/ignore/bulk', 'SiteAuditController@bulkIgnoreFindings')->name('pages.site-audit.ignore.bulk')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/recheck', 'SiteAuditController@recheckFinding')->name('pages.site-audit.recheck')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/note', 'SiteAuditController@saveFindingNote')->name('pages.site-audit.note')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/note/clear', 'SiteAuditController@clearFindingNote')->name('pages.site-audit.note.clear')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/note/clear-pattern', 'SiteAuditController@clearPatternNote')->name('pages.site-audit.note.clear-pattern')->middleware('permission:Site audit');

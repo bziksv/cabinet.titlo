@@ -36,6 +36,12 @@
         @if(session('status'))
             <div class="alert alert-success py-2">{{ session('status') }}</div>
         @endif
+        @if(session('warning'))
+            <div class="alert alert-warning py-2">{{ session('warning') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="alert alert-danger py-2">{{ session('error') }}</div>
+        @endif
 
         @include('pages.partials.site-audit-module-nav', ['active' => 'module'])
 

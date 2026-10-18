@@ -1223,6 +1223,23 @@
                                 <div class="cabinet-sa-note-text">{{ $noteComment }}</div>
                             @endif
                             <div class="cabinet-sa-actions">
+                                @if(!empty($row->id) && !empty($row->url) && $crawl->isFinished()
+                                    && \App\Services\SiteAudit\SiteAuditPageProcessor::isRecheckableCode((string) ($row->code ?? $code)))
+                                    <form method="POST" action="{{ route('pages.site-audit.recheck', $crawl->id) }}" class="cabinet-sa-act-form"
+                                          onsubmit="var b=this.querySelector('button'); if(b){ b.disabled=true; var s=b.querySelector('span'); if(s){ s.textContent='Проверяем…'; } }">
+                                        @csrf
+                                        <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
+                                        <input type="hidden" name="finding_id" value="{{ $row->id }}">
+                                        <div class="cabinet-sa-act cabinet-sa-act--recheck">
+                                            <button type="submit" class="cabinet-sa-act__main">
+                                                <i class="fa fa-refresh" aria-hidden="true"></i><span>Проверить</span>
+                                            </button>
+                                            @include('pages.partials.site-audit-action-help', [
+                                                'tip' => "Скачать эту страницу и robots.txt ещё раз.\nВесь отчёт заново не запускается.\nЕсли проблема ушла — строка исчезнет.",
+                                            ])
+                                        </div>
+                                    </form>
+                                @endif
                                 @if(!empty($canNote) && !empty($row->id))
                                     <div class="cabinet-sa-act cabinet-sa-act--note">
                                         <label class="cabinet-sa-act__main" for="sa-note-{{ (int) $row->id }}">

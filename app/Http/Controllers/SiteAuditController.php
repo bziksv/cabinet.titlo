@@ -21,6 +21,7 @@ use App\Services\SiteAudit\SiteAuditRelevanceBridge;
 use App\Services\SiteAudit\SiteAuditExternalPlagiarismRunner;
 use App\Services\SiteAudit\SiteAuditGlobalCap;
 use App\Services\SiteAudit\SiteAuditLinkReferrers;
+use App\Services\SiteAudit\SiteAuditPageRecheck;
 use App\Services\SiteAudit\SiteAuditProbeRunner;
 use App\Services\SiteAudit\SiteAuditProbeStatus;
 use App\Services\SiteAudit\SiteAuditSerpIndexProbe;
@@ -2227,6 +2228,56 @@ class SiteAuditController extends Controller
             $code,
             $flash
         );
+    }
+
+    public function recheckFinding(Request $request, int $id)
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return redirect()->back()->with('error', 'В демо-кабинете перепроверка страницы недоступна.');
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        $crawl->load('project');
+        $findingId = (int) $request->input('finding_id', 0);
+        $finding = SiteAuditFinding::query()
+            ->where('id', $findingId)
+            ->where('crawl_id', $crawl->id)
+            ->first();
+        if (! $finding) {
+            return redirect()->back()->with('error', 'Замечание не найдено.');
+        }
+
+        @set_time_limit(120);
+
+        try {
+            $result = (new SiteAuditPageRecheck())->recheck($crawl, $finding);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->redirectAfterFindingAction(
+                $request,
+                (int) $crawl->id,
+                (string) $finding->code,
+                ''
+            )->with('error', 'Не удалось перепроверить страницу. Попробуйте ещё раз.');
+        }
+
+        $message = (string) ($result['message'] ?? 'Готово');
+        $level = (string) ($result['level'] ?? 'status');
+        $redirect = $this->redirectAfterFindingAction(
+            $request,
+            (int) $crawl->id,
+            (string) $finding->code,
+            $level === 'status' ? $message : ''
+        );
+        if ($level === 'error' || empty($result['ok'])) {
+            return $redirect->with('error', $message);
+        }
+        if ($level === 'warning') {
+            return $redirect->with('warning', $message);
+        }
+
+        return $redirect;
     }
 
     public function restoreIgnore(Request $request, int $id)

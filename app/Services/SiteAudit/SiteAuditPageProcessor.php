@@ -30,8 +30,13 @@ class SiteAuditPageProcessor
     /**
      * @return array{internal_links:string[]}
      */
-    public function process(int $crawlId, string $url, string $projectHost, array $crawlSettings = []): array
-    {
+    public function process(
+        int $crawlId,
+        string $url,
+        string $projectHost,
+        array $crawlSettings = [],
+        ?array $robotsGroups = null
+    ): array {
         $this->ensureFetcher($crawlId, $crawlSettings);
 
         $rps = (float) ($crawlSettings['rps'] ?? config('site_audit.per_host_rps', 1));
@@ -44,7 +49,16 @@ class SiteAuditPageProcessor
         $bodyPath = isset($result['body_path']) ? (string) $result['body_path'] : null;
 
         try {
-            return $this->processFetched($crawlId, $url, $urlHash, $result, $crawlSettings, $projectHost);
+            return $this->processFetched(
+                $crawlId,
+                $url,
+                $urlHash,
+                $result,
+                $crawlSettings,
+                $projectHost,
+                null,
+                $robotsGroups
+            );
         } finally {
             SiteAuditBodyTemp::release($bodyPath);
         }
@@ -305,12 +319,15 @@ class SiteAuditPageProcessor
         array $result,
         array $crawlSettings,
         string $projectHost,
-        ?array $discovery = null
+        ?array $discovery = null,
+        ?array $robotsGroups = null
     ): array {
         $findings = [];
         $internalLinks = [];
 
-        $robotsGroups = $this->robotsGroupsForCrawl($crawlId);
+        if ($robotsGroups === null) {
+            $robotsGroups = $this->robotsGroupsForCrawl($crawlId);
+        }
         if ($robotsGroups !== null) {
             $robots = new SiteAuditRobotsTxt();
             $match = $robots->matchingRule($robotsGroups, $url);
@@ -1004,7 +1021,36 @@ class SiteAuditPageProcessor
         return [
             'internal_links' => $internalLinks,
             'content_unchanged' => ! empty($pageData['content_unchanged']),
+            'status_code' => isset($result['status_code']) ? (int) $result['status_code'] : null,
+            'url' => $url,
         ];
+    }
+
+    /**
+     * Замечание снимается повторным скачиванием одной страницы, без нового обхода.
+     */
+    public static function isRecheckableCode(string $code): bool
+    {
+        static $set = null;
+        if ($set === null) {
+            $set = array_fill_keys([
+                'robots_blocked', 'unreachable', 'http_4xx', 'http_5xx', 'page_too_large',
+                'page_has_bad_links', 'html_critical_errors', 'adult_content', 'negative_content',
+                'word_repeat_in_sentence', 'commercial_missing_contacts', 'commercial_missing_cta',
+                'commercial_missing_price', 'commercial_missing_delivery', 'commercial_missing_payment',
+                'commercial_missing_stock', 'commercial_missing_reviews', 'meta_nofollow', 'links_nofollow',
+                'external_assets', 'external_links', 'probable_affiliate', 'duplicate_links',
+                'h1_equals_h2', 'heading_hierarchy', 'empty_title', 'empty_description',
+                'multiple_title_or_description', 'noindex', 'missing_h1', 'multiple_h1',
+                'canonical_foreign', 'canonical_not_self', 'multiple_canonical', 'canonical_empty',
+                'pages_with_iframe', 'mixed_content', 'insecure_form', 'bad_doctype', 'missing_charset',
+                'missing_hsts', 'missing_x_frame_options', 'missing_x_content_type_options', 'missing_csp',
+                'missing_referrer_policy', 'missing_permissions_policy', 'missing_coop', 'missing_coep',
+                'missing_corp', 'redirect_loop', 'redirect', 'redirect_chain_long',
+            ], true);
+        }
+
+        return isset($set[$code]);
     }
 
     private function finding(string $code, string $url, string $urlHash, array $meta = []): array
