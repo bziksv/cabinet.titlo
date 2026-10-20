@@ -95,6 +95,10 @@ class SeoChecklistDefaultTemplate
         if (isset($stages[$key]['title'])) {
             return $stages[$key]['title'];
         }
+        $directStages = SeoChecklistDirectTemplate::stages();
+        if (isset($directStages[$key]['title'])) {
+            return $directStages[$key]['title'];
+        }
 
         return $key;
     }
@@ -805,6 +809,7 @@ class SeoChecklistDefaultTemplate
     public static function repeatRuleLabels(): array
     {
         return [
+            'every_1' => __('Every day'),
             'every_3' => __('Every 3 days'),
             'every_5' => __('Every 5 days'),
             'every_7' => __('Every 7 days'),
@@ -828,6 +833,7 @@ class SeoChecklistDefaultTemplate
     public static function repeatIntervalDays(?string $rule): ?int
     {
         $map = [
+            'every_1' => 1,
             'every_3' => 3,
             'every_5' => 5,
             'every_7' => 7,

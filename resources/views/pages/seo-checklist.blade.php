@@ -187,7 +187,7 @@
                             {{ $project->progress_done }}/{{ $project->progress_total }}
                             ·
                             {{ $project->last_activity_at ? $project->last_activity_at->format('d.m.Y H:i') : '—' }}
-                            @if($tpl && !$tpl->is_system)
+                            @if($tpl && $tpl->code !== \App\Support\SeoChecklistDefaultTemplate::CODE)
                                 · <span class="cabinet-sc-card__tpl">{{ $tpl->title }}</span>
                             @endif
                         </div>
@@ -263,7 +263,7 @@
                                 <label class="cabinet-sc-create__label" for="cabinet-sc-template">{{ __('Template') }}</label>
                                 <select name="template_id" id="cabinet-sc-template" class="form-select form-select-sm" data-sc-template-select>
                                     @foreach($templates as $tpl)
-                                        <option value="{{ $tpl->id }}" @if($tpl->is_system) selected @endif>
+                                        <option value="{{ $tpl->id }}" @if($tpl->code === \App\Support\SeoChecklistDefaultTemplate::CODE) selected @endif>
                                             {{ $tpl->title }}@if($tpl->is_system) ({{ __('System') }})@endif
                                             · {{ $tpl->tasks_count }}
                                         </option>

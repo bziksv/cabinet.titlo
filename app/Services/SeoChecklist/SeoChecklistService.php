@@ -20,6 +20,7 @@ use App\SeoChecklist\SeoChecklistUserPreference;
 use App\SiteAuditProject;
 use App\Support\HomeUserSites;
 use App\Support\SeoChecklistDefaultTemplate;
+use App\Support\SeoChecklistDirectTemplate;
 use App\User;
 use App\YandexMetrikaDomainCounter;
 use Illuminate\Support\Facades\Auth;
@@ -87,7 +88,155 @@ class SeoChecklistService
             ])->save();
         }
 
+        $this->ensureDirectSystemTemplate();
+
         return $template->fresh();
+    }
+
+    public function ensureDirectSystemTemplate(): SeoChecklistTemplate
+    {
+        $template = SeoChecklistTemplate::directSystemDefault();
+        if (!$template) {
+            $template = DB::transaction(function () {
+                $templateData = [
+                    'user_id' => null,
+                    'code' => SeoChecklistDirectTemplate::CODE,
+                    'title' => SeoChecklistDirectTemplate::TITLE,
+                    'description' => 'Шаблон запуска и ведения контекстной рекламы в Яндекс.Директ · v' . SeoChecklistDirectTemplate::VERSION,
+                    'is_system' => true,
+                ];
+                if (Schema::hasColumn('seo_checklist_templates', 'skip_weekends')) {
+                    $templateData['skip_weekends'] = true;
+                }
+                if (Schema::hasColumn('seo_checklist_templates', 'stages_json')) {
+                    $templateData['stages_json'] = SeoChecklistDirectTemplate::skeletonStagesList();
+                }
+                $template = SeoChecklistTemplate::query()->create($templateData);
+
+                $this->seedDirectTemplateTasks($template);
+
+                return $template;
+            });
+        }
+
+        $this->syncDirectSystemTemplateFromSeedIfNeeded($template);
+
+        if ($template->is_system
+            && Schema::hasColumn('seo_checklist_templates', 'stages_json')
+            && (!is_array($template->stages_json) || $template->stages_json === [])
+        ) {
+            $template->forceFill([
+                'stages_json' => SeoChecklistDirectTemplate::skeletonStagesList(),
+            ])->save();
+        }
+
+        return $template->fresh();
+    }
+
+    public function syncDirectSystemTemplateFromSeedIfNeeded(SeoChecklistTemplate $template): void
+    {
+        if (!$template->is_system || $template->code !== SeoChecklistDirectTemplate::CODE) {
+            return;
+        }
+
+        $marker = '· v' . SeoChecklistDirectTemplate::VERSION;
+        $description = (string) $template->description;
+        if (strpos($description, $marker) !== false
+            && $template->tasks()->whereNull('parent_id')->count() >= count(SeoChecklistDirectTemplate::tasks())
+        ) {
+            return;
+        }
+
+        $this->rebuildDirectSystemTemplateTasks($template);
+    }
+
+    public function rebuildDirectSystemTemplateTasks(SeoChecklistTemplate $template): void
+    {
+        DB::transaction(function () use ($template) {
+            $this->seedDirectTemplateTasks($template);
+
+            $fill = [
+                'title' => SeoChecklistDirectTemplate::TITLE,
+                'description' => 'Шаблон запуска и ведения контекстной рекламы в Яндекс.Директ · v' . SeoChecklistDirectTemplate::VERSION,
+            ];
+            if (Schema::hasColumn('seo_checklist_templates', 'stages_json')) {
+                $fill['stages_json'] = SeoChecklistDirectTemplate::skeletonStagesList();
+            }
+            $template->forceFill($fill)->save();
+        });
+    }
+
+    private function seedDirectTemplateTasks(SeoChecklistTemplate $template): void
+    {
+        $seed = SeoChecklistDirectTemplate::tasks();
+        $seedCodes = [];
+        $hasClientHelp = Schema::hasColumn('seo_checklist_template_tasks', 'client_help');
+
+        foreach ($seed as $task) {
+            $seedCodes[] = $task['code'];
+            $row = [
+                'parent_id' => null,
+                'stage_key' => $task['stage_key'],
+                'stage_sort' => $task['stage_sort'],
+                'sort' => $task['sort'],
+                'title' => $task['title'],
+                'help' => $task['help'],
+                'role' => $task['role'],
+                'is_important' => !empty($task['is_important']),
+                'include_in_report' => array_key_exists('include_in_report', $task)
+                    ? !empty($task['include_in_report'])
+                    : true,
+                'allows_subtasks' => !empty($task['allows_subtasks']),
+                'repeat_rule' => $task['repeat_rule'] ?? null,
+                'due_days_from_start' => $task['due_days_from_start'] ?? null,
+                'links_json' => $task['links'] ?? [],
+            ];
+            if ($hasClientHelp) {
+                $row['client_help'] = $task['client_help'] ?? null;
+            }
+            $parentModel = SeoChecklistTemplateTask::query()->updateOrCreate(
+                [
+                    'template_id' => $template->id,
+                    'code' => $task['code'],
+                ],
+                $row
+            );
+
+            foreach (($task['subtasks'] ?? []) as $sub) {
+                $seedCodes[] = $sub['code'];
+                $subRow = [
+                    'parent_id' => $parentModel->id,
+                    'stage_key' => $task['stage_key'],
+                    'stage_sort' => $task['stage_sort'],
+                    'sort' => $sub['sort'],
+                    'title' => $sub['title'],
+                    'help' => $sub['help'] ?? null,
+                    'role' => $sub['role'] ?? $task['role'],
+                    'is_important' => false,
+                    'include_in_report' => !empty($sub['include_in_report']),
+                    'allows_subtasks' => false,
+                    'repeat_rule' => null,
+                    'due_days_from_start' => null,
+                    'links_json' => [],
+                ];
+                if ($hasClientHelp) {
+                    $subRow['client_help'] = null;
+                }
+                SeoChecklistTemplateTask::query()->updateOrCreate(
+                    [
+                        'template_id' => $template->id,
+                        'code' => $sub['code'],
+                    ],
+                    $subRow
+                );
+            }
+        }
+
+        SeoChecklistTemplateTask::query()
+            ->where('template_id', $template->id)
+            ->whereNotIn('code', $seedCodes)
+            ->where('code', 'not like', 'custom_%')
+            ->delete();
     }
 
     /**
@@ -195,6 +344,10 @@ class SeoChecklistService
         }
 
         if ($template->is_system) {
+            if ($template->code === SeoChecklistDirectTemplate::CODE) {
+                return SeoChecklistDirectTemplate::skeletonStagesMap();
+            }
+
             return SeoChecklistDefaultTemplate::skeletonStagesMap();
         }
 
@@ -852,7 +1005,9 @@ class SeoChecklistService
         $this->ensureSystemTemplate();
 
         return SeoChecklistTemplate::query()
-            ->withCount('tasks')
+            ->withCount(['tasks' => function ($q) {
+                $q->whereNull('parent_id');
+            }])
             ->withCount(['projects as projects_count' => function ($q) use ($userId) {
                 $q->where('user_id', $userId);
             }])

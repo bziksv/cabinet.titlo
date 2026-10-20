@@ -36,4 +36,9 @@ class SeoChecklistTemplate extends Model
     {
         return static::query()->where('code', \App\Support\SeoChecklistDefaultTemplate::CODE)->first();
     }
+
+    public static function directSystemDefault(): ?self
+    {
+        return static::query()->where('code', \App\Support\SeoChecklistDirectTemplate::CODE)->first();
+    }
 }

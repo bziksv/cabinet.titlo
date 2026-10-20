@@ -36,10 +36,37 @@
     @if($readOnly)
         <div class="cabinet-sc-task__main">
             <span class="cabinet-sc-task__title {{ $task->is_important ? 'is-important' : '' }}">{{ $task->title }}</span>
-            <span class="cabinet-sc-role cabinet-sc-role--{{ $task->role }}">{{ $roleLabel }}</span>
+            <span class="cabinet-sc-tpl-compact__meta">
+                <span class="cabinet-sc-role cabinet-sc-role--{{ $task->role }}">{{ $roleLabel }}</span>
+                @if($task->due_days_from_start)
+                    <span class="cabinet-sc-tpl-pill">{{ __('Due day') }} {{ $task->due_days_from_start }}</span>
+                @endif
+                @if($task->repeat_rule)
+                    <span class="cabinet-sc-tpl-pill">{{ \App\Support\SeoChecklistDefaultTemplate::repeatRuleLabel($task->repeat_rule) }}</span>
+                @endif
+                @if($task->include_in_report)
+                    <span class="cabinet-sc-tpl-pill cabinet-sc-tpl-pill--report">{{ __('Include in SEO reports') }}</span>
+                @endif
+                @if($childCount > 0)
+                    <span class="cabinet-sc-tpl-pill">{{ $childCount }}</span>
+                @endif
+            </span>
         </div>
         @if($task->help)
             <p class="cabinet-sc-task__help cabinet-sc-task__help--tpl">{{ $task->help }}</p>
+        @endif
+        @if($childCount > 0)
+            <div class="cabinet-sc-tpl-subtasks mt-2">
+                <div class="cabinet-sc-tpl-subtasks__head">{{ __('Subtasks') }}</div>
+                <ul class="cabinet-sc-tpl-subtasks__list">
+                    @foreach(($task->children ?? []) as $child)
+                        <li>
+                            <span class="cabinet-sc-tpl-subtasks__title">{{ $child->title }}</span>
+                            <span class="cabinet-sc-role cabinet-sc-role--{{ $child->role }} ms-2">{{ $roleLabels[$child->role] ?? $child->role }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
         @endif
         @if(count($taskLinks) > 0)
             <div class="cabinet-sc-task__links cabinet-sc-task__links--tpl">
