@@ -127,7 +127,9 @@
                     </span>
                     <span class="cabinet-sc-role cabinet-sc-role--{{ $item->role }}">{{ $roleLabel }}</span>
                     <label class="cabinet-sc-report-flag cabinet-sc-report-flag--meta"
-                           data-tip="{{ __('Include in SEO reports') }}">
+                           data-tip-on="Включено в отчёт (нажмите, чтобы скрыть)"
+                           data-tip-off="Скрыто из отчёта (нажмите, чтобы включить)"
+                           data-tip="{{ $item->include_in_report ? 'Включено в отчёт (нажмите, чтобы скрыть)' : 'Скрыто из отчёта (нажмите, чтобы включить)' }}">
                         <input type="checkbox"
                                class="visually-hidden"
                                data-sc-include-report
@@ -403,7 +405,9 @@
                                 <span class="cabinet-sc-subtask__status-label">{{ $statusLabels[$child->status] ?? $child->status }}</span>
                             @endif
                             <label class="cabinet-sc-report-flag cabinet-sc-report-flag--sub"
-                                   data-tip="{{ __('Include in SEO reports') }}">
+                                   data-tip-on="Включено в отчёт (нажмите, чтобы скрыть)"
+                                   data-tip-off="Скрыто из отчёта (нажмите, чтобы включить)"
+                                   data-tip="{{ $child->include_in_report ? 'Включено в отчёт (нажмите, чтобы скрыть)' : 'Скрыто из отчёта (нажмите, чтобы включить)' }}">
                                 <input type="checkbox"
                                        class="visually-hidden"
                                        data-sc-include-report

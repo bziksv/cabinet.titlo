@@ -4185,6 +4185,23 @@ span.cabinet-sc-time--sub {
     border-color: #99f6e4;
 }
 
+.cabinet-sc-report-flag:not(:has(input:checked)) .bi {
+    position: relative;
+    opacity: 0.65;
+}
+
+.cabinet-sc-report-flag:not(:has(input:checked)) .bi::after {
+    content: '';
+    position: absolute;
+    left: -10%;
+    top: 48%;
+    width: 120%;
+    height: 1.5px;
+    background: #ef4444;
+    transform: rotate(-38deg);
+    pointer-events: none;
+}
+
 .cabinet-sc-report-flag:has(input:disabled) {
     opacity: 0.55;
     cursor: not-allowed;

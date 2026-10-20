@@ -522,10 +522,20 @@
     </div>
 @endif
 @if(!empty($snapshot['titlo_checklist']))
-    @php $c = $snapshot['titlo_checklist']; @endphp
+    @php
+        $c = $snapshot['titlo_checklist'];
+        $closedItemsListPdf = is_array($c['closed_items'] ?? null) ? $c['closed_items'] : [];
+    @endphp
     <div class="section">
         <h2>SEO-чеклист</h2>
-        <div class="meta">Закрыто за период: {{ (int)($c['closed_in_period'] ?? 0) }} · просрочено: {{ (int)($c['overdue'] ?? 0) }}</div>
+        <div class="meta">Закрыто за период: {{ (int)($c['closed_in_period'] ?? count($closedItemsListPdf)) }} · просрочено: {{ (int)($c['overdue'] ?? 0) }} · прогресс: {{ (int)($c['progress_done'] ?? 0) }}/{{ (int)($c['progress_total'] ?? 0) }}</div>
+        @if(!empty($closedItemsListPdf))
+            <ul>
+                @foreach($closedItemsListPdf as $ci)
+                    <li>{{ $ci['title'] ?? '' }}@if(!empty($ci['done_at'])) ({{ $fmtDate($ci['done_at']) }})@endif</li>
+                @endforeach
+            </ul>
+        @endif
     </div>
 @endif
 @if(!empty($snapshot['titlo_relevance']))

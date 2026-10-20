@@ -193,9 +193,16 @@
                             </tr>
                             </thead>
                             <tbody>
+                            @php
+                                $seenCurrentPeriods = [];
+                            @endphp
                             @foreach($reports as $report)
                                 @php
-                                    $isArchive = !empty($report->archived_from_report_id);
+                                    $periodKey = optional($report->period_from)->format('Y-m-d') . '_' . optional($report->period_to)->format('Y-m-d');
+                                    $isArchive = !empty($report->archived_from_report_id) || isset($seenCurrentPeriods[$periodKey]);
+                                    if (!$isArchive) {
+                                        $seenCurrentPeriods[$periodKey] = true;
+                                    }
                                     $generatedAt = $report->generated_at ?: $report->updated_at ?: $report->created_at;
                                 @endphp
                                 <tr @if(!$isArchive) class="is-current" @endif>
@@ -367,12 +374,23 @@
                         $genAutoCompare = array_key_exists('auto_compare', $genSettings)
                             ? !empty($genSettings['auto_compare'])
                             : true;
+                        $defaultMonthVal = !empty($genSettings['default_period_month'])
+                            ? $genSettings['default_period_month']
+                            : now()->format('Y-m');
+                        $defaultFromVal = !empty($genSettings['default_period_from'])
+                            ? $genSettings['default_period_from']
+                            : now()->startOfMonth()->format('Y-m-d');
+                        $defaultToVal = !empty($genSettings['default_period_to'])
+                            ? $genSettings['default_period_to']
+                            : now()->format('Y-m-d');
                     @endphp
                     <div class="modal-body" data-sr-generate-period>
                         <div class="mb-3">
                             <label class="form-label">{{ __('Period preset') }}</label>
                             <select class="form-select" name="period_preset" data-sr-period-preset>
                                 <option value="prev_month" @if($genPeriod === 'prev_month') selected @endif>{{ __('Previous calendar month') }}</option>
+                                <option value="this_month" @if($genPeriod === 'this_month') selected @endif>{{ __('Current month to date') }}</option>
+                                <option value="last_14" @if($genPeriod === 'last_14') selected @endif>{{ __('Last 14 days') }}</option>
                                 <option value="last_30" @if($genPeriod === 'last_30') selected @endif>{{ __('Last 30 days') }}</option>
                                 <option value="calendar_month" @if($genPeriod === 'calendar_month') selected @endif>{{ __('Specific calendar month') }}</option>
                                 <option value="custom" @if($genPeriod === 'custom') selected @endif>{{ __('Custom dates') }}</option>
@@ -381,18 +399,18 @@
                         <div class="mb-3" data-sr-period-month @if($genPeriod !== 'calendar_month') hidden @endif>
                             <label class="form-label">{{ __('Report month') }}</label>
                             <input type="month" class="form-control" name="period_month"
-                                   value="{{ $genSettings['default_period_month'] ?? '' }}">
+                                   value="{{ $defaultMonthVal }}">
                         </div>
                         <div class="row g-2 mb-3" data-sr-period-custom @if($genPeriod !== 'custom') hidden @endif>
                             <div class="col-6">
                                 <label class="form-label">{{ __('Date from') }}</label>
                                 <input type="date" class="form-control" name="period_from"
-                                       value="{{ $genSettings['default_period_from'] ?? '' }}">
+                                       value="{{ $defaultFromVal }}">
                             </div>
                             <div class="col-6">
                                 <label class="form-label">{{ __('Date to') }}</label>
                                 <input type="date" class="form-control" name="period_to"
-                                       value="{{ $genSettings['default_period_to'] ?? '' }}">
+                                       value="{{ $defaultToVal }}">
                             </div>
                         </div>
                         <label class="cabinet-sr-toggle-row mb-2">
@@ -525,8 +543,12 @@
                         if (el.tagName === 'BUTTON' && el.type !== 'submit') {
                             el.disabled = true;
                         } else if (el.tagName !== 'BUTTON') {
-                            el.readOnly = true;
-                            if (el.tagName === 'SELECT') el.disabled = true;
+                            // Never set .disabled = true on <select> or <input> during submit,
+                            // otherwise the browser omits their values from the POST request!
+                            el.style.pointerEvents = 'none';
+                            if (el.tagName !== 'SELECT' && el.type !== 'checkbox' && el.type !== 'radio') {
+                                el.readOnly = true;
+                            }
                         }
                     });
                 });

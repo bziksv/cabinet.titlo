@@ -1078,6 +1078,14 @@
             var projectId = reportItem.getAttribute('data-project-id');
             var itemId = reportItem.getAttribute('data-id');
             if (!projectId || !itemId) return;
+            var syncPlanReportTip = function (cb) {
+                var lbl = cb.closest('.cabinet-sc-report-flag');
+                if (!lbl) return;
+                var onTip = lbl.getAttribute('data-tip-on') || 'Включено в отчёт (нажмите, чтобы скрыть)';
+                var offTip = lbl.getAttribute('data-tip-off') || 'Скрыто из отчёта (нажмите, чтобы включить)';
+                lbl.setAttribute('data-tip', cb.checked ? onTip : offTip);
+            };
+            syncPlanReportTip(includeReport);
             includeReport.disabled = true;
             postJson(urlFor(updateTpl, projectId, itemId), {
                 include_in_report: includeReport.checked ? 1 : 0,
@@ -1086,12 +1094,14 @@
                     includeReport.disabled = false;
                     if (!result.ok) {
                         includeReport.checked = !includeReport.checked;
+                        syncPlanReportTip(includeReport);
                         alert((result.data && result.data.message) || 'Error');
                     }
                 })
                 .catch(function () {
                     includeReport.disabled = false;
                     includeReport.checked = !includeReport.checked;
+                    syncPlanReportTip(includeReport);
                 });
             return;
         }

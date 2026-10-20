@@ -100,6 +100,37 @@ class SeoReportTitloModulesCollector
         ];
     }
 
+    private function resolveChecklistProject(int $userId, string $domain): ?SeoChecklistProject
+    {
+        $domain = HomeUserSites::normalizeDomain($domain);
+        if ($domain === '') {
+            return null;
+        }
+
+        $project = SeoChecklistProject::query()
+            ->where('domain', $domain)
+            ->where(function ($q) use ($userId) {
+                $q->where('user_id', $userId)
+                    ->orWhere('pm_user_id', $userId)
+                    ->orWhere('owner_user_id', $userId);
+            })
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
+            ->orderByDesc('progress_done')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($project) {
+            return $project;
+        }
+
+        return SeoChecklistProject::query()
+            ->where('domain', $domain)
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
+            ->orderByDesc('progress_done')
+            ->orderByDesc('id')
+            ->first();
+    }
+
     /**
      * @return array{ok:bool,status:string,message?:string,progress:string,data?:array}
      */
@@ -107,11 +138,7 @@ class SeoReportTitloModulesCollector
     {
         $domain = HomeUserSites::normalizeDomain($domain);
         try {
-            $project = SeoChecklistProject::query()
-                ->where('user_id', $userId)
-                ->where('domain', $domain)
-                ->orderByDesc('id')
-                ->first();
+            $project = $this->resolveChecklistProject($userId, $domain);
         } catch (Throwable $e) {
             return $this->fail('error', __('Could not load Titlo module data'));
         }
@@ -120,17 +147,6 @@ class SeoReportTitloModulesCollector
             return $this->fail('not_connected', __('SEO Checklist is not connected'));
         }
 
-        $closedQuery = $project->items()
-            ->whereIn('status', SeoChecklistItem::CLOSED_STATUSES)
-            ->whereNotNull('done_at');
-        if ($from) {
-            $closedQuery->where('done_at', '>=', $from->copy()->startOfDay());
-        }
-        if ($to) {
-            $closedQuery->where('done_at', '<=', $to->copy()->endOfDay());
-        }
-        $closedInPeriod = (int) $closedQuery->count();
-
         $overdue = (int) $project->items()
             ->whereIn('status', SeoChecklistItem::ASSIGNEE_DUE_STATUSES)
             ->whereNotNull('due_at')
@@ -138,6 +154,7 @@ class SeoReportTitloModulesCollector
             ->count();
 
         $work = $this->workListsForChecklistProject($project, $from, $to);
+        $closedInPeriod = count($work['closed']);
 
         return [
             'ok' => true,
@@ -165,11 +182,7 @@ class SeoReportTitloModulesCollector
     {
         $domain = HomeUserSites::normalizeDomain($domain);
         try {
-            $project = SeoChecklistProject::query()
-                ->where('user_id', $userId)
-                ->where('domain', $domain)
-                ->orderByDesc('id')
-                ->first();
+            $project = $this->resolveChecklistProject($userId, $domain);
         } catch (Throwable $e) {
             return $this->fail('error', __('Could not load Titlo module data'));
         }
@@ -200,24 +213,36 @@ class SeoReportTitloModulesCollector
     {
         $closedQuery = $project->items()
             ->where('include_in_report', true)
-            ->whereIn('status', SeoChecklistItem::CLOSED_STATUSES)
-            ->whereNotNull('done_at');
+            ->whereIn('status', SeoChecklistItem::CLOSED_STATUSES);
         if ($from) {
-            $closedQuery->where('done_at', '>=', $from->copy()->startOfDay());
+            $start = $from->copy()->startOfDay();
+            $closedQuery->where(function ($q) use ($start) {
+                $q->where('done_at', '>=', $start)
+                    ->orWhere(function ($q2) use ($start) {
+                        $q2->whereNull('done_at')->where('updated_at', '>=', $start);
+                    });
+            });
         }
         if ($to) {
-            $closedQuery->where('done_at', '<=', $to->copy()->endOfDay());
+            $end = $to->copy()->endOfDay();
+            $closedQuery->where(function ($q) use ($end) {
+                $q->where('done_at', '<=', $end)
+                    ->orWhere(function ($q2) use ($end) {
+                        $q2->whereNull('done_at')->where('updated_at', '<=', $end);
+                    });
+            });
         }
         $closed = $closedQuery
-            ->orderByDesc('done_at')
-            ->limit(40)
-            ->get(['id', 'title', 'status', 'done_at', 'parent_id'])
+            ->orderByRaw('COALESCE(done_at, updated_at) DESC')
+            ->limit(60)
+            ->get(['id', 'title', 'status', 'done_at', 'updated_at', 'parent_id'])
             ->map(static function (SeoChecklistItem $item) {
+                $dt = $item->done_at ?: $item->updated_at;
                 return [
                     'id' => (int) $item->id,
                     'title' => (string) $item->title,
                     'status' => (string) $item->status,
-                    'done_at' => $item->done_at ? $item->done_at->format('Y-m-d') : null,
+                    'done_at' => $dt ? $dt->format('Y-m-d') : null,
                 ];
             })
             ->values()

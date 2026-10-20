@@ -140,6 +140,12 @@
                                 <option value="prev_month" @if($periodPreset === 'prev_month') selected @endif>
                                     {{ __('Previous calendar month') }}
                                 </option>
+                                <option value="this_month" @if($periodPreset === 'this_month') selected @endif>
+                                    {{ __('Current month to date') }}
+                                </option>
+                                <option value="last_14" @if($periodPreset === 'last_14') selected @endif>
+                                    {{ __('Last 14 days') }}
+                                </option>
                                 <option value="last_30" @if($periodPreset === 'last_30') selected @endif>
                                     {{ __('Last 30 days') }}
                                 </option>

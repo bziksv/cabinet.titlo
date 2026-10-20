@@ -1379,7 +1379,15 @@
             ? el.querySelector('.cabinet-sc-subtask__controls [data-sc-include-report], [data-sc-include-report]')
             : el.querySelector('.cabinet-sc-plan__meta [data-sc-include-report]');
         if (includeReport && updateTpl) {
+            var syncReportTip = function (cb) {
+                var lbl = cb.closest('.cabinet-sc-report-flag');
+                if (!lbl) return;
+                var onTip = lbl.getAttribute('data-tip-on') || 'Включено в отчёт (нажмите, чтобы скрыть)';
+                var offTip = lbl.getAttribute('data-tip-off') || 'Скрыто из отчёта (нажмите, чтобы включить)';
+                lbl.setAttribute('data-tip', cb.checked ? onTip : offTip);
+            };
             includeReport.addEventListener('change', function () {
+                syncReportTip(includeReport);
                 includeReport.disabled = true;
                 postJson(urlFor(updateTpl, el.getAttribute('data-id')), {
                     include_in_report: includeReport.checked ? 1 : 0,
@@ -1388,12 +1396,14 @@
                         includeReport.disabled = false;
                         if (!result.ok) {
                             includeReport.checked = !includeReport.checked;
+                            syncReportTip(includeReport);
                             alert((result.data && result.data.message) || 'Error');
                         }
                     })
                     .catch(function () {
                         includeReport.disabled = false;
                         includeReport.checked = !includeReport.checked;
+                        syncReportTip(includeReport);
                     });
             });
         }

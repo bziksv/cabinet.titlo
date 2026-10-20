@@ -2167,12 +2167,30 @@
                     <p class="small mt-2 mb-0"><a href="{{ $a['open_url'] }}">{{ __('Open source project') }}</a></p>
                 @endif
             @elseif($key === 'titlo_checklist' && !empty($snapshot['titlo_checklist']))
-                @php $c = $snapshot['titlo_checklist']; @endphp
+                @php
+                    $c = $snapshot['titlo_checklist'];
+                    $closedItemsList = is_array($c['closed_items'] ?? null) ? $c['closed_items'] : [];
+                @endphp
                 <div class="cabinet-sr-kpi-grid">
-                    <div class="cabinet-sr-kpi"><div class="cabinet-sr-kpi__label">{{ __('Closed in period') }}</div><div class="cabinet-sr-kpi__value">{{ (int)($c['closed_in_period'] ?? 0) }}</div></div>
+                    <div class="cabinet-sr-kpi"><div class="cabinet-sr-kpi__label">{{ __('Closed in period') }}</div><div class="cabinet-sr-kpi__value">{{ (int)($c['closed_in_period'] ?? count($closedItemsList)) }}</div></div>
                     <div class="cabinet-sr-kpi"><div class="cabinet-sr-kpi__label">{{ __('Overdue') }}</div><div class="cabinet-sr-kpi__value">{{ (int)($c['overdue'] ?? 0) }}</div></div>
                     <div class="cabinet-sr-kpi"><div class="cabinet-sr-kpi__label">{{ __('Progress') }}</div><div class="cabinet-sr-kpi__value">{{ (int)($c['progress_done'] ?? 0) }}/{{ (int)($c['progress_total'] ?? 0) }}</div></div>
                 </div>
+                @if(!empty($closedItemsList))
+                    <div class="mt-3">
+                        <div class="small fw-semibold mb-1">{{ __('Closed in period') }}:</div>
+                        <ul class="small mb-2 ps-3">
+                            @foreach($closedItemsList as $ci)
+                                <li>
+                                    {{ $ci['title'] ?? '' }}
+                                    @if(!empty($ci['done_at']))
+                                        <span class="text-secondary">({{ $fmtDate($ci['done_at']) }})</span>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
                 @if(!empty($c['open_url']) && !$isPublic)
                     <p class="small mt-2 mb-0"><a href="{{ $c['open_url'] }}">{{ __('Open source project') }}</a></p>
                 @endif

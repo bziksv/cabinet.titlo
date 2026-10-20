@@ -10,6 +10,8 @@ use Carbon\Carbon;
 class SeoReportPeriodResolver
 {
     public const PERIOD_PREV_MONTH = 'prev_month';
+    public const PERIOD_THIS_MONTH = 'this_month';
+    public const PERIOD_LAST_14 = 'last_14';
     public const PERIOD_LAST_30 = 'last_30';
     public const PERIOD_CALENDAR_MONTH = 'calendar_month';
     public const PERIOD_CUSTOM = 'custom';
@@ -25,6 +27,8 @@ class SeoReportPeriodResolver
     {
         return [
             self::PERIOD_PREV_MONTH,
+            self::PERIOD_THIS_MONTH,
+            self::PERIOD_LAST_14,
             self::PERIOD_LAST_30,
             self::PERIOD_CALENDAR_MONTH,
             self::PERIOD_CUSTOM,
@@ -50,7 +54,13 @@ class SeoReportPeriodResolver
      */
     public static function resolve(array $settings = [], array $override = []): array
     {
-        $periodPreset = (string) ($override['period_preset'] ?? $settings['default_period'] ?? self::PERIOD_PREV_MONTH);
+        $rawPreset = $override['period_preset'] ?? null;
+        if (($rawPreset === null || $rawPreset === '') && !empty($override['period_from']) && !empty($override['period_to'])) {
+            $rawPreset = self::PERIOD_CUSTOM;
+        } elseif (($rawPreset === null || $rawPreset === '') && !empty($override['period_month'])) {
+            $rawPreset = self::PERIOD_CALENDAR_MONTH;
+        }
+        $periodPreset = (string) ($rawPreset ?: ($settings['default_period'] ?? self::PERIOD_PREV_MONTH));
         if (!in_array($periodPreset, self::periodPresets(), true)) {
             $periodPreset = self::PERIOD_PREV_MONTH;
         }
@@ -86,8 +96,22 @@ class SeoReportPeriodResolver
      */
     public static function resolveReportPeriod(string $preset, array $settings = [], array $override = []): array
     {
+        if ($preset === self::PERIOD_THIS_MONTH) {
+            $to = Carbon::today();
+            $from = $to->copy()->startOfMonth();
+
+            return [$from, $to];
+        }
+
+        if ($preset === self::PERIOD_LAST_14) {
+            $to = Carbon::today();
+            $from = $to->copy()->subDays(13);
+
+            return [$from, $to];
+        }
+
         if ($preset === self::PERIOD_LAST_30) {
-            $to = Carbon::today()->subDay();
+            $to = Carbon::today();
             $from = $to->copy()->subDays(29);
 
             return [$from, $to];

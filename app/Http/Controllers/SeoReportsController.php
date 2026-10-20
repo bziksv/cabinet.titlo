@@ -713,6 +713,16 @@ class SeoReportsController extends Controller
             'public_pin' => $this->normalizePin($request->input('public_pin')),
         ]);
         $report->ensurePublicToken();
+
+        // Mark older reports of the exact same period as previous versions.
+        SeoReport::query()
+            ->where('project_id', $project->id)
+            ->where('id', '!=', $report->id)
+            ->whereDate('period_from', $from->toDateString())
+            ->whereDate('period_to', $to->toDateString())
+            ->whereNull('archived_from_report_id')
+            ->update(['archived_from_report_id' => (int) $report->id]);
+
         $project->touch();
 
         $this->dispatchGenerate($report);
