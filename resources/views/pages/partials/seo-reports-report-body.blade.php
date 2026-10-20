@@ -2184,7 +2184,7 @@
                                 <li>
                                     {{ $ci['title'] ?? '' }}
                                     @if(!empty($ci['done_at']))
-                                        <span class="text-secondary">({{ $fmtDate($ci['done_at']) }})</span>
+                                        <span class="text-secondary">({{ \Carbon\Carbon::parse($ci['done_at'])->format('d.m.Y') }})</span>
                                     @endif
                                 </li>
                             @endforeach

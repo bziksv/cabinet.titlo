@@ -532,7 +532,7 @@
         @if(!empty($closedItemsListPdf))
             <ul>
                 @foreach($closedItemsListPdf as $ci)
-                    <li>{{ $ci['title'] ?? '' }}@if(!empty($ci['done_at'])) ({{ $fmtDate($ci['done_at']) }})@endif</li>
+                    <li>{{ $ci['title'] ?? '' }}@if(!empty($ci['done_at'])) ({{ \Carbon\Carbon::parse($ci['done_at'])->format('d.m.Y') }})@endif</li>
                 @endforeach
             </ul>
         @endif
