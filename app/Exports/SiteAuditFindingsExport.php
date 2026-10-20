@@ -2,8 +2,8 @@
 
 namespace App\Exports;
 
+use App\Services\SiteAudit\SiteAuditFindingExportRows;
 use App\Services\SiteAudit\SiteAuditFindingNoteService;
-use App\Services\SiteAudit\SiteAuditFindingPresenter;
 use App\Services\SiteAudit\SiteAuditIgnoreService;
 use App\Services\SiteAudit\SiteAuditReportFilter;
 use App\SiteAuditCrawl;
@@ -55,7 +55,7 @@ class SiteAuditFindingsExport implements FromCollection, WithHeadings, WithTitle
 
     public function headings(): array
     {
-        return ['URL', 'Код', 'Приоритет', 'Детали'];
+        return SiteAuditFindingExportRows::HEADINGS;
     }
 
     public function collection()
@@ -64,6 +64,8 @@ class SiteAuditFindingsExport implements FromCollection, WithHeadings, WithTitle
         $query = SiteAuditFinding::query()
             ->where('crawl_id', $this->crawlId)
             ->whereIn('code', $this->codes)
+            ->orderBy('url')
+            ->orderBy('code')
             ->orderBy('id');
         SiteAuditReportFilter::applyToFindings($query, $this->crawlId, $this->filters);
         $projectId = (int) SiteAuditCrawl::query()->where('id', $this->crawlId)->value('project_id');
@@ -77,12 +79,9 @@ class SiteAuditFindingsExport implements FromCollection, WithHeadings, WithTitle
         }
         $query->chunk(200, function ($chunk) use (&$rows) {
             foreach ($chunk as $row) {
-                $rows[] = [
-                    $row->url,
-                    $row->code,
-                    SiteAuditFindingPresenter::severityLabel($row->severity),
-                    SiteAuditFindingPresenter::metaLine($row->code, $row->meta_json, $row->url),
-                ];
+                foreach (SiteAuditFindingExportRows::rowsForFinding($row) as $line) {
+                    $rows[] = $line;
+                }
             }
         });
 

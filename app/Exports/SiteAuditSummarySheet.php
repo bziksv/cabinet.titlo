@@ -24,15 +24,23 @@ class SiteAuditSummarySheet implements FromArray, WithTitle
 
     public function array(): array
     {
-        $buckets = $this->crawl->buckets_json ?: [];
-        $counts = $this->crawl->counts_json ?: [];
+        return self::rowsForCrawl($this->crawl);
+    }
+
+    /**
+     * @return list<list<string|int|null>>
+     */
+    public static function rowsForCrawl(SiteAuditCrawl $crawl): array
+    {
+        $buckets = $crawl->buckets_json ?: [];
+        $counts = $crawl->counts_json ?: [];
         $catalog = config('site_audit.findings', []);
 
         $rows = [
-            ['Краул ID', $this->crawl->id],
-            ['Статус', $this->crawl->statusLabelRu()],
-            ['URL всего', $this->crawl->pages_total],
-            ['URL обработано', $this->crawl->pages_fetched],
+            ['Краул ID', $crawl->id],
+            ['Статус', $crawl->statusLabelRu()],
+            ['URL всего', $crawl->pages_total],
+            ['URL обработано', $crawl->pages_fetched],
             ['Грубые', (int) ($buckets['critical'] ?? 0)],
             ['Прочие', (int) ($buckets['other'] ?? 0)],
             ['Важные замечания', (int) ($buckets['important'] ?? 0)],

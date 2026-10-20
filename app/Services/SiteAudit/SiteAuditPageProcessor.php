@@ -564,7 +564,8 @@ class SiteAuditPageProcessor
                 if (! empty($parsed['html_error_count']) && (int) $parsed['html_error_count'] >= $htmlErrMin) {
                     $findings[] = $this->finding('html_critical_errors', $url, $urlHash, [
                         'count' => (int) $parsed['html_error_count'],
-                        'samples' => array_slice($parsed['html_error_samples'] ?? [], 0, 8),
+                        // До 40 ошибок на URL — чтобы XLSX/CSV выгрузка давала 1 строку на ошибку (сортировка).
+                        'samples' => array_slice($parsed['html_error_samples'] ?? [], 0, 40),
                         'checker' => (string) ($parsed['html_checker'] ?? SiteAuditHtmlChecker::LIBXML),
                         'checker_fallback' => ! empty($parsed['html_checker_fallback']),
                     ]);

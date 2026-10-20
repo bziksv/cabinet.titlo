@@ -6,6 +6,9 @@ use App\SiteAuditCrawl;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
+/**
+ * @deprecated Используйте SiteAuditStreamXlsx в контроллере — PhpSpreadsheet OOM на больших краулах.
+ */
 class SiteAuditCrawlSummaryExport implements WithMultipleSheets
 {
     use Exportable;
@@ -20,27 +23,9 @@ class SiteAuditCrawlSummaryExport implements WithMultipleSheets
 
     public function sheets(): array
     {
-        $sheets = [
+        // Только компактная сводка. Полный лист находок — через SiteAuditStreamXlsx.
+        return [
             new SiteAuditSummarySheet($this->crawl),
         ];
-
-        $counts = $this->crawl->counts_json ?: [];
-        $codes = array_keys(array_filter($counts, function ($c, $code) {
-            return (int) $c > 0 && $code !== 'pages_with_canonical';
-        }, ARRAY_FILTER_USE_BOTH));
-
-        if ($codes) {
-            $sheets[] = new SiteAuditFindingsExport(
-                $this->crawl->id,
-                $codes,
-                'Все находки'
-            );
-        }
-
-        if (! empty($counts['pages_with_canonical'])) {
-            $sheets[] = new SiteAuditCanonicalSheet($this->crawl->id);
-        }
-
-        return $sheets;
     }
 }

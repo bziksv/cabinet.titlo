@@ -2,9 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\SiteAuditCanonicalSheet;
-use App\Exports\SiteAuditCrawlSummaryExport;
-use App\Exports\SiteAuditFindingsExport;
 use App\Services\SiteAudit\SiteAuditActionPlanBuilder;
 use App\Services\SiteAudit\SiteAuditBatchUrlLookup;
 use App\Services\SiteAudit\SiteAuditClickDepth;
@@ -2038,14 +2035,16 @@ class SiteAuditController extends Controller
         $includeFixed = in_array((string) $request->input('fixed', ''), ['1', 'true', 'yes'], true);
         $projectId = (int) $crawl->project_id;
 
-        return response()->streamDownload(function () use ($crawl, $codes, $filterValues, $includeIgnored, $includeFixed, $projectId) {
+        return response()->streamDownload(function () use ($crawl, $codes, $filterValues, $includeIgnored, $includeFixed, $projectId, $code) {
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            fputcsv($out, ['url', 'code', 'severity', 'meta'], ';');
+            fputcsv($out, \App\Services\SiteAudit\SiteAuditFindingExportRows::HEADINGS, ';');
 
             $query = SiteAuditFinding::query()
                 ->where('crawl_id', $crawl->id)
                 ->whereIn('code', $codes)
+                ->orderBy('url')
+                ->orderBy('code')
                 ->orderBy('id');
             SiteAuditReportFilter::applyToFindings($query, $crawl->id, $filterValues);
             if (! $includeIgnored) {
@@ -2058,12 +2057,9 @@ class SiteAuditController extends Controller
             $this->excludeEntityJunkNgramFindings($query, $code);
             $query->chunk(200, function ($rows) use ($out) {
                 foreach ($rows as $row) {
-                    fputcsv($out, [
-                        $row->url,
-                        $row->code,
-                        $row->severity,
-                        $row->meta_json ? json_encode($row->meta_json, JSON_UNESCAPED_UNICODE) : '',
-                    ], ';');
+                    foreach (\App\Services\SiteAudit\SiteAuditFindingExportRows::rowsForFinding($row) as $line) {
+                        fputcsv($out, $line, ';');
+                    }
                 }
             });
 
@@ -2073,7 +2069,7 @@ class SiteAuditController extends Controller
         ]);
     }
 
-    public function exportReportXlsx(Request $request, int $id, string $code): BinaryFileResponse
+    public function exportReportXlsx(Request $request, int $id, string $code)
     {
         $crawl = $this->ownedCrawl($id);
         $meta = config('site_audit.findings.' . $code, []);
@@ -2114,19 +2110,60 @@ class SiteAuditController extends Controller
         $includeIgnored = in_array((string) $request->input('ignored', ''), ['1', 'true', 'yes'], true);
         $includeFixed = in_array((string) $request->input('fixed', ''), ['1', 'true', 'yes'], true);
 
-        return Excel::download(
-            new SiteAuditFindingsExport($crawl->id, $codes, $title, $filterValues, $includeIgnored, $includeFixed),
-            $filename
-        );
+        return \App\Services\SiteAudit\SiteAuditStreamXlsx::download($filename, [[
+            'title' => $title,
+            'headings' => \App\Services\SiteAudit\SiteAuditFindingExportRows::HEADINGS,
+            'rows' => \App\Services\SiteAudit\SiteAuditFindingExportRows::streamForCrawl(
+                (int) $crawl->id,
+                $codes,
+                $filterValues,
+                $includeIgnored,
+                $includeFixed
+            ),
+        ]]);
     }
 
-    public function exportCrawlXlsx(int $id): BinaryFileResponse
+    public function exportCrawlXlsx(int $id)
     {
         $crawl = $this->ownedCrawl($id);
+        $sheets = [[
+            'title' => 'Сводка',
+            'headings' => [],
+            'rows' => \App\Exports\SiteAuditSummarySheet::rowsForCrawl($crawl),
+        ]];
 
-        return Excel::download(
-            new SiteAuditCrawlSummaryExport($crawl),
-            'site-audit-' . $crawl->id . '-summary.xlsx'
+        $counts = is_array($crawl->counts_json) ? $crawl->counts_json : [];
+        $hasFindings = (bool) array_filter($counts, static function ($c, $code) {
+            return (int) $c > 0 && $code !== 'pages_with_canonical';
+        }, ARRAY_FILTER_USE_BOTH);
+        if ($hasFindings) {
+            $sheets[] = [
+                'title' => 'Все находки',
+                'headings' => \App\Services\SiteAudit\SiteAuditFindingExportRows::HEADINGS,
+                'rows' => \App\Services\SiteAudit\SiteAuditFindingExportRows::streamForCrawl((int) $crawl->id),
+            ];
+        }
+        if (! empty($counts['pages_with_canonical'])) {
+            $sheets[] = [
+                'title' => 'Canonical',
+                'headings' => ['URL', 'Canonical'],
+                'rows' => (static function () use ($crawl) {
+                    $q = \App\SiteAuditPage::query()
+                        ->where('crawl_id', $crawl->id)
+                        ->whereNotNull('canonical')
+                        ->where('canonical', '!=', '')
+                        ->orderBy('id')
+                        ->select(['url', 'canonical']);
+                    foreach ($q->cursor() as $p) {
+                        yield [$p->url, $p->canonical];
+                    }
+                })(),
+            ];
+        }
+
+        return \App\Services\SiteAudit\SiteAuditStreamXlsx::download(
+            'site-audit-' . $crawl->id . '-summary.xlsx',
+            $sheets
         );
     }
 

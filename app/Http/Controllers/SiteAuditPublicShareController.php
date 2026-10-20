@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\SiteAuditCrawlSummaryExport;
-use App\Exports\SiteAuditFindingsExport;
 use App\Exports\SiteAuditInventorySheet;
 use App\Services\SiteAudit\SiteAuditBatchUrlLookup;
 use App\Services\SiteAudit\SiteAuditDuplicateGrouper;
@@ -325,27 +323,26 @@ class SiteAuditPublicShareController extends Controller
         return response()->streamDownload(function () use ($crawl, $codes, $filterValues) {
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            fputcsv($out, ['url', 'code', 'severity', 'meta'], ';');
+            fputcsv($out, \App\Services\SiteAudit\SiteAuditFindingExportRows::HEADINGS, ';');
             $query = SiteAuditFinding::query()
                 ->where('crawl_id', $crawl->id)
                 ->whereIn('code', $codes)
+                ->orderBy('url')
+                ->orderBy('code')
                 ->orderBy('id');
             SiteAuditReportFilter::applyToFindings($query, $crawl->id, $filterValues);
             $query->chunk(200, function ($rows) use ($out) {
                 foreach ($rows as $row) {
-                    fputcsv($out, [
-                        $row->url,
-                        $row->code,
-                        $row->severity,
-                        $row->meta_json ? json_encode($row->meta_json, JSON_UNESCAPED_UNICODE) : '',
-                    ], ';');
+                    foreach (\App\Services\SiteAudit\SiteAuditFindingExportRows::rowsForFinding($row) as $line) {
+                        fputcsv($out, $line, ';');
+                    }
                 }
             });
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    public function exportReportXlsx(Request $request, string $token, string $code): BinaryFileResponse
+    public function exportReportXlsx(Request $request, string $token, string $code)
     {
         $crawl = $this->crawlByToken($token);
         $meta = config('site_audit.findings.' . $code, []);
@@ -384,19 +381,58 @@ class SiteAuditPublicShareController extends Controller
             ? array_values($meta['codes'])
             : [$code];
 
-        return Excel::download(
-            new SiteAuditFindingsExport($crawl->id, $codes, (string) ($meta['title'] ?? $code), $filterValues),
-            $filename
-        );
+        return \App\Services\SiteAudit\SiteAuditStreamXlsx::download($filename, [[
+            'title' => (string) ($meta['title'] ?? $code),
+            'headings' => \App\Services\SiteAudit\SiteAuditFindingExportRows::HEADINGS,
+            'rows' => \App\Services\SiteAudit\SiteAuditFindingExportRows::streamForCrawl(
+                (int) $crawl->id,
+                $codes,
+                $filterValues
+            ),
+        ]]);
     }
 
-    public function exportCrawlXlsx(string $token): BinaryFileResponse
+    public function exportCrawlXlsx(string $token)
     {
         $crawl = $this->crawlByToken($token);
+        $sheets = [[
+            'title' => 'Сводка',
+            'headings' => [],
+            'rows' => \App\Exports\SiteAuditSummarySheet::rowsForCrawl($crawl),
+        ]];
 
-        return Excel::download(
-            new SiteAuditCrawlSummaryExport($crawl),
-            'site-audit-' . $crawl->id . '-summary.xlsx'
+        $counts = is_array($crawl->counts_json) ? $crawl->counts_json : [];
+        $hasFindings = (bool) array_filter($counts, static function ($c, $code) {
+            return (int) $c > 0 && $code !== 'pages_with_canonical';
+        }, ARRAY_FILTER_USE_BOTH);
+        if ($hasFindings) {
+            $sheets[] = [
+                'title' => 'Все находки',
+                'headings' => \App\Services\SiteAudit\SiteAuditFindingExportRows::HEADINGS,
+                'rows' => \App\Services\SiteAudit\SiteAuditFindingExportRows::streamForCrawl((int) $crawl->id),
+            ];
+        }
+        if (! empty($counts['pages_with_canonical'])) {
+            $sheets[] = [
+                'title' => 'Canonical',
+                'headings' => ['URL', 'Canonical'],
+                'rows' => (static function () use ($crawl) {
+                    $q = \App\SiteAuditPage::query()
+                        ->where('crawl_id', $crawl->id)
+                        ->whereNotNull('canonical')
+                        ->where('canonical', '!=', '')
+                        ->orderBy('id')
+                        ->select(['url', 'canonical']);
+                    foreach ($q->cursor() as $p) {
+                        yield [$p->url, $p->canonical];
+                    }
+                })(),
+            ];
+        }
+
+        return \App\Services\SiteAudit\SiteAuditStreamXlsx::download(
+            'site-audit-' . $crawl->id . '-summary.xlsx',
+            $sheets
         );
     }
 
