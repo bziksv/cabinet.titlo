@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-export PATH="/opt/homebrew/opt/php@7.4/bin:${PATH:-}"
+export PATH="/opt/homebrew/opt/php@8.5/bin:${PATH:-}"
 
 LOG_TMP="/tmp/cabinet-dev.log"
 PID_FILE="/tmp/cabinet-dev.pid"

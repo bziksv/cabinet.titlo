@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-export PATH="/opt/homebrew/opt/php@7.4/bin:${PATH:-}"
+export PATH="/opt/homebrew/opt/php@8.5/bin:${PATH:-}"
 
 WORKERS=(13002 13003 13004)
 PROBE_PATH="${CABINET_HEALTH_PATH:-/login}"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Smoke: text-analyzer tables + jQCloud after POST analyze
 set -euo pipefail
-export PATH="/opt/homebrew/opt/php@7.4/bin:$PATH"
+export PATH="/opt/homebrew/opt/php@8.5/bin:$PATH"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 

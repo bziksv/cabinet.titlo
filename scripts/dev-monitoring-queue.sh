@@ -3,7 +3,7 @@
 # Нужен, если с localhost ставите задачи в database-очередь и не хотите ждать prod workers.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export PATH="/opt/homebrew/opt/php@7.4/bin:/opt/homebrew/opt/php@7.4/sbin:${PATH:-}"
+export PATH="/opt/homebrew/opt/php@8.5/bin:/opt/homebrew/opt/php@8.5/sbin:${PATH:-}"
 
 echo "Monitoring queue worker (database: default,high,position_high,position_low). Ctrl+C to stop."
 exec php artisan queue:work database \

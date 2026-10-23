@@ -2,7 +2,7 @@
 # Профиль публичных страниц (без auth) — C.10 мини-аудит.
 set -euo pipefail
 
-export PATH="/opt/homebrew/opt/php@7.4/bin:$PATH"
+export PATH="/opt/homebrew/opt/php@8.5/bin:$PATH"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 PATHS=(

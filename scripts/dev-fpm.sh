@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-export PATH="/opt/homebrew/opt/php@7.4/bin:/opt/homebrew/opt/php@7.4/sbin:${PATH:-}"
+export PATH="/opt/homebrew/opt/php@8.5/bin:/opt/homebrew/opt/php@8.5/sbin:${PATH:-}"
 
 LOG="/tmp/cabinet-dev.log"
 MODE_FILE="/tmp/cabinet-dev-mode"
@@ -29,7 +29,7 @@ find_php_fpm() {
     command -v php-fpm
     return 0
   fi
-  [[ -x /opt/homebrew/opt/php@7.4/sbin/php-fpm ]] && echo /opt/homebrew/opt/php@7.4/sbin/php-fpm && return 0
+  [[ -x /opt/homebrew/opt/php@8.5/sbin/php-fpm ]] && echo /opt/homebrew/opt/php@8.5/sbin/php-fpm && return 0
   return 1
 }
 

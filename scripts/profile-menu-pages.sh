@@ -2,7 +2,7 @@
 # Прогон группы A (main_projects show=1) + ключевые страницы C.
 set -euo pipefail
 
-export PATH="/opt/homebrew/opt/php@7.4/bin:$PATH"
+export PATH="/opt/homebrew/opt/php@8.5/bin:$PATH"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 USER_ID="${1:-4}"
 

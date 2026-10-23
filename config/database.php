@@ -70,7 +70,8 @@ return [
             'strict' => false,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                // PHP 8.5: PDO::MYSQL_ATTR_SSL_CA deprecated → Pdo\Mysql::ATTR_SSL_CA
+                (PHP_VERSION_ID >= 80500 ? constant('Pdo\\Mysql::ATTR_SSL_CA') : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
                 PDO::ATTR_TIMEOUT => 10,
             ]) : [],
         ],
@@ -90,7 +91,7 @@ return [
             'strict' => false,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                (PHP_VERSION_ID >= 80500 ? constant('Pdo\\Mysql::ATTR_SSL_CA') : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
                 // Local: не держать php-fpm минутами, если prod недоступен.
                 PDO::ATTR_TIMEOUT => (int) env('DB_PROD_TIMEOUT', 2),
             ]) : [],

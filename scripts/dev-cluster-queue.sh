@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-export PATH="/opt/homebrew/opt/php@7.4/bin:/opt/homebrew/opt/php@7.4/sbin:${PATH:-}"
+export PATH="/opt/homebrew/opt/php@8.5/bin:/opt/homebrew/opt/php@8.5/sbin:${PATH:-}"
 
 PID_DIR="/tmp/cabinet-cluster-queue-pids"
 LOG_FILE="/tmp/cabinet-cluster-queue.log"
@@ -66,7 +66,7 @@ start_workers() {
     # Отдельная session: иначе Cursor/IDE убивает воркеры вместе с shell после команды.
     # macOS часто без setsid — используем Python start_new_session.
     pid="$(
-      PATH="/opt/homebrew/opt/php@7.4/bin:${PATH}" \
+      PATH="/opt/homebrew/opt/php@8.5/bin:${PATH}" \
       QUEUE_LIST="$QUEUES" \
       LOG_FILE="$LOG_FILE" \
       ROOT="$ROOT" \

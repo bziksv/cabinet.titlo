@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PHP="${PHP_BIN:-/opt/homebrew/opt/php@7.4/bin/php}"
+PHP="${PHP_BIN:-/opt/homebrew/opt/php@8.5/bin/php}"
 QUEUES="ai_generation"
 PIDDIR="storage/logs"
 PIDFILE="${PIDDIR}/dev-ai-generation.pid"

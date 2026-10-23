@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PHP="${PHP_BIN:-/opt/homebrew/opt/php@7.4/bin/php}"
+PHP="${PHP_BIN:-/opt/homebrew/opt/php@8.5/bin/php}"
 # HTML парсер на больших карточках жрёт >128M — иначе worker падает и очередь встаёт.
 PHP_ARGS=("-d" "memory_limit=${RELEVANCE_PHP_MEMORY:-512M}")
 QUEUES="relevance_high_priority,relevance_medium_priority,relevance_normal_priority"

@@ -25,9 +25,9 @@
 ## Локальный запуск (Mac)
 
 1. `.env` с VPS (имя файла **`.env`**, не `env`).
-2. PHP **7.4**: `/opt/homebrew/opt/php@7.4/bin` в PATH.
+2. PHP **8.5** (локалка): `/opt/homebrew/opt/php@8.5/bin` в PATH. Прод пока на **7.4**. Откат локалки: `CABINET_PHP_PREFIX=/opt/homebrew/opt/php@7.4 ./scripts/dev-local.sh`.
 3. `composer install --no-dev`
-4. `./scripts/dev-serve.sh` → http://localhost:3002
+4. `./scripts/dev-local.sh` → http://localhost:3002
 
 В `.env`: **`DB_HOST=178.250.157.140`**, **`APP_URL=http://localhost:3002`**.
 

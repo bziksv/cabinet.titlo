@@ -4,7 +4,7 @@
 # Ориентир по времени: ~5–8 мин (remote DB).
 set -euo pipefail
 
-export PATH="/opt/homebrew/opt/php@7.4/bin:$PATH"
+export PATH="/opt/homebrew/opt/php@8.5/bin:$PATH"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 USER_ID="${1:-4}"
 LOG="${2:-/tmp/cabinet-full-audit-$(date +%Y%m%d-%H%M).log}"

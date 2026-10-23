@@ -2,7 +2,7 @@
 # Локальный кабинет :3002 — nginx+php-fpm (по умолчанию)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export PATH="/opt/homebrew/opt/php@7.4/bin:/opt/homebrew/opt/php@7.4/sbin:${PATH:-}"
+export PATH="/opt/homebrew/opt/php@8.5/bin:/opt/homebrew/opt/php@8.5/sbin:${PATH:-}"
 
 if [[ "${1:-}" == "parallel" ]]; then
   echo "dev-parallel устарел, используйте dev-fpm (nginx+php-fpm)" >&2

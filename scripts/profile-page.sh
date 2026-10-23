@@ -3,7 +3,7 @@
 # Usage: ./scripts/profile-page.sh /news [user_id]
 set -euo pipefail
 
-export PATH="/opt/homebrew/opt/php@7.4/bin:$PATH"
+export PATH="/opt/homebrew/opt/php@8.5/bin:$PATH"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 URI="${1:-/}"
 USER_ID="${2:-4}"

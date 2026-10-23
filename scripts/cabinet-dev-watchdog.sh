@@ -2,7 +2,7 @@
 # Если :3002 не отвечает 8 с — перезапуск serve (однопоточный PHP зависает на MySQL).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-export PATH="/opt/homebrew/opt/php@7.4/bin:${PATH:-}"
+export PATH="/opt/homebrew/opt/php@8.5/bin:${PATH:-}"
 PORT=3002
 PID_FILE="/tmp/cabinet-dev.pid"
 LOG="/tmp/cabinet-dev.log"

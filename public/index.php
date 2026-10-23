@@ -9,6 +9,8 @@
 
 define('LARAVEL_START', microtime(true));
 
+require __DIR__ . '/../bootstrap/php85-compat.php';
+
 /*
 |--------------------------------------------------------------------------
 | Static DB outage page (no Laravel / no MySQL)
