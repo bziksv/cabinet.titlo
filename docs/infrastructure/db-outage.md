@@ -25,7 +25,7 @@ chmod +x scripts/outage-enable.sh scripts/outage-disable.sh scripts/db-healthche
 Cron от **system** (не `schedule:run`):
 
 ```cron
-* * * * * cabinet_titl_usr /opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/scripts/db-healthcheck.php >> /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/db-healthcheck.log 2>&1
+* * * * * cabinet_titl_usr /opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/scripts/db-healthcheck.php >> /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/db-healthcheck.log 2>&1
 ```
 
 ## Поведение healthcheck

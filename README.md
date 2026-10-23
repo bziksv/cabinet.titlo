@@ -25,7 +25,7 @@
 ## Локальный запуск (Mac)
 
 1. `.env` с VPS (имя файла **`.env`**, не `env`).
-2. PHP **8.5** (локалка): `/opt/homebrew/opt/php@8.5/bin` в PATH. Прод пока на **7.4**. Откат локалки: `CABINET_PHP_PREFIX=/opt/homebrew/opt/php@7.4 ./scripts/dev-local.sh`.
+2. PHP **8.5**: локалка `/opt/homebrew/opt/php@8.5/bin`, прод `/opt/php85/bin/php`. Откат локалки: `CABINET_PHP_PREFIX=/opt/homebrew/opt/php@7.4 ./scripts/dev-local.sh`.
 3. `composer install --no-dev`
 4. `./scripts/dev-local.sh` → http://localhost:3002
 

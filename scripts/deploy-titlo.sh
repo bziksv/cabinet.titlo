@@ -12,7 +12,7 @@ ssh -o BatchMode=yes "$SSH_HOST" bash -s "$BRANCH" <<'REMOTE'
 set -euo pipefail
 BRANCH="$1"
 APP=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
-PHP=/opt/php74/bin/php
+PHP=/opt/php85/bin/php
 USER=cabinet_titl_usr
 
 cd "$APP"
@@ -20,7 +20,7 @@ git fetch origin
 git checkout "$BRANCH"
 git reset --hard "origin/${BRANCH}"
 
-COMPOSER_ALLOW_SUPERUSER=1 "$PHP" "$(which composer)" install --no-dev --optimize-autoloader --no-interaction
+COMPOSER_ALLOW_SUPERUSER=1 "$PHP" "$(which composer)" install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
 if git diff --name-only HEAD@{1} HEAD 2>/dev/null | grep -qE '^(package(-lock)?\.json|resources/(js|sass)/)'; then
   NODE_OPTIONS=--openssl-legacy-provider npm run production
