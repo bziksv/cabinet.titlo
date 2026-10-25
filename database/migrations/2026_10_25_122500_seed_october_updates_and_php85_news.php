@@ -55,7 +55,7 @@ class SeedOctoberUpdatesAndPhp85News extends Migration
 </ul>
 <p>Раздел: <strong><a href="/seo-checklist">«SEO-чеклист»</a></strong>.</p>
 
-<p><strong>Анализ релевантности.</strong> Публичная ссылка на одну проверку — можно отдать коллеге или клиенту без входа в кабинет. Раздел: <strong><a href="/relevance-analysis">«Анализ релевантности»</a></strong>.</p>
+<p><strong>Анализ релевантности.</strong> Публичная ссылка на одну проверку — можно отдать коллеге или клиенту без входа в кабинет. Раздел: <strong><a href="/analyze-relevance">«Анализ релевантности»</a></strong>.</p>
 
 <p><strong>Мониторинг позиций.</strong> Доработки таблицы ключей и групп, прав по команде проекта, экспорта и горизонтального скролла (Shift + колесо). Раздел: <strong><a href="/monitoring-v2">«Мониторинг позиций»</a></strong>.</p>
 
