@@ -134,7 +134,7 @@ class MonitoringImportFaviconsFromLegacy extends Command
             $this->line('HTTP с lk не сработал → rsync каталог monitoring-favicons на s3 и:');
             $this->line('  --from-disk=/path/to/storage/app/public');
         }
-        $this->line('Для 211 без файла: /opt/php74/bin/php artisan monitoring:refresh-favicons --no-file');
+        $this->line('Для 211 без файла: /opt/php85/bin/php artisan monitoring:refresh-favicons --no-file');
 
         return $failed > 0 ? 2 : 0;
     }

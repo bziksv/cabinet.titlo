@@ -9,7 +9,7 @@
  * - When DB is up: refresh admin Telegram chat cache (roles admin / Super Admin)
  *
  * Cron (system, not Laravel schedule — schedule itself needs DB):
- *   * * * * * cabinet_titl_usr /opt/php74/bin/php /var/www/.../scripts/db-healthcheck.php >>.../storage/logs/db-healthcheck.log 2>&1
+ *   * * * * * cabinet_titl_usr /opt/php85/bin/php /var/www/.../scripts/db-healthcheck.php >>.../storage/logs/db-healthcheck.log 2>&1
  *
  * Manual:
  *   php scripts/db-healthcheck.php

@@ -34,10 +34,14 @@ class PhpCliBinary
     public static function defaultCandidates(): array
     {
         return [
-            '/opt/homebrew/opt/php@7.4/bin/php',
+            '/opt/php85/bin/php',
+            '/opt/homebrew/opt/php@8.5/bin/php',
             '/opt/homebrew/bin/php',
             '/usr/local/bin/php',
             '/usr/bin/php',
+            // legacy fallbacks
+            '/opt/php74/bin/php',
+            '/opt/homebrew/opt/php@7.4/bin/php',
         ];
     }
 

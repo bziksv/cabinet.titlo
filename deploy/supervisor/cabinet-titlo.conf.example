@@ -9,12 +9,12 @@
 
 ; --- shared paths (заменить при другом деплое) ---
 ; APP=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
-; PHP=/opt/php74/bin/php
+; PHP=/opt/php85/bin/php
 ; USER=cabinet_titl_usr
 
 [program:cabinet-titlo-default]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=default,cluster_high,high,medium --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=default,cluster_high,high,medium --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=6
@@ -29,7 +29,7 @@ stderr_logfile_maxbytes=20MB
 ; OPTIMIZE TABLE — строго 1 процесс (иначе stampede на lock и «В очереди» навсегда)
 [program:cabinet-titlo-db-optimize]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=db-optimize --sleep=2 --tries=3 --timeout=14400
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=db-optimize --sleep=2 --tries=3 --timeout=14400
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=1
@@ -43,7 +43,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-cluster-child]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=child_cluster --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=child_cluster --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=6
@@ -57,7 +57,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-cluster-main]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=main_cluster --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=main_cluster --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=3
@@ -71,7 +71,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-cluster-wait]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=cluster_wait --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=cluster_wait --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=6
@@ -85,7 +85,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-position]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=position_high,position_low --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=position_high,position_low --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=6
@@ -99,7 +99,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-relevance]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=relevance_high_priority,relevance_medium_priority,relevance_normal_priority --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=relevance_high_priority,relevance_medium_priority,relevance_normal_priority --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=6
@@ -113,7 +113,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-monitoring-helper]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_helper --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_helper --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=5
@@ -127,7 +127,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-monitoring-change-dates]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_change_dates --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_change_dates --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=2
@@ -141,7 +141,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-monitoring-wait]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_wait --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_wait --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=2
@@ -155,7 +155,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-monitoring-competitors-stat]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_competitors_stat --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_competitors_stat --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=1
@@ -169,7 +169,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-competitor-analyse]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=competitor_analyse --sleep=1 --tries=2 --timeout=1200
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=competitor_analyse --sleep=1 --tries=2 --timeout=1200
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=5
@@ -183,7 +183,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-ai-generation]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=ai_generation --sleep=1 --tries=2 --timeout=600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=ai_generation --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=5
@@ -197,7 +197,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-site-audit]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=site_audit --sleep=1 --tries=2 --timeout=3600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=site_audit --sleep=1 --tries=2 --timeout=3600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=3
@@ -211,7 +211,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-site-audit-aggregate]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=site_audit_aggregate --sleep=1 --tries=2 --timeout=3600
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=site_audit_aggregate --sleep=1 --tries=2 --timeout=3600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=2
@@ -225,7 +225,7 @@ stderr_logfile_maxbytes=20MB
 
 [program:cabinet-titlo-websockets]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan websockets:serve --host=127.0.0.1 --port=6001
+command=/opt/php85/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan websockets:serve --host=127.0.0.1 --port=6001
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=1

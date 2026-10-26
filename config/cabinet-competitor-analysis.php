@@ -101,7 +101,8 @@ return [
     'job_max_execution_sec' => (int) env('COMPETITOR_ANALYSIS_JOB_MAX_SEC', 1200),
 
     /** php CLI для фонового queue:work (если run_job_after_response=false) */
-    'php_cli' => env('COMPETITOR_ANALYSIS_PHP_CLI', '/opt/homebrew/opt/php@7.4/bin/php'),
+    // Prod: /opt/php85; local Mac: php@8.5. Override via COMPETITOR_ANALYSIS_PHP_CLI.
+    'php_cli' => env('COMPETITOR_ANALYSIS_PHP_CLI', '/opt/php85/bin/php'),
 
     /** Локально: поднять queue:work --once через Symfony Process (устаревший путь) */
     'spawn_queue_worker' => env('COMPETITOR_ANALYSIS_SPAWN_QUEUE_WORKER', false),
