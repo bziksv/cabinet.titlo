@@ -917,6 +917,20 @@ class SiteAuditPageProcessor
                         $findings[] = $this->finding('missing_corp', $url, $urlHash);
                     }
                 }
+
+                // Page-local отчёты (title/h1, thin, spam…) — здесь, чтобы «Проверить» снимала строку.
+                $chrome = SiteAuditPageLocalFindings::chromeNgramMaps($crawlId);
+                $localPage = $pageData;
+                $localPage['url'] = $url;
+                $localPage['status_code'] = $code;
+                $localPage['content_type'] = $result['content_type'] ?? ($pageData['content_type'] ?? null);
+                foreach (SiteAuditPageLocalFindings::build(
+                    $localPage,
+                    $chrome['bigrams'],
+                    $chrome['trigrams']
+                ) as $local) {
+                    $findings[] = $this->finding($local['code'], $url, $urlHash, $local['meta']);
+                }
             }
         }
 
@@ -946,7 +960,7 @@ class SiteAuditPageProcessor
                 'duplicate_description',
                 'duplicate_content',
                 'similar_pages',
-                'soft_404',
+                // soft_404 — page-local, пишет process (см. SiteAuditPageLocalFindings).
                 'orphan_pages',
                 'duplicate_url_variants',
                 'page_has_broken_links',
@@ -958,23 +972,7 @@ class SiteAuditPageProcessor
                 'heavy_image',
                 'error_spike',
                 'deep_pages',
-                'thin_content',
-                'title_too_short',
-                'title_too_long',
-                'description_too_short',
-                'description_too_long',
-                'title_equals_h1',
-                'title_equals_description',
-                'description_equals_h1',
-                'too_many_strong',
-                'images_without_alt',
-                'meta_spam',
-                'h1_spam',
-                'text_nausea',
-                'text_bigram_spam',
-                'text_trigram_spam',
-                'no_unique_images',
-                'text_in_noindex',
+                // page-local (thin/title/spam/…) пишет process — не в exclude.
                 'not_in_sitemap',
                 'sitemap_not_crawled',
                 'landing_not_in_sitemap',
@@ -992,9 +990,6 @@ class SiteAuditPageProcessor
                 'keyword_cannibalization',
                 'ad_cannibalization',
                 'landing_query_mismatch',
-                'no_outbound_internal',
-                'risky_query_params',
-                'pagination_param',
             ])
             ->delete();
 
@@ -1034,10 +1029,11 @@ class SiteAuditPageProcessor
     {
         static $set = null;
         if ($set === null) {
-            $set = array_fill_keys([
+            $set = array_fill_keys(array_merge([
                 'robots_blocked', 'unreachable', 'http_4xx', 'http_5xx', 'page_too_large',
-                // Цель битой ссылки: перекачать адрес и снять broken_internal_link, если отвечает.
+                // Цель битой ссылки: перекачать адрес и снять finding, если отвечает.
                 'broken_internal_link',
+                'broken_external_link',
                 'page_has_bad_links', 'html_critical_errors', 'adult_content', 'negative_content',
                 'word_repeat_in_sentence', 'commercial_missing_contacts', 'commercial_missing_cta',
                 'commercial_missing_price', 'commercial_missing_delivery', 'commercial_missing_payment',
@@ -1050,7 +1046,7 @@ class SiteAuditPageProcessor
                 'missing_hsts', 'missing_x_frame_options', 'missing_x_content_type_options', 'missing_csp',
                 'missing_referrer_policy', 'missing_permissions_policy', 'missing_coop', 'missing_coep',
                 'missing_corp', 'redirect_loop', 'redirect', 'redirect_chain_long',
-            ], true);
+            ], SiteAuditPageLocalFindings::codes()), true);
         }
 
         return isset($set[$code]);

@@ -679,16 +679,15 @@ class SiteAuditAggregator
      */
     private function emitFromPages(int $crawlId, array &$meta = [], ?float $deadline = null): bool
     {
-        $thin = (int) config('site_audit.thin_words', 150);
-        $titleMin = (int) config('site_audit.title_min', 30);
-        $titleMax = (int) config('site_audit.title_max', 70);
-        $descMin = (int) config('site_audit.description_min', 70);
-        $descMax = (int) config('site_audit.description_max', 160);
         $chunkSize = max(50, (int) config('site_audit.aggregate_from_pages_chunk', 200));
         $afterId = (int) ($meta['after_id'] ?? 0);
-        $chromeBigrams = $this->chromeNgramMap($crawlId, 'top_bigram');
-        $chromeTrigrams = $this->chromeNgramMap($crawlId, 'top_trigram');
-        $ngramMinWords = max(1, (int) config('site_audit.ngram_spam_min_words', 40));
+        $chrome = SiteAuditPageLocalFindings::chromeNgramMaps($crawlId);
+        // Эти коды пишет и emitNoOutboundInternal / emitUrlParamRisks — здесь не дублируем.
+        $skipCodes = [
+            'no_outbound_internal' => true,
+            'risky_query_params' => true,
+            'pagination_param' => true,
+        ];
 
         while (true) {
             $pages = SiteAuditPage::query()
@@ -704,269 +703,32 @@ class SiteAuditAggregator
 
             foreach ($pages as $page) {
                 $afterId = (int) $page->id;
-                    // SEO/контент-находки только для успешно открытых HTML-страниц.
-                    // На 4xx/5xx/unreachable HTML не парсился → img/title = 0 по умолчанию,
-                    // иначе «Нет уникальных изображений» и т.п. заливают весь отчёт битыми URL.
-                    // webp/csv/pdf тоже лежат в pages, но это не документы перелинковки/META.
-                    $status = $page->status_code;
-                    if ($status === null || (int) $status < 200 || (int) $status >= 400) {
+                // SEO/контент-находки только для успешно открытых HTML-страниц.
+                $status = $page->status_code;
+                if ($status === null || (int) $status < 200 || (int) $status >= 400) {
+                    continue;
+                }
+                if (! SiteAuditUrlNormalizer::isHtmlDocument($page->content_type ?? null, (string) $page->url)) {
+                    continue;
+                }
+                // Контент/мета после follow — у финала; редирект уже в «Редиректы».
+                if ($this->pageHadRedirect($page)) {
+                    continue;
+                }
+
+                $pageArr = $page->toArray();
+                foreach (SiteAuditPageLocalFindings::build(
+                    $pageArr,
+                    $chrome['bigrams'],
+                    $chrome['trigrams']
+                ) as $local) {
+                    if (isset($skipCodes[$local['code']])) {
                         continue;
                     }
-                    if (! SiteAuditUrlNormalizer::isHtmlDocument($page->content_type ?? null, (string) $page->url)) {
-                        continue;
-                    }
-                    // Контент/мета после follow — у финала; редирект уже в «Редиректы».
-                    if ($this->pageHadRedirect($page)) {
-                        continue;
-                    }
-
-                    $findings = [];
-
-                    if ($page->word_count !== null && (int) $page->word_count > 0 && (int) $page->word_count < $thin) {
-                        $findings[] = $this->row($crawlId, 'thin_content', $page, [
-                            'word_count' => (int) $page->word_count,
-                            'threshold' => $thin,
-                        ]);
-                    }
-
-                    if ($page->title) {
-                        $len = mb_strlen($page->title);
-                        if ($len < $titleMin) {
-                            $findings[] = $this->row($crawlId, 'title_too_short', $page, [
-                                'length' => $len,
-                                'min' => $titleMin,
-                                'title' => $page->title,
-                            ]);
-                        } elseif ($len > $titleMax) {
-                            $findings[] = $this->row($crawlId, 'title_too_long', $page, [
-                                'length' => $len,
-                                'max' => $titleMax,
-                                'title' => $page->title,
-                            ]);
-                        }
-                    }
-
-                    if ($page->description) {
-                        $len = mb_strlen($page->description);
-                        if ($len < $descMin) {
-                            $findings[] = $this->row($crawlId, 'description_too_short', $page, [
-                                'length' => $len,
-                                'min' => $descMin,
-                                'description' => $page->description,
-                            ]);
-                        } elseif ($len > $descMax) {
-                            $findings[] = $this->row($crawlId, 'description_too_long', $page, [
-                                'length' => $len,
-                                'max' => $descMax,
-                                'description' => $page->description,
-                            ]);
-                        }
-                    }
-
-                    if ($page->title && $page->h1) {
-                        if (mb_strtolower(trim($page->title)) === mb_strtolower(trim($page->h1))) {
-                            $findings[] = $this->row($crawlId, 'title_equals_h1', $page, [
-                                'title' => $page->title,
-                                'h1' => $page->h1,
-                            ]);
-                        }
-                    }
-
-                    if ($page->title && $page->description) {
-                        if (mb_strtolower(trim($page->title)) === mb_strtolower(trim($page->description))) {
-                            $findings[] = $this->row($crawlId, 'title_equals_description', $page, [
-                                'title' => $page->title,
-                                'description' => $page->description,
-                            ]);
-                        }
-                    }
-
-                    if ($page->description && $page->h1) {
-                        if (mb_strtolower(trim($page->description)) === mb_strtolower(trim($page->h1))) {
-                            $findings[] = $this->row($crawlId, 'description_equals_h1', $page, [
-                                'description' => $page->description,
-                                'h1' => $page->h1,
-                            ]);
-                        }
-                    }
-
-                    $strongMax = (int) config('site_audit.strong_max', 20);
-                    if ((int) $page->strong_count > $strongMax) {
-                        $findings[] = $this->row($crawlId, 'too_many_strong', $page, [
-                            'strong_count' => (int) $page->strong_count,
-                            'threshold' => $strongMax,
-                        ]);
-                    }
-
-                    if ((int) $page->img_without_alt > 0) {
-                        $missingSamples = [];
-                        foreach (SiteAuditImageItem::normalizeList($page->img_srcs_json) as $imgItem) {
-                            if (($imgItem['has_alt'] ?? null) !== false) {
-                                continue;
-                            }
-                            $missingSamples[] = [
-                                'src' => $imgItem['src'],
-                                'url' => $imgItem['src'],
-                                'width' => $imgItem['width'] ?? null,
-                                'height' => $imgItem['height'] ?? null,
-                                'loading' => $imgItem['loading'] ?? null,
-                            ];
-                            if (count($missingSamples) >= 15) {
-                                break;
-                            }
-                        }
-                        $findings[] = $this->row($crawlId, 'images_without_alt', $page, [
-                            'img_without_alt' => (int) $page->img_without_alt,
-                            'img_count' => (int) $page->img_count,
-                            'count' => (int) $page->img_without_alt,
-                            'samples' => $missingSamples,
-                        ]);
-                    }
-
-                    if ((int) $page->unique_img_src_count === 0 && ! $page->noindex) {
-                        $imgCount = (int) $page->img_count;
-                        $findings[] = $this->row($crawlId, 'no_unique_images', $page, [
-                            'img_count' => $imgCount,
-                            'unique_img_src_count' => 0,
-                            'reason' => $imgCount > 0 ? 'no_src' : 'no_img',
-                        ]);
-                    }
-
-                    $titleSpam = SiteAuditTextMetrics::fieldSpam($page->title);
-                    $descSpam = SiteAuditTextMetrics::fieldSpam($page->description);
-                    if ($titleSpam['spam'] || $descSpam['spam']) {
-                        $findings[] = $this->row($crawlId, 'meta_spam', $page, [
-                            'title' => $titleSpam['spam'] ? [
-                                'word' => $titleSpam['word'],
-                                'count' => $titleSpam['count'],
-                            ] : null,
-                            'description' => $descSpam['spam'] ? [
-                                'word' => $descSpam['word'],
-                                'count' => $descSpam['count'],
-                            ] : null,
-                        ]);
-                    }
-
-                    $h1Text = is_string($page->h1) ? trim($page->h1) : '';
-                    // Мусорный «H1» (JSON-LD/CSS из кривого парсинга) — не считаем переспамом
-                    $h1LooksBroken = $h1Text !== '' && (
-                        mb_strlen($h1Text) > 300
-                        || preg_match('/\{"@type"|position\s*:\s*relative|!important/i', $h1Text)
+                    SiteAuditFinding::query()->create(
+                        $this->row($crawlId, $local['code'], $page, $local['meta'])
                     );
-                    if (! $h1LooksBroken) {
-                        $h1Spam = SiteAuditTextMetrics::fieldSpam($page->h1);
-                        if ($h1Spam['spam']) {
-                            $findings[] = $this->row($crawlId, 'h1_spam', $page, [
-                                'word' => $h1Spam['word'],
-                                'count' => $h1Spam['count'],
-                                'h1' => $page->h1,
-                            ]);
-                        }
-                    }
-
-                    $nauseaClassicMax = (float) config('site_audit.nausea_classic_max', 8.0);
-                    $nauseaAcademicMax = (float) config('site_audit.nausea_academic_max', 25.0);
-                    $nauseaMinWords = max(1, (int) config('site_audit.nausea_min_words', 50));
-                    $classic = $page->nausea_classic !== null ? (float) $page->nausea_classic : null;
-                    $academic = $page->nausea_academic !== null ? (float) $page->nausea_academic : null;
-                    $nauseaWords = (int) ($page->word_count ?? 0);
-                    if ($nauseaWords >= $nauseaMinWords
-                        && (
-                            ($classic !== null && $classic >= $nauseaClassicMax)
-                            || ($academic !== null && $academic >= $nauseaAcademicMax)
-                        )
-                    ) {
-                        $findings[] = $this->row($crawlId, 'text_nausea', $page, [
-                            'nausea_classic' => $classic,
-                            'nausea_academic' => $academic,
-                            'top_word' => $page->top_word,
-                            'top_word_count' => (int) $page->top_word_count,
-                            'word_count' => $nauseaWords,
-                            'threshold_classic' => $nauseaClassicMax,
-                            'threshold_academic' => $nauseaAcademicMax,
-                            'min_words' => $nauseaMinWords,
-                        ]);
-                    }
-
-                    $bigramMin = (int) config('site_audit.bigram_spam_min', 5);
-                    $bigramDensityMin = (float) config('site_audit.bigram_spam_density_min', 1.5);
-                    $bgCount = (int) $page->top_bigram_count;
-                    $words = (int) $page->word_count;
-                    $bgDensity = ($words > 0 && $bgCount > 0)
-                        ? round(($bgCount / $words) * 100, 2)
-                        : 0.0;
-                    $bgKey = mb_strtolower(trim((string) ($page->top_bigram ?? '')));
-                    if ($words >= $ngramMinWords
-                        && $page->top_bigram
-                        && $bgKey !== ''
-                        && ! SiteAuditTextMetrics::isEntityJunkNgram($bgKey)
-                        && ! isset($chromeBigrams[$bgKey])
-                        && $bgCount >= $bigramMin
-                        && $bgDensity >= $bigramDensityMin
-                    ) {
-                        $findings[] = $this->row($crawlId, 'text_bigram_spam', $page, [
-                            'bigram' => $page->top_bigram,
-                            'count' => $bgCount,
-                            'density' => $bgDensity,
-                            'word_count' => $words,
-                            'threshold_count' => $bigramMin,
-                            'threshold_density' => $bigramDensityMin,
-                            'min_words' => $ngramMinWords,
-                        ]);
-                    }
-
-                    $trigramMin = (int) config('site_audit.trigram_spam_min', 5);
-                    $trigramDensityMin = (float) config('site_audit.trigram_spam_density_min', 1.0);
-                    $tgCount = (int) ($page->top_trigram_count ?? 0);
-                    $tgDensity = ($words > 0 && $tgCount > 0)
-                        ? round(($tgCount / $words) * 100, 2)
-                        : 0.0;
-                    $tgKey = mb_strtolower(trim((string) ($page->top_trigram ?? '')));
-                    if ($words >= $ngramMinWords
-                        && ! empty($page->top_trigram)
-                        && $tgKey !== ''
-                        && ! SiteAuditTextMetrics::isEntityJunkNgram($tgKey)
-                        && ! isset($chromeTrigrams[$tgKey])
-                        && $tgCount >= $trigramMin
-                        && $tgDensity >= $trigramDensityMin
-                    ) {
-                        $findings[] = $this->row($crawlId, 'text_trigram_spam', $page, [
-                            'trigram' => $page->top_trigram,
-                            'count' => $tgCount,
-                            'density' => $tgDensity,
-                            'word_count' => $words,
-                            'threshold_count' => $trigramMin,
-                            'threshold_density' => $trigramDensityMin,
-                            'min_words' => $ngramMinWords,
-                        ]);
-                    }
-
-                    // Любой текст/ссылки внутри Яндекс-блоков noindex (соцкнопки VK/TG тоже).
-                    if ((int) $page->noindex_text_len > 0
-                        || (is_array($page->noindex_links_json ?? null) && $page->noindex_links_json !== [])
-                    ) {
-                        $sample = trim((string) ($page->noindex_sample ?? ''));
-                        $links = is_array($page->noindex_links_json ?? null) ? $page->noindex_links_json : [];
-                        $hash = trim((string) ($page->noindex_hash ?? ''));
-                        if ($hash === '') {
-                            $hash = md5(mb_strtolower($sample) . '|' . (int) $page->noindex_text_len);
-                        }
-                        $findings[] = $this->row($crawlId, 'text_in_noindex', $page, [
-                            'noindex_text_len' => (int) $page->noindex_text_len,
-                            'sample' => $sample !== '' ? $sample : null,
-                            'links' => $links !== [] ? array_values(array_slice($links, 0, 8)) : null,
-                            'hash' => $hash,
-                        ]);
-                    }
-
-                    $softMeta = $this->soft404Meta($page);
-                    if ($softMeta !== null) {
-                        $findings[] = $this->row($crawlId, 'soft_404', $page, $softMeta);
-                    }
-
-                    foreach ($findings as $f) {
-                        SiteAuditFinding::query()->create($f);
-                    }
+                }
             }
 
             $meta['after_id'] = $afterId;
@@ -976,105 +738,6 @@ class SiteAuditAggregator
         }
 
         return false;
-    }
-
-    /**
-     * N-граммы, которые «top» на большой доле страниц = сквозной бренд/chrome, не переспам контента.
-     *
-     * @return array<string,true> ключ — mb_strtolower(фраза)
-     */
-    private function chromeNgramMap(int $crawlId, string $column): array
-    {
-        if (! in_array($column, ['top_bigram', 'top_trigram'], true)) {
-            return [];
-        }
-        $share = (float) config('site_audit.ngram_chrome_share', 0.20);
-        $minPages = max(2, (int) config('site_audit.ngram_chrome_min_pages', 8));
-
-        $rows = SiteAuditPage::query()
-            ->where('crawl_id', $crawlId)
-            ->whereNotNull($column)
-            ->where($column, '!=', '')
-            ->get([$column]);
-
-        $n = $rows->count();
-        if ($n < $minPages) {
-            return [];
-        }
-        $need = max($minPages, (int) ceil($share * $n));
-        $df = [];
-        foreach ($rows as $row) {
-            $key = mb_strtolower(trim((string) ($row->{$column} ?? '')));
-            if ($key === '') {
-                continue;
-            }
-            $df[$key] = ($df[$key] ?? 0) + 1;
-        }
-        $out = [];
-        foreach ($df as $key => $c) {
-            if ($c >= $need) {
-                $out[$key] = true;
-            }
-        }
-
-        return $out;
-    }
-
-    /**
-     * Soft 404: 200 + паттерн «не найдено» в TITLE/H1.
-     * Крайне мало текста без таких паттернов — это thin_content, не soft 404.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function soft404Meta(SiteAuditPage $page): ?array
-    {
-        if ((int) $page->status_code !== 200) {
-            return null;
-        }
-
-        $title = trim((string) $page->title);
-        $h1 = trim((string) $page->h1);
-        $titleL = mb_strtolower($title);
-        $h1L = mb_strtolower($h1);
-        $patterns = config('site_audit.soft_404_title_patterns', [
-            '404',
-            'not found',
-            'page not found',
-            'страница не найдена',
-            'не найдена',
-            'ошибка 404',
-        ]);
-
-        $base = [
-            'status' => 200,
-            'word_count' => $page->word_count !== null ? (int) $page->word_count : null,
-            'title' => $title !== '' ? $title : null,
-            'h1' => $h1 !== '' ? $h1 : null,
-        ];
-
-        foreach ($patterns as $p) {
-            $p = trim((string) $p);
-            if ($p === '') {
-                continue;
-            }
-            $pL = mb_strtolower($p);
-            if ($titleL !== '' && mb_strpos($titleL, $pL) !== false) {
-                return array_merge($base, [
-                    'reason' => 'title_pattern',
-                    'pattern' => $p,
-                    'matched_in' => 'title',
-                ]);
-            }
-            if ($h1L !== '' && mb_strpos($h1L, $pL) !== false) {
-                return array_merge($base, [
-                    'reason' => 'h1_pattern',
-                    'pattern' => $p,
-                    'matched_in' => 'h1',
-                ]);
-            }
-        }
-
-        return null;
     }
 
     private function emitSitemapCoverage(SiteAuditCrawl $crawl): void

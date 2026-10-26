@@ -1227,7 +1227,7 @@
                                     && \App\Services\SiteAudit\SiteAuditPageProcessor::isRecheckableCode((string) ($row->code ?? $code)))
                                     @php
                                         $recheckCode = (string) ($row->code ?? $code);
-                                        $recheckTip = $recheckCode === 'broken_internal_link'
+                                        $recheckTip = in_array($recheckCode, ['broken_internal_link', 'broken_external_link'], true)
                                             ? "Скачать битый адрес ещё раз.\nВесь обход заново не запускается.\nЕсли адрес открывается — строка исчезнет."
                                             : "Скачать эту страницу и robots.txt ещё раз.\nВесь отчёт заново не запускается.\nЕсли проблема ушла — строка исчезнет.";
                                     @endphp

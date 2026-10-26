@@ -42,6 +42,11 @@ class SiteAuditPageRecheck
         }
 
         $url = trim((string) $finding->url);
+
+        if ($code === 'broken_external_link') {
+            return $this->recheckBrokenExternalLink($crawl, $finding, $url);
+        }
+
         if (! $this->urlBelongsToProject($url, (string) $project->domain)) {
             return [
                 'ok' => false,
@@ -100,6 +105,77 @@ class SiteAuditPageRecheck
     }
 
     /**
+     * Битая внешняя ссылка: HEAD/GET цели через LinkChecker.
+     *
+     * @return array{ok:bool,message:string,level:string}
+     */
+    private function recheckBrokenExternalLink(
+        SiteAuditCrawl $crawl,
+        SiteAuditFinding $finding,
+        string $url
+    ): array {
+        if ($url === '' || ! preg_match('#^https?://#i', $url)) {
+            return [
+                'ok' => false,
+                'level' => 'error',
+                'message' => 'Некорректный внешний URL.',
+            ];
+        }
+
+        $check = (new SiteAuditLinkChecker())->check($url);
+        $status = isset($check['status']) && $check['status'] !== null ? (int) $check['status'] : 0;
+        $hash = SiteAuditUrlNormalizer::hash($url);
+
+        if (! empty($check['ok'])) {
+            SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', 'broken_external_link')
+                ->where('url_hash', $hash)
+                ->delete();
+
+            $this->prunePageHasBrokenExternalLinks((int) $crawl->id, [$url], [$hash]);
+
+            $label = $status > 0 ? (string) $status : 'OK';
+
+            return [
+                'ok' => true,
+                'level' => 'status',
+                'message' => 'Адрес отвечает ' . $label . '. Битая ссылка снята.',
+            ];
+        }
+
+        $meta = is_array($finding->meta_json) ? $finding->meta_json : [];
+        $meta['status'] = $status > 0 ? $status : null;
+        $meta['source'] = 'recheck';
+        $meta['error'] = $check['error'] ?? ($status <= 0 ? 'no_response' : null);
+        $finding->meta_json = $meta;
+        $finding->save();
+
+        if ($status >= 400) {
+            return [
+                'ok' => true,
+                'level' => 'warning',
+                'message' => 'Адрес всё ещё отвечает ' . $status . '. Замечание осталось.',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'level' => 'warning',
+            'message' => 'Адрес не ответил. Замечание осталось.',
+        ];
+    }
+
+    /**
+     * @param  string[]  $urls
+     * @param  string[]  $hashes
+     */
+    private function prunePageHasBrokenExternalLinks(int $crawlId, array $urls, array $hashes): void
+    {
+        $this->pruneBrokenLinkSamples($crawlId, 'page_has_broken_external_links', $urls, $hashes);
+    }
+
+    /**
      * Битая внутренняя ссылка: строка = битый целевой URL.
      * Перекачиваем цель; если отвечает — снимаем finding и чистим page_has_broken_links.
      *
@@ -139,8 +215,9 @@ class SiteAuditPageRecheck
                 ->whereIn('url_hash', $hashes)
                 ->delete();
 
-            $this->prunePageHasBrokenLinks(
+            $this->pruneBrokenLinkSamples(
                 (int) $crawl->id,
+                'page_has_broken_links',
                 [$url, $finalUrl],
                 $hashes
             );
@@ -179,12 +256,12 @@ class SiteAuditPageRecheck
     }
 
     /**
-     * Убрать починенную цель из samples «Страницы с битыми ссылками»; пустые — удалить.
+     * Убрать починенную цель из samples page_has_broken_*; пустые — удалить.
      *
      * @param  string[]  $urls
      * @param  string[]  $hashes
      */
-    private function prunePageHasBrokenLinks(int $crawlId, array $urls, array $hashes): void
+    private function pruneBrokenLinkSamples(int $crawlId, string $code, array $urls, array $hashes): void
     {
         $urlSet = [];
         foreach ($urls as $u) {
@@ -200,7 +277,7 @@ class SiteAuditPageRecheck
 
         $rows = SiteAuditFinding::query()
             ->where('crawl_id', $crawlId)
-            ->where('code', 'page_has_broken_links')
+            ->where('code', $code)
             ->get();
 
         foreach ($rows as $row) {
@@ -244,10 +321,6 @@ class SiteAuditPageRecheck
             $row->meta_json = $meta;
             $row->save();
         }
-
-        // Если цель была в обходе как 5xx/4xx — process() уже обновил page-level findings.
-        // Страница без записи в site_audit_pages возможна при HEAD-only битости — ничего доп.
-        unset($urlSet);
     }
 
     /**

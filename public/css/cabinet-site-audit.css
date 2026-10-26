@@ -7812,56 +7812,21 @@ html.sa-tour-active body {
   line-height: 1.15;
 }
 
-.cabinet-sa-ht-num.has-split {
+.cabinet-sa-ht-num.has-hidden {
   white-space: normal;
-  min-width: 6.5rem;
 }
 
 .cabinet-sa-ht-num__v {
   display: block;
 }
 
-.cabinet-sa-ht-num__trio {
-  display: block;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-}
-
-.cabinet-sa-ht-num__t {
-  font-weight: 700;
-}
-
-.cabinet-sa-ht-num__open {
-  font-weight: 700;
-}
-
-.cabinet-sa-ht-num__hid {
-  font-weight: 600;
-  opacity: 0.78;
-}
-
-.cabinet-sa-ht-num__sep {
-  margin: 0 0.12em;
-  font-weight: 500;
-  color: #94a3b8;
-  opacity: 0.95;
-}
-
-.cabinet-sa-ht-num__legend {
+.cabinet-sa-ht-num__hid-line {
   display: block;
   margin-top: 0.1rem;
   font-size: 0.58rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: #94a3b8;
   line-height: 1.1;
-}
-
-.cabinet-sa-ht-num.is-critical .cabinet-sa-ht-num__legend,
-.cabinet-sa-ht-num.is-other .cabinet-sa-ht-num__legend,
-.cabinet-sa-ht-num.is-important .cabinet-sa-ht-num__legend,
-.cabinet-sa-ht-num.is-warning .cabinet-sa-ht-num__legend,
-.cabinet-sa-ht-num.is-info .cabinet-sa-ht-num__legend {
   color: inherit;
   opacity: 0.55;
 }

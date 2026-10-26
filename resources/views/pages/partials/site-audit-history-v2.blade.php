@@ -48,11 +48,11 @@
                 <th class="cabinet-sa-ht-progress">Прогресс</th>
                 <th class="cabinet-sa-ht-when">Начало</th>
                 <th class="cabinet-sa-ht-when">Конец</th>
-                <th class="cabinet-sa-ht-num is-critical" title="Грубые: всего / осталось / скрыто">Грубые</th>
-                <th class="cabinet-sa-ht-num is-other" title="Прочие: всего / осталось / скрыто">Прочие</th>
-                <th class="cabinet-sa-ht-num is-important" title="Важные: всего / осталось / скрыто">Важные</th>
-                <th class="cabinet-sa-ht-num is-warning" title="Предупреждения: всего / осталось / скрыто">Предупреждения</th>
-                <th class="cabinet-sa-ht-num is-info" title="Инфо: всего / осталось / скрыто">Инфо</th>
+                <th class="cabinet-sa-ht-num is-critical">Грубые</th>
+                <th class="cabinet-sa-ht-num is-other">Прочие</th>
+                <th class="cabinet-sa-ht-num is-important">Важные</th>
+                <th class="cabinet-sa-ht-num is-warning">Предупреждения</th>
+                <th class="cabinet-sa-ht-num is-info">Инфо</th>
                 <th class="cabinet-sa-ht-actions" scope="col"><span class="visually-hidden">Действия</span></th>
             </tr>
             </thead>

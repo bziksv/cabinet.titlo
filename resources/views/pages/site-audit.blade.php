@@ -403,30 +403,23 @@
                                 }
                                 var open = Math.max(0, n - hid);
                                 var tip = (sevTitle[k] || k) + ': ' + fmtNum(n);
-                                var html;
+                                var html = '<span class="cabinet-sa-ht-num__v">' + fmtNum(n) + '</span>';
                                 if (hid > 0) {
-                                    tip = (sevTitle[k] || k) + ': всего ' + fmtNum(n)
-                                        + ' · осталось ' + fmtNum(open)
-                                        + ' · скрыто ' + fmtNum(hid)
-                                        + ' (игнор или исправлено)';
-                                    html = '<span class="cabinet-sa-ht-num__trio" aria-label="' + tip.replace(/"/g, '&quot;') + '">'
-                                        + '<span class="cabinet-sa-ht-num__t">' + fmtNum(n) + '</span>'
-                                        + '<span class="cabinet-sa-ht-num__sep" aria-hidden="true">/</span>'
-                                        + '<span class="cabinet-sa-ht-num__open">' + fmtNum(open) + '</span>'
-                                        + '<span class="cabinet-sa-ht-num__sep" aria-hidden="true">/</span>'
-                                        + '<span class="cabinet-sa-ht-num__hid">' + fmtNum(hid) + '</span>'
-                                        + '</span>'
-                                        + '<span class="cabinet-sa-ht-num__legend" aria-hidden="true">все / ост. / скр.</span>';
-                                    cell.classList.add('has-split');
-                                } else {
-                                    html = '<span class="cabinet-sa-ht-num__v">' + fmtNum(n) + '</span>';
+                                    tip = (sevTitle[k] || k) + ': ' + fmtNum(n) + ' всего, '
+                                        + fmtNum(open) + ' осталось, '
+                                        + fmtNum(hid) + ' скрыто (игнор или исправлено)';
+                                    html += '<span class="cabinet-sa-ht-num__hid-line">скрыто ' + fmtNum(hid) + '</span>';
+                                    cell.classList.add('has-hidden');
                                     cell.classList.remove('has-split');
+                                } else {
+                                    cell.classList.remove('has-hidden', 'has-split');
                                 }
                                 cell.innerHTML = html;
                                 cell.setAttribute('data-sa-bucket-hidden', String(hid));
+                                cell.setAttribute('aria-label', tip);
+                                cell.removeAttribute('title');
                                 cell.classList.remove('is-critical', 'is-other', 'is-important', 'is-warning', 'is-info', 'is-zero');
                                 cell.classList.add(n > 0 ? sevClass[k] : 'is-zero');
-                                cell.title = tip;
                             }
                         });
                     }
