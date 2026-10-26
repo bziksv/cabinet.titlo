@@ -2222,9 +2222,97 @@
     margin-bottom: 0.55rem;
 }
 
-.cabinet-sc-card__domain {
+.cabinet-sc-card__heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+}
+
+.cabinet-sc-card__name {
     font-size: 0.95rem;
     word-break: break-all;
+    line-height: 1.25;
+}
+
+.cabinet-sc-card__checklist {
+    font-size: 0.78rem;
+    font-weight: 550;
+    color: var(--sc-muted, #6c757d);
+    word-break: break-word;
+    line-height: 1.3;
+}
+
+.cabinet-sc-card__domain {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--sc-muted, #6c757d);
+    word-break: break-all;
+    line-height: 1.3;
+}
+
+.cabinet-sc-project-rename {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.cabinet-sc-project-rename__btn {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid var(--sc-line, #dee2e6);
+    background: #fff;
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--sc-muted, #6c757d);
+    line-height: 1.3;
+}
+
+.cabinet-sc-project-rename__btn::-webkit-details-marker {
+    display: none;
+}
+
+.cabinet-sc-project-rename__btn:hover,
+.cabinet-sc-project-rename[open] .cabinet-sc-project-rename__btn {
+    color: var(--bs-body-color, #212529);
+    border-color: color-mix(in srgb, var(--plan-accent, #0d6efd) 35%, #dee2e6);
+}
+
+.cabinet-sc-project-rename__form {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    z-index: 30;
+    width: min(20rem, 80vw);
+    padding: 0.75rem;
+    border-radius: 0.65rem;
+    border: 1px solid var(--sc-line, #dee2e6);
+    background: #fff;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+}
+
+.cabinet-sc-project-rename__label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 650;
+    margin-bottom: 0.25rem;
+}
+
+.cabinet-sc-project-rename__hint {
+    margin: 0.35rem 0 0.55rem;
+    font-size: 0.72rem;
+    color: var(--sc-muted, #6c757d);
+    line-height: 1.35;
+}
+
+.cabinet-sc-project-rename__actions {
+    display: flex;
+    justify-content: flex-end;
 }
 
 .cabinet-sc-card__top-right {
@@ -8240,6 +8328,15 @@ html.cabinet-sc-lightbox-open {
     flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem 0.55rem;
+}
+
+.cabinet-sc-show-v2 .cabinet-sc-plan-topbar__title-sep {
+    color: var(--sc-muted, #6c757d);
+    font-weight: 500;
+}
+
+.cabinet-sc-show-v2 .cabinet-sc-plan-topbar__checklist {
+    font-weight: 650;
 }
 
 .cabinet-sc-show-v2 .cabinet-sc-plan-topbar__back {

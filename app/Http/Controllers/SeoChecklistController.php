@@ -56,18 +56,29 @@ class SeoChecklistController extends Controller
             ->get();
 
         $sitesPayload = HomeUserSites::forUser($userId);
-        $ownDomains = SeoChecklistProject::query()
-            ->where('user_id', $userId)
-            ->where('status', 'active')
-            ->pluck('domain')
-            ->all();
+        // Домен можно выбрать снова — на один сайт допускается несколько чеклистов.
         $availableDomains = [];
         foreach (($sitesPayload['sites'] ?? []) as $site) {
             $domain = (string) ($site['domain'] ?? '');
-            if ($domain !== '' && !in_array($domain, $ownDomains, true)) {
+            if ($domain !== '' && !in_array($domain, $availableDomains, true)) {
                 $availableDomains[] = $domain;
             }
         }
+
+        $activeDomains = SeoChecklistProject::query()
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->pluck('domain')
+            ->unique()
+            ->all();
+        $archivedReplaceDomains = $archived
+            ->pluck('domain')
+            ->unique()
+            ->filter(function ($domain) use ($activeDomains) {
+                return $domain !== '' && !in_array($domain, $activeDomains, true);
+            })
+            ->values()
+            ->all();
 
         $templates = $this->service->templatesForUser($userId);
         $accessKinds = [];
@@ -82,6 +93,7 @@ class SeoChecklistController extends Controller
             'projects' => $projects,
             'archived' => $archived,
             'availableDomains' => $availableDomains,
+            'archivedReplaceDomains' => $archivedReplaceDomains,
             'templates' => $templates,
             'teamCount' => $this->service->teamsForUser($userId)->count(),
             'myTasksCount' => (int) ($workPlan['count'] ?? 0),
@@ -778,18 +790,13 @@ class SeoChecklistController extends Controller
         $userId = (int) Auth::id();
         $domain = (string) $request->input('domain', '');
         $templateId = $request->filled('template_id') ? (int) $request->input('template_id') : null;
-        $result = $this->service->createProject($userId, $domain, null, null, $templateId);
+        $title = (string) $request->input('title', '');
+        $result = $this->service->createProject($userId, $domain, null, null, $templateId, $title);
 
         if (empty($result['ok']) || empty($result['project'])) {
             return redirect()
                 ->route('pages.seo-checklist')
                 ->with('error', $result['message'] ?? __('Could not create SEO checklist'));
-        }
-
-        if (!empty($result['reused'])) {
-            return redirect()
-                ->route('pages.seo-checklist.show', ['id' => $result['project']->id])
-                ->with('success', __('SEO checklist already exists'));
         }
 
         $createdMessage = !empty($result['replaced_archive'])
@@ -2151,6 +2158,25 @@ class SeoChecklistController extends Controller
             'ok' => true,
             'ordered_ids' => array_values(array_map('intval', $orderedIds)),
         ]);
+    }
+
+    public function updateTitle(Request $request, int $id): RedirectResponse
+    {
+        $project = $this->findManageableProject($id);
+        if (!$project) {
+            return redirect()->route('pages.seo-checklist')->with('error', __('Project not found'));
+        }
+
+        $result = $this->service->updateProjectTitle($project, (string) $request->input('title', ''));
+        if (empty($result['ok'])) {
+            return redirect()
+                ->route('pages.seo-checklist.show', ['id' => $project->id])
+                ->with('error', $result['message'] ?? __('Error'));
+        }
+
+        return redirect()
+            ->route('pages.seo-checklist.show', ['id' => $project->id])
+            ->with('success', __('Checklist renamed'));
     }
 
     public function archive(int $id): RedirectResponse

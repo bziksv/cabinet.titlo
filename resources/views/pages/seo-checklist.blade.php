@@ -101,8 +101,13 @@
                             }
                         }
                         $activityTs = $project->last_activity_at ? $project->last_activity_at->getTimestamp() : 0;
+                        $checklistTitle = trim((string) ($project->title ?? ''));
+                        if ($checklistTitle === '') {
+                            $checklistTitle = $project->domain;
+                        }
                         $searchBlob = strtolower(implode(' ', array_filter(array_merge([
                             $project->domain,
+                            $checklistTitle,
                             $ownerName,
                             $pmName,
                             $owner ? $owner->email : null,
@@ -119,9 +124,14 @@
                        data-has-team="{{ $team ? '1' : '0' }}"
                        data-sort-activity="{{ $activityTs }}"
                        data-sort-progress="{{ $pct }}"
-                       data-sort-domain="{{ e(mb_strtolower($project->domain)) }}">
+                       data-sort-domain="{{ e(mb_strtolower($project->domain . ' ' . $checklistTitle)) }}">
                         <div class="cabinet-sc-card__top">
-                            <strong class="cabinet-sc-card__domain">{{ $project->domain }}</strong>
+                            <div class="cabinet-sc-card__heading">
+                                <strong class="cabinet-sc-card__name">{{ $project->domain }}</strong>
+                                @if($checklistTitle !== '' && $checklistTitle !== $project->domain)
+                                    <span class="cabinet-sc-card__checklist">{{ $checklistTitle }}</span>
+                                @endif
+                            </div>
                             <span class="cabinet-sc-card__top-right">
                                 @php $kind = $accessKinds[$project->id] ?? 'account'; @endphp
                                 @if($kind === 'pm')
@@ -198,9 +208,20 @@
                 <summary>{{ __('Archive') }} ({{ $archived->count() }})</summary>
                 <div class="cabinet-sc-grid mt-2">
                     @foreach($archived as $project)
+                        @php
+                            $archivedTitle = trim((string) ($project->title ?? ''));
+                            if ($archivedTitle === '') {
+                                $archivedTitle = $project->domain;
+                            }
+                        @endphp
                         <div class="cabinet-sc-card cabinet-sc-card--archived">
                             <div class="cabinet-sc-card__top">
-                                <strong class="cabinet-sc-card__domain">{{ $project->domain }}</strong>
+                                <div class="cabinet-sc-card__heading">
+                                    <strong class="cabinet-sc-card__name">{{ $project->domain }}</strong>
+                                    @if($archivedTitle !== '' && $archivedTitle !== $project->domain)
+                                        <span class="cabinet-sc-card__checklist">{{ $archivedTitle }}</span>
+                                    @endif
+                                </div>
                                 <span class="cabinet-sc-card__pct">{{ $project->progress_total > 0 ? (int) round(100 * $project->progress_done / $project->progress_total) : 0 }}%</span>
                             </div>
                             <div class="cabinet-sc-card__meta text-secondary small mb-2">
@@ -232,7 +253,7 @@
             <div class="modal-content">
                     <form method="post" action="{{ route('pages.seo-checklist.store') }}"
                           data-sc-create-form
-                          data-archived-domains='@json(isset($archived) ? $archived->pluck("domain")->values() : [])'
+                          data-archived-domains='@json($archivedReplaceDomains ?? [])'
                           data-i18n-replace-title="{{ e(__('Replace archived checklist title')) }}"
                           data-i18n-replace-text="{{ e(__('Replace archived checklist text')) }}"
                           data-i18n-replace-ok="{{ e(__('Create checklist again')) }}">
@@ -257,11 +278,23 @@
                             @endforeach
                         </select>
                         <p class="small text-secondary mb-3 mt-2">{{ __('SEO checklist create domain hint') }}</p>
+                        <label class="cabinet-sc-create__label" for="cabinet-sc-title">{{ __('Checklist name') }}</label>
+                        <input type="text"
+                               name="title"
+                               id="cabinet-sc-title"
+                               class="form-control form-control-sm"
+                               maxlength="120"
+                               data-sc-project-title
+                               placeholder="{{ __('Checklist name placeholder') }}"
+                               autocomplete="off">
+                        <p class="small text-secondary mb-3 mt-2">{{ __('SEO checklist create title hint') }}</p>
                         @if(isset($templates) && $templates->count() > 0)
                             <label class="cabinet-sc-create__label" for="cabinet-sc-template">{{ __('Template') }}</label>
                             <select name="template_id" id="cabinet-sc-template" class="form-select form-select-sm" data-sc-template-select>
                                 @foreach($templates as $tpl)
-                                    <option value="{{ $tpl->id }}" @if($tpl->code === \App\Support\SeoChecklistDefaultTemplate::CODE) selected @endif>
+                                    <option value="{{ $tpl->id }}"
+                                            data-title="{{ e($tpl->title) }}"
+                                            @if($tpl->code === \App\Support\SeoChecklistDefaultTemplate::CODE) selected @endif>
                                         {{ $tpl->title }}@if($tpl->is_system) ({{ __('System') }})@endif
                                         · {{ $tpl->tasks_count }}
                                     </option>

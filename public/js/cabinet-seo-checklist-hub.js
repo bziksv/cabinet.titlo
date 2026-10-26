@@ -121,7 +121,31 @@
         applyDefaultToSelect(select);
         select.addEventListener('change', function () {
             writeDefaultTemplateId(select.value);
+            var titleInput = select.form
+                ? select.form.querySelector('[data-sc-project-title]')
+                : document.querySelector('[data-sc-project-title]');
+            if (!titleInput) return;
+            var prev = select.getAttribute('data-sc-last-title') || '';
+            var currentTitle = String(titleInput.value || '').trim();
+            var opt = select.options[select.selectedIndex];
+            var nextTitle = opt ? String(opt.getAttribute('data-title') || '').trim() : '';
+            if (!currentTitle || currentTitle === prev) {
+                titleInput.value = nextTitle;
+            }
+            select.setAttribute('data-sc-last-title', nextTitle);
         });
+        // Prefill once for create modal
+        var titleInput = select.form
+            ? select.form.querySelector('[data-sc-project-title]')
+            : null;
+        if (titleInput && !String(titleInput.value || '').trim()) {
+            var opt0 = select.options[select.selectedIndex];
+            var t0 = opt0 ? String(opt0.getAttribute('data-title') || '').trim() : '';
+            if (t0) {
+                titleInput.value = t0;
+                select.setAttribute('data-sc-last-title', t0);
+            }
+        }
     });
 
     document.querySelectorAll('[data-sc-create-form]').forEach(function (form) {

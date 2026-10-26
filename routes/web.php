@@ -416,6 +416,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('checklist/{id}', 'SeoChecklistController@show')->name('pages.seo-checklist.show')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
     Route::get('checklist/{id}/pdf', 'SeoChecklistController@pdf')->name('pages.seo-checklist.pdf')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
     Route::post('checklist/{id}/team', 'SeoChecklistController@updateTeam')->name('pages.seo-checklist.team.update')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::post('checklist/{id}/title', 'SeoChecklistController@updateTitle')->name('pages.seo-checklist.title')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
     Route::post('checklist/{id}/archive', 'SeoChecklistController@archive')->name('pages.seo-checklist.archive')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
     Route::post('checklist/{id}/restore', 'SeoChecklistController@restore')->name('pages.seo-checklist.restore')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
     Route::post('checklist/{id}/delete', 'SeoChecklistController@destroy')->name('pages.seo-checklist.delete')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');

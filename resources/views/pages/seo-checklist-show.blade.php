@@ -93,10 +93,18 @@
                         <a href="{{ route('pages.seo-checklist') }}" class="cabinet-sc-plan-topbar__back">{{ __('Projects') }}</a>
                         · {{ __('SEO Checklist') }}
                     </p>
+                    @php
+                        $checklistTitle = trim((string) ($project->title ?? ''));
+                        if ($checklistTitle === '' || $checklistTitle === $project->domain) {
+                            $checklistTitle = '';
+                        }
+                    @endphp
                     <h1 class="cabinet-sc-plan-topbar__title">
-                        <a href="https://{{ $project->domain }}" target="_blank" rel="noopener noreferrer" class="cabinet-sc-domain-link">
-                            {{ $project->title ?: $project->domain }}
-                        </a>
+                        <a href="https://{{ $project->domain }}" target="_blank" rel="noopener noreferrer" class="cabinet-sc-domain-link">{{ $project->domain }}</a>
+                        @if($checklistTitle !== '')
+                            <span class="cabinet-sc-plan-topbar__title-sep" aria-hidden="true">—</span>
+                            <span class="cabinet-sc-plan-topbar__checklist" data-sc-project-title-label>{{ $checklistTitle }}</span>
+                        @endif
                         @if($accessKind === 'pm')
                             <span class="cabinet-sc-role cabinet-sc-role--pm">{{ __('Shared as PM') }}</span>
                         @elseif($accessKind === 'owner')
@@ -105,6 +113,33 @@
                             <span class="cabinet-sc-role cabinet-sc-role--shared">{{ __('Shared as auditor') }}</span>
                         @elseif($accessKind === 'participant')
                             <span class="cabinet-sc-role cabinet-sc-role--shared">{{ __('Shared as participant') }}</span>
+                        @endif
+                        @if($canManage)
+                            <details class="cabinet-sc-project-rename">
+                                <summary class="cabinet-sc-project-rename__btn">
+                                    <i class="bi bi-pencil" aria-hidden="true"></i>
+                                    <span>{{ __('Rename checklist') }}</span>
+                                </summary>
+                                <form method="post"
+                                      action="{{ route('pages.seo-checklist.title', ['id' => $project->id]) }}"
+                                      class="cabinet-sc-project-rename__form">
+                                    @csrf
+                                    <label class="cabinet-sc-project-rename__label" for="scProjectTitleInput">{{ __('Checklist name') }}</label>
+                                    <input id="scProjectTitleInput"
+                                           type="text"
+                                           name="title"
+                                           class="form-control form-control-sm"
+                                           value="{{ $project->title }}"
+                                           maxlength="120"
+                                           required
+                                           placeholder="{{ __('Checklist name placeholder') }}"
+                                           autocomplete="off">
+                                    <p class="cabinet-sc-project-rename__hint">{{ __('Rename checklist hint') }}</p>
+                                    <div class="cabinet-sc-project-rename__actions">
+                                        <button type="submit" class="btn btn-sm btn-primary">{{ __('Save') }}</button>
+                                    </div>
+                                </form>
+                            </details>
                         @endif
                     </h1>
                     <p class="cabinet-sc-plan-topbar__meta">

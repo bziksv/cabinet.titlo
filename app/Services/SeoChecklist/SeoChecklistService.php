@@ -2666,23 +2666,37 @@ class SeoChecklistService
     /**
      * @return array{ok:bool,message?:string,project?:SeoChecklistProject}
      */
-    public function createProject(int $userId, string $rawDomain, ?int $ownerUserId = null, ?int $pmUserId = null, ?int $templateId = null): array
+    /**
+     * @return array{ok:bool,message?:string}
+     */
+    public function updateProjectTitle(SeoChecklistProject $project, string $title): array
     {
+        $title = trim($title);
+        if ($title === '') {
+            return ['ok' => false, 'message' => __('Title required')];
+        }
+        if (mb_strlen($title) > 120) {
+            $title = mb_substr($title, 0, 120);
+        }
+
+        $project->title = $title;
+        $project->last_activity_at = now();
+        $project->save();
+
+        return ['ok' => true];
+    }
+
+    public function createProject(
+        int $userId,
+        string $rawDomain,
+        ?int $ownerUserId = null,
+        ?int $pmUserId = null,
+        ?int $templateId = null,
+        ?string $title = null
+    ): array {
         $domain = HomeUserSites::normalizeDomain($rawDomain);
         if ($domain === '') {
             return ['ok' => false, 'message' => __('Invalid domain')];
-        }
-
-        $existing = SeoChecklistProject::query()
-            ->where('user_id', $userId)
-            ->where('domain', $domain)
-            ->first();
-        $replacedArchive = false;
-        if ($existing) {
-            if ($existing->status !== 'archived') {
-                return ['ok' => true, 'project' => $existing->fresh(), 'reused' => true];
-            }
-            $replacedArchive = true;
         }
 
         $template = $this->findUsableTemplate($userId, $templateId);
@@ -2690,11 +2704,35 @@ class SeoChecklistService
             return ['ok' => false, 'message' => __('Template not found')];
         }
 
+        $title = trim((string) $title);
+        if ($title === '') {
+            $tplTitle = trim((string) ($template->title ?? ''));
+            $title = $tplTitle !== '' ? $tplTitle : ('SEO — ' . $domain);
+        }
+        if (mb_strlen($title) > 120) {
+            $title = mb_substr($title, 0, 120);
+        }
+
+        // Архив без активного — пересоздаём (как раньше). Если уже есть активный — новый чеклист рядом.
+        $hasActive = SeoChecklistProject::query()
+            ->where('user_id', $userId)
+            ->where('domain', $domain)
+            ->where('status', 'active')
+            ->exists();
+        $archived = SeoChecklistProject::query()
+            ->where('user_id', $userId)
+            ->where('domain', $domain)
+            ->where('status', 'archived')
+            ->get();
+        $replacedArchive = !$hasActive && $archived->isNotEmpty();
+
         try {
-            $project = DB::transaction(function () use ($userId, $domain, $ownerUserId, $pmUserId, $template, $existing, $replacedArchive) {
-                if ($replacedArchive && $existing) {
-                    $this->purgeProjectData((int) $existing->id);
-                    $existing->delete();
+            $project = DB::transaction(function () use ($userId, $domain, $ownerUserId, $pmUserId, $template, $title, $archived, $replacedArchive) {
+                if ($replacedArchive) {
+                    foreach ($archived as $existing) {
+                        $this->purgeProjectData((int) $existing->id);
+                        $existing->delete();
+                    }
                 }
 
                 $skipWeekends = Schema::hasColumn('seo_checklist_projects', 'skip_weekends')
@@ -2705,7 +2743,7 @@ class SeoChecklistService
                     'user_id' => $userId,
                     'template_id' => $template->id,
                     'domain' => $domain,
-                    'title' => 'SEO — ' . $domain,
+                    'title' => $title,
                     'status' => 'active',
                     'owner_user_id' => $ownerUserId ?: $userId,
                     'pm_user_id' => $pmUserId,

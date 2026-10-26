@@ -98,7 +98,14 @@
             <div class="cabinet-sc-context__crumb">
                 <a href="{{ route('pages.seo-checklist') }}">{{ __('Projects') }}</a>
                 <span class="cabinet-sc-context__sep" aria-hidden="true">/</span>
-                <span class="cabinet-sc-context__current">{{ $scContextProject->domain }}</span>
+                @php
+                    $scCtxTitle = trim((string) ($scContextProject->title ?? ''));
+                    $scCtxLabel = $scContextProject->domain;
+                    if ($scCtxTitle !== '' && $scCtxTitle !== $scContextProject->domain) {
+                        $scCtxLabel = $scContextProject->domain . ' — ' . $scCtxTitle;
+                    }
+                @endphp
+                <span class="cabinet-sc-context__current">{{ $scCtxLabel }}</span>
             </div>
             <a href="{{ route('pages.seo-checklist') }}" class="cabinet-sc-context__back">
                 ← {{ __('All checklists') }}
