@@ -32,14 +32,12 @@
                 <i class="bi bi-clipboard-check display-6 d-block mb-2 opacity-50"></i>
                 <p class="fw-semibold mb-1">{{ __('No SEO checklists yet') }}</p>
                 <p class="small text-secondary mb-3">{{ __('No SEO checklists yet hint') }}</p>
-                @if(count($availableDomains) > 0)
-                    <button type="button"
-                            class="btn btn-primary btn-sm"
-                            data-bs-toggle="modal"
-                            data-bs-target="#cabinetScCreateModal">
-                        {{ __('Create checklist') }}
-                    </button>
-                @endif
+                <button type="button"
+                        class="btn btn-primary btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#cabinetScCreateModal">
+                    {{ __('Create checklist') }}
+                </button>
             </div>
         @else
             <div class="cabinet-sc-toolbar mb-3">
@@ -57,14 +55,12 @@
                     <option value="progress">{{ __('Sort by progress') }}</option>
                     <option value="domain">{{ __('Sort by domain') }}</option>
                 </select>
-                @if(count($availableDomains) > 0)
-                    <button type="button"
-                            class="btn btn-primary btn-sm ms-auto"
-                            data-bs-toggle="modal"
-                            data-bs-target="#cabinetScCreateModal">
-                        {{ __('Create checklist') }}
-                    </button>
-                @endif
+                <button type="button"
+                        class="btn btn-primary btn-sm ms-auto"
+                        data-bs-toggle="modal"
+                        data-bs-target="#cabinetScCreateModal">
+                    {{ __('Create checklist') }}
+                </button>
             </div>
             <div class="cabinet-sc-grid" data-sc-project-grid>
                 @foreach($projects as $project)
@@ -231,56 +227,57 @@
         @endif
     </div>
 
-    @if(count($availableDomains) > 0)
-        <div class="modal fade" id="cabinetScCreateModal" tabindex="-1" aria-labelledby="cabinetScCreateModalTitle" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                        <form method="post" action="{{ route('pages.seo-checklist.store') }}"
-                              data-sc-create-form
-                              data-archived-domains='@json(isset($archived) ? $archived->pluck("domain")->values() : [])'
-                              data-i18n-replace-title="{{ e(__('Replace archived checklist title')) }}"
-                              data-i18n-replace-text="{{ e(__('Replace archived checklist text')) }}"
-                              data-i18n-replace-ok="{{ e(__('Create checklist again')) }}">
-                        @csrf
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="cabinetScCreateModalTitle">{{ __('Create checklist') }}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
-                        </div>
-                        <div class="modal-body">
-                            <label class="cabinet-sc-create__label" for="cabinet-sc-domain">{{ __('Create checklist for site') }}</label>
-                            <select name="domain"
-                                    id="cabinet-sc-domain"
-                                    class="form-select form-select-sm mb-3"
-                                    data-sc-domain-select
-                                    required
-                                    data-placeholder="{{ __('Choose a site') }}…">
-                                <option value=""></option>
-                                @foreach($availableDomains as $domain)
-                                    <option value="{{ $domain }}">{{ $domain }}</option>
+    <div class="modal fade" id="cabinetScCreateModal" tabindex="-1" aria-labelledby="cabinetScCreateModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                    <form method="post" action="{{ route('pages.seo-checklist.store') }}"
+                          data-sc-create-form
+                          data-archived-domains='@json(isset($archived) ? $archived->pluck("domain")->values() : [])'
+                          data-i18n-replace-title="{{ e(__('Replace archived checklist title')) }}"
+                          data-i18n-replace-text="{{ e(__('Replace archived checklist text')) }}"
+                          data-i18n-replace-ok="{{ e(__('Create checklist again')) }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="cabinetScCreateModalTitle">{{ __('Create checklist') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="cabinet-sc-create__label" for="cabinet-sc-domain">{{ __('Create checklist for site') }}</label>
+                        <select name="domain"
+                                id="cabinet-sc-domain"
+                                class="form-select form-select-sm"
+                                data-sc-domain-select
+                                required
+                                data-placeholder="{{ __('Choose or type a site domain') }}…"
+                                data-i18n-no-results="{{ __('Type a domain and press Enter') }}"
+                                data-i18n-new-domain="{{ __('New domain') }}">
+                            <option value=""></option>
+                            @foreach($availableDomains as $domain)
+                                <option value="{{ $domain }}">{{ $domain }}</option>
+                            @endforeach
+                        </select>
+                        <p class="small text-secondary mb-3 mt-2">{{ __('SEO checklist create domain hint') }}</p>
+                        @if(isset($templates) && $templates->count() > 0)
+                            <label class="cabinet-sc-create__label" for="cabinet-sc-template">{{ __('Template') }}</label>
+                            <select name="template_id" id="cabinet-sc-template" class="form-select form-select-sm" data-sc-template-select>
+                                @foreach($templates as $tpl)
+                                    <option value="{{ $tpl->id }}" @if($tpl->code === \App\Support\SeoChecklistDefaultTemplate::CODE) selected @endif>
+                                        {{ $tpl->title }}@if($tpl->is_system) ({{ __('System') }})@endif
+                                        · {{ $tpl->tasks_count }}
+                                    </option>
                                 @endforeach
                             </select>
-                            @if(isset($templates) && $templates->count() > 0)
-                                <label class="cabinet-sc-create__label" for="cabinet-sc-template">{{ __('Template') }}</label>
-                                <select name="template_id" id="cabinet-sc-template" class="form-select form-select-sm" data-sc-template-select>
-                                    @foreach($templates as $tpl)
-                                        <option value="{{ $tpl->id }}" @if($tpl->code === \App\Support\SeoChecklistDefaultTemplate::CODE) selected @endif>
-                                            {{ $tpl->title }}@if($tpl->is_system) ({{ __('System') }})@endif
-                                            · {{ $tpl->tasks_count }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <p class="small text-secondary mb-0 mt-2">{{ __('SEO checklist default template hint') }}</p>
-                            @endif
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
-                            <button type="submit" class="btn btn-primary btn-sm">{{ __('Create') }}</button>
-                        </div>
-                    </form>
-                </div>
+                            <p class="small text-secondary mb-0 mt-2">{{ __('SEO checklist default template hint') }}</p>
+                        @endif
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                        <button type="submit" class="btn btn-primary btn-sm">{{ __('Create') }}</button>
+                    </div>
+                </form>
             </div>
         </div>
-    @endif
+    </div>
 
     @include('pages.partials.seo-checklist-delete-project-modal')
     @include('partials.cabinet-confirm-modal')

@@ -162,7 +162,7 @@
         });
     });
 
-    // —— Create modal: searchable site select (Select2) ——
+    // —— Create modal: Select2 + ввод нового домена (tags) ——
     (function initDomainSelect2() {
         if (typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.select2 !== 'function') {
             return;
@@ -173,6 +173,22 @@
 
         var $modal = $('#cabinetScCreateModal');
         var placeholder = $select.attr('data-placeholder') || '';
+        var noResultsText = $select.attr('data-i18n-no-results') || 'Введите домен и нажмите Enter';
+        var newDomainLabel = $select.attr('data-i18n-new-domain') || 'Новый домен';
+
+        function normalizeDomainTerm(raw) {
+            var term = String(raw || '').trim().toLowerCase();
+            if (!term) return '';
+            term = term.replace(/^https?:\/\//i, '');
+            term = term.replace(/\/.*$/, '');
+            term = term.replace(/:\d+$/, '');
+            term = term.replace(/^www\./, '');
+            term = term.replace(/\s+/g, '');
+            if (!/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(term)) {
+                return '';
+            }
+            return term;
+        }
 
         function initSelect2() {
             if ($select.hasClass('select2-hidden-accessible')) {
@@ -183,10 +199,35 @@
                 width: '100%',
                 placeholder: placeholder,
                 allowClear: true,
+                tags: true,
                 dropdownParent: $modal.length ? $modal : $(document.body),
+                createTag: function (params) {
+                    var term = normalizeDomainTerm(params.term);
+                    if (!term) {
+                        return null;
+                    }
+                    var exists = false;
+                    $select.find('option').each(function () {
+                        if (String(this.value || '').toLowerCase() === term) {
+                            exists = true;
+                            return false;
+                        }
+                    });
+                    if (exists) {
+                        return null;
+                    }
+                    return {
+                        id: term,
+                        text: term + ' (' + newDomainLabel + ')',
+                        newTag: true,
+                    };
+                },
+                insertTag: function (data, tag) {
+                    data.push(tag);
+                },
                 language: {
                     noResults: function () {
-                        return 'Ничего не найдено';
+                        return noResultsText;
                     },
                     searching: function () {
                         return 'Поиск…';
