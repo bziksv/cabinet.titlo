@@ -2,6 +2,7 @@
     $returnTo = $returnTo ?? null;
     $showChecklistAssign = isset($showChecklistAssign) ? (bool) $showChecklistAssign : true;
     $teamsLead = $teamsLead ?? __('SEO checklist teams lead');
+    $authUserId = (int) ($authUserId ?? auth()->id());
 @endphp
 
 @if(session('success'))
@@ -72,6 +73,11 @@
     <div class="cabinet-sc-team-list mb-4" data-sc-team-list>
         @foreach($teams as $team)
             @php
+                $canManageTeam = (int) $team->user_id === $authUserId;
+                $ownerUser = $team->ownerUser ?? null;
+                $ownerLabel = $ownerUser
+                    ? (trim(($ownerUser->name ?? '') . ' ' . ($ownerUser->last_name ?? '')) ?: ($ownerUser->email ?? ''))
+                    : '';
                 $memberNames = $team->members->map(function ($member) {
                     $u = $member->user;
                     if (!$u) {
@@ -79,7 +85,7 @@
                     }
                     return trim(($u->name ?? '') . ' ' . ($u->last_name ?? '')) . ' ' . ($u->email ?? '');
                 })->filter()->implode(' ');
-                $teamSearch = mb_strtolower(trim($team->title . ' ' . ($team->description ?? '') . ' ' . $memberNames));
+                $teamSearch = mb_strtolower(trim($team->title . ' ' . ($team->description ?? '') . ' ' . $memberNames . ' ' . $ownerLabel));
                 $previewByRole = [];
                 foreach (($teamRoleLabels ?? []) as $roleKey => $roleLabel) {
                     $previewByRole[$roleKey] = $team->members->where('role', $roleKey)->map(function ($member) {
@@ -99,11 +105,22 @@
                 <summary class="cabinet-sc-team-card__head">
                     <span class="cabinet-sc-team-card__chevron" aria-hidden="true"></span>
                     <div class="cabinet-sc-team-card__summary-main">
-                        <strong class="cabinet-sc-team-card__name">{{ $team->title }}</strong>
+                        <strong class="cabinet-sc-team-card__name">
+                            {{ $team->title }}
+                            @if($canManageTeam)
+                                <span class="cabinet-sc-role cabinet-sc-role--owner">{{ __('Your team badge') }}</span>
+                            @else
+                                <span class="cabinet-sc-role cabinet-sc-role--shared">{{ __('Team member badge') }}</span>
+                            @endif
+                        </strong>
                         <div class="cabinet-sc-team-card__meta">
                             <span>{{ $team->members_count }} {{ __('members') }}</span>
                             <span>·</span>
                             <span>{{ __('Used in :count projects', ['count' => (int) $team->projects_count]) }}</span>
+                            @if(!$canManageTeam && $ownerLabel !== '')
+                                <span>·</span>
+                                <span>{{ __('Team owned by :name', ['name' => $ownerLabel]) }}</span>
+                            @endif
                         </div>
                         <div class="cabinet-sc-team-card__preview">
                             @foreach(($teamRoleLabels ?? []) as $roleKey => $roleLabel)
@@ -120,32 +137,38 @@
                             @endif
                         </div>
                     </div>
-                    <form method="post"
-                          action="{{ route('pages.seo-checklist.teams.delete', ['teamId' => $team->id]) }}"
-                          class="cabinet-sc-team-card__summary-action"
-                          data-sc-stop-toggle
-                          data-cabinet-confirm="{{ __('Delete this team?') }}"
-                          data-cabinet-confirm-title="Удалить команду"
-                          data-cabinet-confirm-ok="Удалить"
-                          data-cabinet-confirm-danger="1">
-                        @csrf
-                        @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
-                        <button type="submit" class="btn btn-sm btn-outline-danger" @if($team->projects_count > 0) disabled aria-label="{{ __('Team is used by projects') }}" @endif>
-                            {{ __('Delete') }}
-                        </button>
-                    </form>
+                    @if($canManageTeam)
+                        <form method="post"
+                              action="{{ route('pages.seo-checklist.teams.delete', ['teamId' => $team->id]) }}"
+                              class="cabinet-sc-team-card__summary-action"
+                              data-sc-stop-toggle
+                              data-cabinet-confirm="{{ __('Delete this team?') }}"
+                              data-cabinet-confirm-title="Удалить команду"
+                              data-cabinet-confirm-ok="Удалить"
+                              data-cabinet-confirm-danger="1">
+                            @csrf
+                            @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
+                            <button type="submit" class="btn btn-sm btn-outline-danger" @if($team->projects_count > 0) disabled aria-label="{{ __('Team is used by projects') }}" @endif>
+                                {{ __('Delete') }}
+                            </button>
+                        </form>
+                    @endif
                 </summary>
 
                 <div class="cabinet-sc-team-card__body">
-                    <div class="cabinet-sc-team-card__block">
-                        <div class="cabinet-sc-team-card__block-title">{{ __('Team settings') }}</div>
-                        <form method="post" action="{{ route('pages.seo-checklist.teams.update', ['teamId' => $team->id]) }}" class="cabinet-sc-create__row">
-                            @csrf
-                            @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
-                            <input type="text" name="title" class="form-control form-control-sm" required value="{{ $team->title }}" placeholder="{{ __('Team name') }}">
-                            <button type="submit" class="btn btn-sm btn-outline-primary">{{ __('Save') }}</button>
-                        </form>
-                    </div>
+                    @if($canManageTeam)
+                        <div class="cabinet-sc-team-card__block">
+                            <div class="cabinet-sc-team-card__block-title">{{ __('Team settings') }}</div>
+                            <form method="post" action="{{ route('pages.seo-checklist.teams.update', ['teamId' => $team->id]) }}" class="cabinet-sc-create__row">
+                                @csrf
+                                @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
+                                <input type="text" name="title" class="form-control form-control-sm" required value="{{ $team->title }}" placeholder="{{ __('Team name') }}">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">{{ __('Save') }}</button>
+                            </form>
+                        </div>
+                    @else
+                        <p class="small text-secondary mb-3">{{ __('Shared team manage hint') }}</p>
+                    @endif
 
                     <div class="cabinet-sc-team-card__block">
                         <div class="cabinet-sc-team-card__block-title">{{ __('Members by role') }}</div>
@@ -174,26 +197,28 @@
                                                         <span class="cabinet-sc-member__email">{{ optional($u)->email }}</span>
                                                     </span>
                                                 </span>
-                                                <span class="cabinet-sc-role-group__actions">
-                                                    <form method="post" action="{{ route('pages.seo-checklist.teams.members.update', ['teamId' => $team->id, 'memberId' => $member->id]) }}">
-                                                        @csrf
-                                                        @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
-                                                        <select name="role" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="{{ __('Role') }}">
-                                                            @foreach(($teamRoleLabels ?? []) as $rk => $rl)
-                                                                <option value="{{ $rk }}" @if($member->role === $rk) selected @endif>{{ $rl }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    </form>
-                                                    <form method="post" action="{{ route('pages.seo-checklist.teams.members.delete', ['teamId' => $team->id, 'memberId' => $member->id]) }}"
-                                                          data-cabinet-confirm="{{ __('Remove member?') }}"
-                                                          data-cabinet-confirm-title="Удалить участника"
-                                                          data-cabinet-confirm-ok="Удалить"
-                                                          data-cabinet-confirm-danger="1">
-                                                        @csrf
-                                                        @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger cabinet-sc-icon-btn" title="{{ __('Remove member') }}">×</button>
-                                                    </form>
-                                                </span>
+                                                @if($canManageTeam)
+                                                    <span class="cabinet-sc-role-group__actions">
+                                                        <form method="post" action="{{ route('pages.seo-checklist.teams.members.update', ['teamId' => $team->id, 'memberId' => $member->id]) }}">
+                                                            @csrf
+                                                            @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
+                                                            <select name="role" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="{{ __('Role') }}">
+                                                                @foreach(($teamRoleLabels ?? []) as $rk => $rl)
+                                                                    <option value="{{ $rk }}" @if($member->role === $rk) selected @endif>{{ $rl }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </form>
+                                                        <form method="post" action="{{ route('pages.seo-checklist.teams.members.delete', ['teamId' => $team->id, 'memberId' => $member->id]) }}"
+                                                              data-cabinet-confirm="{{ __('Remove member?') }}"
+                                                              data-cabinet-confirm-title="Удалить участника"
+                                                              data-cabinet-confirm-ok="Удалить"
+                                                              data-cabinet-confirm-danger="1">
+                                                            @csrf
+                                                            @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger cabinet-sc-icon-btn" aria-label="{{ __('Remove member') }}">×</button>
+                                                        </form>
+                                                    </span>
+                                                @endif
                                             </li>
                                         @empty
                                             <li class="cabinet-sc-role-group__empty">{{ __('No one yet') }}</li>
@@ -204,29 +229,31 @@
                         </div>
                     </div>
 
-                    <div class="cabinet-sc-team-card__add">
-                        <div class="cabinet-sc-team-card__block-title">{{ __('Add member') }}</div>
-                        <form method="post" action="{{ route('pages.seo-checklist.teams.members.store', ['teamId' => $team->id]) }}" class="cabinet-sc-create__row">
-                            @csrf
-                            @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
-                            <select name="user_id" class="form-select form-select-sm">
-                                <option value="">{{ __('From known users') }}…</option>
-                                @foreach(($teamCandidates ?? []) as $cand)
-                                    @php
-                                        $candLabel = trim(($cand->name ?? '') . ' ' . ($cand->last_name ?? '')) ?: $cand->email;
-                                    @endphp
-                                    <option value="{{ $cand->id }}">{{ $candLabel }} · {{ $cand->email }}</option>
-                                @endforeach
-                            </select>
-                            <input type="email" name="email" class="form-control form-control-sm" placeholder="{{ __('Invite by email') }}">
-                            <select name="role" class="form-select form-select-sm">
-                                @foreach(($teamRoleLabels ?? []) as $rk => $rl)
-                                    <option value="{{ $rk }}" @if($rk === 'participant') selected @endif>{{ $rl }}</option>
-                                @endforeach
-                            </select>
-                            <button type="submit" class="btn btn-sm btn-primary">{{ __('Add') }}</button>
-                        </form>
-                    </div>
+                    @if($canManageTeam)
+                        <div class="cabinet-sc-team-card__add">
+                            <div class="cabinet-sc-team-card__block-title">{{ __('Add member') }}</div>
+                            <form method="post" action="{{ route('pages.seo-checklist.teams.members.store', ['teamId' => $team->id]) }}" class="cabinet-sc-create__row">
+                                @csrf
+                                @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
+                                <select name="user_id" class="form-select form-select-sm">
+                                    <option value="">{{ __('From known users') }}…</option>
+                                    @foreach(($teamCandidates ?? []) as $cand)
+                                        @php
+                                            $candLabel = trim(($cand->name ?? '') . ' ' . ($cand->last_name ?? '')) ?: $cand->email;
+                                        @endphp
+                                        <option value="{{ $cand->id }}">{{ $candLabel }} · {{ $cand->email }}</option>
+                                    @endforeach
+                                </select>
+                                <input type="email" name="email" class="form-control form-control-sm" placeholder="{{ __('Invite by email') }}">
+                                <select name="role" class="form-select form-select-sm">
+                                    @foreach(($teamRoleLabels ?? []) as $rk => $rl)
+                                        <option value="{{ $rk }}" @if($rk === 'participant') selected @endif>{{ $rl }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-primary">{{ __('Add') }}</button>
+                            </form>
+                        </div>
+                    @endif
                 </div>
             </details>
         @endforeach
@@ -278,7 +305,7 @@
                             <option value="">{{ __('Optional') }}</option>
                             @foreach(($teams ?? []) as $team)
                                 <option value="{{ $team->id }}" @if((int) $project->team_id === (int) $team->id) selected @endif>
-                                    {{ $team->title }}
+                                    {{ $team->title }}@if((int) $team->user_id !== $authUserId) ({{ __('Team member badge') }})@endif
                                 </option>
                             @endforeach
                         </select>

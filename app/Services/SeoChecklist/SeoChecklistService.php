@@ -1301,6 +1301,8 @@ class SeoChecklistService
     }
 
     /**
+     * Команды пользователя: свои + те, куда его добавили участником.
+     *
      * @return \Illuminate\Support\Collection<int, SeoChecklistTeam>
      */
     public function teamsForUser(int $userId)
@@ -1310,9 +1312,15 @@ class SeoChecklistService
         }
 
         return SeoChecklistTeam::query()
-            ->where('user_id', $userId)
-            ->with(['members.user'])
+            ->where(function ($q) use ($userId) {
+                $q->where('user_id', $userId)
+                    ->orWhereHas('members', function ($m) use ($userId) {
+                        $m->where('user_id', $userId);
+                    });
+            })
+            ->with(['members.user', 'ownerUser'])
             ->withCount(['members', 'projects'])
+            ->orderByRaw('CASE WHEN user_id = ? THEN 0 ELSE 1 END', [$userId])
             ->orderBy('title')
             ->get();
     }
@@ -1326,6 +1334,26 @@ class SeoChecklistService
         return SeoChecklistTeam::query()
             ->where('user_id', $userId)
             ->where('id', $teamId)
+            ->first();
+    }
+
+    /**
+     * Команда, которой пользователь владеет или в которой состоит.
+     */
+    public function findAccessibleTeam(int $userId, int $teamId): ?SeoChecklistTeam
+    {
+        if (!SeoChecklistTeam::tableReady()) {
+            return null;
+        }
+
+        return SeoChecklistTeam::query()
+            ->where('id', $teamId)
+            ->where(function ($q) use ($userId) {
+                $q->where('user_id', $userId)
+                    ->orWhereHas('members', function ($m) use ($userId) {
+                        $m->where('user_id', $userId);
+                    });
+            })
             ->first();
     }
 
@@ -1481,7 +1509,7 @@ class SeoChecklistService
     public function assignTeamToProject(SeoChecklistProject $project, ?int $teamId): array
     {
         if ($teamId) {
-            $team = $this->findOwnedTeam((int) $project->user_id, $teamId);
+            $team = $this->findAccessibleTeam((int) $project->user_id, $teamId);
             if (!$team) {
                 return ['ok' => false, 'message' => __('Team not found')];
             }

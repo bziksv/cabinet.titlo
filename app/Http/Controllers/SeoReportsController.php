@@ -1730,7 +1730,7 @@ class SeoReportsController extends Controller
             return $back->with($toProfile ? 'status' : 'success', __('Team detached from report project'));
         }
 
-        $team = app(SeoChecklistService::class)->findOwnedTeam((int) Auth::id(), $teamId);
+        $team = app(SeoChecklistService::class)->findAccessibleTeam((int) Auth::id(), $teamId);
         if (!$team) {
             return $back->with('error', __('Team not found'));
         }

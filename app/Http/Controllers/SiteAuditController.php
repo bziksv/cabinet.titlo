@@ -254,7 +254,7 @@ class SiteAuditController extends Controller
             return $back->with('status', 'Команда отключена от проекта ' . $project->domain);
         }
 
-        $team = app(SeoChecklistService::class)->findOwnedTeam((int) $user->id, $teamId);
+        $team = app(SeoChecklistService::class)->findAccessibleTeam((int) $user->id, $teamId);
         if (! $team) {
             return $back->with('error', 'Команда не найдена');
         }

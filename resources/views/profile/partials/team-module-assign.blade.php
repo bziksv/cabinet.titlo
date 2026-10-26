@@ -1,6 +1,7 @@
 @php
     $returnTo = 'profile';
     $teams = $teams ?? collect();
+    $authUserId = (int) ($authUserId ?? auth()->id());
     $checklistProjects = $checklistProjects ?? collect();
     $seoReportProjects = $seoReportProjects ?? collect();
     $siteAuditProjects = $siteAuditProjects ?? collect();
@@ -84,7 +85,7 @@
                             <option value="0">{{ __('No team') }}</option>
                             @foreach($teams as $team)
                                 <option value="{{ $team->id }}" @if($row['team_id'] === (int) $team->id) selected @endif>
-                                    {{ $team->title }}
+                                    {{ $team->title }}@if((int) $team->user_id !== $authUserId) ({{ __('Team member badge') }})@endif
                                 </option>
                             @endforeach
                         </select>
