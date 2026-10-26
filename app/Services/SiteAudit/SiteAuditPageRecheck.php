@@ -50,6 +50,10 @@ class SiteAuditPageRecheck
             ];
         }
 
+        if ($code === 'broken_internal_link') {
+            return $this->recheckBrokenInternalLink($crawl, $finding, $project, $url);
+        }
+
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
         $settings = array_merge(
             is_array($project->settings_json) ? $project->settings_json : [],
@@ -93,6 +97,157 @@ class SiteAuditPageRecheck
         }
 
         return $outcome;
+    }
+
+    /**
+     * Битая внутренняя ссылка: строка = битый целевой URL.
+     * Перекачиваем цель; если отвечает — снимаем finding и чистим page_has_broken_links.
+     *
+     * @return array{ok:bool,message:string,level:string}
+     */
+    private function recheckBrokenInternalLink(
+        SiteAuditCrawl $crawl,
+        SiteAuditFinding $finding,
+        SiteAuditProject $project,
+        string $url
+    ): array {
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $settings = array_merge(
+            is_array($project->settings_json) ? $project->settings_json : [],
+            is_array($progress['settings'] ?? null) ? $progress['settings'] : []
+        );
+        $host = SiteAuditUrlNormalizer::hostOf('https://' . $project->domain) ?: (string) $project->domain;
+        $requestedHash = SiteAuditUrlNormalizer::hash($url);
+        $robots = $this->freshRobotsGroups((string) $project->domain);
+
+        $processed = (new SiteAuditPageProcessor())->process(
+            (int) $crawl->id,
+            $url,
+            $host,
+            $settings,
+            $robots['groups']
+        );
+        $finalUrl = trim((string) ($processed['url'] ?? $url));
+        $finalHash = SiteAuditUrlNormalizer::hash($finalUrl !== '' ? $finalUrl : $url);
+        $status = isset($processed['status_code']) ? (int) $processed['status_code'] : 0;
+        $hashes = array_values(array_unique(array_filter([$requestedHash, $finalHash])));
+
+        if ($status >= 200 && $status < 400) {
+            SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', 'broken_internal_link')
+                ->whereIn('url_hash', $hashes)
+                ->delete();
+
+            $this->prunePageHasBrokenLinks(
+                (int) $crawl->id,
+                [$url, $finalUrl],
+                $hashes
+            );
+
+            return [
+                'ok' => true,
+                'level' => 'status',
+                'message' => 'Адрес отвечает ' . $status . '. Битая ссылка снята.',
+            ];
+        }
+
+        $meta = is_array($finding->meta_json) ? $finding->meta_json : [];
+        $meta['status'] = $status > 0 ? $status : null;
+        $meta['source'] = 'recheck';
+        if ($status <= 0) {
+            $meta['error'] = 'no_response';
+        } else {
+            unset($meta['error']);
+        }
+        $finding->meta_json = $meta;
+        $finding->save();
+
+        if ($status >= 400) {
+            return [
+                'ok' => true,
+                'level' => 'warning',
+                'message' => 'Адрес всё ещё отвечает ' . $status . '. Замечание осталось.',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'level' => 'warning',
+            'message' => 'Адрес не ответил. Замечание осталось.',
+        ];
+    }
+
+    /**
+     * Убрать починенную цель из samples «Страницы с битыми ссылками»; пустые — удалить.
+     *
+     * @param  string[]  $urls
+     * @param  string[]  $hashes
+     */
+    private function prunePageHasBrokenLinks(int $crawlId, array $urls, array $hashes): void
+    {
+        $urlSet = [];
+        foreach ($urls as $u) {
+            $u = trim((string) $u);
+            if ($u !== '') {
+                $urlSet[$u] = true;
+            }
+        }
+        $hashSet = array_fill_keys(array_filter($hashes), true);
+        if ($urlSet === [] && $hashSet === []) {
+            return;
+        }
+
+        $rows = SiteAuditFinding::query()
+            ->where('crawl_id', $crawlId)
+            ->where('code', 'page_has_broken_links')
+            ->get();
+
+        foreach ($rows as $row) {
+            $meta = is_array($row->meta_json) ? $row->meta_json : [];
+            $samples = is_array($meta['samples'] ?? null) ? $meta['samples'] : [];
+            if ($samples === []) {
+                continue;
+            }
+
+            $kept = [];
+            $changed = false;
+            foreach ($samples as $sample) {
+                if (! is_array($sample)) {
+                    $kept[] = $sample;
+                    continue;
+                }
+                $su = trim((string) ($sample['url'] ?? ''));
+                if ($su === '') {
+                    $kept[] = $sample;
+                    continue;
+                }
+                $sh = SiteAuditUrlNormalizer::hash($su);
+                if (isset($urlSet[$su]) || isset($hashSet[$sh])) {
+                    $changed = true;
+                    continue;
+                }
+                $kept[] = $sample;
+            }
+
+            if (! $changed) {
+                continue;
+            }
+
+            if ($kept === []) {
+                $row->delete();
+                continue;
+            }
+
+            $meta['samples'] = $kept;
+            $meta['count'] = count($kept);
+            $row->meta_json = $meta;
+            $row->save();
+        }
+
+        // Если цель была в обходе как 5xx/4xx — process() уже обновил page-level findings.
+        // Страница без записи в site_audit_pages возможна при HEAD-only битости — ничего доп.
+        unset($urlSet);
     }
 
     /**

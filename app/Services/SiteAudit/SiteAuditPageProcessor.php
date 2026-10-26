@@ -1036,6 +1036,8 @@ class SiteAuditPageProcessor
         if ($set === null) {
             $set = array_fill_keys([
                 'robots_blocked', 'unreachable', 'http_4xx', 'http_5xx', 'page_too_large',
+                // Цель битой ссылки: перекачать адрес и снять broken_internal_link, если отвечает.
+                'broken_internal_link',
                 'page_has_bad_links', 'html_critical_errors', 'adult_content', 'negative_content',
                 'word_repeat_in_sentence', 'commercial_missing_contacts', 'commercial_missing_cta',
                 'commercial_missing_price', 'commercial_missing_delivery', 'commercial_missing_payment',

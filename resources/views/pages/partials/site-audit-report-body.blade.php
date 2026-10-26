@@ -1225,6 +1225,12 @@
                             <div class="cabinet-sa-actions">
                                 @if(!empty($row->id) && !empty($row->url) && $crawl->isFinished()
                                     && \App\Services\SiteAudit\SiteAuditPageProcessor::isRecheckableCode((string) ($row->code ?? $code)))
+                                    @php
+                                        $recheckCode = (string) ($row->code ?? $code);
+                                        $recheckTip = $recheckCode === 'broken_internal_link'
+                                            ? "Скачать битый адрес ещё раз.\nВесь обход заново не запускается.\nЕсли адрес открывается — строка исчезнет."
+                                            : "Скачать эту страницу и robots.txt ещё раз.\nВесь отчёт заново не запускается.\nЕсли проблема ушла — строка исчезнет.";
+                                    @endphp
                                     <form method="POST" action="{{ route('pages.site-audit.recheck', $crawl->id) }}" class="cabinet-sa-act-form"
                                           onsubmit="var b=this.querySelector('button'); if(b){ b.disabled=true; var s=b.querySelector('span'); if(s){ s.textContent='Проверяем…'; } }">
                                         @csrf
@@ -1235,7 +1241,7 @@
                                                 <i class="fa fa-refresh" aria-hidden="true"></i><span>Проверить</span>
                                             </button>
                                             @include('pages.partials.site-audit-action-help', [
-                                                'tip' => "Скачать эту страницу и robots.txt ещё раз.\nВесь отчёт заново не запускается.\nЕсли проблема ушла — строка исчезнет.",
+                                                'tip' => $recheckTip,
                                             ])
                                         </div>
                                     </form>
