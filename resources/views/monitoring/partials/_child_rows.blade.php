@@ -3,7 +3,14 @@
     <div class="col-12">
         <div class="card card-outline card-success">
             <div class="card-header">
-                <h3 class="card-title">{{ ucfirst($engine->engine) }}, {{ $engine->location->name }} [{{ $engine->lr }}]</h3>
+                @php
+                    $regionName = \App\Classes\Monitoring\MonitoringLocationLabel::displayName(
+                        (string) $engine->engine,
+                        (string) $engine->lr,
+                        $engine->location ? (string) $engine->location->name : null
+                    );
+                @endphp
+                <h3 class="card-title">{{ ucfirst($engine->engine) }}, {{ $regionName }} [{{ $engine->lr }}]</h3>
 
                 <div class="card-tools">
                     <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse" aria-label="{{ __('Collapse') }}">
@@ -33,7 +40,7 @@
                     @forelse($engine->data as $data)
                         <tr>
                             <td class="text-nowrap align-middle">
-                                {{ $data->latest_created->format('d.m.Y') }}
+                                {{ !empty($data->latest_created) ? $data->latest_created->format('d.m.Y') : '—' }}
                                 @if(!empty($data->snapshot_period_label))
                                     <br><small class="text-secondary">{{ $data->snapshot_period_label }}</small>
                                 @endif
