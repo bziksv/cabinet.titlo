@@ -5,6 +5,7 @@ namespace App\Classes\Position\Engine;
 
 
 use App\Classes\Monitoring\MonitoringGoogleDepth;
+use App\Classes\Position\PositionCollectRateLimiter;
 use App\Classes\Position\Positions;
 use App\Exceptions\ErrorXmlPositionResponseException;
 
@@ -52,6 +53,7 @@ class Google extends Positions
 
         for ($page = 0; $page < $pages; $page++) {
             $this->xml->setPage((string) $page);
+            PositionCollectRateLimiter::acquire();
             $results = $this->xml->getByArray();
 
             if (isset($results['response']['error'])) {

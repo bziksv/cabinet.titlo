@@ -164,6 +164,24 @@ class MonitoringAdminController extends Controller
                     ],
                 ],
             ],
+            'collect' => [
+                'icon' => 'bi-speedometer2',
+                'title_key' => 'Monitoring admin section collect',
+                'lead_key' => 'Monitoring admin section collect lead',
+                'fields' => [
+                    [
+                        'type' => 'number',
+                        'name' => 'position_collect_rps',
+                        'label_key' => 'Monitoring admin field position rps',
+                        'hint_key' => 'Monitoring admin field position rps hint',
+                        'placeholder' => '30',
+                        'col' => 6,
+                        'min' => 1,
+                        'max' => 120,
+                        'default' => 30,
+                    ],
+                ],
+            ],
             'cron' => [
                 'icon' => 'bi-clock-history',
                 'title_key' => 'Monitoring admin section cron',

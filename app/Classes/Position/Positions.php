@@ -80,6 +80,7 @@ abstract class Positions
     protected function getSitePositionWithXml()
     {
         $site = $this->domain;
+        PositionCollectRateLimiter::acquire();
         $results = $this->xml->getByArray();
 
         if (!isset($results['response']['error'])) {

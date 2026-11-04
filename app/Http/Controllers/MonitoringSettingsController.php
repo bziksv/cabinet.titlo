@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\Position\PositionCollectRateLimiter;
 use App\MonitoringSettings;
 use Illuminate\Http\Request;
 
@@ -34,6 +35,8 @@ class MonitoringSettingsController extends Controller
             );
         }
 
+        PositionCollectRateLimiter::forget();
+
         flash()->overlay(__('Settings updated'), __('Save success!'))->success();
 
         return redirect()->back();
@@ -41,8 +44,10 @@ class MonitoringSettingsController extends Controller
 
     public function destroy($name)
     {
-        if($this->model->where('name', $name)->delete())
+        if($this->model->where('name', $name)->delete()) {
+            PositionCollectRateLimiter::forget();
             flash()->overlay($name .' '. __('deleted'), __('Delete success!'))->success();
+        }
 
         return redirect()->back();
     }
