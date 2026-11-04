@@ -55,7 +55,9 @@ class SeoChecklistController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $sitesPayload = HomeUserSites::forUser($userId);
+        // Без визитов Метрики: для селекта доменов они не нужны, а API Яндекса
+        // на локалке часто висит ~20s и рвёт вкладку (nginx 499).
+        $sitesPayload = HomeUserSites::forUser($userId, false);
         // Домен можно выбрать снова — на один сайт допускается несколько чеклистов.
         $availableDomains = [];
         foreach (($sitesPayload['sites'] ?? []) as $site) {
