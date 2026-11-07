@@ -92,6 +92,9 @@ class TariffPayController extends Controller
         foreach ($this->tariffs as $t)
             $this->select['tariffs'][$t->code()] = $t->name();
 
+        $freePlan = new FreeTariff();
+        $this->select['tariffs'][$freePlan->code()] = $freePlan->name();
+
         foreach ($this->periods as $code => $p)
             $this->select['periods'][$p->code()] = $p->name();
 
@@ -118,8 +121,12 @@ class TariffPayController extends Controller
 
     public function total(Request $request)
     {
-        $name = $request->input('name');
-        $period = $request->input('period');
+        $name = (string) $request->input('name', '');
+        $period = (string) $request->input('period', '');
+
+        if ($name === '' || $period === '') {
+            return response()->json(['message' => __('Tariff not found')], 422);
+        }
 
         return $this->getTotal($name, $period);
     }
@@ -158,6 +165,10 @@ class TariffPayController extends Controller
      */
     protected function getTariff(string $code): Tariff
     {
+        if ($code === 'Free') {
+            return new FreeTariff();
+        }
+
         foreach ($this->tariffs as $tariff) {
             if ($tariff->code() === $code)
                 return $tariff;
@@ -208,7 +219,13 @@ class TariffPayController extends Controller
             return redirect()->route('tariff.index');
         }
 
-        $tariff = $this->getTariff($request->input('tariff'));
+        $tariffCode = (string) $request->input('tariff', '');
+        if ($tariffCode === '') {
+            Session::flash('error', __('Tariff not found'));
+            return redirect()->route('tariff.index');
+        }
+
+        $tariff = $this->getTariff($tariffCode);
         $tariff->setPeriod($this->getPeriod($request->input('period')));
         $price = (int) $tariff->price('priceWithDiscount');
 
@@ -233,10 +250,12 @@ class TariffPayController extends Controller
         }
 
         try {
-            if ($company) {
-                $company->decrement('balance', $price);
-            } else {
-                $this->user->decrement('balance', $price);
+            if ($price > 0) {
+                if ($company) {
+                    $company->decrement('balance', $price);
+                } else {
+                    $this->user->decrement('balance', $price);
+                }
             }
         } catch (QueryException $exception) {
             Session::flash('error', $company ? __('Replenish the company balance!') : __('Replenish the balance!'));
