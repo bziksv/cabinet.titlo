@@ -1510,6 +1510,11 @@
                         alert((result.data && result.data.message) || 'Error');
                         return;
                     }
+                    var left = parseInt(result.data.unread_count, 10) || 0;
+                    if (markAll && left > 0) {
+                        window.location.reload();
+                        return;
+                    }
                     updateAfterRead(result.data.unread_count, noteIds, activityIds, markAll);
                     showFlash(result.data.message || markedMsg);
                 })
