@@ -106,12 +106,73 @@
     line-height: 1;
 }
 
-#header-nav-bar.cabinet-header .cabinet-header-module-limit .nav-link {
+#header-nav-bar.cabinet-header .cabinet-header-module-limit .nav-link,
+#header-nav-bar.cabinet-header .cabinet-header-module-limits .nav-link {
     cursor: default;
-    max-width: min(32rem, 48vw);
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-module-limits__row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: min(28rem, 42vw);
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-module-limits__sep {
+    width: 1px;
+    height: 1rem;
+    background: rgba(33, 37, 41, 0.18);
+    flex: 0 0 auto;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-limit-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    max-width: 100%;
+    min-height: 1.75rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255, 193, 7, 0.12);
+    color: #856404;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-limit-chip .bi {
+    flex: 0 0 auto;
+    opacity: 0.85;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-limit-chip__label {
+    color: rgba(33, 37, 41, 0.62);
+    font-weight: 500;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-limit-chip strong {
+    font-weight: 700;
+    color: inherit;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-limit-chip__cap {
+    color: rgba(33, 37, 41, 0.45);
+    font-weight: 500;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-limit-chip.is-exhausted {
+    background: rgba(220, 53, 69, 0.12);
+    color: #842029;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-module-limits--pair .cabinet-header-limit-chip__label {
+    max-width: 7.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 #header-nav-bar.cabinet-header .navbar-badge {

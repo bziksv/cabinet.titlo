@@ -356,6 +356,11 @@
         });
     }
 
+    function formatHeaderCount(n) {
+        var s = String(Math.max(0, Number(n) || 0));
+        return s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+
     function updateHeaderRemaining(left) {
         var header = document.getElementById('cabinet-header-module-limit');
         if (!header || left == null) {
@@ -363,14 +368,12 @@
         }
         var strong = header.querySelector('strong.ms-1');
         if (strong) {
-            strong.textContent = left;
+            strong.textContent = formatHeaderCount(left);
         }
         if (Number(left) <= 0) {
-            var link = header.querySelector('.nav-link');
-            if (link) {
-                link.classList.add('text-danger');
-                link.classList.remove('text-warning-emphasis');
-            }
+            header.classList.add('is-exhausted');
+        } else {
+            header.classList.remove('is-exhausted');
         }
     }
 
@@ -379,20 +382,17 @@
         if (!el || used == null) {
             return;
         }
-        el.textContent = used;
+        el.textContent = formatHeaderCount(used);
         var wrap = document.getElementById('cabinet-header-module-secondary');
         if (!wrap) {
             return;
         }
-        var link = wrap.querySelector('.nav-link');
         var limitAttr = root.getAttribute('data-history-limit');
         var limit = limitAttr !== '' && limitAttr != null ? Number(limitAttr) : null;
-        if (link && limit != null && !isNaN(limit) && Number(used) >= limit) {
-            link.classList.add('text-danger');
-            link.classList.remove('text-warning-emphasis');
-        } else if (link) {
-            link.classList.remove('text-danger');
-            link.classList.add('text-warning-emphasis');
+        if (limit != null && !isNaN(limit) && Number(used) >= limit) {
+            wrap.classList.add('is-exhausted');
+        } else {
+            wrap.classList.remove('is-exhausted');
         }
     }
 

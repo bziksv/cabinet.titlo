@@ -44,6 +44,8 @@ class HeaderModuleLimitComposer
                 $secondary = [
                     'code' => $history['code'],
                     'label' => (string) __('Search suggestions history label'),
+                    'short_label' => (string) __('Search suggestions history label'),
+                    'metric' => 'used',
                     'used' => (int) $history['used'],
                     'limit' => (int) $history['limit'],
                     'left' => $history['left'],
@@ -57,6 +59,8 @@ class HeaderModuleLimitComposer
                 $secondary = [
                     'code' => $history['code'],
                     'label' => (string) __('Site types history label'),
+                    'short_label' => (string) __('Site types history label'),
+                    'metric' => 'used',
                     'used' => (int) $history['used'],
                     'limit' => (int) $history['limit'],
                     'left' => $history['left'],
@@ -70,6 +74,8 @@ class HeaderModuleLimitComposer
                 $secondary = [
                     'code' => $history['code'],
                     'label' => (string) __('Phrase commerce history label'),
+                    'short_label' => (string) __('Phrase commerce history label'),
+                    'metric' => 'used',
                     'used' => (int) $history['used'],
                     'limit' => (int) $history['limit'],
                     'left' => $history['left'],
@@ -83,6 +89,8 @@ class HeaderModuleLimitComposer
                 $secondary = [
                     'code' => $uniq['code'],
                     'label' => (string) __('Text uniqueness'),
+                    'short_label' => (string) __('Text uniqueness header short'),
+                    'metric' => 'left',
                     'used' => (int) $uniq['used'],
                     'limit' => (int) $uniq['limit'],
                     'left' => $uniq['left'],
@@ -96,6 +104,8 @@ class HeaderModuleLimitComposer
                 $secondary = [
                     'code' => $history['code'],
                     'label' => (string) __('Text uniqueness history label'),
+                    'short_label' => (string) __('Text uniqueness history label'),
+                    'metric' => 'used',
                     'used' => (int) $history['used'],
                     'limit' => (int) $history['limit'],
                     'left' => $history['left'],

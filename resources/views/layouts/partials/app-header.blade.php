@@ -150,50 +150,73 @@
                     </li>
                 @endif
                 @if(!empty($headerModuleLimit))
-                    <li class="nav-item d-none d-xl-block cabinet-header-module-limit"
-                        id="cabinet-header-module-limit"
-                        data-limit-code="{{ $headerModuleLimit['code'] }}">
-                        @php
-                            $limitTitle = $headerModuleLimit['name'];
-                            if ($headerModuleLimit['unlimited']) {
-                                $limitTitle .= ': ' . __('No restrictions');
-                            } elseif ($headerModuleLimit['exhausted']) {
-                                $limitTitle .= ': ' . __('Your limits are exhausted this month');
-                            } else {
-                                $limitTitle .= ': ' . __('Left') . ' ' . $headerModuleLimit['left'] . ' ' . __('from') . ' ' . $headerModuleLimit['limit'];
-                            }
-                        @endphp
-                        <span class="nav-link @if($headerModuleLimit['exhausted']) text-danger @else text-warning-emphasis @endif"
-                              title="{{ $limitTitle }}">
-                            <i class="bi bi-pie-chart me-1" aria-hidden="true"></i>
-                            @if($headerModuleLimit['unlimited'])
-                                <span class="text-secondary">{{ $headerModuleLimit['name'] }}:</span>
-                                <strong class="ms-1">{{ __('No restrictions') }}</strong>
-                            @elseif($headerModuleLimit['exhausted'])
-                                <strong>{{ __('Your limits are exhausted this month') }}</strong>
-                            @else
-                                <span class="text-secondary">{{ __('Left') }}:</span>
-                                <strong class="ms-1">{{ $headerModuleLimit['left'] }}</strong>
-                                <span class="text-muted ms-1">{{ __('from') }} {{ $headerModuleLimit['limit'] }}</span>
+                    @php
+                        $headerLimitFmt = static function ($n) {
+                            return number_format((int) $n, 0, '', ' ');
+                        };
+                        $headerPrimaryShort = $headerModuleLimit['code'] === 'TextAnalyzer'
+                            ? (string) __('Text analyzer header short')
+                            : (string) __('Left');
+                        $headerHasSecondary = !empty($headerModuleSecondary);
+                        $headerSecondaryMetric = 'used';
+                        $headerSecondaryValue = 0;
+                        $headerSecondaryShort = '';
+                        $headerSecondaryAria = '';
+                        if ($headerHasSecondary) {
+                            $headerSecondaryMetric = $headerModuleSecondary['metric'] ?? 'used';
+                            $headerSecondaryValue = $headerSecondaryMetric === 'left'
+                                ? (int) ($headerModuleSecondary['left'] ?? 0)
+                                : (int) ($headerModuleSecondary['used'] ?? 0);
+                            $headerSecondaryShort = (string) ($headerModuleSecondary['short_label']
+                                ?? $headerModuleSecondary['label']
+                                ?? '');
+                            $headerSecondaryAria = ($headerModuleSecondary['label'] ?? $headerSecondaryShort)
+                                . ': ' . $headerLimitFmt($headerSecondaryValue)
+                                . ' ' . __('from') . ' ' . $headerLimitFmt($headerModuleSecondary['limit']);
+                        }
+                        $headerPrimaryAria = $headerModuleLimit['name'];
+                        if ($headerModuleLimit['unlimited']) {
+                            $headerPrimaryAria .= ': ' . __('No restrictions');
+                        } elseif ($headerModuleLimit['exhausted']) {
+                            $headerPrimaryAria .= ': ' . __('Your limits are exhausted this month');
+                        } else {
+                            $headerPrimaryAria .= ': ' . __('Left') . ' '
+                                . $headerLimitFmt($headerModuleLimit['left']) . ' '
+                                . __('from') . ' ' . $headerLimitFmt($headerModuleLimit['limit']);
+                        }
+                    @endphp
+                    <li class="nav-item d-none d-xl-block cabinet-header-module-limits @if($headerHasSecondary) cabinet-header-module-limits--pair @endif">
+                        <span class="nav-link cabinet-header-module-limits__row">
+                            <span class="cabinet-header-limit-chip @if(!empty($headerModuleLimit['exhausted'])) is-exhausted @endif"
+                                  id="cabinet-header-module-limit"
+                                  data-limit-code="{{ $headerModuleLimit['code'] }}"
+                                  aria-label="{{ $headerPrimaryAria }}">
+                                <i class="bi bi-pie-chart" aria-hidden="true"></i>
+                                @if($headerModuleLimit['unlimited'])
+                                    <span class="cabinet-header-limit-chip__label">{{ $headerModuleLimit['name'] }}</span>
+                                    <strong class="ms-1">{{ __('No restrictions') }}</strong>
+                                @elseif($headerModuleLimit['exhausted'])
+                                    <span class="cabinet-header-limit-chip__label">{{ $headerPrimaryShort }}</span>
+                                    <strong class="ms-1">0</strong>
+                                    <span class="cabinet-header-limit-chip__cap">/ {{ $headerLimitFmt($headerModuleLimit['limit']) }}</span>
+                                @else
+                                    <span class="cabinet-header-limit-chip__label">{{ $headerPrimaryShort }}</span>
+                                    <strong class="ms-1">{{ $headerLimitFmt($headerModuleLimit['left']) }}</strong>
+                                    <span class="cabinet-header-limit-chip__cap">/ {{ $headerLimitFmt($headerModuleLimit['limit']) }}</span>
+                                @endif
+                            </span>
+                            @if($headerHasSecondary)
+                                <span class="cabinet-header-module-limits__sep" aria-hidden="true"></span>
+                                <span class="cabinet-header-limit-chip @if(!empty($headerModuleSecondary['exhausted'])) is-exhausted @endif"
+                                      id="cabinet-header-module-secondary"
+                                      data-limit-code="{{ $headerModuleSecondary['code'] }}"
+                                      aria-label="{{ $headerSecondaryAria }}">
+                                    <i class="bi {{ ($headerSecondaryMetric === 'left') ? 'bi-shield-check' : 'bi-folder2-open' }}" aria-hidden="true"></i>
+                                    <span class="cabinet-header-limit-chip__label">{{ $headerSecondaryShort }}</span>
+                                    <strong class="ms-1" id="cabinet-header-module-secondary-used">{{ $headerLimitFmt($headerSecondaryValue) }}</strong>
+                                    <span class="cabinet-header-limit-chip__cap">/ {{ $headerLimitFmt($headerModuleSecondary['limit']) }}</span>
+                                </span>
                             @endif
-                        </span>
-                    </li>
-                @endif
-                @if(!empty($headerModuleSecondary))
-                    <li class="nav-item d-none d-xl-block cabinet-header-module-secondary"
-                        id="cabinet-header-module-secondary"
-                        data-limit-code="{{ $headerModuleSecondary['code'] }}">
-                        @php
-                            $secondaryTitle = $headerModuleSecondary['label']
-                                . ': ' . $headerModuleSecondary['used']
-                                . ' ' . __('from') . ' ' . $headerModuleSecondary['limit'];
-                        @endphp
-                        <span class="nav-link @if(!empty($headerModuleSecondary['exhausted'])) text-danger @else text-warning-emphasis @endif"
-                              title="{{ $secondaryTitle }}">
-                            <i class="bi bi-folder2-open me-1" aria-hidden="true"></i>
-                            <span class="text-secondary">{{ $headerModuleSecondary['label'] }}:</span>
-                            <strong class="ms-1" id="cabinet-header-module-secondary-used">{{ $headerModuleSecondary['used'] }}</strong>
-                            <span class="text-muted ms-1">{{ __('from') }} {{ $headerModuleSecondary['limit'] }}</span>
                         </span>
                     </li>
                 @endif

@@ -6827,5 +6827,7 @@
     "Monitoring deferred start invalid time": "Укажите время в формате ЧЧ:ММ",
     "Monitoring deferred start time passed": "Это время уже прошло — выберите другое или «завтра»",
     "Monitoring deferred start too far": "Можно отложить только на сегодня или завтра",
-    "Monitoring deferred start queued": "В очереди, старт :time"
+    "Monitoring deferred start queued": "В очереди, старт :time",
+    "Text analyzer header short": "Анализ",
+    "Text uniqueness header short": "Уникальность"
 }

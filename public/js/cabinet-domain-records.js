@@ -116,13 +116,23 @@
         });
     }
 
+    function formatHeaderCount(n) {
+        var s = String(Math.max(0, Number(n) || 0));
+        return s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+
     function updateHeaderRemaining(remaining) {
         if (remaining == null) return;
         var header = document.getElementById('cabinet-header-module-limit');
         if (!header) return;
         var strong = header.querySelector('strong.ms-1');
         if (strong) {
-            strong.textContent = remaining;
+            strong.textContent = formatHeaderCount(remaining);
+        }
+        if (Number(remaining) <= 0) {
+            header.classList.add('is-exhausted');
+        } else {
+            header.classList.remove('is-exhausted');
         }
     }
 
@@ -133,7 +143,7 @@
         if (!header) return;
         var strong = header.querySelector('strong');
         if (strong) {
-            strong.textContent = count;
+            strong.textContent = formatHeaderCount(count);
         }
     }
 
