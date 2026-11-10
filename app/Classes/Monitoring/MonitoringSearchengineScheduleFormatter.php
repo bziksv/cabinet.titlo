@@ -30,12 +30,13 @@ class MonitoringSearchengineScheduleFormatter
 
         if ($engine->monthday) {
             $n = (int) $engine->monthday;
+            $time = $this->formatTime($engine->time);
 
             return [
                 'manual' => false,
                 'mode' => 'ranges',
-                'label' => __('Monitoring v2 schedule ranges', ['days' => $n]),
-                'short' => __('Monitoring v2 schedule ranges short', ['days' => $n]),
+                'label' => __('Monitoring v2 schedule ranges', ['days' => $n, 'time' => $time]),
+                'short' => __('Monitoring v2 schedule ranges short', ['days' => $n, 'time' => $time]),
             ];
         }
 

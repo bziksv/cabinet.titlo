@@ -705,6 +705,56 @@
                 const $regionSelect = $modal.find('[data-mon-queue-region]');
                 const $regionsWrap = $modal.find('[data-mon-queue-regions-wrap]');
                 const $regionsList = $modal.find('[data-mon-queue-regions-list]');
+                const $whenTimeWrap = $modal.find('[data-mon-queue-when-time-wrap]');
+                const $whenTime = $modal.find('[data-mon-queue-start-time]');
+                const $whenError = $modal.find('[data-mon-queue-when-error]');
+
+                function queueWhenValue() {
+                    return String($modal.find('input[name="queue_confirm_when"]:checked').val() || 'now');
+                }
+
+                function syncWhenUi() {
+                    const when = queueWhenValue();
+                    const needTime = when === 'today' || when === 'tomorrow';
+                    $whenTimeWrap.toggleClass('d-none', !needTime);
+                    if (!needTime) {
+                        $whenTime.removeClass('is-invalid');
+                        $whenError.addClass('d-none').text('');
+                    }
+                }
+
+                function validateWhenSelection() {
+                    const when = queueWhenValue();
+                    if (when === 'now') {
+                        $whenTime.removeClass('is-invalid');
+                        $whenError.addClass('d-none').text('');
+                        return { ok: true, start_when: 'now', start_time: null };
+                    }
+                    let time = String($whenTime.val() || '').trim();
+                    if (!/^\d{1,2}:\d{2}$/.test(time)) {
+                        $whenTime.addClass('is-invalid');
+                        $whenError.removeClass('d-none').text(@json(__('Monitoring deferred start invalid time')));
+                        return { ok: false };
+                    }
+                    const parts = time.split(':');
+                    const hh = String(Math.min(23, parseInt(parts[0], 10))).padStart(2, '0');
+                    const mm = String(Math.min(59, parseInt(parts[1], 10))).padStart(2, '0');
+                    time = hh + ':' + mm;
+                    $whenTime.val(time);
+
+                    if (when === 'today' && typeof moment !== 'undefined') {
+                        const start = moment(time, 'HH:mm');
+                        if (!start.isValid() || !start.isAfter(moment())) {
+                            $whenTime.addClass('is-invalid');
+                            $whenError.removeClass('d-none').text(@json(__('Monitoring deferred start time passed')));
+                            return { ok: false };
+                        }
+                    }
+
+                    $whenTime.removeClass('is-invalid');
+                    $whenError.addClass('d-none').text('');
+                    return { ok: true, start_when: when, start_time: time };
+                }
 
                 function updateConfirmState() {
                     const blocked = (showRegionsPicker && !activeRegionIds.length)
@@ -930,6 +980,11 @@
                         return;
                     }
 
+                    const whenSel = validateWhenSelection();
+                    if (!whenSel.ok) {
+                        return;
+                    }
+
                     $confirmBtn.prop('disabled', true).addClass('disabled');
                     monQueueModalHide();
                     onConfirm({
@@ -939,8 +994,20 @@
                         google_depth: monHasGoogleRegions(pickedRegions) ? stats.google_depth : null,
                         region: pickedRegion,
                         regions: pickedRegions,
+                        start_when: whenSel.start_when,
+                        start_time: whenSel.start_time,
                     });
                 });
+
+                $modal.find('input[name="queue_confirm_when"]').off('change.monWhen').on('change.monWhen', syncWhenUi);
+                $whenTime.off('input.monWhen').on('input.monWhen', function () {
+                    $whenTime.removeClass('is-invalid');
+                    $whenError.addClass('d-none').text('');
+                });
+                $modal.find('#queueConfirmWhenNow').prop('checked', true);
+                $whenTime.val('01:00').removeClass('is-invalid');
+                $whenError.addClass('d-none').text('');
+                syncWhenUi();
 
                 renderLimitsSummary();
                 monQueueModalShow();
@@ -990,13 +1057,20 @@
                 }));
             }
 
-            function monOccurrencePostAll(scope, $btn) {
+            function monOccurrencePostAll(scope, $btn, schedule) {
                 monOccurrenceBtnBusy($btn, true);
+                schedule = schedule || {};
 
-                axios.post('/monitoring/occurrence', {
+                const postData = {
                     id: PROJECT_ID,
                     scope: scope,
-                }, { timeout: 45000 }).then(function (postResponse) {
+                    start_when: schedule.start_when || 'now',
+                };
+                if (schedule.start_time) {
+                    postData.start_time = schedule.start_time;
+                }
+
+                axios.post('/monitoring/occurrence', postData, { timeout: 45000 }).then(function (postResponse) {
                     if (postResponse.data.status) {
                         toastr.success(postResponse.data.msg + ' -' + postResponse.data.count);
                     } else {
@@ -1010,14 +1084,21 @@
                 });
             }
 
-            function monOccurrencePostKeys(arrKeys, region, $btn) {
+            function monOccurrencePostKeys(arrKeys, region, $btn, schedule) {
                 monOccurrenceBtnBusy($btn, true);
+                schedule = schedule || {};
 
-                axios.post('/monitoring/occurrence/keys', {
+                const postData = {
                     projectId: PROJECT_ID,
                     keys: arrKeys,
                     region: region,
-                }, { timeout: 45000 }).then(function (response) {
+                    start_when: schedule.start_when || 'now',
+                };
+                if (schedule.start_time) {
+                    postData.start_time = schedule.start_time;
+                }
+
+                axios.post('/monitoring/occurrence/keys', postData, { timeout: 45000 }).then(function (response) {
                     if (response.data.status) {
                         toastr.success(response.data.msg + ' -' + response.data.count);
                         $('#monitoringTable_wrapper input[type="checkbox"]:checked').prop('checked', false);
@@ -2318,7 +2399,11 @@
                                         const postData = {
                                             projectId: PROJECT_ID,
                                             regions: regions,
+                                            start_when: payload.start_when || 'now',
                                         };
+                                        if (payload.start_time) {
+                                            postData.start_time = payload.start_time;
+                                        }
                                         if (payload.google_depth) {
                                             postData.google_depth = payload.google_depth;
                                         }
@@ -2354,7 +2439,10 @@
                                         mode: 'all',
                                         stats: response.data.stats,
                                         onConfirm: function (result) {
-                                            monOccurrencePostAll(result.scope, $btn);
+                                            monOccurrencePostAll(result.scope, $btn, {
+                                                start_when: result.start_when,
+                                                start_time: result.start_time,
+                                            });
                                         },
                                     });
                                 }).catch(function () {
@@ -2397,8 +2485,11 @@
                                         monOccurrenceConfirmModal({
                                             mode: 'selected',
                                             stats: response.data.stats,
-                                            onConfirm: function () {
-                                                monOccurrencePostKeys(arrKeys, region, $btn);
+                                            onConfirm: function (result) {
+                                                monOccurrencePostKeys(arrKeys, region, $btn, {
+                                                    start_when: result.start_when,
+                                                    start_time: result.start_time,
+                                                });
                                             },
                                         });
                                     }).catch(function () {
@@ -2482,7 +2573,11 @@
                                             projectId: PROJECT_ID,
                                             keys: arrKeys,
                                             region: region,
+                                            start_when: payload.start_when || 'now',
                                         };
+                                        if (payload.start_time) {
+                                            postData.start_time = payload.start_time;
+                                        }
                                         if (payload.google_depth) {
                                             postData.google_depth = payload.google_depth;
                                         }

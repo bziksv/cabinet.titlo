@@ -101,7 +101,7 @@ class MonitoringOccurrenceController extends Controller
     {
         $scope = $request->input('scope', 'all');
 
-        return $this->updateByProjectId($request->input('id'), $scope === 'missing');
+        return $this->updateByProjectId($request->input('id'), $scope === 'missing', $request);
     }
 
     public function updateKeys(Request $request)
@@ -141,6 +141,14 @@ class MonitoringOccurrenceController extends Controller
             $user = $userAdmin;
         }
 
+        $deferred = \App\Support\MonitoringDeferredStart::resolveFromRequest($request);
+        if (!$deferred['ok']) {
+            return response()->json([
+                'status' => false,
+                'error' => $deferred['error'],
+            ]);
+        }
+
         $keywords = $project->keywords()->whereIn('id', $keywordIds)->get();
         if ($keywords->isEmpty()) {
             return response()->json([
@@ -164,17 +172,26 @@ class MonitoringOccurrenceController extends Controller
             return $queue->notify();
         }
 
-        EnqueueMonitoringOccurrenceKeysJob::dispatch(
+        $pending = EnqueueMonitoringOccurrenceKeysJob::dispatch(
             (int) $project->id,
             $regionId,
             $keywords->pluck('id')->all(),
             'high'
         );
+        if ($deferred['start_at'] !== null) {
+            $pending->delay($deferred['start_at']);
+        }
+
+        if ($deferred['start_at'] !== null) {
+            return $queue->notify(
+                __('Monitoring deferred start queued', ['time' => $deferred['start_at']->format('d.m H:i')])
+            );
+        }
 
         return $queue->notify();
     }
 
-    protected function updateByProjectId($id, bool $missingOnly = false)
+    protected function updateByProjectId($id, bool $missingOnly = false, ?Request $request = null)
     {
         $this->authorize('update_occurrence_monitoring');
 
@@ -200,6 +217,16 @@ class MonitoringOccurrenceController extends Controller
             $user = $userAdmin;
         }
 
+        $deferred = $request
+            ? \App\Support\MonitoringDeferredStart::resolveFromRequest($request)
+            : ['ok' => true, 'start_at' => null, 'error' => null];
+        if (!$deferred['ok']) {
+            return response()->json([
+                'status' => false,
+                'error' => $deferred['error'],
+            ]);
+        }
+
         $stats = $this->countService->projectStats($project);
         $pairCount = $missingOnly ? $stats['pairs_missing'] : $stats['pairs_all'];
 
@@ -215,7 +242,16 @@ class MonitoringOccurrenceController extends Controller
             return $queue->notify();
         }
 
-        EnqueueMonitoringOccurrenceJob::dispatch((int) $project->id, 'high', $missingOnly);
+        $pending = EnqueueMonitoringOccurrenceJob::dispatch((int) $project->id, 'high', $missingOnly);
+        if ($deferred['start_at'] !== null) {
+            $pending->delay($deferred['start_at']);
+        }
+
+        if ($deferred['start_at'] !== null) {
+            return $queue->notify(
+                __('Monitoring deferred start queued', ['time' => $deferred['start_at']->format('d.m H:i')])
+            );
+        }
 
         return $queue->notify();
     }

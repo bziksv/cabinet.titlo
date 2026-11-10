@@ -232,7 +232,10 @@
                             time: item.weekdays ? item.time : null,
                             days: item.weekdays,
                         },
-                        monthday: item.monthday,
+                        monthday: {
+                            days: item.monthday,
+                            time: item.monthday ? item.time : null,
+                        },
                         day: {
                             days: item.day,
                             time: item.day ? item.time : null,
@@ -295,14 +298,15 @@
             return form.append(
                 $('<label />').text(data.label),
                 $('<input />', {
-                    class: 'form-control',
+                    class: 'form-control mb-2',
                     type: 'number',
                     min: '1',
                     max: '31',
                     name: 'monthday',
-                    value: data.val.monthday,
+                    value: data.val.monthday.days,
                     placeholder: 'Число месяца 1–31',
-                }).attr('data-id', data.id)
+                }).attr('data-id', data.id),
+                Modes.inputTime(data, data.val.monthday.time)
             );
         },
         monthTemplate: function (data) {

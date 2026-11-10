@@ -168,7 +168,11 @@ class Kernel extends ConsoleKernel
 
                 if ($engine->monthday) {
                     $monthday = $engine->monthday;
-                    $task->dailyAt('10:05')->when(function () use ($monthday) {
+                    $runAt = trim((string) ($engine->time ?? ''));
+                    if (!preg_match('/^\d{1,2}:\d{2}$/', $runAt)) {
+                        $runAt = '10:05';
+                    }
+                    $task->dailyAt($runAt)->when(function () use ($monthday) {
                         $shouldRun = now()->day % $monthday === 0;
                         \Log::info('Schedule check', [
                             'day' => now()->day,

@@ -35,6 +35,34 @@
                     <p class="text-secondary small mb-0 mt-1" data-mon-queue-google-depth-hint>{{ __('Monitoring google depth hint scan') }}</p>
                 </div>
 
+                <div class="mb-3" data-mon-queue-when-wrap>
+                    <label class="form-label small fw-semibold mb-2">{{ __('Monitoring deferred start label') }}</label>
+                    <div class="cabinet-mon-queue-confirm-modal__option">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="queue_confirm_when" id="queueConfirmWhenNow" value="now" checked>
+                            <label class="form-check-label" for="queueConfirmWhenNow">{{ __('Monitoring deferred start now') }}</label>
+                        </div>
+                    </div>
+                    <div class="cabinet-mon-queue-confirm-modal__option">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="queue_confirm_when" id="queueConfirmWhenToday" value="today">
+                            <label class="form-check-label" for="queueConfirmWhenToday">{{ __('Monitoring deferred start today') }}</label>
+                        </div>
+                    </div>
+                    <div class="cabinet-mon-queue-confirm-modal__option">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="queue_confirm_when" id="queueConfirmWhenTomorrow" value="tomorrow">
+                            <label class="form-check-label" for="queueConfirmWhenTomorrow">{{ __('Monitoring deferred start tomorrow') }}</label>
+                        </div>
+                    </div>
+                    <div class="mt-2 d-none" data-mon-queue-when-time-wrap>
+                        <label class="form-label small fw-semibold mb-1" for="monQueueStartTime">{{ __('Monitoring deferred start time label') }}</label>
+                        <input type="text" class="form-control form-control-sm" id="monQueueStartTime" data-mon-queue-start-time
+                               inputmode="numeric" placeholder="01:00" autocomplete="off" maxlength="5">
+                        <div class="invalid-feedback d-block d-none" data-mon-queue-when-error></div>
+                    </div>
+                </div>
+
                 <div data-mon-queue-mode="all">
                     <div class="cabinet-mon-queue-confirm-modal__option">
                         <div class="form-check">

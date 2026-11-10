@@ -246,6 +246,14 @@ class MonitoringController extends Controller
             $user = $userAdmin;
         }
 
+        $deferred = \App\Support\MonitoringDeferredStart::resolveFromRequest($request);
+        if (!$deferred['ok']) {
+            return response()->json([
+                'status' => false,
+                'error' => $deferred['error'],
+            ]);
+        }
+
         $googleDepth = $this->normalizeGoogleDepthRequest($request);
         $keywordCount = (int) $project->keywords()->count();
         $jobCount = MonitoringGoogleDepth::countPositionJobs($keywordCount, $engines, $googleDepth);
@@ -256,12 +264,21 @@ class MonitoringController extends Controller
             return $queue->notify();
         }
 
-        \App\Jobs\EnqueueMonitoringPositionsJob::dispatch(
+        $pending = \App\Jobs\EnqueueMonitoringPositionsJob::dispatch(
             (int) $project->id,
             $engines->pluck('id')->all(),
             'position_high',
             $googleDepth
         );
+        if ($deferred['start_at'] !== null) {
+            $pending->delay($deferred['start_at']);
+        }
+
+        if ($deferred['start_at'] !== null) {
+            return $queue->notify(
+                __('Monitoring deferred start queued', ['time' => $deferred['start_at']->format('d.m H:i')])
+            );
+        }
 
         return $queue->notify();
     }
@@ -291,6 +308,14 @@ class MonitoringController extends Controller
             $user = $userAdmin;
         }
 
+        $deferred = \App\Support\MonitoringDeferredStart::resolveFromRequest($request);
+        if (!$deferred['ok']) {
+            return response()->json([
+                'status' => false,
+                'error' => $deferred['error'],
+            ]);
+        }
+
         $googleDepth = $this->normalizeGoogleDepthRequest($request);
         $jobCount = MonitoringGoogleDepth::countPositionJobs(count($keywordIds), collect([$engine]), $googleDepth);
         $queue = new PositionsDispatch($user['id'], 'position_high');
@@ -300,13 +325,22 @@ class MonitoringController extends Controller
             return $queue->notify();
         }
 
-        \App\Jobs\EnqueueMonitoringPositionsKeysJob::dispatch(
+        $pending = \App\Jobs\EnqueueMonitoringPositionsKeysJob::dispatch(
             (int) $project->id,
             $regionId,
             $keywordIds,
             'position_high',
             $googleDepth
         );
+        if ($deferred['start_at'] !== null) {
+            $pending->delay($deferred['start_at']);
+        }
+
+        if ($deferred['start_at'] !== null) {
+            return $queue->notify(
+                __('Monitoring deferred start queued', ['time' => $deferred['start_at']->format('d.m H:i')])
+            );
+        }
 
         return $queue->notify();
     }
