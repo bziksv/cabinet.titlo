@@ -252,17 +252,45 @@
                 .catch(console.log);
         });
 
-        $root.on('click', '.detach-user', function () {
+        $root.on('click', '.detach-user', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
             const $self = $(this);
-            axios
-                .post(@json(route('user.detach')), {
-                    project_id: $self.data('project'),
-                    user_id: $self.data('id'),
-                })
-                .then(refreshList)
-                .catch(function () {
-                    toastr.error(@json(__('Wrong request')));
+            const projectId = $self.data('project');
+            const userId = Number($self.data('id'));
+            const isSelf = userId === Number(@json(auth()->id()));
+            const tip = (($self.closest('li').attr('aria-label') || '').split(' — ')[0] || '').trim();
+            const title = isSelf ? 'Покинуть проект' : @json(__('Remove member'));
+            const text = isSelf
+                ? 'Вы уверены, что хотите покинуть проект?'
+                : tip
+                  ? 'Удалить «' + tip + '» из проекта?'
+                  : @json(__('Detach user from project?'));
+            const okLabel = isSelf ? 'Покинуть' : 'Удалить';
+
+            function doDetach() {
+                axios
+                    .post(@json(route('user.detach')), {
+                        project_id: projectId,
+                        user_id: userId,
+                    })
+                    .then(refreshList)
+                    .catch(function () {
+                        toastr.error(@json(__('Wrong request')));
+                    });
+            }
+
+            if (window.CabinetConfirm && typeof window.CabinetConfirm.show === 'function') {
+                window.CabinetConfirm.show({
+                    title: title,
+                    text: text,
+                    okLabel: okLabel,
+                    danger: true,
+                    onConfirm: doDetach,
                 });
+            } else if (window.confirm(text)) {
+                doDetach();
+            }
             return false;
         });
 

@@ -43,6 +43,7 @@
         @include('monitoring-v2.partials.public-share-modal')
         @include('monitoring-v2.partials.delete-projects-modal')
         @include('monitoring-v2.partials.form-modal')
+        @include('partials.cabinet-confirm-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
