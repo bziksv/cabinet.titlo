@@ -17,7 +17,7 @@ return [
     /** Лимиты заданий и автосохранения (расширяются по тарифу). */
     'limits' => [
         'max_versions_per_session' => 3,
-        'max_saved_sessions' => 50,
+        'max_saved_sessions' => 100,
         'autosave_debounce_ms' => 2500,
     ],
 

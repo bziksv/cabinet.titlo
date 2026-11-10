@@ -22,7 +22,7 @@ class EseninTextCheckSessionService
 
     public static function maxSavedSessions(): int
     {
-        return max(1, EseninTextCheckSettingsRegistry::moduleInt('max_saved_sessions', 50));
+        return max(1, EseninTextCheckSettingsRegistry::moduleInt('max_saved_sessions', 100));
     }
 
     public static function findSessionForUser(int $sessionId, int $userId): ?EseninTextCheckSession

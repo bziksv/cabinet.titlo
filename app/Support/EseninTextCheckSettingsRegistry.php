@@ -51,7 +51,7 @@ class EseninTextCheckSettingsRegistry
             'module.default_mode' => (string) config('cabinet-esenin-text-check.default_mode', 'risk'),
             'module.analyzer_version' => (string) (int) config('cabinet-esenin-text-check.analyzer_version', 1),
             'module.max_versions_per_session' => (string) (int) ($limits['max_versions_per_session'] ?? 3),
-            'module.max_saved_sessions' => (string) (int) ($limits['max_saved_sessions'] ?? 50),
+            'module.max_saved_sessions' => (string) (int) ($limits['max_saved_sessions'] ?? 100),
             'module.autosave_debounce_ms' => (string) (int) ($limits['autosave_debounce_ms'] ?? 2500),
             'module.public_share_ttl_days' => json_encode(
                 config('cabinet-esenin-text-check.public_share_ttl_days', [30, 90, 180, 365, 0]),

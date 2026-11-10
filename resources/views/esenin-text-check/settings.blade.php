@@ -67,7 +67,7 @@
                                 <div class="col-md-4">
                                     <label class="form-label" for="module_max_saved_sessions">{{ __('Esenin admin max sessions') }}</label>
                                     <input type="number" name="module_max_saved_sessions" id="module_max_saved_sessions" min="1" max="500"
-                                           class="form-control form-control-sm" value="{{ old('module_max_saved_sessions', $s['module.max_saved_sessions'] ?? 50) }}">
+                                           class="form-control form-control-sm" value="{{ old('module_max_saved_sessions', $s['module.max_saved_sessions'] ?? 100) }}">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="module_autosave_debounce_ms">{{ __('Esenin admin autosave ms') }}</label>
