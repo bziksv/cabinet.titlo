@@ -40,11 +40,13 @@ class EseninTextCheckSessionService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public static function listSessionsForUser(int $userId, int $limit = 30): array
+    public static function listSessionsForUser(int $userId, ?int $limit = null): array
     {
         if (! self::tablesReady()) {
             return [];
         }
+
+        $limit = $limit ?? self::maxSavedSessions();
 
         return EseninTextCheckSession::query()
             ->where('user_id', $userId)
@@ -66,6 +68,84 @@ class EseninTextCheckSessionService
             })
             ->values()
             ->all();
+    }
+
+    public static function savedCountForUser(int $userId): int
+    {
+        if (! self::tablesReady()) {
+            return 0;
+        }
+
+        return (int) EseninTextCheckSession::query()->where('user_id', $userId)->count();
+    }
+
+    /**
+     * Удаляет самые старые задания, чтобы освободить слот(ы) под новые.
+     */
+    public static function pruneOldestSessionsForUser(int $userId, int $keepMax): int
+    {
+        if (! self::tablesReady() || $keepMax < 1) {
+            return 0;
+        }
+
+        $keepIds = EseninTextCheckSession::query()
+            ->where('user_id', $userId)
+            ->orderByDesc('updated_at')
+            ->limit($keepMax)
+            ->pluck('id')
+            ->all();
+
+        $query = EseninTextCheckSession::query()->where('user_id', $userId);
+        if ($keepIds !== []) {
+            $query->whereNotIn('id', $keepIds);
+        }
+
+        $ids = $query->pluck('id')->all();
+        if ($ids === []) {
+            return 0;
+        }
+
+        return self::deleteSessionsByIds($userId, $ids);
+    }
+
+    /**
+     * @param int[] $sessionIds
+     */
+    public static function deleteSessionsByIds(int $userId, array $sessionIds): int
+    {
+        if (! self::tablesReady() || $sessionIds === []) {
+            return 0;
+        }
+
+        $ids = EseninTextCheckSession::query()
+            ->where('user_id', $userId)
+            ->whereIn('id', array_map('intval', $sessionIds))
+            ->pluck('id')
+            ->all();
+
+        if ($ids === []) {
+            return 0;
+        }
+
+        EseninTextCheckVersion::query()->whereIn('session_id', $ids)->delete();
+
+        if (Schema::hasTable('esenin_text_check_public_shares')
+            && Schema::hasColumn('esenin_text_check_public_shares', 'esenin_text_check_session_id')) {
+            \App\EseninTextCheckPublicShare::query()
+                ->where('user_id', $userId)
+                ->whereIn('esenin_text_check_session_id', $ids)
+                ->delete();
+        }
+
+        return (int) EseninTextCheckSession::query()
+            ->where('user_id', $userId)
+            ->whereIn('id', $ids)
+            ->delete();
+    }
+
+    public static function deleteSessionForUser(int $sessionId, int $userId): bool
+    {
+        return self::deleteSessionsByIds($userId, [$sessionId]) > 0;
     }
 
     public static function defaultName(string $text): string
@@ -115,11 +195,11 @@ class EseninTextCheckSessionService
         $session = $sessionId > 0 ? self::findSessionForUser($sessionId, $userId) : null;
 
         if ($session === null) {
-            if (EseninTextCheckSession::query()->where('user_id', $userId)->count() >= self::maxSavedSessions()) {
-                throw new \InvalidArgumentException(sprintf(
-                    'Достигнут лимит сохранённых заданий (%d). Удалите старые или увеличьте тариф.',
-                    self::maxSavedSessions()
-                ));
+            // Автосохранение копит «задания» отдельно от таблицы истории проверок.
+            // При лимите освобождаем слот, удаляя самые старые (по updated_at).
+            $max = self::maxSavedSessions();
+            if (self::savedCountForUser($userId) >= $max) {
+                self::pruneOldestSessionsForUser($userId, $max - 1);
             }
 
             $session = EseninTextCheckSession::query()->create([

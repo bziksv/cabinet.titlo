@@ -1022,9 +1022,10 @@
 
         sessions.forEach(function (session) {
             var item = document.createElement('li');
+            item.className = 'd-flex align-items-stretch';
             var btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'dropdown-item small' + (sessionId === session.id ? ' active' : '');
+            btn.className = 'dropdown-item small flex-grow-1' + (sessionId === session.id ? ' active' : '');
             var label = session.name || ('Задание #' + session.id);
             if (session.updated_at_label) {
                 label += ' · ' + session.updated_at_label;
@@ -1033,9 +1034,66 @@
             btn.addEventListener('click', function () {
                 loadSession(session.id, true);
             });
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'btn btn-link btn-sm text-danger px-2';
+            del.setAttribute('aria-label', 'Удалить задание');
+            del.innerHTML = '&times;';
+            del.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                deleteSession(session.id);
+            });
             item.appendChild(btn);
+            item.appendChild(del);
             sessionsMenuEl.appendChild(item);
         });
+    }
+
+    function deleteSession(id) {
+        if (!id) {
+            return;
+        }
+        var confirmFn = window.CabinetConfirm && typeof window.CabinetConfirm.show === 'function'
+            ? function (opts) { window.CabinetConfirm.show(opts); }
+            : null;
+        var run = function () {
+            fetch(sessionBaseUrl + '/' + id, {
+                method: 'DELETE',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '',
+                },
+                credentials: 'same-origin',
+            })
+                .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+                .then(function (pack) {
+                    if (!pack.ok) {
+                        setAutosaveStatus((pack.data && pack.data.message) || 'Не удалось удалить', 'danger');
+                        return;
+                    }
+                    if (sessionId === id) {
+                        sessionId = null;
+                        try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch (e) { /* ignore */ }
+                    }
+                    refreshSessionsMenu();
+                })
+                .catch(function () {
+                    setAutosaveStatus('Не удалось удалить задание', 'danger');
+                });
+        };
+        if (confirmFn) {
+            confirmFn({
+                title: 'Удалить задание',
+                text: 'Удалить сохранённое задание из списка?',
+                okLabel: 'Удалить',
+                danger: true,
+                onConfirm: run,
+            });
+        } else if (window.confirm('Удалить сохранённое задание из списка?')) {
+            run();
+        }
     }
 
     function refreshSessionsMenu() {

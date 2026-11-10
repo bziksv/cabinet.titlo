@@ -477,6 +477,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('esenin-text-check/save', 'EseninTextCheckController@save')->name('pages.esenin-text-check.save')->middleware('permission:Esenin text check');
     Route::get('esenin-text-check/sessions', 'EseninTextCheckController@listSessions')->name('pages.esenin-text-check.sessions')->middleware('permission:Esenin text check');
     Route::get('esenin-text-check/sessions/{session}', 'EseninTextCheckController@showSession')->name('pages.esenin-text-check.session')->middleware('permission:Esenin text check');
+    Route::delete('esenin-text-check/sessions/{session}', 'EseninTextCheckController@destroySession')->name('pages.esenin-text-check.session.destroy')->middleware('permission:Esenin text check');
     Route::get('esenin-text-check/sessions/{session}/versions/{version}', 'EseninTextCheckController@loadVersion')->name('pages.esenin-text-check.version')->middleware('permission:Esenin text check');
     Route::get('esenin-text-check/history/{id}', 'EseninTextCheckController@historyShow')->name('pages.esenin-text-check.history.show')->middleware('permission:Esenin text check');
     Route::delete('esenin-text-check/history/{id}', 'EseninTextCheckController@historyDestroy')->name('pages.esenin-text-check.history.destroy')->middleware('permission:Esenin text check');

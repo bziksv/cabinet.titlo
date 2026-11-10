@@ -140,6 +140,30 @@ class EseninTextCheckController extends Controller
         return response()->json([
             'ok' => true,
             'sessions' => EseninTextCheckSessionService::listSessionsForUser($userId),
+            'saved_count' => EseninTextCheckSessionService::savedCountForUser($userId),
+            'saved_limit' => EseninTextCheckSessionService::maxSavedSessions(),
+        ]);
+    }
+
+    public function destroySession(int $session): JsonResponse
+    {
+        $userId = (int) Auth::id();
+        if ($userId <= 0) {
+            return response()->json(['error' => 'auth', 'message' => 'Требуется авторизация'], 401);
+        }
+
+        if (! EseninTextCheckSessionService::tablesReady()) {
+            return response()->json(['error' => 'unavailable', 'message' => 'Хранение заданий временно недоступно'], 503);
+        }
+
+        if (! EseninTextCheckSessionService::deleteSessionForUser($session, $userId)) {
+            return response()->json(['error' => 'not_found', 'message' => 'Задание не найдено'], 404);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'saved_count' => EseninTextCheckSessionService::savedCountForUser($userId),
+            'saved_limit' => EseninTextCheckSessionService::maxSavedSessions(),
         ]);
     }
 
