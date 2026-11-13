@@ -254,7 +254,8 @@ class Cluster
                 }
             }
 
-            if (count($chunk) < 10) {
+            // Google часто отдаёт <10 organic на странице — не стопаем пагинацию раньше depth.
+            if (count($chunk) === 0) {
                 break;
             }
 

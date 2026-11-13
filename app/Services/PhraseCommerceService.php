@@ -398,7 +398,8 @@ class PhraseCommerceService
                         break 2;
                     }
                 }
-                if (count($chunk) < self::GOOGLE_PAGE_SIZE) {
+                // Google часто отдаёт <10 organic на странице — не стопаем пагинацию раньше depth.
+                if (count($chunk) === 0) {
                     break;
                 }
             } catch (\Throwable $e) {

@@ -738,8 +738,10 @@ class SimplifiedXmlFacade extends XmlFacade
                 $this->setPath('https://xmlriver.com/search/xml');
                 $this->setUser(config('xmlriver.user'));
                 $this->setKey(config('xmlriver.key'));
+                // Google XmlRiver: первая страница = 1 (у Яндекса/xmlstock — 0).
+                $riverPage = max(1, ((int) $this->page) + 1);
 
-                return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=$this->count&loc=$loc";
+                return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=$this->count&loc=$loc&page=$riverPage";
             }
 
             return null;
@@ -850,7 +852,9 @@ class SimplifiedXmlFacade extends XmlFacade
                 }
             }
 
-            if ($added === 0 || count($chunk) < $pageSize) {
+            // Не стопаем из‑за chunk < pageSize: Google часто отдаёт <10 organic
+            // на странице (реклама/блоки), при этом следующая page ещё есть.
+            if (count($chunk) === 0 || $added === 0) {
                 break;
             }
 

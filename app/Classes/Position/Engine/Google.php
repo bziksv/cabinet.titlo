@@ -91,7 +91,8 @@ class Google extends Positions
                 $found = $doc;
             }
 
-            if (count($positions) < MonitoringGoogleDepth::STEP) {
+            // Google часто отдаёт <10 organic на странице — не стопаем пагинацию раньше depth.
+            if (count($positions) === 0) {
                 break;
             }
         }
