@@ -43,7 +43,7 @@ return [
     'ai_name_max_chars' => 500,
     'ai_keywords_max' => 80,
     'ai_html_max_chars' => 80000,
-    'ai_monthly_request_limit' => 500,
+    'ai_monthly_request_limit' => 50000,
 
     /** Регионы ПС (Яндекс lr / Google gl), пусто = любой non-empty. */
     'allowed_regions' => null,
