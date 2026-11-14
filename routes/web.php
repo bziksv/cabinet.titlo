@@ -202,6 +202,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/xml-providers', 'XmlProvidersAdminController@index')->name('admin.xml-providers.index');
     Route::post('/admin/xml-providers/refresh', 'XmlProvidersAdminController@refresh')->name('admin.xml-providers.refresh');
 
+    Route::get('/admin/ai-providers', 'AiProvidersAdminController@index')->name('admin.ai-providers.index');
+    Route::put('/admin/ai-providers', 'AiProvidersAdminController@update')->name('admin.ai-providers.update');
+
     Route::get('/admin/finance', 'FinanceAdminController@index')->name('admin.finance.index');
     Route::get('/admin/finance/users-search', 'FinanceAdminController@searchUsers')->name('admin.finance.users-search');
     Route::get('/admin/finance/companies', 'FinanceAdminController@companies')->name('admin.finance.companies');

@@ -345,7 +345,8 @@ class SiteAuditController extends Controller
             'actionPlan' => is_array($crawl->progress_json['action_plan'] ?? null)
                 ? $crawl->progress_json['action_plan']
                 : null,
-            'canActionPlanAi' => (bool) config('deepseek.token')
+            'canActionPlanAi' => app(\App\Services\Ai\AiChatGateway::class)
+                ->hasConfiguredProvider(\App\Services\Ai\AiChatGateway::MODULE_SITE_AUDIT_ACTION_PLAN)
                 && (bool) config('site_audit.action_plan_ai_enabled', true),
             // Кандидаты и релевантность — lazy AJAX (LandingResolver + pages тяжелы на remote DB).
             'plagiarismCandidates' => [],

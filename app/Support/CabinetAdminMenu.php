@@ -141,6 +141,15 @@ class CabinetAdminMenu
             ];
         }
 
+        if (\Illuminate\Support\Facades\Route::has('admin.ai-providers.index')) {
+            $items[] = [
+                'id' => 0,
+                'title' => __('AI management'),
+                'link' => route('admin.ai-providers.index'),
+                'external' => false,
+            ];
+        }
+
         self::$itemsCache = self::appendGoogleDocumentation(
             self::pinNotificationsAfterSmtp(self::sortItemsByTitle($items))
         );

@@ -214,10 +214,12 @@ class SiteAuditActionPlanBuilder
      */
     private function polishWithAi(array $plan): ?string
     {
-        if (! config('deepseek.token')) {
+        if (! (bool) config('site_audit.action_plan_ai_enabled', true)) {
             return null;
         }
-        if (! (bool) config('site_audit.action_plan_ai_enabled', true)) {
+
+        $ai = app(\App\Services\Ai\AiChatGateway::class);
+        if (! $ai->hasConfiguredProvider(\App\Services\Ai\AiChatGateway::MODULE_SITE_AUDIT_ACTION_PLAN)) {
             return null;
         }
 
@@ -238,8 +240,10 @@ class SiteAuditActionPlanBuilder
             . implode("\n", $brief);
 
         try {
-            $svc = app(\App\Services\deepseek\DeepSeekBaseService::class);
-            $text = trim($svc->request($prompt));
+            $text = trim($ai->request(
+                $prompt,
+                \App\Services\Ai\AiChatGateway::MODULE_SITE_AUDIT_ACTION_PLAN
+            ));
 
             return $text !== '' ? mb_substr($text, 0, 4000) : null;
         } catch (\Throwable $e) {

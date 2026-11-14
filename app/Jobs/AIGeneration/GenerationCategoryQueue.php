@@ -18,7 +18,7 @@ class GenerationCategoryQueue implements ShouldQueue
 
     private $data;
 
-    /** Воркер ai_generation --timeout=600. Две попытки DeepSeek по 240 с. */
+    /** Воркер ai_generation --timeout=600. LLM до 240 с × попытки/модели. */
     public $timeout = 520;
 
     public function __construct(AiGenerationHistory $data)
@@ -28,7 +28,7 @@ class GenerationCategoryQueue implements ShouldQueue
 
     public function handle()
     {
-        $deepseekService = app(\App\Services\deepseek\DeepSeekBaseService::class);
+        $ai = app(\App\Services\Ai\AiChatGateway::class);
 
         try {
             $finalPrompt = $this->getMacroses($this->data->prompt);
@@ -53,9 +53,12 @@ class GenerationCategoryQueue implements ShouldQueue
             // TLP — после HTML: иначе модель «забывает» длинный список слов.
             $finalPrompt .= $this->getWords();
 
-            $this->data->result = $deepseekService->request($finalPrompt);
-            $usage = $deepseekService->getLastUsageDetails();
-            $this->data->used_tokens = (int) ($usage['total_tokens'] ?? $deepseekService->getLastUsageTokens());
+            $this->data->result = $ai->request(
+                $finalPrompt,
+                \App\Services\Ai\AiChatGateway::MODULE_AI_GENERATION
+            );
+            $usage = $ai->getLastUsageDetails();
+            $this->data->used_tokens = (int) ($usage['total_tokens'] ?? $ai->getLastUsageTokens());
             if (\Illuminate\Support\Facades\Schema::hasColumn('ai_generation_histories', 'prompt_tokens')) {
                 $this->data->prompt_tokens = (int) ($usage['prompt_tokens'] ?? 0);
                 $this->data->completion_tokens = (int) ($usage['completion_tokens'] ?? 0);

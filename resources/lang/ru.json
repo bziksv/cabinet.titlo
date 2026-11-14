@@ -6829,5 +6829,19 @@
     "Monitoring deferred start too far": "Можно отложить только на сегодня или завтра",
     "Monitoring deferred start queued": "В очереди, старт :time",
     "Text analyzer header short": "Анализ",
-    "Text uniqueness header short": "Уникальность"
+    "Text uniqueness header short": "Уникальность",
+    "AI management": "Управление AI",
+    "AI providers admin lead": "Ключи провайдеров — в .env. Здесь выбираете, через какой сервис идут запросы каждого AI-модуля.",
+    "AI providers admin saved": "Настройки AI сохранены",
+    "AI providers token set": "Ключ задан",
+    "AI providers token missing": "Нет ключа",
+    "AI providers base uri": "Base URL",
+    "AI providers model": "Модель",
+    "AI providers fallback model": "Fallback-модель",
+    "AI providers token": "Токен",
+    "AI providers module routing": "Маршрутизация по модулям",
+    "AI providers default": "Провайдер по умолчанию",
+    "AI providers default hint": "Если для модуля не задано иное — используется этот провайдер.",
+    "AI providers provider": "Провайдер",
+    "AI providers env hint": "Токены: DEEPSEEK_TOKEN и PLUSVIBEAPI_TOKEN в .env на сервере. После смены .env — config:cache / деплой."
 }
